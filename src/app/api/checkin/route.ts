@@ -3,8 +3,8 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
-import { cityTaxOf, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, type GroupTaxRow } from "@/lib/booking";
-import type { Structure } from "@/lib/types";
+import { cityTaxOfBookingRaw, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, sanitizeChosenExtras, type GroupTaxRow } from "@/lib/booking";
+import type { ExtraService, Structure } from "@/lib/types";
 import { guestLangOrNull } from "@/lib/guest-lang";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { clientIp } from "@/lib/server-booking-guard";
@@ -34,6 +34,9 @@ async function viewerCanSeeDocs(req: Request, admin: SupabaseClient, store: { ta
   } catch { return false; }
 }
 const withoutDocPhotos = (o: Json): Json => { const c = { ...o }; delete c.docPhotoFront; delete c.docPhotoBack; return c; };
+// Per l'ospite anonimo il JSON non porta nemmeno i dati personali e del documento (la pagina li ignora: compila sempre da capo).
+const PII_FIELDS = ["docNumber", "birthDate", "birthPlace", "docPlace", "email", "phone"];
+const withoutPii = (o: Json): Json => { const c = { ...o }; for (const k of PII_FIELDS) if (k in c) c[k] = ""; return c; };
 
 // GET: dati per rendere la pagina di check-in a un ospite ANONIMO (dal link email).
 export async function GET(req: Request) {
@@ -41,6 +44,8 @@ export async function GET(req: Request) {
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
   try {
+    // Anche il GET è pubblico e, senza slug, scorre gli store di tutti i tenant: limite per IP (come sul POST).
+    if (rateLimited("ci-get:" + clientIp(req), 60, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
     const u = new URL(req.url);
     const slug = (u.searchParams.get("slug") || "").trim();
     const bid = (u.searchParams.get("b") || "").trim();
@@ -59,8 +64,8 @@ export async function GET(req: Request) {
     const seeDocs = await viewerCanSeeDocs(req, admin, store);
     const unit = arr(store.data.units).find((x) => (x as { id?: string }).id === s(b.unitId)) as Json | undefined;
     // Tassa di soggiorno calcolata sul server (dipende dalla configurazione struttura).
-    const nightsTot = (() => { try { return Math.max(1, Math.round((Date.parse(s(b.checkOut)) - Date.parse(s(b.checkIn))) / 86400000)); } catch { return 1; } })();
-    let cityTax = cityTaxOf(st as unknown as Structure, n(b.adults) || 1, nightsTot, n(b.total), b.cityTaxExempt === true, (n(b.adults) || 1) + n(b.children));
+    // Stesso calcolo di elenco, fatture e link di pagamento: paganti = adulti + minori sopra la soglia d'età del Comune, divisore = tutti gli ospiti.
+    let cityTax = cityTaxOfBookingRaw(st as unknown as Structure, { adults: n(b.adults) || 1, children: n(b.children), childAges: (Array.isArray(b.childAges) ? (b.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(b.checkIn), checkOut: s(b.checkOut), total: n(b.total), cityTaxExempt: b.cityTaxExempt === true });
     let cityTaxGroup: number | undefined;
     let groupBalance: number | undefined;
 
@@ -100,11 +105,11 @@ export async function GET(req: Request) {
         total: n(b.total), paid: n(b.paid), cleaningFee: n(b.cleaningFee), cityTax, cityTaxGroup, groupBalance,
         cityTaxExempt: b.cityTaxExempt === true,
         webCheckin: b.webCheckin === true, arrivalTime: s(b.arrivalTime), guestRequests: s(b.guestRequests),
-        extras: arr(b.extras), extraGuests: seeDocs ? arr(b.extraGuests) : arr(b.extraGuests).map(withoutDocPhotos),
+        extras: arr(b.extras), extraGuests: seeDocs ? arr(b.extraGuests) : arr(b.extraGuests).map((x) => withoutPii(withoutDocPhotos(x))),
         docPhotoFront: seeDocs ? s(b.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(b.docPhotoBack) || null : null, signature: seeDocs ? s(b.signature) || null : null,
-        invoiceRequest: (b.invoiceRequest as Json) || null,
+        invoiceRequest: seeDocs ? (b.invoiceRequest as Json) || null : null,
       },
-      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace), docPhotoFront: seeDocs ? s(g.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(g.docPhotoBack) || null : null,
+      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: seeDocs ? s(g.email) : "", phone: seeDocs ? s(g.phone) : "", sex: s(g.sex), birthDate: seeDocs ? s(g.birthDate) : "", birthPlace: seeDocs ? s(g.birthPlace) : "", citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: seeDocs ? s(g.docNumber) : "", docPlace: seeDocs ? s(g.docPlace) : "", docPhotoFront: seeDocs ? s(g.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(g.docPhotoBack) || null : null,
         // Lingua della pagina: scheda ospite → Paese → prefisso del telefono. null se non c'è nessun dato (allora decide il browser).
         lang: guestLangOrNull({ language: s(g.language), lang: s(g.lang), country: s(g.country), phone: s(g.phone) }) },
       // Ospite "di ritorno": ha già dati documento da un soggiorno precedente → check-in veloce.
@@ -160,13 +165,14 @@ export async function POST(req: Request) {
     const rawSignature = typeof body?.signature === "string" ? body.signature : undefined;
     const uploadTokens = (body?.uploads && typeof body.uploads === "object" && !Array.isArray(body.uploads) ? body.uploads : {}) as Record<string, unknown>;
     const invoiceRequest = (body?.invoiceRequest ?? undefined) as Json | undefined;
-    const chosenExtras = arr(body?.chosenExtras).map((e) => ({ name: s((e as Json).name).slice(0, 120), price: n((e as Json).price) })).filter((e) => e.name);
+    const chosenExtrasRaw = arr(body?.chosenExtras).slice(0, 50); // validati sotto contro il catalogo della struttura: nome e prezzo non si prendono dal client
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
     let store = slug ? await findBookingStore(admin, slug, bid) : null;
     if (!store) store = await findBookingStoreById(admin, bid);
     if (!store) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
     const guestId = s((store.booking as Json).guestId);
+    const extrasCatalog = arr((store.structure as Json | undefined)?.extras) as unknown as ExtraService[]; // catalogo della struttura: unica fonte di nomi e prezzi degli extra
 
     // Allegati (foto documento, firma) -> riferimenti nel bucket PRIVATO. Il client ha già caricato i file da /api/checkin/upload e manda
     // solo i riferimenti + i token; qui si accettano solo quelli di QUESTA prenotazione (stesso proprietario, già presenti o con token valido).
@@ -201,7 +207,7 @@ export async function POST(req: Request) {
       // Merge extra (upsell) senza duplicati.
       const baseExtras = arr(bk.extras) as { name: string; price: number }[];
       const merged = [...baseExtras];
-      for (const c of chosenExtras) if (!merged.some((x) => x.name === c.name)) merged.push(c);
+      for (const c of sanitizeChosenExtras(chosenExtrasRaw, extrasCatalog, { checkIn: s(bk.checkIn), checkOut: s(bk.checkOut), adults: n(bk.adults) || 1 }, baseExtras)) merged.push(c);
       const primaryGuest = { firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), sex: (doc.sex || undefined) as string | undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace };
       bookings[idx] = {
         ...bk, webCheckin: true, arrivalTime: arrival || bk.arrivalTime, guestRequests: guestRequests || undefined,

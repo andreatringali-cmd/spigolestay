@@ -16,6 +16,7 @@ import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 import { apiPost } from "./invoicing/client";
 import { loadNotifPrefs } from "./notifPrefs";
 import { fmtDMY } from "./dates";
+import { roomTypeCascadeIds } from "./pricing";
 import { notifyBookingLines } from "./booking-notify";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
@@ -490,16 +491,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const nm = roomTypes.find((rt) => rt.id === id)?.name;
         // Cascata: la tipologia + TUTTE le tariffe derivate che pendono da lei (anche a più
         // livelli, es. Matrimoniale → Dus Tripla). Così sparisce anche da "Tariffe".
-        const ids = new Set<string>([id]);
-        let grew = true;
-        while (grew) {
-          grew = false;
-          for (const rt of roomTypes) {
-            const parent = (rt as { deriveFrom?: string }).deriveFrom;
-            if (parent && ids.has(parent) && !ids.has(rt.id)) { ids.add(rt.id); grew = true; }
-          }
-        }
-        const idList = [...ids];
+        const idList = roomTypeCascadeIds(id, roomTypes);
         const unitIds = units.filter((u) => idList.includes(u.roomTypeId)).map((u) => u.id);
         const bIds = bookings.filter((b) => idList.includes(b.roomTypeId) || unitIds.includes(b.unitId ?? "")).map((b) => b.id);
         tomb("roomTypes", ...idList); tomb("units", ...unitIds); tomb("bookings", ...bIds);
@@ -515,7 +507,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const nm = units.find((u) => u.id === id)?.name;
         tomb("units", id);
         // Le prenotazioni dell'unità restano ma tornano "da assegnare".
-        setBookings((prev) => prev.map((b) => (b.unitId === id ? { ...b, unitId: null } : b)));
+        // updatedAt aggiornato: nella fusione con gli altri dispositivi vince la versione più recente, così non resta una prenotazione agganciata a una camera che non esiste più.
+        const ts = Date.now();
+        setBookings((prev) => prev.map((b) => (b.unitId === id ? { ...b, unitId: null, updatedAt: ts } : b)));
         setUnits((prev) => prev.filter((u) => u.id !== id));
         logAct("config", `Camera eliminata${nm ? " — " + nm : ""}`);
       },

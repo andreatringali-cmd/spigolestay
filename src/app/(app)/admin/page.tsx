@@ -216,8 +216,9 @@ export default function AdminPage() {
     else if (payF === "due") inv = inv.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due");
     const t = q.trim().toLowerCase();
     if (t) inv = inv.filter((i) => (i.customerEmail || "").toLowerCase().includes(t) || (i.customerName || "").toLowerCase().includes(t) || (i.description || "").toLowerCase().includes(t));
-    const incassato = allPay.invoices.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
-    const daRecuperare = allPay.invoices.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due").reduce((s, i) => s + i.amount, 0);
+    // Totali dalle fatture FILTRATE (ricerca + stato): coerenti con l'elenco sotto.
+    const incassato = inv.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
+    const daRecuperare = inv.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due").reduce((s, i) => s + i.amount, 0);
     return { inv, incassato, daRecuperare };
   }, [allPay.invoices, payF, q]);
 
@@ -312,7 +313,7 @@ export default function AdminPage() {
       ) : view === "overview" ? (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <StatCard label="Incasso totale finora" value={stripeOn ? `€ ${dash.lifetime.toFixed(0)}` : "—"} color="var(--ok)" hint="tutte le fatture pagate" />
+            <StatCard label="Incasso totale finora" value={stripeOn ? `€ ${dash.lifetime.toFixed(0)}` : "—"} color="var(--ok)" hint="fatture pagate (ultime 500)" />
             <StatCard label="Da incassare" value={stripeOn ? `€ ${dash.dueTotal.toFixed(0)}` : "—"} color={dash.dueTotal > 0 ? "var(--bad,#dc2626)" : undefined} hint="fatture aperte" />
             <StatCard label="ARPU" value={stripeOn ? `€ ${dash.arpu.toFixed(0)}` : "—"} hint="ricavo medio per abbonato" />
           </div>
@@ -381,7 +382,7 @@ export default function AdminPage() {
       ) : view === "pagamenti" ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Incassato (ultime 100 fatture)" value={stripeOn ? `€ ${filteredPay.incassato.toFixed(0)}` : "—"} color="var(--ok)" hint="fatture pagate" />
+            <StatCard label="Incassato (ultime 500 fatture)" value={stripeOn ? `€ ${filteredPay.incassato.toFixed(0)}` : "—"} color="var(--ok)" hint="fatture pagate" />
             <StatCard label="Da recuperare" value={stripeOn ? `€ ${filteredPay.daRecuperare.toFixed(0)}` : "—"} color={filteredPay.daRecuperare > 0 ? "var(--bad,#dc2626)" : undefined} hint="fatture aperte / non pagate" onClick={() => setPayF("due")} />
           </div>
           <Card className="overflow-x-auto p-0">

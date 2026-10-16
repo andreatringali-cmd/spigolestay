@@ -27,6 +27,7 @@ import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 import { mergeKeyedList } from "./list-merge";
 import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig } from "./org-cassa-config";
+import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges } from "./sync-merge";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -387,6 +388,7 @@ function reloadSig(obj: Record<string, string> | null | undefined): string {
 // Fonde lo stato locale con quello del server usando la base (ultimo stato sincronizzato).
 // - chiavi solo sul server -> mantenute; chiavi in comune -> vince il locale;
 // - strutture/camere/prenotazioni/ospiti -> fusione a 3 vie (aggiunte tenute, cancellazioni rispettate).
+const isObjectLike = (x: unknown): boolean => !!x && typeof x === "object" && !Array.isArray(x);
 function mergeSnapshots(
   local: Record<string, string>,
   server: Record<string, string> | null | undefined,
@@ -402,6 +404,9 @@ function mergeSnapshots(
       let b: Record<string, unknown> = {};
       try { const bRaw = base?.["spigolestay:data:v1"]; if (bRaw) b = JSON.parse(bRaw) as Record<string, unknown>; } catch {}
       const out: Record<string, unknown> = { ...s, ...l }; // vince il locale sui campi in comune
+      // Prezzi forzati per giorno (rateOverrides): fusione per CHIAVE a 3 vie, non "vince il locale in blocco". Un dispositivo con la mappa vuota o vecchia
+      // (es. socio appena invitato, EMPTY_ORG_DATA) non cancella i prezzi già sul server; una chiave cambiata o tolta qui vince il locale.
+      if (isObjectLike(l.rateOverrides) || isObjectLike(s.rateOverrides)) out.rateOverrides = mergeRecord3(b.rateOverrides, l.rateOverrides, s.rateOverrides);
       // Lapidi (tombstone): una cancellazione non deve "risorgere".
       //  - Lapidi dal SERVER = AUTORITATIVE: se un'altra sessione/socio ha cancellato un'entità
       //    condivisa, va rimossa anche qui ANCHE se è ancora nel mio locale non sincronizzato
@@ -492,7 +497,12 @@ function mergeSnapshots(
     const m = mergeKeyedList(local[key], server[key], base?.[key]);
     if (m !== null) merged[key] = m;
   }
-  return merged;
+  // Tutte le altre chiavi piatte (impostazioni, utenti e permessi, piano, modelli messaggi…): regola a 3 vie. Se questo dispositivo non le ha toccate
+  // (uguali alla base) e il server le ha cambiate, si adotta il server; prima il locale vinceva sempre e un dispositivo con dati vecchi li rimetteva sul server.
+  // Escluse le chiavi che hanno già una regola propria qui sopra e quelle per-dispositivo.
+  return adoptServerFlatKeys(merged, local, server, base, (k) =>
+    k === "spigolestay:data:v1" || FLAT_ENTITY_KEYS.includes(k) || k === THREADS_KEY || k === PREVENTIVI_KEY || isMediaFlatKey(k)
+    || k === "spigolestay:cassa:cats" || k === "spigolestay:cassa:conti" || SIG_SKIP.has(k) || k === LOCAL_OWNER_KEY);
 }
 
 type SbClient = NonNullable<typeof supabase>;
@@ -637,6 +647,7 @@ async function syncOnce(
   lastSynced: { current: Record<string, string> },
   orgRefs: { current: Record<string, SyncRef> },
 ): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean }> {
+  const versionAtStart = kvVersion(); // contatore delle scritture locali al momento della fotografia (per l'anti-race più sotto)
   const snap = snapshot();
   if (!("spigolestay:data:v1" in snap)) return { changedLocal: false, wrote: false };
   let fullData: DataObj;
@@ -676,18 +687,16 @@ async function syncOnce(
 
   // ANTI-RACE: la sincronizzazione fotografa il localStorage all'inizio, poi fa round-trip di
   // rete, poi restore() riscrive. Se l'utente SALVA durante il round-trip, restore lo cancellerebbe.
-  // Qui preserviamo le chiavi "piatte" (non il blob dati) modificate DURANTE il ciclo, rileggendo
-  // il localStorage attuale: così un salvataggio appena fatto (es. spigolestay:billing) non va perso.
+  // Qui preserviamo le chiavi "piatte" modificate DURANTE il ciclo, rileggendo il localStorage attuale
+  // (es. spigolestay:billing), e anche il blocco dati: se è cambiato durante il ciclo (kvVersion diverso da
+  // quello della fotografia) la versione fresca viene rifusa col risultato del server invece di essere
+  // sovrascritta (vedi applyRaceChanges). Le chiavi piatte si confrontano sempre: alcune pagine scrivono
+  // direttamente in localStorage senza passare da kvSet (e quindi senza far salire kvVersion).
   try {
+    const DK = "spigolestay:data:v1";
     const fresh = snapshot();
-    for (const k of Object.keys(fresh)) {
-      if (k === "spigolestay:data:v1") continue;
-      if (fresh[k] !== snap[k]) newBlob[k] = fresh[k]; // modificata in locale durante il ciclo → tieni il fresco
-    }
-    for (const k of Object.keys(snap)) {
-      if (k === "spigolestay:data:v1") continue;
-      if (!(k in fresh) && k in newBlob) delete newBlob[k]; // rimossa in locale durante il ciclo
-    }
+    if (kvVersion() === versionAtStart) fresh[DK] = snap[DK]; // nessuna scrittura via kvSet: il blocco dati è certamente quello fotografato
+    applyRaceChanges(snap, fresh, newBlob, DK, (l, s, b) => mergeSnapshots({ [DK]: l }, { [DK]: s }, { [DK]: b })[DK]);
   } catch { /* localStorage non disponibile: nessun ritocco */ }
 
   // Rileva QUALSIASI cambiamento di contenuto (anche di un singolo campo, es. webCheckin,

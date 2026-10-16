@@ -15,6 +15,7 @@ import { DATA_KEY } from "@/lib/publicdata";
 import type { NormalizedReview } from "@/lib/reviews/google";
 import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChannel, type ReviewScore, type ScoreSummary } from "@/lib/channex-review-scores";
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
+import { waDigits } from "@/lib/contacts-check";
 
 const fmt = (iso: string) => fmtDate(iso);
 
@@ -471,7 +472,8 @@ export default function RecensioniPage() {
 
   const exportCsv = () => {
     const head = ["Data", "Fonte", "Ospite", "Voto (0-10)", "Testo", "Risposta"];
-    const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+    // Valori che iniziano con = + - @ sarebbero formule in Excel (testi scritti dagli ospiti): si neutralizzano con un apice.
+    const q = (x: unknown) => { let v = String(x ?? ""); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return `"${v.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`; };
     const lines = shown.map((r) => [fmtDate(r.date), SRC[r.source as SourceKey]?.label ?? r.source, r.guest, r.rating, r.text, replies[r.id] ?? ""].map(q).join(";"));
     const csv = "\ufeff" + [head.map(q).join(";"), ...lines].join("\r\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -601,14 +603,19 @@ export default function RecensioniPage() {
     const st = structures.find((s) => s.id === item.booking.structureId);
     const url = googleReviewUrl(st?.googlePlaceId);
     if (!url) { flash("Imposta prima il Google Place ID di questa struttura."); return; }
-    const phone = (item.guest?.phone ?? "").replace(/\D/g, "");
+    const phone = waDigits(item.guest?.phone, item.guest?.country); // con il prefisso del Paese anche se scritto senza o come 0039…
     if (!phone) { flash("L'ospite non ha un numero di telefono."); return; }
     const text = reviewRequestMessage({ guestName: item.guestName, structureName: st?.name, reviewUrl: url });
     setReqBusy((b) => ({ ...b, [bookingId]: "wa" }));
     try {
       let sent = false;
       if (wa.connected) { try { const r = await apiPost<{ ok: boolean }>("whatsapp/send", { to: phone, text }); sent = !!r.ok; } catch { sent = false; } }
-      if (!sent) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      if (!sent) {
+        // Il ripiego si apre dopo un await: se il browser lo blocca (Safari) non risulta inviato nulla.
+        const w = window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
+        if (!w) { flash("Invio non riuscito e apertura di WhatsApp bloccata dal browser: la richiesta NON risulta inviata."); return; }
+        try { w.opener = null; } catch { /* niente */ }
+      }
       markRequested(bookingId, "whatsapp");
       addActivity("message", `Richiesta recensione inviata (WhatsApp)${item.guestName ? " — " + item.guestName : ""}`);
       flash(sent ? "Richiesta inviata via WhatsApp." : "WhatsApp aperto con il messaggio pronto.");
@@ -635,7 +642,11 @@ export default function RecensioniPage() {
         const j = await r.json().catch(() => ({}));
         ok = r.ok && !!j?.ok;
       } catch { ok = false; }
-      if (!ok) window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`, "_blank", "noopener");
+      if (!ok) {
+        const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`, "_blank");
+        if (!w) { flash("Invio non riuscito e apertura della bozza bloccata dal browser: la richiesta NON risulta inviata."); return; }
+        try { w.opener = null; } catch { /* niente */ }
+      }
       markRequested(bookingId, "email");
       addActivity("message", `Richiesta recensione inviata (email)${item.guestName ? " — " + item.guestName : ""}`);
       flash(ok ? "Richiesta inviata via email." : "Bozza email aperta con il messaggio pronto.");

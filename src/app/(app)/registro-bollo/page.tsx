@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
+import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { PageHeader, StatCard, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
@@ -20,7 +21,8 @@ const dmy = (iso: string) => fmtDate(iso);
 
 export default function RegistroBolloPage() {
   const router = useRouter();
-  const { activeStructureId, structures } = useData();
+  const { allStructures, selectedStructureIds } = useData();
+  const scope = useMemo(() => cashScopeOf(selectedStructureIds, allStructures.map((x) => x.id)), [selectedStructureIds, allStructures]);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -33,7 +35,7 @@ export default function RegistroBolloPage() {
       .then(({ data, error }) => { if (error) setErr(error.message); setRows((data ?? []) as Row[]); setLoading(false); });
   }, []);
 
-  const scoped = useMemo(() => rows.filter((r) => activeStructureId === "all" || r.structure_id === activeStructureId), [rows, activeStructureId]);
+  const scoped = useMemo(() => rows.filter((r) => scope === "all" || scopeVisible(r.structure_id, scope)), [rows, scope]);
   const years = useMemo(() => Array.from(new Set(scoped.map((r) => (r.issue_date ?? "").slice(0, 4)).filter(Boolean))).sort().reverse(), [scoped]);
   const ofYear = scoped.filter((r) => (r.issue_date ?? "").slice(0, 4) === String(year));
   const shown = quarter === "all" ? ofYear : ofYear.filter((r) => quarterOf(r.issue_date) === quarter);
@@ -43,7 +45,7 @@ export default function RegistroBolloPage() {
   const cents = (c: number) => c / 100;
   const today = todayLocalISO();
   const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
-  const structName = (id: string | null) => structures.find((s) => s.id === id)?.name ?? "—";
+  const structName = (id: string | null) => allStructures.find((s) => s.id === id)?.name ?? "—";
   const cpName = (r: Row) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
 
   const exportCsv = () => {

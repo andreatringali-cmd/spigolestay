@@ -19,9 +19,13 @@ export async function POST(req: Request) {
     const label = String(body?.label || "Prenotazione").slice(0, 250);
     const desc = typeof body?.desc === "string" && body.desc.trim() ? body.desc.trim().slice(0, 300) : "";
     const email = typeof body?.email === "string" ? body.email : undefined;
+    // Metadata: SOLO le chiavi usate dalle pagine (preventivo / check-in). Qualsiasi altra chiave
+    // (kind, source, fee_*, …) viene scartata: le imposta solo il server, più sotto.
+    const META_KEYS = ["sid", "rt", "ci", "co", "ad", "ch", "tot", "dep", "gn", "ge", "oe", "ref", "uid", "ext", "bookingId", "group"];
     const meta: Record<string, string> = {};
     if (body?.metadata && typeof body.metadata === "object") {
-      for (const [k, v] of Object.entries(body.metadata)) meta[k.slice(0, 40)] = String(v ?? "").slice(0, 480);
+      const src = body.metadata as Record<string, unknown>;
+      for (const k of META_KEYS) if (k in src) meta[k] = String(src[k] ?? "").slice(0, 480);
     }
     // Lingua della pagina di pagamento Stripe: quella scelta dall'ospite (it/en/fr/de/es), altrimenti la decide Stripe dal browser.
     const locale = typeof body?.locale === "string" && ["it", "en", "fr", "de", "es"].includes(body.locale) ? (body.locale as "it" | "en" | "fr" | "de" | "es") : undefined;
@@ -50,8 +54,9 @@ export async function POST(req: Request) {
     const params: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
       line_items: [{ price_data: { currency: "eur", unit_amount: amountCents, product_data: { name: label, ...(desc ? { description: desc } : {}) } }, quantity: 1 }],
-      metadata: { kind: "quote", source, ...meta },
-      payment_intent_data: { metadata: { kind: "quote", source, ...meta } },
+      // kind e source per ULTIMI: il chiamante non può sovrascriverli.
+      metadata: { ...meta, kind: "quote", source },
+      payment_intent_data: { metadata: { ...meta, kind: "quote", source } },
       customer_email: email,
       ...(locale ? { locale } : {}),
       success_url: success.includes("{CHECKOUT_SESSION_ID}") ? success : `${success}${success.includes("?") ? "&" : "?"}paid=1&session_id={CHECKOUT_SESSION_ID}`,

@@ -1,0 +1,35 @@
+r2 #1, #2 e #3 sono fatti. `npx tsc --noEmit` è pulito e i 33 test mirati passano (sync-merge, list-merge, org-combine, org-cassa-config, bigstore). Il byte NUL di `authsync.tsx` (il `join("\0")` in `contentSig`) è rimasto intatto e il diff è di sole 20 righe in più e 11 in meno.
+
+**r2 #1 – FATTO**
+- Per le chiavi piatte vale ora la regola a 3 vie: se il locale è uguale alla base e il server è cambiato, si adotta il server. Se il locale è diverso dalla base vince il locale, come oggi.
+- Con base vuota (prima idratazione) o chiave assente dalla base non cambia nulla. Se la chiave manca sul server resta il locale.
+- Sono escluse `data:v1`, le chiavi Pulizie, `threads`, `preventivi`, le chiavi foto/sito, `cassa:cats` e `cassa:conti`, le chiavi di vista per dispositivo (`SIG_SKIP`) e `spigolestay:localowner`.
+- File: `src/lib/authsync.tsx`, funzione pura `adoptServerFlatKeys` in `src/lib/sync-merge.ts`.
+
+**r2 #2 – FATTO**
+- Dopo la rete `syncOnce` rilegge il localStorage. Se `data:v1` è cambiato durante il ciclo (la fotografia è presa prima, con `kvVersion` come controllo veloce), il ripristino non lo sovrascrive più.
+- Rifonde invece il `data:v1` fresco col risultato del server, usando la fotografia iniziale come base. Così la modifica appena fatta resta e le novità del server non si perdono.
+- Ho scelto la rifusione e non il semplice "salta il restore". Con il solo salto, la base conterrebbe voci assenti dal locale e al ciclo dopo il server le cancellerebbe.
+- Il confronto delle chiavi piatte resta sempre attivo, perché alcune pagine scrivono in localStorage senza passare da `kvSet`.
+- File: `src/lib/authsync.tsx`, funzione pura `applyRaceChanges` in `src/lib/sync-merge.ts`.
+
+**r2 #3 – FATTO**
+- `rateOverrides` si fonde per chiave a 3 vie dentro `mergeSnapshots`. Una chiave non toccata qui segue il server (nuova, cambiata o rimossa altrove). Una chiave toccata qui vince il locale.
+- Con base vuota, sulle chiavi in comune vince il locale e quelle solo del server si tengono. Un socio appena invitato (`EMPTY_ORG_DATA`) non cancella più i prezzi dell'org.
+- File: `src/lib/authsync.tsx`, funzione pura `mergeRecord3` in `src/lib/sync-merge.ts`.
+
+**File toccati**
+- `src/lib/authsync.tsx`
+- `src/lib/sync-merge.ts` (nuovo)
+- `tests/sync-merge.test.ts` (nuovo, 17 test)
+
+`list-merge.ts`, `org-combine.ts`, `org-cassa-config.ts` e `bigstore.ts` non servivano modificarli.
+
+**Rischi e limiti**
+- Il caso "scheda nuova con localStorage persistente" (`mergeSnapshots(snap, serverData, {})`, riga ~1041 originale) resta com'è: con base vuota il locale vince ancora. Chiuderlo richiederebbe di salvare la base su disco, e ho preferito non cambiare il formato dei dati salvati. Sul ciclo normale a ogni focus, invece, la correzione vale.
+- Se il locale ha solo riordinato le chiavi del JSON senza cambiare contenuto, la regola lo tratta come "modificato qui" e vince il locale (comportamento conservativo, uguale a oggi).
+- Quando il locale ha cancellato una chiave piatta e il server la ha ancora uguale alla base, la chiave continua a risorgere dal server. Non era richiesto e non l'ho toccato.
+- Non ho potuto testare `mergeSnapshots` direttamente, perché `authsync.tsx` importa Supabase e React. I test coprono le tre funzioni pure e l'anti-race con una fusione di prova.
+- L'anti-race dà per scontato che lo store rilegga `data:v1` dal localStorage all'evento `spigolestay:datasync`. Se lo store tenesse in memoria modifiche non ancora scritte con `kvSet`, quelle sarebbero fuori da questo perimetro.
+
+Non ho toccato r2 #6 (permessi) né altro fuori perimetro.

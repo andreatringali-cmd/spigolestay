@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { AV_COLORS } from "@/lib/users";
-import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
+import { effectiveBase, effectiveMinStay, effectiveClosed, bookingsLostWithRoomType, roomTypeCascadeIds } from "@/lib/pricing";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -40,6 +40,16 @@ const scartoOf = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign =
 const CONN = "color-mix(in srgb, var(--focus) 55%, var(--line))";
 
 // Iconcine ospiti (occupazione della tariffa)
+// Eliminare una derivata cancella anche le prenotazioni fatte su di lei e sulle sue derivate (storico e incassi compresi): finché ce ne sono, si blocca con un avviso.
+// Ritorna true se l'eliminazione è bloccata.
+async function blockedByBookings(ask: ReturnType<typeof useConfirm>, t: (s: string) => string, id: string, name: string, roomTypes: RoomType[], units: { id: string; roomTypeId: string }[], bookings: { roomTypeId: string; unitId?: string | null }[]): Promise<boolean> {
+  const n = bookingsLostWithRoomType(id, roomTypes, units, bookings).length;
+  if (n === 0) return false;
+  const nDerived = roomTypeCascadeIds(id, roomTypes).length - 1;
+  await ask({ title: t("Tariffa con prenotazioni"), message: `"${name}" ${t("ha")} ${n} ${t("prenotazioni (anche passate o pagate")}${nDerived > 0 ? `, ${t("comprese quelle delle sue tariffe derivate")}` : ""}${t("): eliminarla le cancellerebbe tutte. Sposta le prenotazioni su un'altra tipologia, oppure chiudi le vendite della tariffa.")}`, confirmLabel: t("Ho capito") });
+  return true;
+}
+
 function Occ({ n }: { n: number }) {
   const c = Math.max(1, Math.min(Math.round(n) || 1, 8));
   return (
@@ -75,7 +85,7 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
 export default function TariffeDerivatePage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, units, activeStructureId, deleteRoomType } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId, deleteRoomType } = useData();
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
   const [view, setView] = useState<"table" | "map">("map");
@@ -142,7 +152,7 @@ export default function TariffeDerivatePage() {
                   onAdd={(pid) => setDerivModal({ structureIds: [s.id], parentId: pid })}
                   onEdit={(id) => setDerivModal({ structureIds: [s.id], editId: id })}
                   onOpenType={(id) => router.push(`/camere/tipologia/${id}`)}
-                  onDelete={async (id, name) => { if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
+                  onDelete={async (id, name) => { if (await blockedByBookings(ask, t, id, name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
                 />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
@@ -344,7 +354,7 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
 }
 
 function DerivataModal({ structureIds, parentId, editId, onClose }: { structureIds: string[]; parentId?: string; editId?: string; onClose: () => void }) {
-  const { structures, roomTypes, addRoomType, updateRoomType, deleteRoomType, addActivity } = useData();
+  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const multi = structureIds.length > 1;
@@ -492,7 +502,7 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
           </div>
 
           <div className="mt-4 flex items-center gap-2">
-            {editing && <button onClick={async () => { if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${editing.name}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteRoomType(editing.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+            {editing && <button onClick={async () => { if (await blockedByBookings(ask, t, editing.id, editing.name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${editing.name}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteRoomType(editing.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{editing ? t("Salva") : t("Crea derivata")}</button>
           </div>

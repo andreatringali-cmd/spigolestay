@@ -83,7 +83,8 @@ export default function IstatPage() {
 
   // Navigazione "Data corrente soggiorni" (come Turist@t): giorno per giorno.
   const shiftDay = (n: number) => { const d = new Date((filterDate || todayIso) + "T00:00"); d.setDate(d.getDate() + n); setFilterDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`); };
-  const dayPending = rowsVisible.filter((r) => r.stato === "pending" && (!filterDate || r.arrival === filterDate)).length;
+  // "Chiudi giornata" invia SEMPRE un solo giorno (quello selezionato, o oggi se il filtro è "Tutte"): il conteggio è quello di quel giorno, non di tutto il pending.
+  const dayPending = rowsVisible.filter((r) => r.stato === "pending" && r.arrival === (filterDate || todayIso)).length;
 
   // Chiudi giornata: invia il movimento del giorno selezionato, poi avanza al giorno dopo (come il portale).
   const chiudiGiornata = async () => {
@@ -94,7 +95,8 @@ export default function IstatPage() {
 
   // CSV per-ospite (stile check-in Turist@t): permanenza, camera, età, sesso, cittadinanza, nascita, residenza.
   const exportCsv = () => {
-    const esc = (v: unknown) => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    // Valori che iniziano con = + - @ sarebbero formule in Excel (campi compilati dall'ospite): si neutralizzano con un apice.
+    const esc = (v: unknown) => { let s = String(v ?? ""); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const head = ["Data arrivo", "Tipo", "Permanenza (notti)", "Camera", "Età", "Sesso", "Cittadinanza", "Luogo di nascita", "Luogo di residenza"];
     const src = filterDate ? rowsAll.filter((r) => (r.arrival || "") === filterDate) : rowsAll;
     const out: string[][] = [];

@@ -4,6 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// ilike senza caratteri jolly: "_" e "%" dell'email (es. mario_rossi@…) non devono combaciare con altri indirizzi.
+const likeEsc = (s: string) => s.replace(/[\\%_]/g, (c) => "\\" + c);
+
 // Chi sta entrando è un COLLABORATORE? Xenora è ad invito, i profili sono due:
 //  1) titolari: chiedono l'accesso dall'esterno, il titolare di Xenora accetta e si registrano → hanno la guida "registra la tua struttura";
 //  2) collaboratori: invitati da un membro già registrato a co-gestire la sua struttura → entrano e vedono solo le strutture di chi li ha invitati.
@@ -27,7 +30,7 @@ export async function POST(req: Request) {
 
     let accepted = 0;
     if (caller.email) {
-      const { data: invites } = await admin.from("org_invites").select("code, org_id").ilike("email", caller.email).eq("status", "pending");
+      const { data: invites } = await admin.from("org_invites").select("code, org_id").ilike("email", likeEsc(caller.email)).eq("status", "pending");
       for (const inv of invites ?? []) {
         const { data: existing } = await admin.from("memberships").select("id").eq("org_id", inv.org_id).eq("user_id", caller.id).maybeSingle();
         if (!existing) {
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
     let invitedAsCollaborator = false;
     let profile: Record<string, unknown> | null = null;
     if (caller.email) {
-      const { data: al } = await admin.from("access_allowlist").select("kind, profile").ilike("email", caller.email).maybeSingle();
+      const { data: al } = await admin.from("access_allowlist").select("kind, profile").ilike("email", likeEsc(caller.email)).maybeSingle();
       invitedAsCollaborator = al?.kind === "collaboratore";
       profile = (al?.profile as Record<string, unknown> | null) ?? null; // la scheda compilata dal titolare
     }

@@ -1,6 +1,7 @@
 // Libreria promo riutilizzabili, condivisa tra Promozioni, Ospiti e scheda ospite.
 import { lsGet } from "./publicdata";
 import { fmtDMY } from "./dates";
+import { realEmail } from "./guest-key";
 
 export interface Promo {
   id: string;
@@ -52,6 +53,16 @@ export function loadPromos(): Promo[] {
 export function promosForStructure(list: Promo[], structureId: string): Promo[] {
   if (!structureId || structureId === "all") return list;
   return list.filter((p) => !p.structureId || p.structureId === structureId);
+}
+/**
+ * Email a cui si può mandare una promo, oppure "" se l'ospite non è contattabile per marketing:
+ *  - serve un'email VERA (gli indirizzi di inoltro delle OTA @guest.booking.com ecc. non sono utilizzabili per il marketing);
+ *  - serve il consenso marketing (flag nella scheda) oppure l'iscrizione alla newsletter dal sito (tag "newsletter", che è un consenso esplicito).
+ */
+export function promoRecipientEmail(g: { email?: string; marketingConsent?: boolean; tags?: string[] }): string {
+  const em = realEmail(g.email);
+  if (!em) return "";
+  return g.marketingConsent === true || (Array.isArray(g.tags) && g.tags.includes("newsletter")) ? em : "";
 }
 export function savePromos(list: Promo[]) {
   try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {}

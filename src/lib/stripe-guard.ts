@@ -16,9 +16,12 @@ export async function customerBelongsToUser(stripe: Stripe, customerId: string, 
 /** Il conto collegato (acct_…) è dell'utente? (creato da lui, oppure salvato in una sua struttura o in una struttura condivisa di cui è socio). */
 export async function userOwnsStripeAccount(stripe: Stripe, admin: SupabaseClient, userId: string, acct: string): Promise<boolean> {
   if (!/^acct_[A-Za-z0-9]+$/.test(acct)) return false;
+  // Se il conto è stato creato da Xenora porta il proprietario in metadata.uid: quello è l'unico dato non scrivibile dal chiamante.
+  let metaUid = "";
   try {
     const a = await stripe.accounts.retrieve(acct);
     if (a.metadata?.uid === userId) return true;
+    metaUid = a.metadata?.uid || "";
   } catch { /* conto non accessibile: si controlla nei dati */ }
   const hasAcct = (raw: unknown): boolean => {
     try {
@@ -27,8 +30,11 @@ export async function userOwnsStripeAccount(stripe: Stripe, admin: SupabaseClien
     } catch { return false; }
   };
   try {
-    const { data: own } = await admin.from("app_state").select("data").eq("user_id", userId).maybeSingle();
-    if (own && hasAcct(own.data)) return true;
+    // Lo stato personale lo scrive il browser dell'utente: se il conto ha già un altro proprietario (metadata.uid), un acct_ scritto a mano nella propria struttura NON basta.
+    if (!metaUid) {
+      const { data: own } = await admin.from("app_state").select("data").eq("user_id", userId).maybeSingle();
+      if (own && hasAcct(own.data)) return true;
+    }
     const { data: mem } = await admin.from("memberships").select("org_id").eq("user_id", userId);
     const orgIds = (mem ?? []).map((m: { org_id?: string }) => m.org_id).filter((x): x is string => !!x);
     if (orgIds.length) {

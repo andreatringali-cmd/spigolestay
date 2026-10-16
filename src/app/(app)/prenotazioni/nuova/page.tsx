@@ -9,7 +9,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { captureA4ToPdfBlob, blobToBase64 } from "@/lib/pdf-capture";
 import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { shortenLink } from "@/lib/guestlink";
-import { rateForDay } from "@/lib/pricing";
+import { loadWeekendPct, rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, nights, fmtDate } from "@/lib/dates";
 import DateField from "@/components/DateField";
 import { cityTaxOf } from "@/lib/booking";
@@ -28,7 +28,7 @@ const fmtDay = (iso: string) => fmtDate(iso);
 export default function NuovaPrenotazionePage() {
   const router = useRouter();
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, getStructure, getGuest, getRoomType, getUnit, activeStructureId } = useData();
-  const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  const weekendPct = useMemo(() => loadWeekendPct(), []); // regola weekend del calendario (rispetta "weekend disattivato" e le regole per struttura)
   // Dati per l'anteprima fuori schermo del voucher (VoucherDoc), usata SOLO per catturare il vero
   // PDF allegato al momento dell'invio della conferma — vedi confirm() più sotto.
   const [pdfVp, setPdfVp] = useState<VoucherPayload | null>(null);
@@ -159,6 +159,11 @@ export default function NuovaPrenotazionePage() {
   const confirm = () => {
     if (totalRooms < 1) { setErr("Seleziona almeno una camera"); return; }
     if (!lastName.trim() && !firstName.trim()) { setErr("Inserisci nome o cognome dell'ospite"); return; }
+    // Camere libere reali PRIMA di toccare l'anagrafica: se sono meno di quelle scelte (es. link dal calendario su una camera ormai occupata) non si crea nulla e si avvisa.
+    const flat: { rt: RoomType; unitId: string | null }[] = [];
+    const usedUnitIds = new Set<string>(); // evita di assegnare la stessa camera fisica a madre e derivata
+    selected.forEach((rt) => { const free = availUnits(rt).filter((u) => !usedUnitIds.has(u.id)); if (preferUnit) { const idx = free.findIndex((u) => u.id === preferUnit); if (idx > 0) { const [pu] = free.splice(idx, 1); free.unshift(pu); } } const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) { const u = free[k]; if (u) usedUnitIds.add(u.id); flat.push({ rt, unitId: u?.id ?? null }); } });
+    if (flat.length !== totalRooms) { setErr("Alcune camere scelte non sono più libere per queste date: torna alla scelta delle camere e riprova. Nessuna prenotazione è stata creata."); return; }
     // Riusa un'anagrafica ospite esistente (stessa email, o stesso nome con telefono compatibile) per non
     // creare doppioni: così le prenotazioni della stessa persona restano un'unica conversazione/scheda ospite.
     const fullName = `${firstName} ${lastName}`.trim();
@@ -177,9 +182,6 @@ export default function NuovaPrenotazionePage() {
       guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phoneN });
     }
     const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
-    const flat: { rt: RoomType; unitId: string | null }[] = [];
-    const usedUnitIds = new Set<string>(); // evita di assegnare la stessa camera fisica a madre e derivata
-    selected.forEach((rt) => { const free = availUnits(rt).filter((u) => !usedUnitIds.has(u.id)); if (preferUnit) { const idx = free.findIndex((u) => u.id === preferUnit); if (idx > 0) { const [pu] = free.splice(idx, 1); free.unshift(pu); } } const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) { const u = free[k]; if (u) usedUnitIds.add(u.id); flat.push({ rt, unitId: u?.id ?? null }); } });
     const nR = Math.max(1, flat.length);
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
     let ci = 0; // cursore per distribuire le età dei bambini tra le camere del gruppo

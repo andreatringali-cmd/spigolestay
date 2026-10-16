@@ -1,0 +1,71 @@
+Ho trovato 12 problemi nelle route `src/app/api/**`, verificati sul codice. Il numero 5 l'ho confermato anche sul database in sola lettura. Non ho modificato file né scritto sul database.
+
+**1. [ALTA] src/app/api/stripe/quote/route.ts:22-24,53 (con stripe/quote/confirm/route.ts:48-56,126,168-179) — Sessione di pagamento anonima con metadata a scelta, che la conferma poi prende per buoni**
+- Scenario: `/api/stripe/quote` non ha autenticazione e copia `body.metadata` dopo `kind:"quote"`, quindi il chiamante può cambiare anche `kind`. L'importo (`amount`) e `acct` arrivano dal client. Un anonimo crea una sessione da 0,50 € con `uid=<id di un tenant>`, `sid`, `ci`, `co`, `tot=1`, `fee_total=99999`, la paga e chiama `/api/stripe/quote/confirm` con il `session_id`.
+- Effetto:
+  - Si crea una prenotazione "confirmed" nel calendario di un altro tenant (`uid` oppure `oe` email), senza controllo di disponibilità.
+  - Un ospite può pagare 1 € un preventivo da 1000 €, perché `total` viene da `m.tot` scelto da lui.
+  - Si inserisce una riga arbitraria in `platform_fees` per quel tenant.
+  - Con `kind:"book"` o `"chatpay"` il webhook Stripe tratta la sessione come interna e fidata.
+- Correzione: far creare la sessione solo da un utente autenticato, oppure ricalcolare importo e proprietario dal preventivo nel database. Costruire i metadata con `kind` e `source` per ultimi, con una whitelist delle chiavi. Nella conferma verificare che la sessione sia nata da un preventivo noto.
+
+**2. [ALTA] src/app/api/forniture/confirm/route.ts:27-37 — Un ordine di forniture si segna pagato con la sessione Stripe di un altro ordine**
+- Scenario: la route controlla solo che `session.payment_status==="paid"` e che l'ordine sia del tenant. Non guarda `session.metadata.order_id`, né l'importo, né che la sessione sia già stata usata. Un utente paga un ordine da 5 €, crea un ordine da 5000 € in `pending_payment` e conferma quest'ultimo con il `session_id` del primo.
+- Effetto: forniture da 5000 € risultano pagate (`status=paid`) pur non essendolo.
+- Correzione: pretendere `session.metadata.order_id === orderId` e `session.amount_total === order.total_cents`, e rifiutare un `payment_intent` già registrato su un altro ordine.
+
+**3. [ALTA] src/app/api/org/unshare/route.ts:68-72 (la causa è org/invite/route.ts:134) — "Rimuovi condivisione" lascia `channex_map.org_id` sull'organizzazione cancellata**
+- Scenario: l'invito imposta `channex_map.org_id=<org>`. Lo smantellamento cancella `org_state` e `organizations` ma non azzera quel campo. Il webhook e il cron Channex scelgono il target `{kind:"org"}` (channex-inbound.ts:147,192), leggono una riga inesistente e trovano 0 camere mappate.
+- Effetto: le revision delle OTA non vengono né importate né confermate. Le prenotazioni Booking e Airbnb di quella struttura spariscono dal calendario, con rischio di overbooking. La mappa non compare nemmeno tra le mappe personali, perché lì si filtra `org_id IS NULL`.
+- Correzione: in unshare fare `update channex_map set org_id=null where org_id=<orgId>`, oppure fare in modo che l'import ricada sul personale se l'org non esiste.
+
+**4. [ALTA] src/app/api/manage-booking/cancel/route.ts:53-56 + stripe/webhook/route.ts:50 + stripe/book/route.ts:101-107 — Il rimborso automatico per annullamento ospite non parte mai**
+- Scenario: i pagamenti sono destination charge sulla piattaforma, e anche confirm e pay-confirm lo dicono nei commenti. Il webhook registra `stripeAccountId: event.account || ""`, che è vuoto, perché l'evento è sulla piattaforma e di solito arriva prima del ritorno dell'ospite. Se la prenotazione nasce dal webhook, nel cancel `acct` è vuoto e la condizione `free && paid>0 && pi && acct && key` è falsa. Se invece nasce da `book/confirm`, `acct` c'è ma `refunds.create(..., {stripeAccount: acct})` cerca il PaymentIntent sul conto sbagliato e fallisce.
+- Effetto: la pagina `/gestisci` offre il rimborso (`canRefund` non guarda `acct`), la prenotazione viene annullata e l'ospite non riceve nulla. Nel primo caso nessuno viene avvisato dell'errore.
+- Correzione: rimborsare sulla piattaforma senza header, con `reverse_transfer:true` al posto di `refund_application_fee`. Salvare `stripeAccountId` anche nel webhook (dalla struttura) e, se il rimborso fallisce, non marcare annullata, oppure segnalarlo al gestore.
+
+**5. [ALTA] src/lib/server-auth.ts:67-69 — Il gate "su invito" lato server si aggira creandosi una riga `app_state`**
+- Scenario: `isUserAllowed` accetta chiunque abbia una riga in `app_state`. Sul database la policy `app_state_self` (ALL per `authenticated` con `user_id=auth.uid()`) e l'assenza di trigger sull'INSERT permettono a qualunque utente autenticato di creare la propria riga. `access/status/route.ts` dice invece "solo allowlist" e che "Rimuovi" revoca davvero.
+- Effetto: un account Google non approvato supera `requireUser` e `authTenant`, quindi usa `/api/email`, le chiamate AI e tutte le altre route autenticate. Chi viene rimosso dall'allowlist ma ha già dati salvati mantiene l'accesso alle API per sempre.
+- Correzione: togliere la clausola `app_state` (e quella `memberships`) da `isUserAllowed`, e basarsi solo su allowlist, admin e inviti. In alternativa, impedire l'INSERT diretto sulla tabella.
+
+**6. [ALTA] src/app/api/checkin/route.ts:163,203-204 (con lib/booking.ts:123-124) — Un ospite anonimo può scrivere extra con prezzo negativo o zero**
+- Scenario: la route è pubblica e usa solo l'id prenotazione. `chosenExtras` prende `{name, price: n(e.price)}` dal client senza confrontarlo con `structure.extras`, e li aggiunge a `bk.extras`. Un POST con `[{name:"Sconto",price:-300}]` abbassa `bookingExtrasTotal` e quindi saldo e totale da incassare.
+- Effetto: il saldo dovuto sparisce, anche per via di un link inoltrato. Il gestore vede solo un extra in più.
+- Correzione: accettare solo gli id degli extra attivi della struttura e prendere nome e prezzo dal server. Scartare i prezzi non finiti o negativi.
+
+**7. [MEDIA] src/app/api/public-lead/route.ts:35 — La regex dell'email manca dei backslash e scarta quasi tutti gli indirizzi**
+- Scenario: `/^[^s@]+@[^s@]+$/` esclude la lettera "s", non lo spazio. `mario.rossi@gmail.com` contiene una "s" e viene rifiutato con 400 `bad_request`. Passano solo gli indirizzi senza "s" e senza punto.
+- Effetto: l'iscrizione alla newsletter dal sito pubblico fallisce per la maggior parte degli utenti. Chi non ha "s" passa anche con un testo non valido.
+- Correzione: usare `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`.
+
+**8. [MEDIA] src/app/api/public-booking/route.ts:48-49 e 181-192 — Importi arrotondati all'euro e doppia scrittura senza lock**
+- Scenario: Stripe incassa `tot` e `dep` ai centesimi (stripe/book:53-54: "non all'euro intero"), ma qui `Math.round(Number(body.total))` e `Math.round(Number(body.deposit))` li arrotondano a interi. Totale 123,50 diventa 124 e caparra 37,05 diventa 37. In più, al conflitto di `rev` il ramo di ripiego riscrive senza il lock `.eq("rev")` e usa il `unitId` scelto dai dati vecchi.
+- Effetto: `paid` e `total` della prenotazione non coincidono con quanto incassato (saldi sbagliati di fino a 0,50 €). Se nel frattempo il gestore ha assegnato quella camera, si crea un doppione o si sovrascrive il suo salvataggio.
+- Correzione: arrotondare a 2 decimali (`Math.round(x*100)/100`). Nel ripiego rileggere, rifare il controllo di disponibilità e riscrivere con il lock `rev`.
+
+**9. [MEDIA] src/app/api/stripe/webhook/route.ts:87-92,285-286,297-301 — Un rimborso parziale annulla l'intera prenotazione e la ricerca non regge**
+- Scenario: `charge.refunded` scatta anche per i rimborsi parziali (per esempio 20 € su 200 €). `reconcileRefund` imposta sempre `status:"cancelled"`. Se `patchInRow` perde il confronto sul `rev`, restituisce `false` e passa alla riga dopo; alla fine la funzione termina senza errore e il webhook risponde 200, quindi Stripe non riprova. Per trovare la prenotazione legge in sequenza fino a 1000 `org_state` e 5000 `app_state`.
+- Effetto: camere liberate per errore (con possibile overbooking) e sincronizzazione Channex. Con molti tenant la route supera i tempi e Stripe ripete l'evento.
+- Correzione: annullare solo se `charge.amount_refunded >= charge.amount`, altrimenti annotare il rimborso. Cercare la prenotazione con un indice (`stripePaymentIntent`) e ritentare sul conflitto di `rev`.
+
+**10. [MEDIA] src/app/api/org/members/route.ts:81 (con is_org_member nel database e lib/channex-guard.ts:44-50) — "Disattiva" un co-gestore non ne revoca l'accesso**
+- Scenario: il proprietario imposta `active=false`. Ma `is_org_member` guarda solo che esista la riga in `memberships`, quindi la policy `org_state_member_all` continua a dare lettura e scrittura su tutti i dati dell'organizzazione. Anche `allowedChannexProperties` e tutte le route che interrogano `memberships` ignorano `active`.
+- Effetto: un socio disattivato continua a leggere e modificare prenotazioni, ospiti e documenti. Via API può inviare prezzi e disponibilità a Channex e leggere i messaggi delle OTA.
+- Correzione: aggiungere `and m.active is not false` in `is_org_member` e nei filtri `memberships` lato server.
+
+**11. [MEDIA] src/lib/stripe-guard.ts:21-31 (con checkin/route.ts:119 e stripe/connect/route.ts:34) — Il controllo di proprietà del conto Stripe si fida di dati scritti dal chiamante**
+- Scenario: `userOwnsStripeAccount` accetta un `acct_` se compare tra le strutture dell'`app_state` dell'utente, e quel campo lo scrive il browser stesso. L'`acct_` di un altro host è pubblico per chi ha un link prenotazione, perché `GET /api/checkin` restituisce `structure.stripeAccount`. L'utente scrive quell'`acct_` su una sua struttura e chiama `POST /api/stripe/connect` con `accountId`.
+- Effetto: ottiene un `accountLinks.create` di onboarding sul conto di un altro (modifiche a dati e IBAN) e può leggere lo stato del conto. Serve un account Xenora, che con il problema 5 è facile da ottenere.
+- Correzione: verificare solo `account.metadata.uid === userId` o un record lato server. Non mostrare `stripeAccount` negli endpoint pubblici.
+
+**12. [MEDIA] src/lib/manage-booking.ts:107-119 (usato da checkin/route.ts:51-52, wallet/pass:36, checkin/upload:58, pay-confirm:37) — Richiesta anonima che scorre tutti i tenant**
+- Scenario: `GET /api/checkin?b=<id inesistente>` non ha limite di frequenza (il POST ne ha uno). Non trovando la prenotazione dallo slug, chiama `findBookingStoreById`, che legge in sequenza fino a 5000 `org_state` e 10000 `app_state`, ognuno con l'intero blob (anche MB).
+- Effetto: poche richieste in parallelo saturano il database e le funzioni, e l'app va in timeout per tutti. Lo stesso vale per wallet, upload e pay-confirm.
+- Correzione: limite per IP anche sui GET. Salvare una tabella indice `booking_id -> store`, oppure richiedere sempre lo slug e rifiutare con 404 senza il fallback.
+
+**Altre osservazioni brevi, fuori classifica**
+- `calendar/sync-event` accetta qualunque `calendarId` e scrive con il service account condiviso, quindi si possono creare o cancellare eventi su calendari di altri tenant.
+- `whatsapp/settings` salva `phone_id` senza controllare che sia unico tra i tenant. Il webhook sceglie il primo che corrisponde, quindi si possono dirottare i messaggi di un altro tenant.
+- `org/invite` prende `orgId` da `structure.orgId` dello stato personale senza controllare l'appartenenza (righe 68 e 149+). Un socio non proprietario può inoltre invitare altre persone.
+- Il collegamento di approvazione in `admin/allowlist/approve` è un GET che modifica dati, quindi gli anteprima-link dei client di posta possono approvare accessi da soli.

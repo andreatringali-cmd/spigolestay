@@ -1,0 +1,63 @@
+1. [ALTA] src/lib/authsync.tsx:395 (e 484-494) — Un dispositivo con dati vecchi, anche se non modificato, riscrive sul server le impostazioni più recenti
+Scenario: dal PC cambi `spigolestay:paysettings`, `spigolestay:users`, `rateplans`, `msgtemplates` o `plan`. Il telefono ha ancora il valore vecchio e non lo ha toccato. Alla riapertura (evento focus) fa `syncOnce`, e `mergeSnapshots` costruisce `{...server, ...local}`. Per tutte le chiavi piatte il locale vince in blocco, anche se è identico alla base (`base` è usata solo per `cassa:cats/conti` e per le chiavi Pulizie/threads/preventivi, che hanno una regola a parte). Il server torna al valore vecchio e il telefono non lo aggiorna mai (`changedLocal` resta false). Al ciclo dopo il PC riscrive il valore nuovo, e i due dispositivi si rimpallano ogni 4 s. La stessa cosa succede all'apertura di una scheda nuova con localStorage persistente (`mergeSnapshots(snap, serverData, {})`, riga 1041).
+Effetto: le impostazioni cambiate "tornano indietro" a seconda di quale dispositivo si apre per ultimo. Utenti e permessi, piano, modelli messaggi e simili si perdono senza avvisi.
+Correzione: per le chiavi piatte usa la regola a 3 vie: se `local[k] === base[k]` e `server[k] !== base[k]`, adotta `server[k]` (come fa `mergeKeyedList`).
+
+2. [ALTA] src/lib/authsync.tsx:681-691 e 960-968 — Una modifica fatta durante la sincronizzazione viene cancellata
+Scenario: `syncOnce` fotografa il localStorage, poi attende la rete (più secondi con 4 MB). In quel tempo aggiungi o sposti una prenotazione, e lo store scrive `data:v1`. Se il server aveva novità (una prenotazione Channex o un'altra scheda), `changedLocal` è true. Allora `restore(newBlob)` sovrascrive `data:v1` con il merge calcolato sul vecchio snapshot, e `spigolestay:datasync` fa rileggere lo stato allo store. Il blocco "ANTI-RACE" salta proprio `spigolestay:data:v1` (riga 684) e protegge solo le chiavi piatte.
+Effetto: la prenotazione o la modifica appena fatta sparisce dalla schermata e non arriva mai sul server.
+Correzione: salva `kvVersion()` prima del ciclo. Se è cambiato prima del `restore`, non applicare `data:v1` e rifai il ciclo, oppure rifondi `fresh["data:v1"]` col risultato.
+
+3. [ALTA] src/lib/authsync.tsx:404 e 556-579 — `rateOverrides` (prezzi forzati per giorno) vince in blocco il locale, con effetto sulle strutture condivise
+Scenario: `rateOverrides` non è in `ENTITY_COLLECTIONS`, quindi in `out = {...s, ...l}` il campo locale sostituisce quello del server. Un socio appena invitato ha `rateOverrides: {}` in `EMPTY_ORG_DATA`. Al primo sync cancella dal server i prezzi forzati dell'org (es. `rt1|2026-12-31 → 180`). Lo stesso accade con un dispositivo che ha dati vecchi mentre l'Autopilot (`setDayRates`) ha scritto prezzi da un altro dispositivo.
+Effetto: i prezzi per giorno spariscono o tornano ai valori vecchi, e poi vengono inviati alle OTA da Channex.
+Correzione: fondi `rateOverrides` per chiave con base a 3 vie, oppure con timbro per chiave.
+
+4. [MEDIA] src/lib/server-auth.ts:67 (con RLS `app_state_self` ALL) — Il blocco "accesso su invito" lato server si aggira
+Scenario: `isUserAllowed` considera ammesso chiunque abbia una riga in `app_state`. La policy `app_state_self` (verificata sul DB, cmd ALL, `user_id = auth.uid()`) permette a qualsiasi utente registrato di inserire la propria riga con la anon key. Un utente non in allowlist fa `signUp`, inserisce una riga in `app_state`, e `requireUser` lo lascia passare su tutte le API (email Resend, AI, WhatsApp, ecc.). Inoltre, anche togliendo un'email da "Accessi" (che `/api/access/status` blocca nel browser), le API continuano ad accettarla se esiste già `app_state`.
+Effetto: "Rimuovi" non revoca davvero l'accesso e la registrazione su invito non è applicata al server.
+Correzione: in `isUserAllowed` ammetti per allowlist, membership o invito; non usare `app_state` come prova di ammissione.
+
+5. [MEDIA] src/app/api/admin/all-payments/route.ts:47 (stessa riga in payments/route.ts:39 e account/route.ts:198) — Le fatture non pagate risultano da €0
+Scenario: `amount: (i.amount_paid ?? i.amount_due ?? 0) / 100`. Stripe restituisce `amount_paid = 0` (non null) per una fattura aperta, quindi `??` non passa a `amount_due`. Una fattura open da 29 € compare come € 0,00.
+Effetto: "Da incassare" nella Panoramica e "Da recuperare" in Pagamenti sono sempre € 0 (`dash.dueTotal`, admin/page.tsx:201). Le righe da recuperare mostrano importo zero.
+Correzione: `i.paid ? i.amount_paid : (i.amount_remaining ?? i.amount_due)`.
+
+6. [MEDIA] src/lib/access.tsx:113 e 142 (più src/lib/users.ts:219-221) — I limiti del co-gestore e quelli per struttura non valgono con "Tutte"
+Scenario: `activeOrgId` si calcola solo se `activestruct !== "all"`, e "all" è il valore di default. Un co-gestore con livello "sola lettura" o con accesso in pausa, con "Tutte" selezionato, usa i permessi del suo account di titolare (tutto `edit`). Vede e modifica anche le strutture condivise, senza `restriction`. In più `allowedStructureIds` restituisce `null` (= tutte le strutture) quando `structureIds` è vuoto. Un utente creato con `blankUser()` (allStructures=false, "Nessuna" in elenco) vede quindi tutte le strutture. Lo stesso vale se le sue strutture sono state eliminate.
+Effetto: i limiti decisi dal proprietario si aggirano di default. Non è un problema già noto: la mancata applicazione lato server (Fase 3) non spiega questo.
+Correzione: applica `restriction` per struttura (con `orgId` della singola struttura) invece che per la sola struttura attiva. Con `structureIds` vuoto restituisci `[]`.
+
+7. [MEDIA] src/app/api/org/invite/route.ts:76-88 — Qualsiasi membro può invitare altre persone
+Scenario: se la struttura non è nel personale del chiamante, la route cerca nelle sue `memberships` senza filtrare per `role` né per `active`. Un co-gestore "view" o in pausa chiama `POST /api/org/invite` con `structureId` e l'email di un terzo già registrato. Si crea un invito per quell'org. Alla `accept` (o a `/api/org/role`) il terzo entra come `member` con permessi di default.
+Effetto: la possibilità di aggiungere soci non è riservata al proprietario, mentre la UI la mostra solo a lui. Il terzo ottiene accesso ai dati degli ospiti.
+Correzione: nel ramo "già condivisa" richiedi `m.role === "owner"`.
+
+8. [MEDIA] src/app/api/org/role/route.ts:30 e 46 (anche invite/route.ts:49, 54, 154) — `ilike` con l'email del chiamante tratta `_` e `%` come caratteri jolly
+Scenario: l'utente `mario_rossi@gmail.com` ha un inviato in attesa per `mario.rossi@gmail.com` di un'altra persona. `ilike("email", caller.email)` fa combaciare `_` con `.`. Il chiamante viene aggiunto come `member` all'org dell'altro e l'invito risulta accettato. Le email con `_` sono comuni.
+Effetto: accesso non voluto alla struttura di un altro cliente, e invito consumato.
+Correzione: usa `eq` su email già in minuscolo, oppure escapa `\`, `%`, `_` prima dell'`ilike`.
+
+9. [MEDIA] src/app/(app)/strutture/[id]/page.tsx:537, 546, 570, 426-427 — Non si possono digitare i decimali negli importi
+Scenario: gli input di testo di `cityTaxCap`, `cityTaxAmount`, `deposit`, `lat` e `lng` sono controllati con `value={f.x ?? ""}` e `onChange` fa `set(k, num(v))`. Per scrivere "2,50" si digita "2" e poi ",". `num("2,")` dà 2, e React riscrive "2" nel campo, cancellando la virgola. Poi digitando "5" e "0" si ottiene 250.
+Effetto: la tassa di soggiorno per persona/notte, il tetto o la cauzione possono saltare a 25 o 250 € invece di 2,50 € (visibile solo se l'utente controlla). Funziona solo incollando il valore intero.
+Correzione: tieni il testo grezzo in uno stato locale e converti al blur, oppure usa `type="number" step="0.01"` come per `cityTaxPercent`.
+
+10. [MEDIA] src/app/(app)/strutture/[id]/page.tsx:36, 52, 207-219, 244, 259-276 — L'autosalvataggio scrive l'intera scheda con valori vecchi e valori predefiniti
+Scenario A: `f = {...blankStructure(), ...existing}`. Una struttura senza `cityTax`, `province`, `region`, `payMethods` o `cancelPolicy` riceve i predefiniti di Siracusa (tassa 4%, tetto 5 €, SR, Sicilia). Alla prima modifica qualsiasi, `updRef.current(params.id, {...f})` li salva tutti.
+Scenario B: l'effetto di precompilazione (riga 207) modifica `f` dopo la baseline (riga 259). Aprire la scheda copia quindi da sola email e telefono dell'account nella struttura. Un co-gestore che apre una struttura condivisa senza email la riempie con la propria.
+Scenario C: `patch = {...f}` contiene anche `stripeChargesEnabled`, `orgId`, `order`, `gcalVerifiedId`, e li riscrive con `updatedAt` nuovo. Annulla quindi `verifyStripe` o un cambio fatto da un altro dispositivo nel frattempo.
+Effetto: tassa di soggiorno attivata senza volerlo, email di notifica prenotazioni dirottate, campi cambiati altrove sovrascritti.
+Correzione: salva solo i campi che l'utente ha cambiato (diff tra `f` e baseline), e non applicare i predefiniti di `blankStructure()` alle strutture esistenti.
+
+11. [BASSA] src/app/(app)/admin/page.tsx:262, 384-385, 219-220 (e api/admin/overview/route.ts:~110) — I filtri del back-office non incidono su totali e ricerca
+Scenario: in "Pagamenti" le card "Incassato" e "Da recuperare" sommano sempre tutte le fatture, mentre `filteredPay.inv` è filtrata per ricerca e stato. Con "Solo da recuperare" o una ricerca per cliente, i totali sopra non cambiano. Il segnaposto "Cerca email, nome, telefono, struttura…" promette la ricerca per struttura, ma il server cerca solo in `email`, `full_name` e `phone`. Il filtro "Solo paganti" usa `stripe_customer_id not null`, quindi include i clienti con abbonamento cancellato, mentre il conteggio "Abbonati paganti" usa `isPayer`. "Incasso totale finora" è calcolato sulle sole ultime 100 fatture (`invoices.list({limit:100})`) ma l'etichetta dice "tutte le fatture pagate".
+Effetto: cifre e risultati incoerenti con i filtri attivi.
+Correzione: calcola le card da `filteredPay.inv`. Aggiungi `structure_names` all'`or()`. Allinea il filtro "paganti" a `isPayer`. Pagina Stripe con `auto_paging` oppure cambia l'etichetta.
+
+12. [BASSA] src/app/login/page.tsx:19 — Redirect aperto dopo l'accesso
+Scenario: `next.startsWith("/") && !next.startsWith("//")` lascia passare `/\evil.com`, che l'URL parser tratta come `//evil.com`. Un utente già loggato che apre `https://xenora.it/login?next=/\evil.com` viene mandato subito da `router.replace(afterLoginPath())` su un sito esterno. Lo stesso accade dopo il login con password.
+Effetto: link di phishing con dominio xenora.it.
+Correzione: rifiuta `\` e caratteri di controllo in `next`, e verifica che `new URL(next, origin).origin === origin`.
+
+Non ho modificato file né scritto sul database. Ho letto codice e interrogato il DB solo con SELECT sulle policy RLS (punto 4). Nella lettura non ho trovato problemi di rilievo in `bigstore.ts`, `list-merge.ts`, `org-combine.ts`, `org-cassa-config.ts`, `media-migrate-plan.ts`, `WorkspaceSync.tsx`, `accetta-invito`, `salute` e `importa`.

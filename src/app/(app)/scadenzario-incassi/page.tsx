@@ -19,6 +19,7 @@ import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, daysOverdue, todayLocalISO, agingBucket, AGING_LABEL, type AgingKey } from "@/lib/invoicing/receivables";
 import { reminderText, reminderSubject, waReminderLink, mailReminderLink, waDigits } from "@/lib/invoicing/reminders";
 import { useTenantId } from "@/lib/tenant";
+import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { fmtDate } from "@/lib/dates";
 
 interface Doc {
@@ -36,7 +37,10 @@ export default function ScadenzarioIncassiPage() {
   const { user } = useAuth();
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const ask = useConfirm();
-  const { activeStructureId, bookings, getGuest, getStructure, updateBooking } = useData();
+  const { raw, allStructures, selectedStructureIds, getGuest, getStructure, updateBooking } = useData();
+  // Prenotazioni COMPLETE (non filtrate dalla selezione): un documento di una struttura fuori selezione deve poter aggiornare comunque il suo incasso.
+  const bookings = raw.bookings;
+  const scope = useMemo(() => cashScopeOf(selectedStructureIds, allStructures.map((x) => x.id)), [selectedStructureIds, allStructures]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [paid, setPaid] = useState<Record<string, number>>({});
   const [reminders, setReminders] = useState<Record<string, Reminder>>({});
@@ -72,8 +76,8 @@ export default function ScadenzarioIncassiPage() {
   const residui = useMemo(() => computeResidui(docs, paid), [docs, paid]);
   const all = useMemo(() => docs
     .filter((d) => d.doc_kind !== "nota_di_credito" && (residui[d.id]?.residuo ?? 0) > 0)
-    .filter((d) => activeStructureId === "all" || d.structure_id === activeStructureId)
-    .map((d) => ({ ...d, residuo: residui[d.id].residuo, credited: residui[d.id].credited, days: daysOverdue(d.due_date, t), bucket: agingBucket(d.due_date, t) })), [docs, residui, activeStructureId, t]);
+    .filter((d) => scope === "all" || scopeVisible(d.structure_id, scope))
+    .map((d) => ({ ...d, residuo: residui[d.id].residuo, credited: residui[d.id].credited, days: daysOverdue(d.due_date, t), bucket: agingBucket(d.due_date, t) })), [docs, residui, scope, t]);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -107,8 +111,8 @@ export default function ScadenzarioIncassiPage() {
 
   // Registra nello storico del documento che il sollecito è stato preparato/inviato (tabella document_events già esistente).
   const logReminder = async (docId: string, via: string) => {
-    if (!supabase || !user) return;
-    const { error } = await supabase.from("document_events").insert({ tenant_id: tenantId ?? user.id, document_id: docId, kind: "reminder", message: `Sollecito di pagamento inviato via ${via}` });
+    if (!supabase || !user || !tenantId) return; // senza l'account di lavoro (collaboratore) non si scrive: finirebbe sull'account sbagliato
+    const { error } = await supabase.from("document_events").insert({ tenant_id: tenantId, document_id: docId, kind: "reminder", message: `Sollecito di pagamento inviato via ${via}` });
     if (!error) { setReminders((p) => ({ ...p, [docId]: { count: (p[docId]?.count ?? 0) + 1, last: new Date().toISOString() } })); }
   };
   const copy = async (docId: string) => {
@@ -117,9 +121,10 @@ export default function ScadenzarioIncassiPage() {
 
   const markPaid = async (r: Doc & { residuo: number }) => {
     if (!supabase || !user) return;
+    if (!tenantId) { setErr("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
     if (!(await ask({ title: "Segna come incassato", message: `Registrare l'incasso di ${eur(cents(r.residuo))} per ${r.number_label ?? "il documento"}?`, confirmLabel: "Registra incasso" }))) return;
     setBusy(r.id); setErr("");
-    const { error } = await supabase.from("document_payments").insert({ document_id: r.id, tenant_id: tenantId ?? user.id, amount_cents: r.residuo, method: "manuale" });
+    const { error } = await supabase.from("document_payments").insert({ document_id: r.id, tenant_id: tenantId, amount_cents: r.residuo, method: "manuale" });
     if (error) { setErr("Errore incasso: " + error.message); setBusy(""); return; }
     // Fonte di verità incassi = prenotazione (come nella scheda documento).
     const b = r.booking_code ? bookings.find((x) => x.code === r.booking_code) : undefined;

@@ -66,6 +66,9 @@ export async function POST(req: Request) {
     if (upErr) return NextResponse.json({ error: "app_state_failed", message: upErr.message }, { status: 500 });
 
     // Smantella l'organizzazione: inviti, membership, stato condiviso, record org.
+    // Il collegamento al Channel Manager torna personale: senza questo punterebbe a un'org cancellata
+    // (webhook/cron Channex non troverebbero camere e le prenotazioni OTA non verrebbero importate).
+    await admin.from("channex_map").update({ org_id: null }).eq("org_id", orgId);
     await admin.from("org_invites").delete().eq("org_id", orgId);
     await admin.from("memberships").delete().eq("org_id", orgId);
     await admin.from("org_state").delete().eq("org_id", orgId);

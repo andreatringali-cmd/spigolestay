@@ -13,6 +13,7 @@ import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { dateLocale } from "@/lib/guest-i18n";
 import DateTextField from "@/components/DateTextField";
 import { fmtDate } from "@/lib/dates";
+import { todayRome } from "@/lib/dates-rome";
 import { REQUIRE_DOC_PHOTOS, checkinStatus, needsMoreGuests, stepsWithMissing, type CheckinStep, type Miss } from "@/lib/checkin-flow";
 
 // Check-in online per l'OSPITE — pagina PUBBLICA e SERVER-backed.
@@ -313,6 +314,10 @@ function Engine() {
   const missingRooms = isGroup ? groupRooms.filter((r) => !roomsWithGuest.has(r.b)).map((r) => r.roomType || r.code) : [];
   const status = checkinStatus({ doc, extras, photoFront, consent, signature, isOperator, expectedGuests, isGroup, missingRooms, requireDocPhotos: REQUIRE_DOC_PHOTOS });
   const valid = status.valid;
+  // Campi dei dati ospiti obbligatori (tutti quelli della checklist tranne consenso, firma, foto e camere del gruppo, controllati a parte).
+  const DATA_CODES = ["firstName", "lastName", "sex", "birthDate", "birthPlace", "citizenship", "docNumber", "docPlace"];
+  const dataFieldsOk = status.blocking.every((m) => !DATA_CODES.includes(m.code));
+  const maxBirth = todayRome(); // nessuna data di nascita nel futuro
   const missIds = new Set(status.blocking.map((m) => m.id));
   const fcls = (id: string) => (showErr && missIds.has(id) ? fieldErr : field);
   const stepWarn = stepsWithMissing(status.blocking);
@@ -321,12 +326,17 @@ function Engine() {
     const nm = [p?.firstName, p?.lastName].filter((x) => (x ?? "").trim()).join(" ");
     return nm || (n === 1 ? t("Ospite principale") : `${t("Ospite")} ${n}`);
   };
+  const who = (m: Miss) => ((m.guest ?? 1) > 1 ? ` · ${personName(m.guest!)}` : ""); // per i co-ospiti: di chi è il campo mancante
   const missText = (m: Miss): string => {
     switch (m.code) {
       case "firstName": return t("Compila il nome");
       case "lastName": return t("Compila il cognome");
-      case "birthDate": return t("Inserisci la data di nascita");
+      case "sex": return t("Sesso") + who(m);
+      case "birthDate": return t("Inserisci la data di nascita") + who(m);
+      case "birthPlace": return t("Luogo di nascita") + who(m);
+      case "citizenship": return t("Cittadinanza") + who(m);
       case "docNumber": return t("Inserisci il numero del documento");
+      case "docPlace": return t("Luogo di rilascio");
       case "group": return t("Assegna almeno un ospite a ogni camera: {rooms}", { rooms: (m.rooms ?? []).join(", ") });
       case "docPhoto": return t("Carica la foto del documento di {name}", { name: personName(m.guest ?? 1) });
       case "consent": return t("Spunta il consenso al trattamento dei dati personali");
@@ -343,10 +353,13 @@ function Engine() {
     setStep(2); topScroll();
   };
   const goStep = (n: CheckinStep) => { setStep(n); topScroll(); };
+  // Invio con dati ospite incompleti (anche dal pulsante rapido): non resta muto, evidenzia e porta al primo campo mancante.
+  const missingToFirst = () => { setShowErr(true); const m = status.blocking.find((x) => DATA_CODES.includes(x.code)); if (m) goTo(m); };
 
   // Invio di GRUPPO: distribuisce gli ospiti per camera e salva ogni camera.
   const submitGroup = async () => {
-    const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
+    const reqOk = !!doc && dataFieldsOk;
+    if (doc && !reqOk) { missingToFirst(); return; }
     if (!info || !doc || !reqOk || !consent || (!isOperator && !signature) || submitting) return;
     type Person = { room: string; d: DocData; pf?: string; pb?: string };
     const people: Person[] = [{ room: primaryRoom || groupRooms[0].b, d: doc, pf: photoFront, pb: photoBack }];
@@ -384,7 +397,8 @@ function Engine() {
 
   const submit = async (opts?: { assumeConsent?: boolean }) => {
     const consented = opts?.assumeConsent || consent;
-    const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
+    const reqOk = !!doc && dataFieldsOk;
+    if (doc && !reqOk) { missingToFirst(); return; }
     if (!info || !doc || !reqOk || !consented || (!isOperator && !signature) || submitting) return;
     // Se con la prenotazione soggiornano più persone di quelle inserite, avvisa prima di inviare (un secondo clic prosegue comunque).
     // L'avviso resta VICINO al pulsante (prima compariva in cima alla pagina, fuori vista).
@@ -646,13 +660,13 @@ function Engine() {
                 {isGroup && <div id="f-group" tabIndex={-1} className="sm:col-span-2" />}
                 <label className={lbl}>{t("Nome")} *<input id="f-firstName" value={doc.firstName} onChange={(e) => setD("firstName", e.target.value)} className={`${fcls("f-firstName")} mt-1`} /></label>
                 <label className={lbl}>{t("Cognome")} *<input id="f-lastName" value={doc.lastName} onChange={(e) => setD("lastName", e.target.value)} className={`${fcls("f-lastName")} mt-1`} /></label>
-                <label className={lbl}>{t("Sesso")}<select value={doc.sex} onChange={(e) => setD("sex", e.target.value)} className={`${field} mt-1`}><option value="">—</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select></label>
-                <label className={lbl}>{t("Data di nascita")} *<DateTextField id="f-birthDate" value={doc.birthDate} onChange={(v) => setD("birthDate", v)} className={`${fcls("f-birthDate")} mt-1`} /></label>
-                <label className={lbl}>{t("Luogo di nascita")}<input value={doc.birthPlace} onChange={(e) => setD("birthPlace", e.target.value)} className={`${field} mt-1`} placeholder={t("Comune o Stato")} /></label>
-                <label className={lbl}>{t("Cittadinanza")}<input value={doc.citizenship} onChange={(e) => setD("citizenship", e.target.value)} className={`${field} mt-1`} /></label>
+                <label className={lbl}>{t("Sesso")} *<select id="f-sex" value={doc.sex} onChange={(e) => setD("sex", e.target.value)} className={`${fcls("f-sex")} mt-1`}><option value="">—</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select></label>
+                <label className={lbl}>{t("Data di nascita")} *<DateTextField id="f-birthDate" value={doc.birthDate} onChange={(v) => setD("birthDate", v)} max={maxBirth} className={`${fcls("f-birthDate")} mt-1`} /></label>
+                <label className={lbl}>{t("Luogo di nascita")} *<input id="f-birthPlace" value={doc.birthPlace} onChange={(e) => setD("birthPlace", e.target.value)} className={`${fcls("f-birthPlace")} mt-1`} placeholder={t("Comune o Stato")} /></label>
+                <label className={lbl}>{t("Cittadinanza")} *<input id="f-citizenship" value={doc.citizenship} onChange={(e) => setD("citizenship", e.target.value)} className={`${fcls("f-citizenship")} mt-1`} /></label>
                 <label className={lbl}>{t("Tipo documento")}<select value={doc.docType} onChange={(e) => setD("docType", e.target.value)} className={`${field} mt-1`}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select></label>
                 <label className={lbl}>{t("Numero documento")} *<input id="f-docNumber" value={doc.docNumber} onChange={(e) => setD("docNumber", e.target.value)} className={`${fcls("f-docNumber")} mt-1`} /></label>
-                <label className={`${lbl} sm:col-span-2`}>{t("Luogo di rilascio")}<input value={doc.docPlace} onChange={(e) => setD("docPlace", e.target.value)} className={`${field} mt-1`} /></label>
+                <label className={`${lbl} sm:col-span-2`}>{t("Luogo di rilascio")} *<input id="f-docPlace" value={doc.docPlace} onChange={(e) => setD("docPlace", e.target.value)} className={`${fcls("f-docPlace")} mt-1`} /></label>
               </div>
             )}
           </div>
@@ -674,10 +688,10 @@ function Engine() {
                       {isGroup && <select value={e.room} onChange={(ev) => setExtra(i, "room", ev.target.value)} className={`${field} sm:col-span-2`}>{groupRooms.map((r) => <option key={r.b} value={r.b}>{t("Camera")}: {roomLabel(r)}</option>)}</select>}
                       <input value={e.firstName} onChange={(ev) => setExtra(i, "firstName", ev.target.value)} placeholder={t("Nome")} className={field} />
                       <input value={e.lastName} onChange={(ev) => setExtra(i, "lastName", ev.target.value)} placeholder={t("Cognome")} className={field} />
-                      <select value={e.sex ?? ""} onChange={(ev) => setExtra(i, "sex", ev.target.value)} className={field}><option value="">{t("Sesso")}</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select>
-                      <DateTextField value={e.birthDate} onChange={(v) => setExtra(i, "birthDate", v)} className={field} aria-label={t("Data di nascita")} />
-                      <input value={e.birthPlace} onChange={(ev) => setExtra(i, "birthPlace", ev.target.value)} placeholder={t("Luogo di nascita")} className={field} />
-                      <input value={e.citizenship} onChange={(ev) => setExtra(i, "citizenship", ev.target.value)} placeholder={t("Cittadinanza")} className={field} />
+                      <select id={`f-sex-${i + 2}`} value={e.sex ?? ""} onChange={(ev) => setExtra(i, "sex", ev.target.value)} className={fcls(`f-sex-${i + 2}`)}><option value="">{t("Sesso")}{named(e) ? " *" : ""}</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select>
+                      <DateTextField id={`f-birthDate-${i + 2}`} value={e.birthDate} onChange={(v) => setExtra(i, "birthDate", v)} max={maxBirth} className={fcls(`f-birthDate-${i + 2}`)} aria-label={t("Data di nascita")} />
+                      <input id={`f-birthPlace-${i + 2}`} value={e.birthPlace} onChange={(ev) => setExtra(i, "birthPlace", ev.target.value)} placeholder={t("Luogo di nascita") + (named(e) ? " *" : "")} className={fcls(`f-birthPlace-${i + 2}`)} />
+                      <input id={`f-citizenship-${i + 2}`} value={e.citizenship} onChange={(ev) => setExtra(i, "citizenship", ev.target.value)} placeholder={t("Cittadinanza") + (named(e) ? " *" : "")} className={fcls(`f-citizenship-${i + 2}`)} />
                       <select value={e.docType} onChange={(ev) => setExtra(i, "docType", ev.target.value)} className={field}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select>
                       <input value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder={t("Numero documento")} className={field} />
                       <input value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder={t("Luogo di rilascio")} className={`${field} sm:col-span-2`} />

@@ -1,0 +1,111 @@
+Ho trovato 12 problemi nel mio perimetro. Non ho modificato nulla. Il database l'ho letto con sole SELECT, e le prove le ho fatte su funzioni pure con uno script esterno al repo, quindi nel repo non è cambiato nulla. Dove scrivo "provato" ho eseguito il codice. Dove scrivo "da verificare" mi manca una conferma sul comportamento reale.
+
+I primi due toccano direttamente "devono seguire i filtri".
+
+1. [ALTA] documenti/page.tsx:86 — Con 2 o più strutture selezionate (non tutte) i filtri vengono ignorati su documenti, scadenzario, bollo, fatture passive, fascicolo e abbonamento
+   - Scenario: ci sono 3 strutture e ne selezioni A e B. Il selettore lascia `activeStructureId="all"` e filtra solo le liste del contesto dati (prenotazioni, strutture, camere).
+   - Le pagine che leggono le tabelle del database confrontano ancora `activeStructureId === "all"`, quindi mostrano anche C. Succede in:
+     - documenti/page.tsx:86;
+     - scadenzario-incassi/page.tsx:75;
+     - registro-bollo/page.tsx:36;
+     - fatture-passive/page.tsx:60 e :123;
+     - fascicolo-fiscale/page.tsx:148 e :241 (dove `AccountantPackPanel` riceve "all").
+   - Nel fascicolo le fatture sono di tutte le strutture mentre incassi e tassa di soggiorno sono solo di A e B. L'etichetta resta "Tutte le strutture" (:46).
+   - In abbonamento/page.tsx:16-19 camere e strutture vengono contate sulle sole liste filtrate. Con A+B si calcolano camere extra e avviso "superi il piano" sbagliati.
+   - In scadenzario-incassi/page.tsx:125-126 un documento della struttura C non trova la prenotazione tra quelle filtrate. L'incasso finisce in `document_payments` ma `booking.paid` non si aggiorna. Lo stesso accade in documenti/[id]/page.tsx:319.
+   - Effetto: totali, CSV e il pacchetto per il commercialista includono strutture non selezionate. Gli incassi possono restare disallineati tra documento e prenotazione.
+   - Correzione: usare `selectedStructureIds` (insieme di id) al posto di `activeStructureId==="all"`. Per abbonamento usare `allStructures` e `raw.units`.
+
+2. [ALTA] chiusura-cassa/page.tsx:97 — Il "saldo teorico" somma tutta la storia e conta anche il saldo di partenza
+   - Scenario: sul conto contanti c'è un incasso di agosto di 300 €, un saldo di partenza di 500 € al 1/9 e un'uscita di 50 € il 5/9. Provato: la Chiusura dice 750 €, mentre la Cassa (`computeBalances`) dice 450 €.
+   - Il saldo di partenza vale come nuovo inizio: contano solo i movimenti dopo quella data.
+   - Effetto: la differenza di quadratura è sbagliata e viene salvata in `cash_closures`. Il verbale stampato riporta lo stesso errore.
+   - Correzione: usare `computeBalances` / `balanceParts` come la Cassa, e i movimenti con `date<=day` solo dopo il saldo di partenza di ogni coppia struttura/conto.
+
+3. [ALTA] documenti/[id]/page.tsx:510-511 — Nelle righe della fattura i decimali digitati vengono mangiati
+   - Scenario: prezzo e quantità sono campi di testo controllati dal numero (`num()` a :45). Scrivendo "12," il valore diventa 12 e React riscrive "12". Poi "5" e "0" danno 1250.
+   - Anche con il punto va così. È lo stesso difetto per cui esiste `NumInput`.
+   - Effetto: su un documento fiscale il prezzo con centesimi è praticamente inseribile solo incollandolo. Un 12,50 digitato diventa 1.250 €.
+   - Correzione: usare `NumInput` o tenere il testo nello stato e convertire con `parseDecimalIT` al salvataggio.
+
+4. [ALTA] fatture-passive/page.tsx:231-232 — Importi con migliaia o formato italiano vengono letti male in più pagine
+   - Il parser è `Number(str.replace(",", "."))`, o `parseFloat` nella Cassa. Provato:
+
+     | Digitato | `Number(...)` | `parseFloat` |
+     |---|---|---|
+     | "1.234,56" | 0 | 1,234 |
+     | "1.200" | 1,2 | 1,2 |
+
+   - Dove succede:
+     - fatture-passive/page.tsx:43, 231-232 e 341;
+     - cassa/page.tsx:173, 444, 469 e 557;
+     - chiusura-cassa/page.tsx:20, 105 e 171;
+     - documenti/[id]/page.tsx:45 e :565.
+   - Esempi: una fattura passiva da "1.234,56" si salva con imponibile 0. Un affitto "1.200" diventa 1,20 €. Un incasso registrato "1.200" diventa 1,20 € e viene propagato a `booking.paid`.
+   - Effetto: importi sbagliati o azzerati senza alcun errore. Nella stessa fattura passiva esiste già un `parseNum` robusto, non usato nel salvataggio.
+   - Correzione: usare `parseDecimalIT` (src/lib/num-it.ts) ovunque e rifiutare il testo non valido invece di restituire 0.
+
+5. [MEDIA, da verificare] cassa/page.tsx:144 — Per i collaboratori l id dell'account di lavoro non è affidabile e i salvataggi possono perdersi o finire sull'account sbagliato
+   - `useTenantId` (lib/tenant.ts:30) restituisce `undefined` per il collaboratore finché la chiamata `workspace_owner` non risponde. Se la chiamata fallisce resta `undefined`.
+   - Alcuni punti scrivono comunque con `tenantId ?? user.id`:
+     - cassa/page.tsx:144 (`migrateLocalCash`, eseguita una volta sola al caricamento), :169 e :385;
+     - scadenzario-incassi/page.tsx:111 e :122;
+     - documenti/[id]/page.tsx:133 e :315;
+     - fatture-passive/page.tsx:229 e :234.
+   - Altri punti fanno `if (tenantId) …` e saltano in silenzio: cassa/page.tsx:177, 487, 499 e 571.
+   - Scenario: Greta aggiunge un movimento subito dopo aver aperto la Cassa. A schermo compare "Movimento registrato" ma niente viene scritto, senza errore. Oppure il dato va su `tenant_id` = Greta e il titolare non lo vede.
+   - In impostazioni-fattura/page.tsx:44 la lettura `.maybeSingle()` senza filtro, per chi vede due righe (la propria e quella del titolare), restituisce un errore ignorato. Il form resta vuoto e il Salva sovrascrive.
+   - Cosa manca per confermare: provare con un account collaboratore con rete lenta, o dopo un errore di `rpc workspace_owner`.
+   - Correzione: non scrivere finché `tenantId` non è definito, disabilitando i pulsanti e mostrando un errore. Filtrare le letture con `.eq("tenant_id", tenantId)`.
+
+6. [MEDIA] lib/invoicing/service.ts:94 — La tassa di soggiorno nelle fatture create dal server è diversa da quella della prenotazione
+   - `folioFromBooking` chiama `cityTaxOf(structure, b.adults, n, acc, exempt)`. Ignora ospiti minorenni paganti, il divisore con tutti gli ospiti e le quote di gruppo, che invece usano `cityTaxOfBooking` / `cityTaxOfBookingRaw`.
+   - Provato, con Siracusa 4%, tetto 5 €, 2 adulti più 1 bimbo di 5 anni, 3 notti, 360 €: la fattura dice 14,40 €, la prenotazione 9,60 €.
+   - La descrizione a :96 usa 3 notti come massimo, ma in modalità percentuale il massimo è 7.
+   - Effetto: la fattura riporta una tassa diversa da quella incassata e dichiarata.
+   - Correzione: usare `cityTaxOfBooking(structure, booking)` e lo stesso massimo notti.
+
+7. [MEDIA] cassa/page.tsx:492-497 — Un pagamento mensile creato dal 29, 30 o 31 salta un mese
+   - Scenario: registro un movimento del 31/01 "Ogni mese". Il calcolo `setMonth(+1)` su `new Date("2026-01-31")` dà il 03/03 come `start` della regola.
+   - Provato: le scadenze generate sono 31/03, 30/04, 31/05 e così via. Febbraio manca.
+   - Succede anche per l anno bisestile (29/02): da quel momento la regola cade sempre al 1° marzo.
+   - Effetto: una rata o un affitto di febbraio non compare né nel saldo né nella previsione.
+   - Correzione: calcolare il primo mese successivo limitando il giorno alla fine del mese (come fa `occurrences`), oppure usare come `start` la data stessa con `day` fisso.
+
+8. [MEDIA] lib/invoicing/service.ts:513-518 — Il numero dell autofattura può duplicarsi
+   - Il numero è "conta le autofatture dell anno + 1". Cancellando una fattura passiva con autofattura già inviata (fatture-passive/page.tsx:250-251, nessun controllo), il conteggio scende.
+   - Scenario: AF/2026/0001, 0002 e 0003 sono emesse. Cancello la fattura passiva della 0002 e la prossima autofattura riceve di nuovo 0003.
+   - Con due richieste in parallelo c è la stessa gara.
+   - Effetto: numero duplicato verso lo SdI e sezionale non progressivo.
+   - Correzione: numerazione atomica (sequenza o funzione DB come `fn_issue_document`) e vietare la cancellazione di documenti con autofattura emessa.
+
+9. [MEDIA] lib/invoicing/service.ts:279 — La nota di credito non storna il bollo, e lo scadenzario resta con 2,00 € da incassare
+   - Scenario: fattura forfettaria da 100 € più 2 € di bollo, totale 102 €, non incassata. La nota di credito totale è 100 €.
+   - Il residuo in `computeResidui` (receivables.ts:27) è 102 − 0 − 100 = 2 €. La fattura completamente stornata resta in Scadenzario incassi con 2,00 €.
+   - Nel codice c è un commento "da confermare col commercialista".
+   - Effetto: crediti fantasma e solleciti per 2 €.
+   - Correzione: copiare il bollo nella nota di credito oppure escluderlo dal residuo quando il documento è stornato per intero. Va deciso col commercialista.
+
+10. [MEDIA, da verificare] abbonamento/page.tsx:518 — Con abbonamento Stripe attivo il cambio piano non tocca Stripe
+    - Il pulsante "Conferma cambio" chiama solo `choose(k)`, cioè `localStorage`, e mostra "attivo dal prossimo rinnovo… usiamo la carta salvata". Non c è nessuna chiamata API.
+    - Le funzioni si sbloccano da `localStorage` (lib/access.tsx:53-57).
+    - Scenario: da Basic passo a Ultimate. Ottengo i moduli Ultimate pagando ancora Basic. Un downgrade non riduce mai l addebito.
+    - Cosa manca per confermare: vedere se un webhook o una route riallinea il piano. Non ne ho trovata una.
+    - Correzione: aggiornare la subscription Stripe (route dedicata o Customer Portal) e leggere il piano dal server.
+
+11. [MEDIA] abbonamento/fatture/page.tsx:46-78 — Se Stripe non restituisce fatture, la pagina mostra fatture di esempio presentate come reali
+    - La pagina genera rate mensili dalla fine prova (da `localStorage`) con numero "0001/2026", metodo "Carta ••4242" e stato Pagata. Si possono anche stampare come "Fattura" di Xenora (:87).
+    - Succede con un errore di rete su `/api/stripe/invoices`, con Stripe non configurato o con un account senza abbonamento reale.
+    - Anche "Prossimo rinnovo" in abbonamento/page.tsx:473 è calcolato localmente (primo del mese dopo) e non viene da Stripe.
+    - Effetto: l utente vede e stampa documenti fiscali inesistenti e una data di rinnovo inventata.
+    - Correzione: mostrare l elenco vuoto o un avviso quando non ci sono fatture reali, e prendere la data di rinnovo da `current_period_end` di Stripe.
+
+12. [MEDIA, da verificare] abbonamento/pagamento/page.tsx:58-69 — I "dati di fatturazione" dell abbonamento scrivono nei dati emittente senza normalizzare e senza CAP
+    - La pagina fa l upsert su `tenant_invoice_settings`, la stessa riga usata come emittente nelle fatture agli ospiti. Salva `vat`, `tax_code`, `sdi` e `province` così come digitati. Impostazioni fattura normalizza (`normalizeVat`, maiuscole); qui no.
+    - In `fatturapa.ts:107` il campo `IdCodice` usa la P.IVA grezza. Se l utente scrive "IT01234567890" o con spazi, lo SdI scarta le fatture.
+    - `validateDocument` controlla solo che l emittente sia presente, non il formato.
+    - La pagina non chiede il CAP e non salva civico ed email (:14-16 e :62-66). L autofattura e le bozze di abbonamento hanno quindi un indirizzo incompleto.
+    - Cosa manca per confermare: provare un salvataggio con "IT…" e poi generare l XML di un documento.
+    - Correzione: normalizzare con le stesse funzioni di impostazioni-fattura prima del salvataggio, aggiungere il CAP al form e validarlo.
+
+Percorsi relativi a `C:\Users\pcimp\Desktop\spigolestay\src`: le pagine sono in `app\(app)\<cartella>\page.tsx`, le librerie in `lib\` e `lib\invoicing\`.

@@ -350,7 +350,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   };
   const clickRate = (typeId: string, iso: string, typeIds?: string[]) => {
     if (iso < todayISO) return; // giorno passato: tariffa non modificabile
-    if (sel?.kind === "rate" && sel.typeId === typeId && selLo && selHi) { const members = typeIds ?? [typeId]; setSel(null); setSelHover(null); setRateEdit({ typeId: members[0], typeIds: members, from: selLo, to: selHi, mode: "fixed", value: rateFor(members[0], selLo), weekendBoost: true, weekendPct: loadWeekendPct() }); return; }
+    if (sel?.kind === "rate" && sel.typeId === typeId && selLo && selHi) { const members = typeIds ?? [typeId]; setSel(null); setSelHover(null); const wkPct = loadWeekendPct(roomTypes.find((x) => x.id === members[0])?.structureId); setRateEdit({ typeId: members[0], typeIds: members, from: selLo, to: selHi, mode: "fixed", value: startFixedRate(members[0], selLo, selHi, wkPct), weekendBoost: true, weekendPct: wkPct }); return; }
     setSel({ kind: "rate", typeId, anchor: iso }); setSelHover(iso);
   };
   const clickAvail = (typeId: string, iso: string) => {
@@ -370,15 +370,25 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const out: string[] = []; let d = a; while (d <= b) { out.push(d); d = shiftISO(d, 1); }
     return out;
   };
+  // Valore di partenza dell'importo fisso: se l'intervallo ha più giorni e contiene dei weekend, si propone il prezzo
+  // FERIALE (la maggiorazione weekend viene riapplicata al salvataggio e non va contata due volte); con un solo giorno, il prezzo reale di quel giorno.
+  const startFixedRate = (typeId: string, from: string, to: string, wkPct: number) => {
+    const isos = futureIsos(from, to);
+    if (isos.length <= 1 || !isos.some(isWeekendISO)) return rateFor(typeId, from);
+    const weekday = isos.find((d) => !isWeekendISO(d));
+    return weekday ? rateFor(typeId, weekday) : Math.round(rateFor(typeId, isos[0]) / (1 + wkPct / 100));
+  };
   const saveRate = () => {
     if (!rateEdit) return;
     const targets = rateEdit.typeIds ?? [rateEdit.typeId];
     const map: Record<string, number> = {};
-    for (const tid of targets) for (const iso of futureIsos(rateEdit.from, rateEdit.to)) {
+    const days = futureIsos(rateEdit.from, rateEdit.to);
+    for (const tid of targets) for (const iso of days) {
       let v = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(tid, iso) * (1 + rateEdit.value / 100)));
       // Il valore impostato è per i feriali: sui giorni ven/sab/dom si tiene la maggiorazione
       // weekend anche sopra un prezzo forzato, invece di appiattirla a un'unica tariffa fissa.
-      if (rateEdit.weekendBoost && isWeekendISO(iso)) v = Math.round(v * (1 + rateEdit.weekendPct / 100));
+      // In modalità % il prezzo di partenza (rateFor) contiene già la maggiorazione weekend: non va applicata di nuovo. Con un solo giorno la spunta non è visibile e non si applica.
+      if (rateEdit.mode === "fixed" && rateEdit.weekendBoost && days.length > 1 && isWeekendISO(iso)) v = Math.round(v * (1 + rateEdit.weekendPct / 100));
       map[rateKey(tid, iso)] = v;
     }
     setDayRates(map);
@@ -400,7 +410,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     persistCloses(next); persistCta(nextCta); persistCtd(nextCtd); setAvailEdit(null);
   };
   const saveEvent = () => {
-    if (!evDraft || !evDraft.name.trim()) return;
+    if (!evDraft || !evDraft.name.trim() || !evDraft.from || !evDraft.to || evDraft.to <= evDraft.from) return; // date vuote ("Cancella" del selettore) o invertite: l'evento colorerebbe tutta l'intestazione
     if (evDraft.id) updateEvent(evDraft.id, { name: evDraft.name.trim(), from: evDraft.from, to: evDraft.to, color: evDraft.color });
     else addEvent({ name: evDraft.name.trim(), from: evDraft.from, to: evDraft.to, color: evDraft.color, ...(activeStructureId !== "all" ? { structureId: activeStructureId } : {}) });
     setEvDraft(null);
@@ -640,12 +650,17 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const sid = roomTypes.find((r) => r.id === typeId)?.structureId;
     return poolOcc && inPool(poolCfg, sid) ? poolOcc.availFor(typeId, iso, closed) : null;
   };
+  // Camere occupate di una tipologia in un giorno, come in buildAriPayload (channex-ari.ts): le annullate non contano; una prenotazione vale per la tipologia della camera in cui sta ORA,
+  // e se non ha camera per quella scelta alla prenotazione (così lo schermo e i portali mostrano la stessa disponibilità).
+  const unitTypeById = new Map(units.map((u) => [u.id, u.roomTypeId]));
+  const typeOfBooking = (b: (typeof bookings)[number]): string => (b.unitId && unitTypeById.get(b.unitId)) || b.roomTypeId;
+  const occupiedOfType = (tid: string, iso: string) => bookings.filter((b) => b.status !== "cancelled" && b.checkIn <= iso && iso < b.checkOut && typeOfBooking(b) === tid).length;
   // Striscia tariffa+disponibilità per una singola tipologia.
   const typeStrip = (typeId: string, typeUnits: typeof units) => {
     const act = typeUnits.filter((u) => !u.outOfService);
     return days.map((d) => {
       const iso = toISO(d);
-      const occupied = bookings.filter((b) => b.unitId && act.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
+      const occupied = occupiedOfType(typeId, iso);
       const closed = closes[closeKey(typeId, iso)] ?? 0;
       return { iso, rate: rateFor(typeId, iso), overridden: rateOverrides[rateKey(typeId, iso)] != null, avail: poolAvail(typeId, iso, closed) ?? Math.max(0, act.length - occupied - closed), closed };
     });
@@ -657,7 +672,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       let avail = 0, closed = 0;
       for (const tid of typeIds) {
         const act = sectionUnits.filter((u) => u.roomTypeId === tid && !u.outOfService);
-        const occupied = bookings.filter((b) => b.unitId && act.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
+        const occupied = occupiedOfType(tid, iso);
         const cl = closes[closeKey(tid, iso)] ?? 0;
         avail += poolAvail(tid, iso, cl) ?? Math.max(0, act.length - occupied - cl);
         closed += cl;
@@ -667,10 +682,13 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     });
   };
   // Occupazione complessiva (per il grafico in alto).
+  const activeUnitIds = new Set(activeUnits.map((u) => u.id));
+  const activeTypeIds = new Set(activeUnits.map((u) => u.roomTypeId));
   const occStrip = days.map((d) => {
     const iso = toISO(d);
-    const occupied = bookings.filter((b) => b.unitId && activeUnits.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
-    return { iso, pct: activeUnits.length ? Math.round((occupied / activeUnits.length) * 100) : 0 };
+    // Annullate escluse; le prenotazioni senza camera occupano una camera della loro tipologia (come per la disponibilità).
+    const occupied = bookings.filter((b) => b.status !== "cancelled" && b.checkIn <= iso && iso < b.checkOut && (b.unitId ? activeUnitIds.has(b.unitId) : activeTypeIds.has(b.roomTypeId))).length;
+    return { iso, pct: activeUnits.length ? Math.min(100, Math.round((occupied / activeUnits.length) * 100)) : 0 };
   });
 
   const gridW = dayCount * cellW;
@@ -1712,8 +1730,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <input autoFocus value={evDraft.name} onChange={(e) => setEvDraft({ ...evDraft, name: e.target.value })} placeholder="Es. Festa di Santa Lucia, Ponte 25 aprile…" className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
             </label>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="block text-xs font-medium text-dim">Dal<DateField value={evDraft.from} onChange={(v) => setEvDraft({ ...evDraft, from: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
-              <label className="block text-xs font-medium text-dim">Al (escluso)<DateField value={evDraft.to} onChange={(v) => setEvDraft({ ...evDraft, to: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+              <label className="block text-xs font-medium text-dim">Dal<DateField value={evDraft.from} onChange={(v) => { if (v) setEvDraft({ ...evDraft, from: v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+              <label className="block text-xs font-medium text-dim">Al (escluso)<DateField value={evDraft.to} onChange={(v) => { if (v) setEvDraft({ ...evDraft, to: v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
             </div>
             <div className="mt-3 text-xs font-medium text-dim">Colore</div>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -1733,7 +1751,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       {/* Modale Tariffa (intervallo: importo fisso o variazione %) */}
       {rateEdit && (() => {
         const isos = futureIsos(rateEdit.from, rateEdit.to);
-        const sample = isos[0];
+        const sample = isos[0] ?? todayISO; // senza giorni validi (es. solo date passate) non si calcola su un giorno inesistente
         const preview = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(rateEdit.typeId, sample) * (1 + rateEdit.value / 100)));
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
@@ -1744,12 +1762,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <button onClick={() => setRateEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-dim">Dal<DateField min={todayISO} value={rateEdit.from} onChange={(v) => setRateEdit({ ...rateEdit, from: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
-                <label className="block text-xs font-medium text-dim">Al<DateField min={todayISO} value={rateEdit.to} onChange={(v) => setRateEdit({ ...rateEdit, to: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+                <label className="block text-xs font-medium text-dim">Dal<DateField min={todayISO} value={rateEdit.from} onChange={(v) => { if (v) setRateEdit({ ...rateEdit, from: v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+                <label className="block text-xs font-medium text-dim">Al<DateField min={todayISO} value={rateEdit.to} onChange={(v) => { if (v) setRateEdit({ ...rateEdit, to: v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
               </div>
 
               <div className="mt-3 flex items-center rounded-lg border border-line p-0.5">
-                <button onClick={() => setRateEdit({ ...rateEdit, mode: "fixed" })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "fixed" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Importo fisso</button>
+                <button onClick={() => setRateEdit({ ...rateEdit, mode: "fixed", ...(rateEdit.mode === "percent" ? { value: startFixedRate(rateEdit.typeId, rateEdit.from, rateEdit.to, rateEdit.weekendPct) } : {}) })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "fixed" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Importo fisso</button>
                 <button onClick={() => setRateEdit({ ...rateEdit, mode: "percent", value: 10 })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "percent" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Variazione %</button>
               </div>
 
@@ -1758,7 +1776,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <input type="number" value={rateEdit.value} onChange={(e) => setRateEdit({ ...rateEdit, value: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
               </label>
 
-              {isos.length > 1 && isos.some(isWeekendISO) && (
+              {rateEdit.mode === "fixed" && isos.length > 1 && isos.some(isWeekendISO) && (
                 <div className="mt-3 flex items-start gap-2 text-xs text-dim">
                   <input type="checkbox" className="mt-0.5 shrink-0" checked={rateEdit.weekendBoost} onChange={(e) => setRateEdit({ ...rateEdit, weekendBoost: e.target.checked })} />
                   <span>
@@ -1773,7 +1791,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 {" "}Esempio {fmtDMlib(sample)}: <span className="font-mono">€{rateFor(rateEdit.typeId, sample)}</span> → <span className="font-mono font-bold text-[color:var(--focus)]">€{preview}</span>
                 {(() => {
                   const wknd = isos.find(isWeekendISO);
-                  if (!wknd || wknd === sample || !rateEdit.weekendBoost) return null;
+                  if (rateEdit.mode !== "fixed" || isos.length < 2 || !wknd || wknd === sample || !rateEdit.weekendBoost) return null;
                   const boosted = Math.round(preview * (1 + rateEdit.weekendPct / 100));
                   return <> · {fmtDMlib(wknd)} (weekend): <span className="font-mono font-bold text-[color:var(--focus)]">€{boosted}</span></>;
                 })()}
@@ -1782,7 +1800,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div className="mt-4 flex items-center gap-2">
                 <button onClick={resetRate} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash" title="Rimuovi le modifiche e torna alla tariffa base">Ripristina base</button>
                 <button onClick={() => setRateEdit(null)} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-                <button onClick={saveRate} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Applica</button>
+                <button onClick={saveRate} disabled={isos.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica</button>
               </div>
             </div>
           </div>

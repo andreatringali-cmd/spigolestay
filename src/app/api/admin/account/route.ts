@@ -195,7 +195,7 @@ export async function POST(req: Request) {
           id: i.id ?? null,
           number: i.number || null,
           date: i.created ? new Date(i.created * 1000).toISOString() : null,
-          amount: (i.amount_paid ?? i.amount_due ?? 0) / 100,
+          amount: (i.status === "paid" ? (i.amount_paid ?? 0) : (i.amount_remaining ?? i.amount_due ?? 0)) / 100, // pagata: incassato; altrimenti: residuo (amount_paid vale 0 su una fattura aperta)
           currency: (i.currency || "eur").toUpperCase(),
           status: i.status || null,
           paid: i.status === "paid",

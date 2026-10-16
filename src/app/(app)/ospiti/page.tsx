@@ -19,6 +19,8 @@ import Icon from "@/components/Icon";
 import { exportExcel } from "@/lib/export";
 import ContattiDaCorreggere from "./_contatti";
 import { phoneShown } from "@/lib/contacts-check";
+import { refineGroups, planMerges } from "./_merge";
+import { promoRecipientEmail } from "@/lib/promos";
 import { needsBulkGuard } from "@/lib/bulk-guard";
 import { useBulkGuard } from "@/components/useBulkGuard";
 
@@ -31,31 +33,26 @@ export default function OspitiPage() {
   const router = useRouter();
   const { t } = useLang();
   const { guests, bookings, structures, activeStructureId, mergeGuestGroups, updateGuest, deleteGuest } = useData();
-  // Doppioni = stessa persona con più schede: stessa email reale, stesso telefono oppure stesso nome (se il paese o l'email reale non dicono il contrario; le email anonime di Booking/Airbnb non contano).
-  // Una scheda per ospite, con dentro tutto lo storico delle prenotazioni.
-  const dupGroups = useMemo(() => groupDuplicates(guests), [guests]);
+  // Doppioni = stessa persona con più schede: stessa email reale, stesso nome (se il paese o l'email reale non dicono il contrario) oppure stesso telefono
+  // CON nome compatibile (stesso numero ma nomi diversi = persone diverse: agenzia, genitore). Le email anonime di Booking/Airbnb non contano.
+  // NON si uniscono più da sole all'apertura: la pagina propone, mostra l'anteprima e unisce solo dopo conferma.
+  const dupGroups = useMemo(() => refineGroups(groupDuplicates(guests)), [guests]);
   const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);
-  // Li unisce in automatico, in un solo passaggio: all'apertura e quando ne compaiono di nuovi (es. dopo un import).
-  // Tiene la scheda con più prenotazioni e completa i campi mancanti con quelli delle altre.
-  useEffect(() => {
-    if (dupCount === 0) return;
-    const fields = ["email", "phone", "country", "firstName", "lastName", "birthDate", "birthPlace", "citizenship", "docType", "docNumber", "docPlace", "address"] as const;
-    const cnt = new Map<string, number>();
-    bookings.forEach((b) => cnt.set(b.guestId, (cnt.get(b.guestId) ?? 0) + 1));
-    mergeGuestGroups(dupGroups.map((group) => {
-      const keeper = [...group].sort((x, y) => (cnt.get(y.id) ?? 0) - (cnt.get(x.id) ?? 0))[0];
-      const patch: Record<string, unknown> = {};
-      group.forEach((g) => fields.forEach((k) => { if (!keeper[k] && !patch[k] && g[k]) patch[k] = g[k]; }));
-      return { keepId: keeper.id, dropIds: group.filter((g) => g.id !== keeper.id).map((g) => g.id), patch: patch as never };
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dupCount]);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSkip, setMergeSkip] = useState<Set<string>>(new Set()); // gruppi (id della scheda che resta) esclusi dall'unione
+  const bookingCount = useMemo(() => { const m = new Map<string, number>(); bookings.forEach((b) => m.set(b.guestId, (m.get(b.guestId) ?? 0) + 1)); return m; }, [bookings]);
+  const mergePlans = useMemo(() => (mergeOpen ? planMerges(dupGroups, bookingCount) : []), [mergeOpen, dupGroups, bookingCount]);
+  const doMerge = () => {
+    const chosen = mergePlans.filter((p) => !mergeSkip.has(p.keepId));
+    if (chosen.length) mergeGuestGroups(chosen.map((p) => ({ keepId: p.keepId, dropIds: p.dropIds, patch: p.patch })));
+    setMergeOpen(false); setMergeSkip(new Set());
+  };
   const [q, setQ] = useState("");
   const [seg, setSeg] = useState<string>("all"); // segmento CRM: all|repeat|vip|new|ch:<canale>
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
   const [sel, setSel] = useState<Set<string>>(new Set());
   // Cambiando struttura attiva la selezione multipla non ha più senso (potrebbe includere ospiti non visibili).
-  useEffect(() => { setSel(new Set()); }, [activeStructureId]);
+  useEffect(() => { setSel(new Set()); }, [activeStructureId, q, seg]);
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [promos, setPromos] = useState<Promo[]>([]);
   const [pickPromo, setPickPromo] = useState(false);
@@ -109,7 +106,7 @@ export default function OspitiPage() {
   const sorted = [...rows].sort((a, b) => {
     const d = sort.dir === "asc" ? 1 : -1;
     switch (sort.key) {
-      case "name": return a.guest.fullName.localeCompare(b.guest.fullName, "it", { sensitivity: "base" }) * d;
+      case "name": return (a.guest.fullName ?? "").localeCompare(b.guest.fullName ?? "", "it", { sensitivity: "base" }) * d;
       case "nights": return (a.nightsTot - b.nightsTot) * d;
       case "avg": return (a.avg - b.avg) * d;
       case "spent": return (a.spent - b.spent) * d;
@@ -171,7 +168,7 @@ export default function OspitiPage() {
 
   // Esportazione Excel del registro ospiti con colonne a scelta (stesso segmento visibile).
   const EXPORT_COLUMNS: { key: string; label: string; get: (r: (typeof guestSorted)[number]) => string | number }[] = [
-    { key: "nome", label: t("Nome"), get: (r) => r.guest.fullName },
+    { key: "nome", label: t("Nome"), get: (r) => r.guest.fullName ?? "" },
     { key: "email", label: t("Email"), get: (r) => r.guest.email ?? "" },
     { key: "telefono", label: t("Telefono"), get: (r) => (r.guest.phone ? phoneShown(r.guest) : "") },
     { key: "paese", label: t("Paese"), get: (r) => r.guest.country ?? "" },
@@ -194,10 +191,19 @@ export default function OspitiPage() {
   useEffect(() => { setRegLim({ ospiti: PAGE, nl: PAGE }); }, [dq, seg, activeStructureId, sort.key, sort.dir]); // cambia filtro o ordine: si riparte dalla prima pagina
 
   // Selezione multipla → invio promo
-  const selEmails = sorted.filter((r) => sel.has(r.guest.id)).map((r) => r.guest.email).filter(Boolean) as string[];
+  // Solo gli ospiti che si vedono nei registri, con un'email vera (no indirizzi di inoltro OTA) e il consenso marketing / iscrizione newsletter.
+  const visibleIds = new Set([...guestSorted, ...nlSorted].map((r) => r.guest.id));
+  const selRows = [...guestSorted, ...nlSorted].filter((r) => sel.has(r.guest.id) && visibleIds.has(r.guest.id));
+  const selEmails = [...new Set(selRows.map((r) => promoRecipientEmail(r.guest)).filter(Boolean))];
+  const selExcluded = selRows.length - selRows.filter((r) => promoRecipientEmail(r.guest)).length;
   const sendPromoTo = (p: Promo) => {
     if (selEmails.length) {
-      const st = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) : structures[0];
+      // Brand e contatti: la struttura attiva; con "Tutte" quella dei destinatari se è una sola (ultima prenotazione di ciascuno), altrimenti nessun brand.
+      const lastStructOf = (list: { checkIn: string; structureId: string }[]) => [...list].sort((x, y) => (x.checkIn < y.checkIn ? 1 : -1))[0]?.structureId;
+      const stIds = new Set(selRows.filter((r) => promoRecipientEmail(r.guest)).map((r) => lastStructOf(r.list)).filter(Boolean));
+      const st = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId)
+        : structures.length === 1 ? structures[0]
+        : stIds.size === 1 ? structures.find((s) => s.id === [...stIds][0]) : undefined;
       const contatti = [st?.phone, st?.email, st?.website].filter(Boolean).join(" · ");
       window.open(promoMailto(selEmails, p, { struttura: st?.name, contatti }), "_blank");
     }
@@ -217,7 +223,7 @@ export default function OspitiPage() {
     const allR = ids.length > 0 && ids.every((id) => sel.has(id));
     const toggleAllR = () => setSel((prev) => { const n = new Set(prev); if (allR) ids.forEach((id) => n.delete(id)); else ids.forEach((id) => n.add(id)); return n; });
     const nameCell = (guest: typeof list[number]["guest"]) => (
-      <span className="flex min-w-0 items-center gap-1.5 truncate font-medium text-txt">{guest.fullName}
+      <span className="flex min-w-0 items-center gap-1.5 truncate font-medium text-txt">{guest.fullName ?? ""}
         {guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
         {repeatIds.has(guest.id) && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}
         {guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}
@@ -339,6 +345,14 @@ export default function OspitiPage() {
 
       <ContattiDaCorreggere />
 
+      {dupCount > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
+          <span className="text-sm font-semibold text-txt">{dupCount} {t("possibili doppioni")}</span>
+          <span className="text-xs text-dim">{t("Stessa persona con più schede: controlla l'anteprima e conferma, nulla viene unito da solo.")}</span>
+          <button onClick={() => { setMergeSkip(new Set()); setMergeOpen(true); }} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Rivedi e unisci")}</button>
+        </div>
+      )}
+
       {/* Ricerca + segmenti CRM + azioni, tutto in un'unica riga. Stessa griglia dei riepiloghi
           sopra: la ricerca è larga quanto una card e allineata con essa. */}
       <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-4">
@@ -363,7 +377,7 @@ export default function OspitiPage() {
       {sel.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
           <span className="text-sm font-semibold text-txt">{sel.size} {t("selezionati")}</span>
-          <span className="text-xs text-faint">· {selEmails.length} {t("con email")}</span>
+          <span className="text-xs text-faint">· {selEmails.length} {t("contattabili via email")}{selExcluded > 0 ? ` · ${selExcluded} ${t("esclusi (senza consenso marketing o con email di inoltro)")}` : ""}</span>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setSel(new Set())} className="rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Deseleziona")}</button>
             <button onClick={() => setPickPromo(true)} disabled={selEmails.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">✉ {t("Invia promo")} ({selEmails.length})</button>
@@ -373,6 +387,46 @@ export default function OspitiPage() {
 
       <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} open={openReg.ospiti} onToggle={() => setOpenReg((v) => ({ ...v, ospiti: !v.ospiti }))} />
       <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
+
+      {mergeOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
+          <button aria-label="Chiudi" onClick={() => setMergeOpen(false)} className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-2xl rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Unisci i doppioni")}</span><button onClick={() => setMergeOpen(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 text-xs text-dim">{t("Per ogni gruppo resta la scheda con più prenotazioni: le prenotazioni delle altre le passano e i campi mancanti vengono completati (tag in unione, VIP e consenso marketing se presenti in una delle schede, note accodate). L'unione non si può annullare: togli la spunta ai gruppi che non sono la stessa persona.")}</div>
+            <div className="flex flex-col gap-3">
+              {mergePlans.map((p) => {
+                const off = mergeSkip.has(p.keepId);
+                return (
+                  <div key={p.keepId} className={`rounded-xl border border-line p-3 ${off ? "opacity-50" : ""}`}>
+                    <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-txt">
+                      <input type="checkbox" checked={!off} onChange={() => setMergeSkip((s) => { const n = new Set(s); if (n.has(p.keepId)) n.delete(p.keepId); else n.add(p.keepId); return n; })} className="h-4 w-4 accent-[color:var(--focus)]" />
+                      {t("Unisci")} {p.dropped.length + 1} {t("schede")}
+                    </label>
+                    <div className="flex flex-col gap-1">
+                      {[p.keeper, ...p.dropped].map((g) => (
+                        <div key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                          <span className={`w-16 shrink-0 rounded-full px-2 py-0.5 text-center text-[10px] font-bold uppercase ${g.id === p.keepId ? "bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] text-[color:var(--ok)]" : "bg-wash text-faint"}`}>{g.id === p.keepId ? t("resta") : t("si unisce")}</span>
+                          <b className="text-txt">{g.fullName || [g.firstName, g.lastName].filter(Boolean).join(" ") || "—"}</b>
+                          <span className="text-dim">{g.email || "—"}</span>
+                          <span className="text-dim">{g.phone ? phoneShown(g) : "—"}</span>
+                          <span className="text-faint">{g.country || ""}</span>
+                          <span className="ml-auto text-faint">{bookingCount.get(g.id) ?? 0} {t("prenotazioni")}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {Object.keys(p.patch).length > 0 && <div className="mt-2 text-[11px] text-faint">{t("Si aggiunge alla scheda che resta")}: {Object.keys(p.patch).join(", ")}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
+              <button onClick={() => setMergeOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
+              <button onClick={doMerge} disabled={mergePlans.every((p) => mergeSkip.has(p.keepId))} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Unisci")} ({mergePlans.filter((p) => !mergeSkip.has(p.keepId)).length})</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {exportPick && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

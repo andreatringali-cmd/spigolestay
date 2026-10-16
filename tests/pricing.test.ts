@@ -264,3 +264,25 @@ test("rateForDay: la regola weekend della struttura della tipologia batte la per
   assert.equal(rateForDay("A", VEN, all, {}, 25), 100); // feriale: nessuna maggiorazione
   reset();
 });
+
+// ───────────────────────── cascata di eliminazione tipologia ─────────────────────────
+test("roomTypeCascadeIds: la tipologia più tutte le derivate a più livelli, mai le sorelle", () => {
+  const all = [{ id: "M" }, { id: "D1", deriveFrom: "M" }, { id: "D2", deriveFrom: "D1" }, { id: "X" }, { id: "XD", deriveFrom: "X" }];
+  assert.deepEqual([...P.roomTypeCascadeIds("M", all)].sort(), ["D1", "D2", "M"]);
+  assert.deepEqual(P.roomTypeCascadeIds("D1", all).sort(), ["D1", "D2"]);
+  assert.deepEqual(P.roomTypeCascadeIds("X", all).sort(), ["X", "XD"]);
+});
+
+test("bookingsLostWithRoomType: conta anche le prenotazioni delle derivate e quelle nelle camere della tipologia", () => {
+  const all = [{ id: "M" }, { id: "D1", deriveFrom: "M" }, { id: "X" }];
+  const units = [{ id: "u1", roomTypeId: "M" }, { id: "u2", roomTypeId: "X" }];
+  const bk = [
+    { id: "b1", roomTypeId: "D1", unitId: null },   // prenotata sulla derivata, senza camera
+    { id: "b2", roomTypeId: "D1", unitId: "u1" },   // derivata, nella camera della madre
+    { id: "b3", roomTypeId: "X", unitId: "u2" },    // altra tipologia: resta
+    { id: "b4", roomTypeId: "X", unitId: "u1" },    // nella camera della madre: va via con lei; con X se ne va anche perché è sua
+  ];
+  assert.deepEqual(P.bookingsLostWithRoomType("M", all, units, bk).map((b) => b.id).sort(), ["b1", "b2", "b4"]);
+  assert.deepEqual(P.bookingsLostWithRoomType("D1", all, units, bk).map((b) => b.id).sort(), ["b1", "b2"]);
+  assert.deepEqual(P.bookingsLostWithRoomType("X", all, units, bk).map((b) => b.id).sort(), ["b3", "b4"]);
+});

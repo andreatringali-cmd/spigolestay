@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useData } from "@/lib/store";
+import { bookingsLostWithRoomType, roomTypeCascadeIds } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
 import { ROOM_TYPE_OPTIONS, BED_CONFIGS, ROOM_AMENITIES, ROOM_SPACES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
@@ -77,13 +78,14 @@ export default function TipologiaSchedaPage() {
   const remove = async () => {
     if (!existing) return;
     // Eliminare una tipologia cancellerebbe anche le sue prenotazioni (storico e incassi): si blocca finché ce ne sono.
-    const unitIdsOfType = new Set(units.filter((u) => u.roomTypeId === existing.id).map((u) => u.id));
-    const nBookings = bookings.filter((b) => b.roomTypeId === existing.id || (b.unitId && unitIdsOfType.has(b.unitId))).length;
+    // Si contano anche le prenotazioni delle tariffe derivate (e delle loro camere): la cancellazione le porta via a cascata.
+    const nBookings = bookingsLostWithRoomType(existing.id, roomTypes, units, bookings).length;
+    const nDerived = roomTypeCascadeIds(existing.id, roomTypes).length - 1;
     if (nBookings > 0) {
-      await ask({ title: t("Tipologia con prenotazioni"), message: `"${existing.name}" ${t("ha")} ${nBookings} ${t("prenotazioni (anche passate o pagate): eliminarla le cancellerebbe tutte. Sposta le prenotazioni su un'altra tipologia, oppure disattiva la tipologia dalla vendita.")}`, confirmLabel: t("Ho capito") });
+      await ask({ title: t("Tipologia con prenotazioni"), message: `"${existing.name}" ${t("ha")} ${nBookings} ${t("prenotazioni (anche passate o pagate")}${nDerived > 0 ? `, ${t("comprese quelle delle tariffe derivate")}` : ""}${t("): eliminarla le cancellerebbe tutte. Sposta le prenotazioni su un'altra tipologia, oppure disattiva la tipologia dalla vendita.")}`, confirmLabel: t("Ho capito") });
       return;
     }
-    if ((await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere?")}`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); }
+    if ((await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere")}${nDerived > 0 ? ` ${t("e")} ${nDerived} ${t("tariffe derivate")}` : ""}?`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); }
   };
 
   // Imposta il numero esatto di camere della tipologia: crea o rimuove le unità per arrivare al totale.

@@ -161,6 +161,8 @@ export function applyChatPayment(booking: Json, p: ApplyPaymentInput): ApplyPaym
   // La tassa risulta incassata se pagata col link "tassa", oppure se il saldo (tassa inclusa) azzera il residuo.
   const taxApplies = (p.cityTaxCents || 0) > 0 && !p.cityTaxExempt;
   if (taxApplies && (p.kind === "tassa" || p.cents >= before)) patch.cityTaxPaid = true;
+  // Tassa pagata col link: quei soldi sono dentro `paid` (il residuo del soggiorno non deve scendere due volte, vedi incassi.ts totalDue).
+  if (taxApplies && p.kind === "tassa") patch.cityTaxInPaid = true;
   return {
     booking: { ...booking, ...patch },
     applied: true,

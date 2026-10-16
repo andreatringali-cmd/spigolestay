@@ -143,6 +143,18 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
     if (orphanIds.length) await admin.from("alloggiati_schedine").delete().in("id", orphanIds);
   }
 
+  // Schedine GIÀ inviate di queste prenotazioni: non si ricreano mai (né la prenotazione intera né il singolo ospite), altrimenti la stessa schedina
+  // ripartirebbe alla Questura a ogni riapertura/ricalcolo. Si inseriscono solo i guest_ref che non hanno ancora una riga inviata.
+  const sentRefs = new Map<string, Set<string>>();
+  const bookingIds = bookings.map((b) => b.id);
+  for (let i = 0; i < bookingIds.length; i += 100) {
+    const { data: sentRows } = await admin.from("alloggiati_schedine").select("booking_id, guest_ref").eq("tenant_id", tenantId).eq("stato", "inviata").in("booking_id", bookingIds.slice(i, i + 100));
+    for (const s of (sentRows ?? []) as { booking_id: string | null; guest_ref: string | null }[]) {
+      if (!s.booking_id) continue;
+      const set = sentRefs.get(s.booking_id) ?? new Set<string>(); set.add(s.guest_ref ?? "primary"); sentRefs.set(s.booking_id, set);
+    }
+  }
+
   let count = 0;
   for (const b of bookings) {
     // Non toccare le schedine già inviate per questa prenotazione.
@@ -155,6 +167,7 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
     // la prenotazione è "da completare" e NESSUNA sua schedina è "pronta" (resta "da_validare").
     const expectedPax = Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
     const incomplete = people.length < expectedPax;
+    const alreadySent = sentRefs.get(b.id);
     const rows = people.map((g, i) => {
       const ruolo = roleFor(i, people.length, group);
       const errors = [...validateSchedina(g, ruolo)];
@@ -165,7 +178,8 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
         ruolo, stato: errors.length ? "da_validare" : "pronta", errors: errors.length ? errors : null,
       };
     });
-    if (rows.length) { const { error } = await admin.from("alloggiati_schedine").insert(rows); if (!error) count += rows.length; }
+    const toInsert = alreadySent ? rows.filter((row) => !alreadySent.has(row.guest_ref)) : rows;
+    if (toInsert.length) { const { error } = await admin.from("alloggiati_schedine").insert(toInsert); if (!error) count += toInsert.length; }
   }
   return { count };
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 import { findBookingStore, findBookingStoreById } from "@/lib/manage-booking";
 import { buildWalletSaveUrl, googleWalletConfigured } from "@/lib/googleWallet";
 import { uploadPublicAsset, dataUrlToBytes } from "@/lib/email-assets";
@@ -24,6 +26,7 @@ export async function GET(req: Request) {
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ ok: false, reason: "not_configured" });
 
+  if (rateLimited("wp:" + clientIp(req), 30, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
   try {
     const u = new URL(req.url);
     const slug = (u.searchParams.get("slug") || "").trim();

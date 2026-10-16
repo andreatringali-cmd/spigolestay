@@ -12,11 +12,19 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 type Mode = "login" | "signup";
 
+// `next` valido solo se resta sulla STESSA origine: niente "//host", "/\host" (il browser tratta "\" come "/"),
+// caratteri di controllo, né URL assoluti.
+function isSafeNext(next: string): boolean {
+  if (!next.startsWith("/") || next.startsWith("//")) return false;
+  if (next.includes("\\") || /[\u0000-\u001f\u007f]/.test(next)) return false;
+  try { return new URL(next, window.location.origin).origin === window.location.origin; } catch { return false; }
+}
+
 // Dove andare dopo l'accesso: ?next=/percorso (solo interno) oppure un invito in sospeso.
 function afterLoginPath(): string {
   if (typeof window === "undefined") return "/";
   const next = new URLSearchParams(window.location.search).get("next") || "";
-  if (next.startsWith("/") && !next.startsWith("//")) return next;
+  if (isSafeNext(next)) return next;
   try { const code = localStorage.getItem("xn-pending-invite"); if (code) return `/accetta-invito?code=${encodeURIComponent(code)}`; } catch {}
   return "/";
 }

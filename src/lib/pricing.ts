@@ -33,6 +33,26 @@ export const effectiveClosed = (rt: RoomType, all: RoomType[]) => resolveInherit
 
 export const isWeekendISO = (iso: string) => isWeekend(parseISO(iso));
 
+// Eliminando una tipologia (deleteRoomType nello store) vanno via anche TUTTE le tariffe derivate che pendono da lei (a più livelli),
+// le loro camere e le prenotazioni di tutte queste. Logica unica: la usano lo store e le guardie delle pagine che chiedono conferma.
+export function roomTypeCascadeIds(id: string, all: { id: string; deriveFrom?: string }[]): string[] {
+  const ids = new Set<string>([id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const rt of all) {
+      if (rt.deriveFrom && ids.has(rt.deriveFrom) && !ids.has(rt.id)) { ids.add(rt.id); grew = true; }
+    }
+  }
+  return [...ids];
+}
+// Prenotazioni che spariscono con la tipologia (e i suoi discendenti): quelle della tipologia o dei suoi discendenti e quelle nelle loro camere.
+export function bookingsLostWithRoomType<B extends { roomTypeId: string; unitId?: string | null }>(id: string, all: { id: string; deriveFrom?: string }[], units: { id: string; roomTypeId: string }[], bookings: B[]): B[] {
+  const ids = new Set(roomTypeCascadeIds(id, all));
+  const unitIds = new Set(units.filter((u) => ids.has(u.roomTypeId)).map((u) => u.id));
+  return bookings.filter((b) => ids.has(b.roomTypeId) || (!!b.unitId && unitIds.has(b.unitId)));
+}
+
 // Maggiorazione weekend configurabile (regole prezzo in localStorage). Default 25%, attiva.
 // Se l'interruttore è spento (weekendOn: false), la % effettiva è 0: ogni chiamante la applica
 // già come "prezzo base × (1 + weekendPct/100)", quindi 0 la disattiva ovunque senza dover

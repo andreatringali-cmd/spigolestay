@@ -39,3 +39,18 @@ test("planOverlapFix: prima un'altra camera libera (stessa tipologia, poi un'alt
   r = planOverlapFix([bk("a", "s1", "2026-07-01", "2026-07-05"), bk("b", "s1", "2026-07-02", "2026-07-04"), bk("c", "s2", "2026-07-01", "2026-07-05"), bk("d", "d1", "2026-07-01", "2026-07-05")], units, roomTypes);
   assert.deepEqual(r, { moves: [], unassign: ["b"] });
 });
+
+test("planOverlapFix: la camera di destinazione deve avere posto per gli ospiti; se nessuna basta, Da assegnare", () => {
+  const roomTypes = [{ id: "S", structureId: "X", beds: 2 }, { id: "F", structureId: "X", beds: 2, maxOccupancy: 4 }];
+  const units = [{ id: "s1", roomTypeId: "S" }, { id: "s2", roomTypeId: "S" }, { id: "f1", roomTypeId: "F" }];
+  const bk = (id: string, unitId: string, adults: number, children = 0) => ({ id, unitId, checkIn: "2026-07-02", checkOut: "2026-07-04", status: "confirmed", roomTypeId: "S", structureId: "X", adults, children });
+  // 4 ospiti: la Singola s2 (2 posti) libera non basta, va nella Famiglia (maxOccupancy 4)
+  let r = planOverlapFix([{ ...bk("a", "s1", 2), checkIn: "2026-07-01" }, bk("b", "s1", 3, 1)], units, roomTypes);
+  assert.deepEqual(r, { moves: [{ id: "b", unitId: "f1" }], unassign: [] });
+  // 2 ospiti: resta la regola di prima (stessa tipologia per prima)
+  r = planOverlapFix([{ ...bk("a", "s1", 2), checkIn: "2026-07-01" }, bk("b", "s1", 2)], units, roomTypes);
+  assert.deepEqual(r, { moves: [{ id: "b", unitId: "s2" }], unassign: [] });
+  // 4 ospiti e la Famiglia è occupata: nessuna camera basta, Da assegnare (non nella s2 da 2 posti)
+  r = planOverlapFix([{ ...bk("a", "s1", 2), checkIn: "2026-07-01" }, bk("b", "s1", 3, 1), bk("c", "f1", 2)], units, roomTypes);
+  assert.deepEqual(r, { moves: [], unassign: ["b"] });
+});

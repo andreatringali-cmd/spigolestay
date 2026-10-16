@@ -1,6 +1,5 @@
 import type { Booking, Structure } from "@/lib/types";
-import { bookingPaidTotal, cityTaxOf, groupTaxShareOf, cityTaxPayers, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
-import { nights } from "@/lib/dates";
+import { bookingPaidTotal, cityTaxOfBooking, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
 
@@ -9,14 +8,13 @@ import { effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
 export default function BookingAmounts({ b, structure }: { b: Booking; structure?: Structure }) {
   const acc = b.total ?? 0;
   if (!acc) return null;
-  const n = nights(b.checkIn, b.checkOut);
   const clean = b.cleaningFee ?? 0;
   const extras = (b.extras ?? []).filter((e) => e && (e.price || e.name));
   const hasParkingExtra = extras.some((e) => /parcheggi|parking/i.test(e.name || ""));
   const total = bookingPaidTotal(b);
   const paid = b.paid ?? 0;
   const resid = Math.max(0, total - paid);
-  const tax = groupTaxShareOf(b.id) ?? cityTaxOf(structure, cityTaxPayers(structure, b), n, acc, b.cityTaxExempt); // camera di un gruppo: quota della tassa del gruppo
+  const tax = cityTaxOfBooking(structure, b); // camera di un gruppo: quota della tassa del gruppo; altrimenti paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti
   const comm = commissionOf(b);
   const payFee = paymentFeeOf(b);
   const pm = effectivePayMethod(b).method;

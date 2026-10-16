@@ -1,0 +1,73 @@
+Ho trovato 12 problemi nel mio perimetro, i più gravi per primi. Non ho modificato file né scritto sul database: ho solo letto codice e interrogato il DB. Il difetto 1 l'ho riprodotto con una simulazione in sola lettura che usa un client Supabase finto. Il difetto 3 è ragionato dal codice ma da confermare con un rimborso di prova in test mode.
+
+**[ALTA] src/lib/alloggiati/service.ts:147-168 — `syncSchedine` ricrea come "pronta" le schedine già inviate**
+- Scenario: una prenotazione con arrivo negli ultimi 7 giorni ha già una schedina `inviata`. Alla riapertura di `/alloggiati-web`, al check-in online o nel cron, `syncSchedine` cancella solo le righe non inviate (riga 149) e reinserisce una riga "pronta" per ogni ospite (riga 168).
+- Simulazione: con una riga `inviata` per `b1`, `syncSchedine` ha inserito una nuova `pronta:primary`. La versione ISTAT (`istat/service.ts:60-61`) ha invece il controllo `alreadySent`.
+- Effetto: appena `ALLOGGIATI_LIVE` sarà attivo, la Questura riceverà la stessa schedina più volte, ogni notte per 7 giorni.
+- Correzione: saltare le prenotazioni che hanno già una riga `inviata`, oppure inserire solo gli `guest_ref` mancanti.
+
+**[ALTA] src/app/api/manage-booking/cancel/route.ts:40-45 (e gestisci/page.tsx:207) — chiunque abbia il link può annullare un soggiorno già iniziato o finito**
+- Scenario: la route controlla solo che la prenotazione non sia già annullata. Un ospite riapre l'email di conferma dopo il check-out (o una persona a cui l'ha inoltrata) e preme "Annulla prenotazione".
+- Effetto: lo stato diventa `cancelled`, il soggiorno sparisce da incassi, report e ISTAT, e `syncSchedine` cancella le schedine non inviate. Se il rimborso è fuori finestra non c'è rimborso, ma l'annullamento passa lo stesso.
+- Correzione: rifiutare l'annullamento se `checkIn <= oggi` (data di Roma) e se il canale non è `direct`; nascondere il pulsante nella pagina.
+
+**[ALTA, da verificare] src/app/api/manage-booking/cancel/route.ts:56 — il rimborso automatico probabilmente fallisce sempre e il messaggio all'ospite è sbagliato**
+- Scenario: il pagamento nasce come destination charge sull'account piattaforma (`stripe/book/route.ts:106`, `transfer_data`). Il rimborso invece è chiesto con `{ stripeAccount: acct }` e `refund_application_fee`, che valgono per i direct charge.
+- Effetto atteso: Stripe risponde "No such payment_intent", `refunded` resta 0, la prenotazione risulta annullata e l'ospite legge "Nessun rimborso previsto" dopo che la pagina gli aveva promesso `eur(b.paid)` (`gestisci/page.tsx:215-219`).
+- Altri due difetti sulla stessa funzione:
+  - Si rimborsa solo `stripePaymentIntent`, cioè l'acconto. Il saldo pagato al check-in (`pay-confirm`) non ha un suo PI salvato e resta incassato.
+  - Con saldo pagato online ma senza PI iniziale, `canRefund` (`manage-booking/route.ts:37`) è falso e la pagina dice "tariffa non rimborsabile" anche se è rimborsabile.
+- Correzione: rimborsare sull'account piattaforma con `reverse_transfer: true`, salvare un PI per ogni pagamento e rimborsarli tutti; mostrare l'importo realmente rimborsabile.
+- Da confermare: un annullamento di prova in test mode.
+
+**[MEDIA] src/app/api/checkin/route.ts:63 — la tassa di soggiorno nel check-in ignora la soglia età dei minori**
+- Scenario: `cityTaxOf` riceve `adults`, mentre il resto dell'app usa `cityTaxPayers` (adulti + minori sopra `cityTaxChildFreeUnder`, `booking.ts:116`). Esempio: 2 adulti + 1 ragazzo di 15 anni, soglia 14, 2 €/notte, 3 notti.
+- Effetto: il check-in mostra 12 € e fa pagare 12 € su Stripe; l'app calcola 18 €. Restano 6 € di saldo nel gestionale.
+- Correzione: usare `cityTaxOfBookingRaw(st, b)` (o `cityTaxPayers`) come in `chat-pay.ts:17`.
+
+**[MEDIA] src/app/api/checkin/route.ts:163,204 — i prezzi dei servizi extra arrivano dal client e non sono controllati**
+- Scenario: `chosenExtras.price = n(e.price)` accetta anche valori negativi o zero, da un POST anonimo con `b` noto, e viene aggiunto a `extras`. Esempio: `{name:"x", price:-500}`.
+- Effetto: totale e saldo della prenotazione scendono. In più, il dedupe è per nome e la pagina manda "Colazione ×2" dopo "Colazione", quindi un secondo invio duplica l'extra (`checkin/page.tsx:281`).
+- Correzione: ricalcolare il prezzo dal catalogo `structure.extras` per `id` e quantità, con `price >= 0`.
+
+**[MEDIA] src/app/api/checkin/route.ts:103,107 — il GET anonimo restituisce dati personali e documenti**
+- Scenario: basta `?b=<id>` (anche da link inoltrato o da cronologia). La risposta contiene `guest.email/phone/birthDate/docNumber/docType` e gli `extraGuests` con `docNumber` e `birthDate`; vengono tolte solo le foto.
+- Effetto: la pagina li scarta ("compila sempre da capo"), ma il JSON li espone. Per un ospite di ritorno sono i dati di soggiorni precedenti.
+- Correzione: se `!seeDocs`, azzerare nel JSON `docNumber`, `birthDate`, `birthPlace`, `docPlace`, `email`, `phone` e quelli degli `extraGuests`.
+
+**[MEDIA] src/app/api/alloggiati/settings/route.ts:22-26 (+ SettingsModal.tsx:34) — "reveal" restituisce in chiaro password e Webservice Code della Questura**
+- Scenario: `authTenant` non controlla i permessi di sezione e mappa ogni collaboratore sul titolare. Un account "solo Pulizie" può fare POST `{action:"reveal"}`; la stessa lacuna vale per `/api/alloggiati/send`.
+- Effetto: esposizione delle credenziali del portale Polizia di Stato. Il commento nella route dice invece "mai ri-lette dal client". È la lacuna "Fase 3" già nota, ma qui riguarda credenziali statali.
+- Correzione: eliminare `reveal` (mostrare solo "salvata ✓") e richiedere il permesso `impostazioni=edit` lato server.
+
+**[MEDIA] src/app/(app)/pulizie/page.tsx:143,154,195 (vs AddettaPurchases.tsx:125, useSyncedList.ts:49) — scorte e acquisti sovrascritti con dati vecchi**
+- Scenario: nella tab "Scorte" la pagina tiene `stock` e `orders` in uno stato React, mentre `AddettaPurchases` scrive su `localStorage` con `useSyncedList` e lancia `LIST_EVENT`. La pagina ascolta solo `datasync`, `focus` e `visibilitychange`, non `LIST_EVENT` (righe 161-180). Si registra l'acquisto di carta igienica +10, che porta la giacenza a 10; la lista sopra resta a 0; si tocca "Disp." su un altro prodotto e `persistStock(stock.map…)` riscrive la copia vecchia.
+- Effetto: la giacenza torna indietro e un `doRestock` può cancellare l'ordine appena registrato (e il suo movimento in Prima nota).
+- Correzione: usare `useSyncedList` anche nella pagina, o ascoltare `spigolestay:pulizie-list` e rileggere da `localStorage` prima di ogni scrittura.
+
+**[MEDIA] src/app/(app)/pulizie/page.tsx:91,100 — la foto di una segnalazione si salva a piena risoluzione e il fallimento è silenzioso**
+- Scenario: `onIssuePhoto` legge il file con `FileReader` senza ridimensionarlo (una foto da iPhone pesa 3-5 MB in base64) e `persistIssues` ignora l'errore di quota.
+- Effetto: la segnalazione compare a schermo ma non viene salvata né sincronizzata. Dopo un ricaricamento sparisce e il titolare non la vede mai.
+- Correzione: usare `downscaleImage(file, 900, 0.72)` come nel check-in e mostrare un errore se `setItem` fallisce.
+
+**[MEDIA] src/app/checkin/page.tsx:649-655 + src/lib/checkin-flow.ts:38-42 — il check-in risulta "pronto" ma la schedina resta da correggere**
+- Scenario: obbligatori nel form sono solo nome, cognome, data di nascita e numero documento. `validateSchedina` (`alloggiati/service.ts:33-47`) richiede anche sesso, luogo di nascita, cittadinanza e, per i ruoli 16/17/18, tipo documento e luogo di rilascio. Per i co-ospiti il check-in non richiede nulla oltre al nome.
+- Effetto: l'ospite vede "✓ Tutto pronto", poi la schedina nasce `da_validare` ("Sesso mancante · Luogo di nascita mancante…") e il gestore deve raccogliere i dati a mano.
+- Correzione: rendere obbligatori (asterisco e blocco) sesso, luogo di nascita, cittadinanza e luogo di rilascio per i capi, e almeno data/luogo di nascita, sesso e cittadinanza per ogni co-ospite.
+
+**[BASSA] src/lib/manage-booking.ts:52,107-114 (usato da api/checkin/route.ts:239) — i link `/checkin?b=ID` senza `site` non generano la schedina**
+- Scenario: `findBookingStoreById` non valorizza `ownerId` (resta `""`) e fa una scansione completa di `org_state` e `app_state`. Il link senza slug è quello usato da `adempimenti/page.tsx:95` per solleciti WhatsApp/email, e da `adempimenti-2/page.tsx:124` per "Compila tu".
+- Effetto: dopo il check-in `syncSchedine(admin, "", …)` non fa nulla, quindi la schedina non diventa subito pronta come dice il commento. Ogni GET o POST con un `b` sbagliato costa una lettura di tutti i dati di tutti gli utenti: oggi ~2,7 MB, cresce con gli utenti, e il GET non ha rate limit.
+- Correzione: aggiungere `site` ai link generati, valorizzare `ownerId` in `findBookingStoreById`, mettere un rate limit sul GET.
+
+**[BASSA] src/lib/puliziePlan.ts:41 (e pulizie/page.tsx:249) — le prenotazioni `no_show` entrano nel planning pulizie**
+- Scenario: `active` esclude solo `cancelled`. Un no-show dal 14 al 17 sulla camera 3 genera "Arrivo" il 14 e "Riassetto" il 15 e 16.
+- Effetto: la signora riceve lavori inutili e i conteggi di biancheria e asciugamani sono gonfiati. `isLive` e `isActive` escludono già i no-show negli adempimenti.
+- Correzione: filtrare anche `b.status !== "no_show"`.
+
+Altri difetti di gravità bassa che ho verificato ma non incluso:
+- `gestisci/page.tsx:16` formatta gli importi con `toLocaleString("it-IT")` e produce "€ 45,5" e "€ 1234" invece di "€ 45,50" e "€ 1.234,00" (esiste già `lib/format.eur`).
+- `guida-ospiti/page.tsx:685` calcola "oggi" in UTC, quindi tra le 00 e le 02 mostra gli arrivi del giorno prima.
+- `istat/page.tsx:86,91`: con filtro "Tutte" il pulsante "Chiudi giornata (N)" conta tutti i pending ma chiude solo la data di oggi.
+- `istat/page.tsx:96-109`: l'export CSV non neutralizza i valori che iniziano con `=`, `+`, `-` o `@` (iniezione di formule da campi compilati dall'ospite).
+- `checkin/page.tsx:650,678`: `DateTextField` senza `max` accetta date di nascita nel futuro.

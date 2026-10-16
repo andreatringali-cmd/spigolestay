@@ -2,9 +2,8 @@
 // dell'app (incassi.ts / booking.ts), così il residuo mostrato in chat coincide con quello
 // del check-in online e con la scheda prenotazione. Nessun importo inventato.
 import type { Booking, Structure } from "./types";
-import { cityTaxOf, cityTaxPayers, cityTaxShareOf, bookingGrandTotal } from "./booking";
+import { cityTaxOfBooking, cityTaxShareOf, bookingGrandTotal } from "./booking";
 import { balanceDue } from "./incassi";
-import { nights } from "./dates";
 import { toCents, type ChatPayContext } from "./chat-pay-core";
 
 // optimistic (solo browser): con un account Stripe collegato non blocca in anticipo sul flag salvato, che può essere vecchio;
@@ -14,7 +13,7 @@ export function chatPayContext(b: Booking, st: Structure | undefined, optimistic
   const members = b.groupId && all ? all.filter((x) => x.groupId === b.groupId && x.status !== "cancelled" && x.status !== "no_show" && x.channel !== "blocked") : [];
   const tax = members.length > 1 && members.some((x) => x.id === b.id)
     ? cityTaxShareOf(st, members, b.id)
-    : cityTaxOf(st, cityTaxPayers(st, b), nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
+    : cityTaxOfBooking(st, b);
   return {
     totalCents: toCents(bookingGrandTotal(b, st)),
     balanceCents: toCents(balanceDue(b, st)),

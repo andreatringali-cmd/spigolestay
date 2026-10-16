@@ -39,13 +39,20 @@ export default function ImpostazioniFatturaPage() {
   const [ficBusy, setFicBusy] = useState("");
   const [ficMsg, setFicMsg] = useState("");
 
+  // Si legge la riga dell'account di LAVORO (filtro tenant_id): senza filtro un collaboratore che vede due righe (la propria e quella del titolare) otteneva un errore ignorato e un form vuoto, poi sovrascritto dal Salva.
+  const [loadErr, setLoadErr] = useState("");
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
-    supabase.from("tenant_invoice_settings").select("*").maybeSingle().then(({ data }) => {
-      if (data) setS({ ...DEF, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null)) as Partial<Settings> });
+    if (!tenantId) { if (!user) setLoading(false); return; } // un collaboratore aspetta di conoscere l'account di lavoro
+    let off = false;
+    void Promise.resolve(supabase.from("tenant_invoice_settings").select("*").eq("tenant_id", tenantId).maybeSingle()).then(({ data, error }) => {
+      if (off) return;
+      if (error) setLoadErr("Impossibile leggere le impostazioni: " + error.message + ". Il salvataggio è disattivato per non sovrascriverle.");
+      else if (data) setS({ ...DEF, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null)) as Partial<Settings> });
       setLoading(false);
     });
-  }, []);
+    return () => { off = true; };
+  }, [tenantId, user]);
 
   const set = (patch: Partial<Settings>) => { setDirty(true); setS((p) => ({ ...p, ...patch })); };
   const [dirty, setDirty] = useState(false);
@@ -107,6 +114,8 @@ export default function ImpostazioniFatturaPage() {
 
   const save = async () => {
     if (!supabase || !user) { setMsg("Devi essere connesso."); return; }
+    if (!tenantId) { setMsg("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
+    if (loadErr) { setMsg(loadErr); return; }
     if (hasErrors(issues)) { setMsg("Correggi i campi segnati in rosso prima di salvare."); return; }
     setSaving(true); setMsg("");
     const regime_note = s.regime === "forfettario" && !s.regime_note.trim() ? FORFETTARIO_NOTE : s.regime_note;
@@ -117,7 +126,7 @@ export default function ImpostazioniFatturaPage() {
       address: s.address.trim(), city: s.city.trim(), cap: s.cap.trim(), province: s.province.trim().toUpperCase(),
       pec: s.pec.trim().toLowerCase(), sdi: s.sdi.trim().toUpperCase(), regime_note,
     };
-    const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: tenantId ?? user.id, ...clean, updated_at: new Date().toISOString() });
+    const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: tenantId, ...clean, updated_at: new Date().toISOString() });
     setSaving(false);
     if (!error) { setS(clean); setDirty(false); }
     setMsg(error ? "Errore: " + error.message : "Impostazioni salvate ✓");
@@ -129,11 +138,12 @@ export default function ImpostazioniFatturaPage() {
   const fieldMsg = (m?: string, soft?: boolean) => (m ? <span className="mt-0.5 block text-[11px] font-medium" style={{ color: soft ? "var(--warn)" : "var(--err)" }}>{m}</span> : null);
 
   if (loading) return <div className="p-6 text-sm text-faint">Caricamento…</div>;
+  // (il messaggio di errore di lettura è sotto, accanto al messaggio di salvataggio)
 
   return (
     <div>
       <PageHeader title="Impostazioni fattura" subtitle="Regime, dati dell'emittente e servizio di invio"
-        actions={<div className="flex items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button></div>} />
+        actions={<div className="flex items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<button onClick={save} disabled={saving || !tenantId || !!loadErr} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -261,6 +271,7 @@ export default function ImpostazioniFatturaPage() {
           </div>
         </Card>
       </div>
+      {loadErr && <p className="mt-3 text-sm font-medium text-[color:var(--err)]">{loadErr}</p>}
       {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
     </div>
   );

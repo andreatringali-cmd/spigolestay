@@ -125,7 +125,7 @@ export async function GET(req: Request) {
     };
 
     let query = admin.from("profiles").select("*", { count: "exact" });
-    if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%`);
+    if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%,structure_names.ilike.%${q}%`);
     if (status === "paganti") query = query.not("stripe_customer_id", "is", null);
     else if (status === "none") query = query.is("stripe_customer_id", null);
     else if (status === "trialing") query = query.eq("subscription_status", "trialing");

@@ -38,6 +38,16 @@ export async function POST(req: Request) {
       const m = (session.metadata ?? {}) as Record<string, string>;
       if (session.payment_status === "paid" && m.kind === "book" && m.slug) {
         const pi = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id || "");
+        // Destination charge: l'evento è sulla piattaforma (event.account vuoto). Il conto della struttura
+        // si ricava dal payment_intent (transfer_data.destination) per salvarlo sulla prenotazione. Best-effort.
+        let acctId = event.account || "";
+        if (!acctId && pi) {
+          try {
+            const pIntent = await stripe.paymentIntents.retrieve(pi);
+            const dest = pIntent.transfer_data?.destination;
+            acctId = typeof dest === "string" ? dest : (dest?.id || "");
+          } catch { /* il rimborso non dipende da questo dato */ }
+        }
         // Registra la prenotazione (idempotente sul token) — stessa logica del ritorno pagina.
         const pbRes = await internalFetch(`${origin}/api/public-booking`, {
           method: "POST", headers: { "content-type": "application/json" },
@@ -47,7 +57,7 @@ export async function POST(req: Request) {
             total: Number(m.tot) || 0, deposit: Number(m.dep) || 0,
             note: m.note || "", code: m.code || "", token: m.token || session.id,
             planName: m.rpn || "", refundable: m.ref === "1", cancelDays: Number(m.cd) || 0,
-            stripePaymentIntent: pi, stripeSessionId: session.id, stripeAccountId: event.account || "",
+            stripePaymentIntent: pi, stripeSessionId: session.id, stripeAccountId: acctId,
             guest: { firstName: (m.gn || "").split(" ")[0] || "", lastName: (m.gn || "").split(" ").slice(1).join(" "), email: m.ge || "", phone: m.gp || "", country: m.gc || "" },
           }),
         });
@@ -88,7 +98,14 @@ export async function POST(req: Request) {
       // Riconciliazione rimborsi/dispute: annota sull'ente giusto se ritroviamo il payment_intent.
       const ch = event.data.object as Stripe.Charge;
       const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : (ch.payment_intent?.id || "");
-      if (pi) await reconcileRefund(pi, event.account || "", event.type === "charge.dispute.created");
+      const isDispute = event.type === "charge.dispute.created";
+      // Rimborso PARZIALE (es. 20 € su 200 €): la prenotazione non si annulla, si annota soltanto.
+      const partialCents = !isDispute && Number(ch.amount) > 0 && Number(ch.amount_refunded) < Number(ch.amount) ? Math.max(0, Math.round(Number(ch.amount_refunded) || 0)) : 0;
+      if (pi) {
+        const res = await reconcileRefund(pi, event.account || "", isDispute, partialCents);
+        // Prenotazione trovata ma scrittura non riuscita (conflitto di versione): 500 così Stripe ritenta l'evento.
+        if (res === "failed") return NextResponse.json({ ok: false, error: "reconcile_write_failed" }, { status: 500 });
+      }
     }
 
     // Avvisi al TITOLARE per eventi importanti di abbonamento/fatturazione della PIATTAFORMA (!event.account).
@@ -263,26 +280,32 @@ async function notifyAdmins(origin: string, subject: string, text: string) {
 }
 
 // Trova la prenotazione col dato payment_intent (in app_state o org_state) e annota rimborso/dispute.
-async function reconcileRefund(paymentIntent: string, account: string, isDispute: boolean) {
+// Esito: "ok" (annotata), "none" (nessuna prenotazione con quel payment_intent), "failed" (trovata ma scrittura persa sul rev).
+async function reconcileRefund(paymentIntent: string, account: string, isDispute: boolean, partialRefundCents = 0): Promise<"ok" | "none" | "failed"> {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!sbUrl || !service) return;
+  if (!sbUrl || !service) return "none";
   const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
   const DATA_KEY = "spigolestay:data:v1";
   type Json = Record<string, unknown>;
   const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
   const parse = (data: unknown): Json => { const b = ((data ?? {}) as Record<string, string>) || {}; try { return JSON.parse(b[DATA_KEY] || "{}") as Json; } catch { return {}; } };
 
-  const patchInRow = async (table: "app_state" | "org_state", col: "user_id" | "org_id", val: string) => {
+  const patchOnce = async (table: "app_state" | "org_state", col: "user_id" | "org_id", val: string): Promise<"ok" | "none" | "conflict"> => {
     const { data: row } = await admin.from(table).select("data, rev").eq(col, val).maybeSingle();
-    if (!row) return false;
+    if (!row) return "none";
     const blob = (((row as { data?: unknown }).data ?? {}) as Record<string, string>) || {};
     const d = parse((row as { data?: unknown }).data);
     const bookings = arr(d.bookings);
     const idx = bookings.findIndex((b) => (b as { stripePaymentIntent?: string }).stripePaymentIntent === paymentIntent);
-    if (idx < 0) return false;
+    if (idx < 0) return "none";
     const bk = bookings[idx] as Json;
-    if (isDispute) bookings[idx] = { ...bk, dispute: true, updatedAt: Date.now(), note: [String(bk.note || ""), "⚠ Dispute Stripe aperta"].filter(Boolean).join(" · ") };
+    if (partialRefundCents > 0) {
+      // Rimborso parziale: solo una nota (idempotente sul valore cumulato), nessun cambio di stato.
+      const mark = `Rimborso parziale Stripe € ${(partialRefundCents / 100).toFixed(2).replace(".", ",")}`;
+      if (String(bk.note || "").includes(mark)) return "ok";
+      bookings[idx] = { ...bk, updatedAt: Date.now(), note: [String(bk.note || ""), mark].filter(Boolean).join(" · ") };
+    } else if (isDispute) bookings[idx] = { ...bk, dispute: true, updatedAt: Date.now(), note: [String(bk.note || ""), "⚠ Dispute Stripe aperta"].filter(Boolean).join(" · ") };
     else bookings[idx] = { ...bk, status: "cancelled", cancelledBy: (bk.cancelledBy as string) || "host", cancelledAt: (bk.cancelledAt as string) || new Date().toISOString(), updatedAt: Date.now() };
     d.bookings = bookings;
     const nb = { ...blob, [DATA_KEY]: JSON.stringify(d) };
@@ -290,16 +313,23 @@ async function reconcileRefund(paymentIntent: string, account: string, isDispute
     let w = admin.from(table).update({ data: nb, updated_at: new Date().toISOString() }).eq(col, val);
     if (typeof rev === "number") w = w.eq("rev", rev);
     const { data: u } = await w.select("rev");
-    return !!(u && u.length > 0);
+    return u && u.length > 0 ? "ok" : "conflict";
   };
+  // Un retry su conflitto di rev (il proprietario ha salvato nel frattempo): riletto e riapplicato.
+  const patchInRow = async (table: "app_state" | "org_state", col: "user_id" | "org_id", val: string) => {
+    const r1 = await patchOnce(table, col, val);
+    return r1 === "conflict" ? await patchOnce(table, col, val) : r1;
+  };
+  let conflict = false;
 
   // Cerca prima nelle org (le strutture in società tengono qui le prenotazioni), poi nei personali.
   const { data: orgs } = await admin.from("org_state").select("org_id").limit(1000);
-  for (const o of arr(orgs)) { if (await patchInRow("org_state", "org_id", String((o as { org_id?: string }).org_id))) return; }
+  for (const o of arr(orgs)) { const r = await patchInRow("org_state", "org_id", String((o as { org_id?: string }).org_id)); if (r === "ok") return "ok"; if (r === "conflict") conflict = true; }
   // Restringi i personali a quelli collegati a questo conto Stripe se possibile.
   const { data: users } = await admin.from("app_state").select("user_id").limit(5000);
-  for (const u of arr(users)) { if (await patchInRow("app_state", "user_id", String((u as { user_id?: string }).user_id))) return; }
+  for (const u of arr(users)) { const r = await patchInRow("app_state", "user_id", String((u as { user_id?: string }).user_id)); if (r === "ok") return "ok"; if (r === "conflict") conflict = true; }
   void account;
+  return conflict ? "failed" : "none";
 }
 
 // Mappa configurabile price.id → chiave piano, letta da STRIPE_PRICE_MAP (JSON), es.

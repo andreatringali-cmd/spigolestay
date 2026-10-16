@@ -342,6 +342,49 @@ test("conflitto di revisione con la stessa prenotazione gia' scritta da un'altra
   assert.equal(sc.state().bookings.length, 1);
 });
 
+test("conflitto di revisione: se nel frattempo la camera scelta e' stata presa, ripiega su un'altra libera (ricontrollo sui dati freschi)", async () => {
+  const sc = scenario();
+  let bumped = false;
+  sc.db.afterSelect = (table, db) => {
+    if (table === "app_state" && !bumped) {
+      bumped = true;
+      const row = db.tables.app_state[0] as any;
+      const d = JSON.parse(row.data[DATA_KEY]); d.bookings.push(seed({ id: "presa-u1", unitId: "u1" })); row.data[DATA_KEY] = JSON.stringify(d); row.rev = 9;
+    }
+  };
+  const r = await post(body());
+  assert.equal(r.status, 200);
+  const mine = sc.state().bookings.find((b: any) => b.extId === "site:casa-ortigia:tok-1");
+  assert.equal(mine.unitId, "u2");
+});
+
+test("conflitto di revisione: se nel frattempo tutte le camere sono state prese, l'anonimo riceve 409 e non si scrive nulla", async () => {
+  const sc = scenario();
+  let bumped = false;
+  sc.db.afterSelect = (table, db) => {
+    if (table === "app_state" && !bumped) {
+      bumped = true;
+      const row = db.tables.app_state[0] as any;
+      const d = JSON.parse(row.data[DATA_KEY]);
+      d.bookings.push(seed({ id: "presa-u1", unitId: "u1" }), seed({ id: "presa-u2", unitId: "u2" }));
+      row.data[DATA_KEY] = JSON.stringify(d); row.rev = 9;
+    }
+  };
+  const r = await post(body());
+  assert.equal(r.status, 409); assert.equal(r.json.error, "no_availability");
+  assert.equal(sc.state().bookings.length, 2);
+  assert.ok(!sc.state().bookings.some((b: any) => b.extId === "site:casa-ortigia:tok-1"));
+});
+
+test("importi ai centesimi: totale 123,50 e caparra 37,05 non vengono arrotondati all'euro", async () => {
+  const sc = scenario(baseData(), { internal: true });
+  const r = await post(body({ total: 123.5, deposit: 37.05, stripePaymentIntent: "pi_1" }));
+  assert.equal(r.status, 200);
+  const b = sc.state().bookings[0];
+  assert.equal(b.total, 123.5);
+  assert.equal(b.paid, 37.05);
+});
+
 test("errore di scrittura nel database = 500 write_error", async () => {
   const sc = scenario();
   sc.db.failUpdate = { app_state: "disco pieno" };

@@ -44,6 +44,13 @@ export async function POST(req: Request) {
     if (session.payment_status !== "paid") return NextResponse.json({ error: "not_paid", status: session.payment_status }, { status: 402 });
 
     const m = (session.metadata ?? {}) as Record<string, string>;
+    // Solo sessioni nate da un preventivo (kind "quote"): niente "book"/"chatpay" né pagamenti
+    // del saldo al check-in (che portano bookingId e sono registrati da pay-confirm).
+    if (m.kind !== "quote" || m.bookingId) return NextResponse.json({ error: "not_a_quote" }, { status: 400 });
+    // L'importo realmente incassato deve coincidere con quello dichiarato nei metadata (dep = importo da pagare ora).
+    if (m.dep !== undefined && m.dep !== "" && Math.abs(Math.round((Number(m.dep) || 0) * 100) - (session.amount_total ?? 0)) > 1) {
+      return NextResponse.json({ error: "amount_mismatch" }, { status: 400 });
+    }
     const amountPaid = Math.round(session.amount_total ?? 0) / 100; // in euro, ai centesimi
     const uid = (m.uid || "").trim();
     const ownerEmail = (m.oe || "").trim().toLowerCase();
@@ -98,7 +105,7 @@ export async function POST(req: Request) {
     if (ge) { const g = guests.find((x) => (x.email || "").toLowerCase() === ge.toLowerCase()); if (g) guestId = g.id; }
     if (!guestId) {
       guestId = (globalThis.crypto?.randomUUID?.() ?? `g_${Date.now()}`);
-      guests.push({ id: guestId, name: gn || ge || "Ospite", email: ge || undefined });
+      guests.push({ id: guestId, fullName: gn || ge || "Ospite", firstName: (gn || "").split(" ")[0] || undefined, lastName: (gn || "").split(" ").slice(1).join(" ") || undefined, email: ge || undefined });
       data.guests = guests;
     }
 
@@ -156,7 +163,7 @@ export async function POST(req: Request) {
       const bk2 = (Array.isArray(d2.bookings) ? d2.bookings : []) as Booking[];
       if (bk2.some((b) => b.extId === extId)) return NextResponse.json({ ok: true, already: true });
       const gs2 = (Array.isArray(d2.guests) ? d2.guests : []) as (Json & { id: string })[];
-      if (!gs2.some((g) => g.id === guestId)) { gs2.push({ id: guestId, name: gn || ge || "Ospite", email: ge || undefined } as Json & { id: string }); d2.guests = gs2; }
+      if (!gs2.some((g) => g.id === guestId)) { gs2.push({ id: guestId, fullName: gn || ge || "Ospite", firstName: (gn || "").split(" ")[0] || undefined, lastName: (gn || "").split(" ").slice(1).join(" ") || undefined, email: ge || undefined } as Json & { id: string }); d2.guests = gs2; }
       bk2.push(booking); d2.bookings = bk2; blob2[DATA_KEY] = JSON.stringify(d2);
       const { error: wErr2 } = await admin.from("app_state").update({ data: blob2, updated_at: new Date().toISOString() }).eq("user_id", ownerId);
       if (wErr2) return NextResponse.json({ error: "write_error", message: wErr2.message }, { status: 500 });

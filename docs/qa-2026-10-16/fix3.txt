@@ -1,0 +1,45 @@
+Tutti i punti assegnati sono fatti, in parte con limiti o a metà (indicati sotto). `npx tsc --noEmit` non dà errori nel mio perimetro. I test mirati passano: 6 nuovi in `manage-booking-cancel`, 4 nuovi in `stripe-quote`, e `public-booking` a 40 su 42 (3 nuovi, più 2 già segnati "da verificare"). `whatsapp-send` ha fallito una volta nella suite completa (`npm test`) ma passa da solo. Il perimetro era `src/app/api/**` (senza `checkin/route.ts` e `metasearch`) più i file indicati nel compito.
+
+**r1**
+- **#1 stripe/quote**: FATTO. I metadata passano per una whitelist di chiavi, e `kind` e `source` vengono impostati per ultimi. `quote/confirm` accetta solo `kind="quote"` e rifiuta le sessioni con `bookingId`. Controlla anche che `amount_total` coincida con `dep` nei metadata. L'importo è comunque quello dichiarato dal chiamante, quindi il rischio non sparisce del tutto: vedi sotto.
+- **#2 forniture/confirm**: FATTO. Richiede `metadata.order_id === orderId` e `kind` supply_order, `amount_total === total_cents`, e rifiuta un `payment_intent` già usato su un altro ordine.
+- **#3 org/unshare**: FATTO. Prima di smantellare l'org azzera `channex_map.org_id`.
+- **#4 manage-booking/cancel**: FATTO, in `cancel/route.ts` e `api/stripe/webhook/route.ts`.
+  - Rifiuta se il canale non è `direct` (403) o se `checkIn` è oggi o prima in fuso Roma (409).
+  - Il rimborso usa `refunds.create` senza `stripeAccount`, con `reverse_transfer:true` e una `idempotencyKey`.
+  - Se il rimborso fallisce risponde 502 e non annulla.
+  - Se era dovuto un rimborso ma non c'è un pagamento online registrato, l'email al gestore avvisa di gestirlo a mano.
+  - Il webhook ora salva `stripeAccountId` ricavandolo da `transfer_data.destination` del payment intent.
+- **#7 public-lead**: FATTO. Regex email con i backslash corretti.
+- **#8 public-booking**: FATTO. Importi ai centesimi. Dopo un conflitto di `rev` rilegge, rifà il controllo di disponibilità (anche con camere in condivisione) e scrive con il lock sul `rev`.
+  - Se non c'è più posto, l'anonimo riceve 409. Un pagamento già incassato viene registrato senza camera, con l'avviso "da assegnare a mano".
+  - Se il `rev` cambia ancora risponde 409 `write_conflict`; il webhook Stripe riprova.
+- **#9 webhook charge.refunded**: FATTO. Annulla solo se `amount_refunded >= amount`; per un rimborso parziale aggiunge solo una nota, senza duplicarla. Fa un retry sul conflitto di `rev` e risponde 500 se la prenotazione c'è ma la scrittura non riesce. Non ho aggiunto una ricerca con indice (serve una tabella nuova).
+- **#12 rate limit**: FATTO.
+  - Aggiunto limite per IP su `manage-booking` (GET), `cancel`, `modify`, `wallet/pass` e `checkin/pay-confirm`.
+  - In `findBookingStoreById` ho messo un tetto globale di 60 scansioni al minuto per istanza, quindi anche `GET /api/checkin` ne beneficia senza toccare quel file. Oltre il tetto restituisce "non trovata".
+- **#11 stripe-guard**: PARZIALE. Se il conto Stripe ha già un proprietario in `metadata.uid` diverso dall'utente, non basta più scrivere l'`acct_` nella propria struttura. Resta il fallback sui dati scritti dal client per i conti senza `metadata.uid` e per i soci di un'org. La correzione piena richiede di impostare `metadata.uid` su tutti i conti esistenti (backfill) o una tabella lato server dei conti collegati. Serve anche togliere `stripeAccount` da `GET /api/checkin`, che è fuori perimetro.
+
+**r2**
+- **#5 admin**: FATTO in `all-payments`, `payments` e `account`. Una fattura pagata mostra `amount_paid`, altrimenti `amount_remaining` (poi `amount_due`).
+- **#7 org/invite**: FATTO. Nel ramo "struttura già condivisa" richiede ruolo `owner` e membership non disattivata, altrimenti 403.
+- **#8 org/role e org/invite**: FATTO. Ho tenuto `ilike` (le email in `profiles` e nella lista accessi potrebbero non essere in minuscolo) ma con escape di `\ % _`.
+- **#11 admin**: PARZIALE, fatti tre punti su quattro:
+  - Le card "Incassato" e "Da recuperare" sommano ora le fatture filtrate.
+  - La ricerca copre anche `structure_names`.
+  - `all-payments` legge fino a 500 fatture con paginazione automatica e le etichette dicono "ultime 500".
+  - NON FATTO: il filtro "Solo paganti" resta com'è. Allinearlo a `isPayer` richiede una logica che il filtro lato server non può esprimere in modo semplice.
+- **#12 login**: FATTO. `next` è valido solo se non contiene backslash né caratteri di controllo e se `new URL(next, origin).origin === origin`.
+
+**r7 mercato/page.tsx**: FATTO. I consensi partono tutti a false. `market_share`, `market_daily` e `market_profile` si scrivono solo se esiste già una scelta salvata o se l'utente tocca un interruttore.
+
+**Rischi e decisioni per Andrea**
+1. **r1 #1, rischio residuo**: l'importo e il proprietario del preventivo arrivano ancora dal client, perché `stripe/quote` è anonimo. Chiuderlo del tutto vuol dire ricalcolare l'importo sul preventivo salvato (tabella `quotes`, RPC `get_quote`, il cui schema non è nel repo) oppure richiedere l'autenticazione.
+2. **Nuovi errori per l'ospite**: sulla pagina `/gestisci` l'annullamento di un soggiorno già iniziato o di un canale non diretto ora dà un errore. La pagina mostra già il `message` della risposta.
+3. **Fuori perimetro, da fare altrove**:
+   - `gestisci/page.tsx`: nascondere il pulsante "Annulla" quando non è applicabile.
+   - `checkin/route.ts`: rate limit sul GET e il campo `stripeAccount` esposto.
+   - `server-auth.ts`: `isUserAllowed` (r1 #5).
+   - `checkin/route.ts` r1 #6: extra con prezzo scelto dal client.
+4. **`checkin/pay-confirm`**: non verifica che la sessione Stripe appartenga a quella prenotazione (`metadata.bookingId`). Non era assegnato; ho aggiunto solo il rate limit.
+5. **File di test aggiunti**: `tests/manage-booking-cancel.test.ts`, `tests/stripe-quote.test.ts`, `tests/helpers/stripe-stub-loader.mjs` (finto del pacchetto `stripe`) e 3 test in `tests/public-booking.test.ts`. Non ho scritto test per il webhook.

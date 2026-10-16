@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, cashOrgOf, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, groupOpeningRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, cashOrgOf, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, groupOpeningRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid, nextRecurrenceStart } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -82,6 +82,17 @@ export default function CassaPage() {
   const { user } = useAuth();
   const orgForStruct = (sid?: string) => cashOrgOf(allStructures.find((s) => s.id === sid)?.orgId); // org della cassa condivisa (soci) della struttura, se c'è
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
+  // Senza l'account di lavoro (collaboratore, risposta del server in arrivo) non si scrive: il dato finirebbe sull'account sbagliato o andrebbe perso in silenzio.
+  const needTenant = (): string | null => { if (tenantId) return tenantId; toast(t("Account di lavoro non ancora caricato: riprova tra qualche secondo."), "error"); return null; };
+  // Importo scritto a mano (formato italiano) → euro al centesimo, oppure null (con avviso a video) se vuoto, non valido o non positivo.
+  const readAmount = (txt: string): number | null => {
+    if (!txt.trim()) { toast(t("Inserisci un importo maggiore di zero."), "error"); return null; }
+    const n = parseDecimalIT(txt);
+    if (n === null) { toast(t("Importo non valido: scrivi un numero, per esempio 1234,56."), "error"); return null; }
+    const a = roundCents(n);
+    if (a <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return null; }
+    return a;
+  };
   // Acquisti di materiale (modulo Pulizie): il movimento ha lo stesso id dell'acquisto, quindi da qui si risale allo scontrino allegato.
   const [pOrders] = useSyncedList<PulizieOrder>(KEY_ORDERS);
   const receiptOf = useMemo(() => receiptsByMovement(pOrders), [pOrders]);
@@ -139,13 +150,13 @@ export default function CassaPage() {
       .catch((e) => { rollback(); setSaveErr(`${what} non salvato: ${e instanceof Error ? e.message : "errore di rete"}. La modifica è stata annullata, riprova.`); });
   };
   useEffect(() => {
-    if (!user) return;
+    if (!user || !tenantId) return; // un collaboratore aspetta di conoscere l'account di lavoro
     (async () => {
-      await migrateLocalCash(tenantId ?? user.id); // una-tantum: sale i vecchi dati locali sul server
+      await migrateLocalCash(tenantId); // una-tantum: sale i vecchi dati locali sul server
       const c = await loadCash();
       setManual(c.movements); setRules(c.rules); setPaid(c.paid);
     })();
-  }, [user]);
+  }, [user, tenantId]);
 
   const today = todayISO();
 
@@ -166,19 +177,23 @@ export default function CassaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rules, scopeKey, today, paidSet]);
   const dropPaid = (keys: string[]) => setPaid((p) => p.filter((x) => !keys.includes(x)));
-  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(tenantId ?? user.id, [k], () => orgForStruct(r.structureId)), "Il pagamento", () => dropPaid([k])); };
+  const markPaid = (r: Rule, iso: string) => { const tid = needTenant(); if (!tid) return; const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(tid, [k], () => orgForStruct(r.structureId)), "Il pagamento", () => dropPaid([k])); };
   const [pendAmt, setPendAmt] = useState<Record<string, string>>({}); // importo reale digitato per le scadenze a importo variabile
   const confirmVariable = (r: Rule, iso: string) => {
     const key = `${r.id}|${iso}`;
-    const amt = roundCents(parseFloat((pendAmt[key] ?? String(r.amount)).replace(",", ".")) || 0);
+    const tid = needTenant(); if (!tid) return;
+    const txt = pendAmt[key] ?? String(r.amount);
+    const parsed = txt.trim() ? parseDecimalIT(txt) : 0;
+    if (parsed === null) { toast(t("Importo non valido: scrivi un numero, per esempio 1234,56."), "error"); return; }
+    const amt = roundCents(parsed);
     if (amt <= 0) { toast(t("Inserisci l'importo reale."), "error"); return; }
     const mov: Mov = { id: uid(), date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: amt, conto: r.conto, structureId: r.structureId };
     setManual((prev) => [mov, ...prev]);
-    if (tenantId) checkWrite(insertMovement(tenantId, mov, orgForStruct(mov.structureId)), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    checkWrite(insertMovement(tid, mov, orgForStruct(mov.structureId)), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     markPaid(r, iso);
     toast(`${t("Registrato")} · ${r.desc} · ${eur(amt)}`, "success");
   };
-  const markAllPaid = () => { const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(tenantId ?? user.id, keys, (key) => orgForStruct(rules.find((r) => key.startsWith(r.id + "|"))?.structureId)), "I pagamenti", () => dropPaid(keys)); };
+  const markAllPaid = () => { const tid = needTenant(); if (!tid) return; const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(tid, keys, (key) => orgForStruct(rules.find((r) => key.startsWith(r.id + "|"))?.structureId)), "I pagamenti", () => dropPaid(keys)); };
 
   // Prossime scadenze (dopo oggi).
   const upcoming = useMemo(() => {
@@ -357,7 +372,9 @@ export default function CassaPage() {
   const openingTotal = opening ? sumCents(scopeStructs.flatMap((s) => contiOf(s.id).map((c) => parseDecimalIT(amountOf(s.id, c.key)) ?? 0))) : 0;
   const saveOpening = async () => {
     if (!opening) return;
+    const tid = needTenant(); if (!tid) return;
     const pairs = scopeStructs.flatMap((s) => contiOf(s.id).map((c) => ({ s, c })));
+    { const bad = pairs.find(({ s, c }) => { const txt = amountOf(s.id, c.key).trim(); return !!txt && parseDecimalIT(txt) === null; }); if (bad) { toast(`${t("Importo non valido")} · ${bad.s.name} · ${bad.c.label}`, "error"); return; } }
     const curOf = (sid: string, key: string) => { const op = openingOf(manual, sid, key); return op ? signedAmount(op) : 0; };
     // Protezione: se si sta per portare a zero un saldo che oggi ha un importo, si chiede conferma (è così che si perde il saldo per errore).
     const azzerati = pairs.filter(({ s, c }) => { const txt = amountOf(s.id, c.key).trim(); const v = txt ? parseDecimalIT(txt) : null; return v === 0 && Math.abs(curOf(s.id, c.key)) > 0.005; });
@@ -382,7 +399,7 @@ export default function CassaPage() {
     setManual((prev) => [...newMovs, ...prev.filter((x) => !oldIds.has(x.id))]);
     if (user) {
       for (const o of oldList) checkWrite(deleteMovement(o.id), "Il saldo di partenza precedente", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
-      for (const mv of newMovs) checkWrite(insertMovement(tenantId ?? user.id, mv, orgForStruct(mv.structureId)), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
+      for (const mv of newMovs) checkWrite(insertMovement(tid, mv, orgForStruct(mv.structureId)), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
     }
     setOpening(null);
   };
@@ -441,8 +458,8 @@ export default function CassaPage() {
   };
   const saveOcc = () => {
     if (!occCtx) return;
-    const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0);
-    if (amt <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return; }
+    const amt = readAmount(form.amount);
+    if (amt === null) return;
     if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
     const desc = form.desc.trim() || occCtx.orig.desc;
     const o = occCtx.orig;
@@ -466,8 +483,8 @@ export default function CassaPage() {
   const add = () => {
     if (editingMov === OCC_MOV) { saveOcc(); return; }
     if (!form.struttura) { toast(t("Scegli la struttura."), "error"); return; } // con più strutture (o tutte) la struttura va scelta: niente voci «comuni» per sbaglio
-    const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0); // al centesimo (prima era arrotondato all'euro)
-    if (amt <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return; }
+    const amt = readAmount(form.amount); // al centesimo; formato italiano ("1.234,56"), testo non valido = errore
+    if (amt === null) return;
     if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
     const desc = form.desc.trim() || catOf(form.cat)?.label || "";
     const summary = `${fmtDMY(form.date)} · ${form.kind === "in" ? "+" : "−"} ${eur(amt)}`;
@@ -482,21 +499,18 @@ export default function CassaPage() {
       resetForm();
       return;
     }
+    const tid = needTenant(); if (!tid) return;
     const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
     setManual((prev) => [mov, ...prev]);
-    if (tenantId) checkWrite(insertMovement(tenantId, mov, orgForStruct(mov.structureId)), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    checkWrite(insertMovement(tid, mov, orgForStruct(mov.structureId)), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     showDate(form.date);
     toast(`${t("Movimento registrato")} · ${summary}`, "success");
     // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
     if (form.repeat !== "once") {
-      const d = new Date(form.date);
-      if (form.repeat === "monthly") d.setMonth(d.getMonth() + 1);
-      else if (form.repeat === "weekly") d.setDate(d.getDate() + 7);
-      else d.setFullYear(d.getFullYear() + 1);
-      const nextStart = fmt(d.getFullYear(), d.getMonth(), d.getDate());
+      const nextStart = nextRecurrenceStart(form.date, form.repeat); // giorno limitato a fine mese: dal 29/30/31 non salta febbraio
       const rule: Rule = { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true };
       setRules((prev) => [...prev, rule]);
-      if (tenantId) checkWrite(insertRule(tenantId, rule, orgForStruct(rule.structureId)), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
+      checkWrite(insertRule(tid, rule, orgForStruct(rule.structureId)), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     }
     resetForm();
   };
@@ -554,8 +568,8 @@ export default function CassaPage() {
   };
   const closeRuleModal = () => { setRuleModal(false); setEditingRule(null); };
   const addRule = () => {
-    const amt = roundCents(parseFloat(rf.amount.replace(",", ".")) || 0);
-    if (amt <= 0) return;
+    const amt = readAmount(rf.amount);
+    if (amt === null) return;
     if (!rf.struttura) { toast(t("Scegli la struttura."), "error"); return; }
     if (editingRule) {
       const prev = rules.find((r) => r.id === editingRule);
@@ -567,8 +581,9 @@ export default function CassaPage() {
       return;
     }
     const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.variable ? false : rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined, variable: rf.variable };
+    const tid = needTenant(); if (!tid) return;
     setRules((prev) => [...prev, rule]);
-    if (tenantId) checkWrite(insertRule(tenantId, rule, orgForStruct(rule.structureId)), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
+    checkWrite(insertRule(tid, rule, orgForStruct(rule.structureId)), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     closeRuleModal();
     setRf((f) => ({ ...f, desc: "", amount: "" }));
   };

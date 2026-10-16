@@ -1,0 +1,40 @@
+Ho corretto tutte le segnalazioni assegnate, tranne il pezzo del #12 che sta fuori dal mio perimetro. `npx tsc --noEmit` è pulito. La suite completa dà 1155 test, 0 fail (4 non risultano né passati né falliti). Ho aggiunto test in `tests/` per #2, #3, #5 (e promo, #11), #1 di r5 e la checklist del check-in. La nuova logica del #4 (invio in sequenza) e del #6 non ha test: sta dentro componenti React.
+
+**r3**
+- **#2 FATTO.** Un prefisso non in elenco resta intero con prefisso "Altro", mai riscritto +39. Un numero senza prefisso e con Paese diverso da IT non viene più forzato a +39. File: `ospiti/_phone.ts` (nuovo) e `ospiti/[id]/page.tsx`.
+- **#3 FATTO.** Gli id dei modelli seed eliminati vengono ricordati e non tornano più. File: `msg-templates.ts`, `ModelliPanel.tsx`.
+- **#4 FATTO.** "Invia oggi" invia un messaggio alla volta con un registro sempre aggiornato, e un clic ripetuto non rimanda. Nell'invio massivo, ciò che richiederebbe di aprire wa.me o mailto non viene aperto in raffica né segnato come inviato: resta in coda, con un avviso. File: `ConversazioniPanel.tsx`.
+- **#5 FATTO.** Niente più unione automatica all'apertura. C'è un banner "Rivedi e unisci" con anteprima e spunta per gruppo.
+  - L'unione completa tutti i campi mancanti, fa l'unione dei tag, mette in OR VIP e consenso marketing, e accoda le note.
+  - Stesso telefono con nomi diversi non si unisce.
+  - File: `ospiti/_merge.ts` (nuovo), `ospiti/page.tsx`.
+- **#6 FATTO.** I prezzi €/notte scritti a mano non vengono più ricalcolati. Il ricalcolo parte solo se cambiano date, piano o il contenuto delle tariffe, e solo sulle righe non toccate. Le righe di un preventivo caricato dall'archivio restano com'erano. File: `preventivi/page.tsx`.
+- **#7 FATTO.** Il numero del preventivo resta quello dell'archivio dopo il salvataggio. File: `preventivi/page.tsx`.
+- **#8 FATTO.** Le condizioni di cancellazione vengono dal piano tariffario scelto, nelle 5 lingue, in messaggio, PDF e HTML stampato. File: `preventivi/page.tsx`.
+- **#9 FATTO.**
+  - I numeri WhatsApp passano da `waDigits(telefono, paese)` in Conversazioni, recensioni, upselling e preventivi.
+  - In chat, il messaggio entra come "inviato" solo dopo l'esito, e un errore è visibile.
+  - Un wa.me o Gmail bloccato dal browser dopo un `await` non viene più registrato come inviato.
+  - L'offerta extra via email, se l'invio fallisce, non si registra più come inviata.
+- **#10 FATTO.** Gli ospiti con sola prenotazione annullata nella struttura restano visibili in lista, e il badge usa la stessa regola. File: `ConversazioniPanel.tsx`, `messaggi/page.tsx`.
+- **#11 FATTO, tranne il log.** Le promo vanno solo a email vere (non gli indirizzi relay delle OTA) e con consenso. Contano sia il flag `marketingConsent` sia il tag newsletter. Brand e contatti sono quelli della struttura dell'ospite. In `/ospiti` la selezione si svuota al cambio di ricerca o segmento, e include solo chi è visibile e contattabile. Anche il pulsante "Invia promo" della scheda ospite applica la regola.
+- **#12 PARZIALE.** Nel mio perimetro ho messo il fallback sul nome mancante in `/ospiti` e `/messaggi`. Fuori perimetro restano `stripe/quote/confirm/route.ts:101` (usa `name` invece di `fullName`/`firstName`/`lastName`) e la normalizzazione `fullName ??= name ?? ""` in `store.tsx`.
+- **Minori FATTO.** `addDaysISO` e "oggi" ora usano `dates-rome` (ora legale e fuso Roma). Il CSV recensioni neutralizza `= + - @`. L'escape HTML in `printPdf` copre anche le virgolette, e il colore accent è validato. Il `map_url` di `ConciergeKb.tsx` accetta solo http(s), sia al salvataggio sia al render.
+
+**r5**
+- **`syncSchedine` FATTO.** Non ricrea più righe per guest già con una schedina inviata (le righe già inviate non vengono toccate); inserisce solo i `guest_ref` mancanti. File: `alloggiati/service.ts`.
+- **Scorte e acquisti pulizie FATTO.** Ogni scrittura riparte dalla copia più recente in localStorage, e la pagina rilegge anche su `spigolestay:pulizie-list`. File: `pulizie/page.tsx`.
+- **Foto e salvataggio segnalazioni FATTO.** La foto passa da `downscaleImage(900, 0.72)`. Se il salvataggio fallisce lo dice, tiene aperta la finestra e non mostra a video ciò che non è salvato.
+- **`no_show` esclusi dal planning FATTO.** Sia in `puliziePlan.ts` sia in `pulizie/page.tsx`.
+- **Campi obbligatori del check-in FATTO.** Per l'ospite principale sono ora obbligatori sesso, luogo di nascita, cittadinanza e luogo di rilascio. I co-ospiti compilati con nome e cognome richiedono sesso, data e luogo di nascita e cittadinanza. C'è l'asterisco, il blocco e lo scorrimento al campo mancante. L'invio rapido "Bentornato" non resta più muto se mancano dati. Ho aggiornato `tests/checkin-flow.test.ts`. File: `checkin-flow.ts`, `checkin/page.tsx`.
+- **Date di nascita FATTO.** `DateTextField` ha `max` = oggi (Roma).
+- **`gestisci/page.tsx` FATTO.** Importi nel formato italiano (`lib/format` `eur`).
+- **ISTAT FATTO.** Il conteggio di "Chiudi giornata" è quello del giorno che viene davvero chiuso. Il CSV neutralizza le formule.
+
+**Fuori perimetro o decisioni per Andrea**
+1. **`workspace-keys.ts`.** Servono `"promolog"` e `"msgtemplates:deleted"` in `EXACT` (e va controllato il filtro `ws_deny` della migrazione 0015). Finché non ci sono, il limite "4 invii l'anno" e i modelli eliminati valgono solo per dispositivo.
+2. **Consenso marketing.** Ho considerato consenso anche il tag `newsletter`, perché l'iscrizione dal sito è un consenso esplicito. Se vuoi solo il flag `marketingConsent`, è una riga in `promoRecipientEmail` (`lib/promos.ts`). Con la regola attuale le liste promo possono diventare molto più piccole.
+3. **Check-in guest-facing.** I nuovi campi obbligatori allungano il modulo per l'ospite. Le etichette riusano chiavi già presenti nel dizionario delle 5 lingue, quindi non servono nuove traduzioni.
+4. **Preventivi, #1 non assegnato.** Il link con `?q=` e gli importi modificabili dal client è una vulnerabilità, ma richiede anche la correzione lato server in `/api/stripe/quote`. Non l'ho toccato.
+5. **Annullamento da `gestisci/page.tsx`.** Non ho nascosto il pulsante "Annulla" per i soggiorni già iniziati (r5 #2), perché la regola va decisa insieme alla route `cancel` dell'altro agente.
+6. **Chat senza WhatsApp collegato.** Se il collegamento è attivo e l'invio fallisce, in chat non c'è più il ripiego automatico su wa.me: errore visibile e bozza intatta.

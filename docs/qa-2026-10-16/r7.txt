@@ -1,0 +1,77 @@
+QA a sola lettura nel perimetro assegnato: 12 segnalazioni verificate. `npx tsc --noEmit` passa senza errori. Non ho modificato nulla. Per i filtri indicati nella richiesta ("devono seguire i filtri") sono rilevanti le segnalazioni 2 e 11. La prova su xenora.it a 440px non ha mostrato overflow orizzontale.
+
+[ALTA] src/app/prenota/page.tsx:233-236,273,278 — Totale, acconto e sconto non coincidono con quanto viene registrato e incassato
+Scenario: Spigolerooms, piano "Non rimborsabile" (prepagato 100%), Deluxe 2 notti a 144 €. La pagina mostra totale 149,76 € (soggiorno più tassa 5,76 €) e "da pagare adesso 149,76 €". Al server però viene inviato `total: accommodation` = 144, senza tassa, extra e sconto. `api/stripe/book/route.ts:71` limita l'addebito a `min(deposit,total)` = 144 €, mentre `confirm/route.ts:67` e `public-booking/route.ts:158` registrano `paid` e `paidOnline` = 150 € (il 149,76 arrotondato).
+Con un codice sconto −10% su 160 € la pagina mostra 150,40 €, ma la prenotazione e l'email voucher hanno totale 160 € e il saldo in gestionale risulta 85 € invece di 75,40 €. Gli extra scelti finiscono solo nella nota.
+Effetto: incassi sovrastimati in Cassa, saldi e totali sbagliati, ospite che vede cifre diverse tra pagina, Stripe ed email.
+Correzione: inviare totale e acconto calcolati dal server a partire da tipologia, date, piano, promo ed extra, e usare l'importo realmente pagato per `paid`.
+
+[ALTA] src/app/(app)/revenue-autopilot/page.tsx:41,81-89,119-132 — Cambiando struttura, l'autopilot applica prezzi con la configurazione dell'altra struttura
+Scenario: A ha l'autopilot attivo (±25%), B è spenta. Dalla pagina si passa da A a B nel filtro in alto. Nel primo render `cfg` è ancora quello di A (lo aggiorna un effect dopo). L'effect di auto-apply parte con `cfg.on` = true e con `suggestions` calcolate con la config di A sulle tipologie di B. `commit` scrive i prezzi su B e compare il toast "Autopilot: applicati N aggiustamenti", mentre B risulta spenta.
+Inoltre la pagina ignora `cfg.lastRun` (che invece rispetta `AutopilotRunner`). A ogni apertura o cambio struttura riapplica i prezzi e sovrascrive eventuali override manuali messi nel frattempo dal Calendario.
+Effetto: prezzi modificati su una struttura con autopilot spento e con guardrail altrui.
+Correzione: auto-apply solo quando `cfg` corrisponde a `scopeSid`, ad esempio leggendo `loadAutopilot(scopeSid)` dentro l'effect e rispettando `lastRun`.
+
+[ALTA] src/app/prenota/page.tsx:78,159-163 — Il motore pubblico non usa `rateForDay`, quindi i prezzi differiscono da calendario e canali
+Scenario 1: l'host spegne il supplemento weekend (regola di default `{weekendOn:false}`, senza regola per struttura). La riga 78 legge solo `.weekendPct ?? 25` e ignora `weekendOn`. Il motore pubblico continua ad aggiungere il 10-25% su venerdì, sabato e domenica, mentre `rateForDay` e il controllo prezzo minimo del server usano 0%.
+Scenario 2: Spigolerooms ha "DUS Matrimoniale" derivata da Deluxe, e Deluxe ha 487 giorni di override nello snapshot pubblico. Il prezzo della derivata viene da `effectiveBase(derivata) × weekend` e ignora il prezzo giornaliero della madre. Il supplemento weekend viene inoltre applicato anche al +€ della derivata.
+Effetto: l'ospite vede prezzi diversi da Booking e dal calendario.
+Correzione: usare `rateForDay(rt.id, iso, roomTypes, rateOverrides, loadWeekendPct(structureId))` e poi il piano.
+
+[ALTA] src/app/(app)/sito/page.tsx:96-124 (e widget/page.tsx:187-193) — Lo snapshot pubblico (`public_sites`) si aggiorna solo con il clic manuale su "Aggiorna"
+Verificato nel database (sola lettura): `spigolehouse` è fermo al 22.09.2026 con 2 prenotazioni e 0 override. `spigolerooms` è fermo all'01.10 con 974 chiavi di override congelate (487 giorni per ciascuna delle due tipologie madre). L'autopilot cambia i prezzi ogni giorno.
+Effetto: /prenota, /embed e Xenosite mostrano disponibilità e prezzi vecchi. Le date già occupate da OTA risultano libere e l'ospite si vede rifiutare la prenotazione con errore 409 a fine form (la verifica sul server è corretta). Le date liberate risultano esaurite, e il suggerimento "al completo" può essere sbagliato. L'avviso `staleSince` del Widget guarda solo `updatedAt` di struttura e tipologie, non prenotazioni né tariffe.
+Correzione: ripubblicare in automatico (con debounce) a ogni modifica di prenotazioni e tariffe, oppure far leggere disponibilità e prezzi live a una route server.
+
+[ALTA, da verificare] src/app/prenota/page.tsx:276 — Il reindirizzamento a Stripe avviene dentro l'iframe dell'embed
+Scenario: struttura con Stripe collegato, widget incorporato con `/embed.js`. `window.location.href = j.url` naviga dentro l'iframe. Per quanto ne so Stripe Checkout non è incorporabile (qui non ho potuto aprire una sessione reale). L'iframe resta vuoto e l'ospite non paga.
+Per confermare serve una sessione Checkout reale aperta dentro un iframe. Nota: `success_url` non porta `embed=1` e l'`embed.js` servito in produzione non imposta `allow="payment"`.
+Correzione: in modalità embed usare `window.top.location.href = url` (o `window.open(url,"_top")`).
+
+[MEDIA] src/lib/publicsanitize.ts e tabella `public_sites` — Snapshot pubblici vecchi contengono campi poi dichiarati privati
+Verificato in sola lettura (solo lunghezze dei campi): `spigolehouse` (22.09) ha `alloggiatiUser` (8 caratteri), `pec` (23) e `businessName` (15). `central-perk` (16.09) ha `pec` (22) e `businessName` (16). La tabella è leggibile da chiunque (è l'ipotesi su cui si basano il codice e le note nel repo). La pulizia avviene solo nel browser al momento della pubblicazione.
+Effetto: il nome utente del portale Alloggiati e la PEC restano esposti finché non si ripubblica.
+Correzione: ripubblicare o ripulire le righe con SQL e spostare la sanificazione sul server (RPC o trigger).
+
+[MEDIA] src/app/api/public-booking/route.ts:49,129-135 (chiamata da prenota/page.tsx:278) — Prenotazioni confermate senza pagamento e con prezzo scelto dal chiamante
+Scenario: un POST anonimo con `slug`, `rt`, date, `adults:20` e `total` pari al 50% del listino. Passa solo il controllo `stayFloor` (50%) e la disponibilità. La route crea una prenotazione `confirmed` con `paid` = 0, anche per tariffe non rimborsabili o prepagate, e manda il voucher all'email indicata. La route non applica minStay, capienza massima né tipologie chiuse. Il limite è 10 richieste al minuto per IP, tenuto in memoria per istanza.
+Effetto: calendario bloccabile fino a 60 notti per richiesta, prezzi dimezzati, uso del sistema per inviare email a terzi.
+Correzione: per le tariffe prepagate/con acconto, confermare solo da chiamata interna dopo il pagamento. Ricalcolare il totale sul server e validare piano e capienza.
+
+[MEDIA] src/app/prenota/page.tsx:97,129,489,679 — Extra di esempio, scelta del pagamento ignorata, "acconto pagato" senza incasso
+Extra: se la struttura non ha extra, o li ha non confermati, il motore mostra `DEFAULT_EXTRAS` (verificato in produzione su Spigolerooms: bici, transfer 120 €, gommone 250 €, late check-out 60 €). `lib/upselling.ts:49` dichiara che questi non vanno mai proposti. Il motore ignora anche `maxQty`, `seasonFrom` e `minNights` (cfr. l'extra `maxQty:2` di central-perk-antioco).
+Pagamento: lo stato `pay` (Carta/Bonifico/PayPal) non viene mai usato. Anche scegliendo "Bonifico" si va a Stripe o si registra senza pagamento.
+Schermata di conferma: se Stripe non è collegato (`payment:false`), la schermata finale dice "Acconto pagato € 83,00", ma `paid` resta 0.
+Effetto: l'ospite prenota servizi che l'host non offre e crede di aver pagato.
+Correzione: filtrare con `isPriceUnverified` e `active`, rispettare maxQty/stagione, rimuovere o implementare la scelta del pagamento, mostrare "acconto pagato" solo dopo conferma da Stripe.
+
+[MEDIA] src/app/prenota/page.tsx:261 — Codice prenotazione non univoco
+Il codice è `SPG-anno-(somma dei codici dei caratteri di gid+checkIn) % 100000`. Simulazione con 300 prenotazioni: 76 collisioni, tutti i codici tra 2518 e 3379. Stesso ospite e stesso check-in danno sempre lo stesso codice.
+Effetto: il codice è salvato in `booking.code` (`public-booking/route.ts:163`) e usato in email, ricerche e fatture (`documenti/page.tsx`): più prenotazioni diverse con lo stesso codice.
+Correzione: generare 6-8 caratteri casuali con `crypto.getRandomValues` e verificare l'unicità lato server.
+
+[MEDIA] src/app/prenota/page.tsx:24-27 (idem sito-web/page.tsx:19-20, revenue/page.tsx:22, rate-checker/page.tsx:11) — Date calcolate in UTC e lette in locale
+Verificato in fuso Europe/Rome: `addDays("2026-03-29",1)` restituisce "2026-03-29" e `addDays("2026-03-27",3)` restituisce "2026-03-29" invece del 30. Check-in il 29.03: il check-out di default coincide con l'arrivo, quindi 0 notti e "Tariffa non ancora disponibile". Soggiorno 27.03→31.03: il calcolo del prezzo duplica un giorno e salta un altro.
+`today = toISOString` è la data UTC. Tra le 00:00 e le 02:00 italiane l'arrivo di default è ieri e `min=today` ammette una data passata.
+`isWeekendISO` usa `new Date(iso).getDay()` locale: in fusi americani il venerdì risulta feriale e il lunedì weekend.
+Correzione: usare `shiftISO`/`toISO` di `lib/dates.ts`, oppure l'aritmetica UTC con `getUTCDay`.
+
+[MEDIA] src/app/(app)/revenue/page.tsx:37,90,118,262 — Il segno "Applicato" segue il filtro, non la struttura realmente modificata
+Scenario: con "Tutte" si preme "Applica" su +10% al 20.11. `planDay` scrive gli override su tutte le strutture, ma il segno viene salvato solo come `all|2026-11-20`. Passando alla struttura A, lo stesso giorno risulta ancora da applicare e premendo di nuovo il +10% si compone sul prezzo già modificato. Viceversa, applicare su A e poi tornare a "Tutte" ripropone il giorno.
+Con "Tutte" il suggerimento nasce dall'occupazione aggregata e dal benchmark della sola prima struttura con città (righe 47-52 e 97-118), ma viene applicato a tutte le strutture.
+Correzione: salvare il segno per ogni coppia `rt.structureId|iso` e calcolare i suggerimenti per struttura.
+
+[MEDIA] src/app/(app)/mercato/page.tsx:34,118-139 — Consenso alla condivisione preimpostato su "sì" e dati caricati senza azione dell'utente
+Se non esiste ancora una riga `market_share`, `DEFAULT_CONSENTS` ha occupazione e ADR a true. Aprendo la pagina, `refresh` fa subito l'upsert di `market_share` e di `market_daily` (90 giorni di camere vendute e ricavo giornaliero) verso la rete città, visibile ad altre strutture tramite `market_breakdown`.
+Correzione: default tutti a false, caricare solo dopo un consenso esplicito.
+
+Minori (stesse regole di verifica, non conteggiate nelle 12):
+- assistente/page.tsx:121-127 — "Ricavo del mese" usa `bookingGrandTotal` con la tassa di soggiorno, confrontata con l'incassato che non la include.
+- assistente/page.tsx:244 — `cityTaxDue` conta anche prenotazioni esenti, future o di strutture senza tassa.
+- sito-web/page.tsx — `cfg.contatti` e `cfg.lang` non sono mai usati, i toggle "Contatti" e "Lingue" non hanno effetto.
+- sito-web/page.tsx:108-115,287-293 — newsletter e recensione mostrano "Grazie" anche se la richiesta fallisce.
+- prenota/page.tsx:426-427 e sito-web/page.tsx:733-734 — link social costruiti male per valori senza schema. In produzione Spigolehouse punta a `instagram.com/Instagram.com` e `facebook.com/Facebook.com`.
+- prenota/page.tsx:390 — `structure.website` senza schema (es. `www.spigolehouse.it`) viene scartato silenziosamente.
+- rate-checker/page.tsx:70-102 — race tra `refresh` con i competitor della struttura precedente e il ricaricamento, senza guardia sull'ordine delle risposte.
+- assistente-ricavi/page.tsx:31-45 — gli eventi sono solo in localStorage, scollegati dagli eventi dello store usati da Revenue e Autopilot.
+- prenota/page.tsx:369 — `printPdf` fa `document.write` senza escape dei nomi (impatto solo su sé stessi).

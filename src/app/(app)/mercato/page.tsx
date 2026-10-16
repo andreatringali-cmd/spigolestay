@@ -33,8 +33,12 @@ export default function MercatoPage() {
   }, [structures, activeStructureId]);
   const city = (struct?.city || "").trim();
 
-  const DEFAULT_CONSENTS: Consents = { occupancy: true, adr: true, demand: false, channels: false };
+  // Nessuna condivisione di default: i dati escono solo dopo un consenso esplicito dell'utente.
+  const DEFAULT_CONSENTS: Consents = { occupancy: false, adr: false, demand: false, channels: false };
   const [consents, setConsents] = useState<Consents>(DEFAULT_CONSENTS);
+  // true solo se esiste già una scelta salvata per questa struttura oppure l'utente ha appena toccato un interruttore:
+  // finché è false non si scrive nulla sulla rete (né market_share né market_daily né market_profile), si legge soltanto.
+  const [consentChosen, setConsentChosen] = useState(false);
   // Struttura per cui i consensi sono stati caricati: i consensi sono PER STRUTTURA, quindi non si sincronizza nulla
   // finché non sono quelli della struttura in vista (altrimenti i consensi dell'altra finirebbero su questa).
   const [consentsFor, setConsentsFor] = useState<string | null>(null);
@@ -69,12 +73,12 @@ export default function MercatoPage() {
   useEffect(() => {
     if (!supabase || !user?.id || !struct?.id) return;
     let cancelled = false;
-    setConsentsFor(null); setConsents(DEFAULT_CONSENTS); setPulse(null); setBreakdown([]);
+    setConsentsFor(null); setConsents(DEFAULT_CONSENTS); setConsentChosen(false); setPulse(null); setBreakdown([]);
     (async () => {
       try {
         const { data } = await supabase!.from("market_share").select("*").eq("user_id", user.id).eq("structure_id", struct.id).maybeSingle();
         if (cancelled) return;
-        if (data) setConsents({ occupancy: !!data.share_occupancy, adr: !!data.share_adr, demand: !!data.share_demand, channels: !!data.share_channels });
+        if (data) { setConsents({ occupancy: !!data.share_occupancy, adr: !!data.share_adr, demand: !!data.share_demand, channels: !!data.share_channels }); setConsentChosen(true); }
       } catch {}
       if (!cancelled) setConsentsFor(struct.id);
     })();
@@ -121,6 +125,8 @@ export default function MercatoPage() {
     const st = { failed: false }; // oggetto (non variabile riassegnata) per restare compatibile con la memoizzazione
     try {
       const anyShare = consents.occupancy || consents.adr || consents.demand || consents.channels;
+      // Senza una scelta esplicita non si scrive nulla: si leggono solo le medie di zona.
+      if (consentChosen) {
       const rShare = await supabase.from("market_share").upsert({ user_id: user.id, structure_id: struct.id, city, share_occupancy: consents.occupancy, share_adr: consents.adr, share_demand: consents.demand, share_channels: consents.channels, updated_at: new Date().toISOString() });
       if (rShare.error) st.failed = true;
       const rDaily = (anyShare && dailyForUpload.length)
@@ -138,6 +144,7 @@ export default function MercatoPage() {
         });
         if (rProf.error) st.failed = true;
       } else { const rDel = await supabase.from("market_profile").delete().eq("user_id", user.id).eq("structure_id", struct.id); if (rDel.error) st.failed = true; }
+      }
       const from = shiftISO(toISO(new Date()), -WINDOW), to = toISO(new Date());
       const { data, error: e1 } = await supabase.rpc("market_pulse", { p_city: city, p_from: from, p_to: to });
       if (e1) st.failed = true;
@@ -147,11 +154,11 @@ export default function MercatoPage() {
       setBreakdown(Array.isArray(bd) ? (bd as typeof breakdown) : []);
       if (st.failed) setNetErr("Alcuni dati della Rete città non sono stati caricati o salvati. Le medie di zona potrebbero mancare o non essere aggiornate: riprova tra poco.");
     } catch { setNetErr("Rete città non raggiungibile: controlla la connessione e riprova. I tuoi dati qui sotto sono comunque calcolati dalle tue prenotazioni."); } finally { setLoading(false); }
-  }, [consents, consentsFor, user?.id, struct?.id, city, dailyForUpload, profile]);
+  }, [consents, consentChosen, consentsFor, user?.id, struct?.id, city, dailyForUpload, profile]);
 
-  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [consents, consentsFor, struct?.id, city]);
+  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [consents, consentChosen, consentsFor, struct?.id, city]);
 
-  const toggle = (k: keyof Consents) => setConsents((c) => ({ ...c, [k]: !c[k] }));
+  const toggle = (k: keyof Consents) => { setConsentChosen(true); setConsents((c) => ({ ...c, [k]: !c[k] })); };
   const enough = (pulse?.n_structures ?? 0) >= THRESHOLD;
 
   if (!struct) return (<div><PageHeader title={t("Rete città")} subtitle={t("Confronta la tua struttura con il mercato locale")} /><Card><p className="text-sm text-dim">{t("Aggiungi prima una struttura.")}</p></Card></div>);

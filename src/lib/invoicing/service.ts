@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, RoomType, Booking, Guest } from "@/lib/types";
-import { cityTaxOf } from "@/lib/booking";
+import { cityTaxOfBooking, cityTaxPayers } from "@/lib/booking";
 import { invoicePayMethodLabel } from "@/lib/pay-method";
 import { nights } from "@/lib/dates";
 import { todayRome } from "@/lib/dates-rome";
@@ -91,9 +91,10 @@ function folioFromBooking(ctx: Ctx): { folio: FolioLine[]; advanceCents: number 
   (b.extras ?? []).forEach((e, i) => {
     if (e?.price) folio.push({ folioRef: `extra:${i}`, description: e.name || `Extra ${i + 1}`, qty: 1, unitCents: toCents(e.price), vatRate: 22, sourceKind: "extra" });
   });
-  const tax = cityTaxOf(structure, b.adults ?? 0, n, acc, b.cityTaxExempt);
+  const tax = cityTaxOfBooking(structure, b); // stessa cifra della prenotazione: paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti, quota di gruppo se presente
   if (tax) {
-    folio.push({ folioRef: "citytax", description: `Imposta di soggiorno (${b.adults ?? 0} × ${Math.min(n, structure?.cityTaxMaxNights ?? 3)} notti)`, qty: 1, unitCents: toCents(tax), vatRate: 0, outOfScope: true, sourceKind: "city_tax" });
+    const maxNights = structure?.cityTaxMaxNights ?? (structure?.cityTaxMode === "percent" ? 7 : 3); // stesso massimo notti di cityTaxOf
+    folio.push({ folioRef: "citytax", description: `Imposta di soggiorno (${cityTaxPayers(structure, b)} × ${Math.min(n, maxNights)} notti)`, qty: 1, unitCents: toCents(tax), vatRate: 0, outOfScope: true, sourceKind: "city_tax" });
   }
   return { folio, advanceCents: toCents(b.paid) };
 }

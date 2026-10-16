@@ -38,7 +38,7 @@ export function computePuliziePlan(opts: {
   bookings: Booking[];
 }): { rooms: PlanRoom[]; toClean: PlanRoom[]; counts: PlanCounts; linen: PlanLinen } {
   const { date, structures, units, roomTypes, bookings } = opts;
-  const active = bookings.filter((b) => b.status !== "cancelled");
+  const active = bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show"); // un no-show non porta nessun lavoro (né biancheria)
   const activeGuests = active.filter((b) => b.channel !== "blocked");
   const blockedNow = active.filter((b) => b.channel === "blocked" && b.checkIn <= date && date < b.checkOut);
 

@@ -17,6 +17,9 @@ import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 import { validateDocument, hasErrors, type Issue } from "@/lib/invoicing/validate";
 import { sendAction, sendButtonLabel, sendConfirmText, isTrialSend, rejectionReason, sdiBadge, TRIAL_NOTE, eventDisplay } from "@/lib/invoicing/sdi-status";
 import { useTenantId } from "@/lib/tenant";
+import NumInput from "@/components/NumInput";
+import { parseDecimalIT } from "@/lib/num-it";
+import { cashScopeOf } from "@/lib/cassa";
 
 interface Doc { id: string; tenant_id: string; structure_id: string | null; booking_id: string | null; booking_code: string | null;
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
@@ -42,7 +45,6 @@ const OTA_PRESETS = [
   { name: "Airbnb Ireland UC", kind: "societa", country: "IE", vat: "IE9827384L", address: "8 Hanover Quay", city: "Dublin", cap: "D02 K512", province: "", sdi_code: "XXXXXXX" },
   { name: "Expedia Lodging Partner Services Sàrl", kind: "societa", country: "CH", vat: "", address: "", city: "Ginevra", cap: "", province: "", sdi_code: "XXXXXXX" },
 ];
-const num = (v: string) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
 
 export default function DocumentoPage() {
   const params = useParams();
@@ -50,7 +52,10 @@ export default function DocumentoPage() {
   const { user } = useAuth();
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const ask = useConfirm();
-  const { structures, activeStructureId, bookings, getGuest, getStructure, getRoomType, updateBooking } = useData();
+  // `structures` = elenco COMPLETO: il documento può appartenere a una struttura fuori dalla selezione corrente.
+  const { allStructures: structures, selectedStructureIds, raw, bookings, getGuest, getStructure, getRoomType, updateBooking } = useData();
+  // Ambito dalla selezione vera (con 2+ strutture scelte `activeStructureId` del contesto resta "all"): una sola struttura = il suo id, altrimenti "all".
+  const activeStructureId = useMemo(() => { const s = cashScopeOf(selectedStructureIds, structures.map((x) => x.id)); return typeof s === "string" ? s : "all"; }, [selectedStructureIds, structures]);
   const id = String(params.id || "");
   const [doc, setDoc] = useState<Doc | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
@@ -92,14 +97,12 @@ export default function DocumentoPage() {
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
-    const [d, l, e, p, iss] = await Promise.all([
+    const [d, l, e, p] = await Promise.all([
       supabase.from("documents").select("*").eq("id", id).maybeSingle(),
       supabase.from("document_lines").select("*").eq("document_id", id).order("pos"),
       supabase.from("document_events").select("*").eq("document_id", id).order("ts", { ascending: false }),
       supabase.from("document_payments").select("*").eq("document_id", id).order("paid_at"),
-      supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, address, city, cap, province, pec, regime_note, footer_note, bollo_auto").maybeSingle(),
     ]);
-    setIssuer((iss.data ?? null) as IssuerInfo | null);
     const dd = (d.data ?? null) as Doc | null;
     setDoc(dd); setEvents((e.data ?? []) as Ev[]); setPays((p.data ?? []) as Pay[]);
     if (dd) hydrate(dd, (l.data ?? []) as DbLine[]);
@@ -117,6 +120,14 @@ export default function DocumentoPage() {
     setLoading(false);
   }, [id, hydrate]);
   useEffect(() => { load(); }, [load]);
+  // Dati emittente dell'account di lavoro (filtrati per tenant: un collaboratore potrebbe vedere due righe).
+  useEffect(() => {
+    if (!supabase || !tenantId) return;
+    let off = false;
+    void Promise.resolve(supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, address, city, cap, province, pec, regime_note, footer_note, bollo_auto").eq("tenant_id", tenantId).maybeSingle())
+      .then(({ data }) => { if (!off) setIssuer((data ?? null) as IssuerInfo | null); });
+    return () => { off = true; };
+  }, [tenantId]);
   const loadCounterparts = useCallback(async () => {
     if (!supabase) return;
     const { data } = await supabase.from("counterparts").select("id, kind, name, vat, tax_code, country, address, city, cap, province, sdi_code, pec").order("name");
@@ -129,8 +140,9 @@ export default function DocumentoPage() {
   };
   const saveCounterpart = async () => {
     if (!supabase || !user || !cp.name.trim()) return;
+    if (!tenantId) { setMsg("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
     const fullName = `${cp.name} ${cp.lastName}`.trim();
-    const { error } = await supabase.from("counterparts").insert({ tenant_id: tenantId ?? user.id, kind: cp.kind, name: fullName, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || null, pec: f.pec || null });
+    const { error } = await supabase.from("counterparts").insert({ tenant_id: tenantId, kind: cp.kind, name: fullName, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || null, pec: f.pec || null });
     setMsg(error ? "Errore anagrafica: " + error.message : "Intestatario salvato in anagrafica ✓");
     if (!error) loadCounterparts();
   };
@@ -234,6 +246,7 @@ export default function DocumentoPage() {
 
   const saveDraft = async () => {
     if (!supabase || !user || !doc) return false;
+    if (!tenantId) { setMsg("Account di lavoro non ancora caricato: riprova tra qualche secondo. Il documento non è stato modificato."); return false; }
     // Righe: elimino e reinserisco (solo in bozza è consentito dal trigger).
     // Si controlla ogni passaggio: se l'inserimento fallisce si ripristinano le righe di prima,
     // così il documento non resta mai senza righe a metà salvataggio.
@@ -243,7 +256,7 @@ export default function DocumentoPage() {
     if (delErr) { setMsg("Errore salvataggio righe: " + delErr.message + " Il documento non è stato modificato."); return false; }
     if (lines.length) {
       const { error: insErr } = await supabase.from("document_lines").insert(lines.map((l, i) => ({
-        document_id: id, tenant_id: tenantId ?? user.id, pos: i + 1, description: l.description || "—", qty: l.qty || 1,
+        document_id: id, tenant_id: tenantId, pos: i + 1, description: l.description || "—", qty: l.qty || 1,
         unit_price_cents: Math.round(l.unitEur * 100), vat_rate: l.vat === "N1" || l.vat === "N2.2" ? 0 : Number(l.vat) || 0,
         vat_nature: l.vat === "N1" ? "N1" : l.vat === "N2.2" ? "N2.2" : null,
         line_total_cents: Math.round(l.unitEur * 100 * (l.qty || 0)), source_kind: l.sourceKind, booking_id: doc.booking_id, folio_ref: `l${i}`,
@@ -311,12 +324,13 @@ export default function DocumentoPage() {
   };
   const addPayment = async (amountCents: number, method: string) => {
     if (!supabase || !user || amountCents <= 0) return;
+    if (!tenantId) { setMsg("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
     await act("pay", async () => {
-      const { error: payErr } = await supabase!.from("document_payments").insert({ document_id: id, tenant_id: tenantId ?? user.id, amount_cents: amountCents, method });
+      const { error: payErr } = await supabase!.from("document_payments").insert({ document_id: id, tenant_id: tenantId, amount_cents: amountCents, method });
       // Se il pagamento non è stato registrato NON si tocca booking.paid (altrimenti incassi e documento divergono).
       if (payErr) throw new Error("Pagamento non registrato: " + payErr.message);
       // Fonte di verità = prenotazione: propaga l'incasso su booking.paid (in €).
-      if (link.bookingId) { const b = bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(amountCents) / 100) }); }
+      if (link.bookingId) { const b = raw.bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(amountCents) / 100) }); }
       syncFicPayment(true);
     });
   };
@@ -331,8 +345,8 @@ export default function DocumentoPage() {
 
   // Anteprima (autoPrint=false) o stampa/PDF (autoPrint=true) dello stesso documento di cortesia.
   const openDoc = async (autoPrint: boolean) => {
-    if (!doc || !supabase) return;
-    const { data: se } = await supabase.from("tenant_invoice_settings").select("*").maybeSingle();
+    if (!doc || !supabase || !tenantId) return;
+    const { data: se } = await supabase.from("tenant_invoice_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
     // Riepilogo IVA per aliquota/natura (stessa matematica dei totali a video).
     const vatGroups = (() => {
       const g = new Map<string, { label: string; base: number; vat: number }>();
@@ -507,8 +521,8 @@ export default function DocumentoPage() {
                 {lines.map((l, i) => (
                   <tr key={i} className="border-b border-line last:border-0">
                     {frozen ? <td className="py-2 pr-2 text-txt">{l.description}</td> : <td className="py-1 pr-2"><input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} className="w-full rounded border border-line bg-paper px-2 py-1 text-sm" /></td>}
-                    {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{l.qty}</td> : <td className="py-1 px-1"><input value={l.qty} onChange={(e) => setLine(i, { qty: num(e.target.value) })} className="w-14 rounded border border-line bg-paper px-1 py-1 text-right text-sm" /></td>}
-                    {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{eur(l.unitEur)}</td> : <td className="py-1 px-1"><input value={l.unitEur} onChange={(e) => setLine(i, { unitEur: num(e.target.value) })} className="w-20 rounded border border-line bg-paper px-1 py-1 text-right text-sm" /></td>}
+                    {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{l.qty}</td> : <td className="py-1 px-1"><NumInput value={l.qty} decimals={3} onChange={(v) => setLine(i, { qty: v ?? 0 })} className="w-14 rounded border border-line bg-paper px-1 py-1 text-right text-sm" aria-label="Quantità" /></td>}
+                    {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{eur(l.unitEur)}</td> : <td className="py-1 px-1"><NumInput value={l.unitEur} min={-1000000} onChange={(v) => setLine(i, { unitEur: v ?? 0 })} className="w-20 rounded border border-line bg-paper px-1 py-1 text-right text-sm" aria-label="Prezzo unitario" /></td>}
                     {frozen ? <td className="py-2 px-1 text-dim">{l.vat === "N1" || l.vat === "N2.2" ? l.vat : l.vat + "%"}</td> : <td className="py-1 px-1"><select value={l.vat} onChange={(e) => setLine(i, { vat: e.target.value })} className="rounded border border-line bg-paper px-1 py-1 text-sm">{VAT_OPTS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></td>}
                     <td className="py-1 pl-1 text-right font-mono text-txt">{eur(l.unitEur * (l.qty || 0))}</td>
                     {!frozen && <td className="py-1 pl-1 text-right"><button onClick={() => delLine(i)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>}
@@ -562,7 +576,7 @@ export default function DocumentoPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <input value={payAmt} onChange={(e) => setPayAmt(e.target.value)} inputMode="decimal" placeholder={`€ (max ${e2(residuo)})`} className="w-28 rounded border border-line bg-paper px-2 py-1.5 text-sm" />
                   <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="rounded border border-line bg-paper px-1.5 py-1.5 text-sm"><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select>
-                  <button onClick={() => { const c = Math.round(num(payAmt) * 100); if (c <= 0) { setMsg("Indica un importo da incassare."); return; } if (c > residuo) { setMsg(`L'importo supera il residuo (${e2(residuo)}).`); return; } setPayAmt(""); addPayment(c, payMethod); }} disabled={!!busy || !payAmt.trim()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">Registra incasso</button>
+                  <button onClick={() => { const pn = parseDecimalIT(payAmt); if (pn === null) { setMsg("Importo non valido: scrivi un numero, per esempio 1234,56."); return; } const c = Math.round(pn * 100); if (c <= 0) { setMsg("Indica un importo da incassare."); return; } if (c > residuo) { setMsg(`L'importo supera il residuo (${e2(residuo)}).`); return; } setPayAmt(""); addPayment(c, payMethod); }} disabled={!!busy || !payAmt.trim()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">Registra incasso</button>
                   <button onClick={() => addPayment(residuo, payMethod)} disabled={!!busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>
                 </div>
               )}

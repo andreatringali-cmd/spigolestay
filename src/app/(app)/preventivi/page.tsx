@@ -17,6 +17,7 @@ import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
+import { waDigits } from "@/lib/contacts-check";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
 const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]];
@@ -48,7 +49,24 @@ const QL: Record<Lang, QLabels> = {
   es: { hi: "Estimado/a", guest: "huésped", avail: "tenemos el placer de confirmar la disponibilidad para las fechas solicitadas", periodo: "Fechas", ci: "Entrada", co: "Salida", durata: "Duración", notte: "noche", notti: "noches", riepilogo: "Resumen económico", room: "habitación", aNotte: "por noche", colazione: "Desayuno", inclusa: "Incluido", parcheggio: "Aparcamiento", parkIncl: "Incluido en el precio (un coche)", culla: "Cuna", cullaIncl: "Gratis (bajo petición)", tassa: "Tasa turística", persone: "personas", totale: "TOTAL", condizioni: "Condiciones y pago", accNone: "No se requiere anticipo: el saldo de {tot} se paga en la entrada.", accPart: "Para confirmar se requiere un anticipo del {pct}%, es decir {dep}. Saldo de {bal} en la entrada.", accFull: "Para confirmar se requiere el pago íntegro: {tot}.", cancLabel: "Cancelación", cancText: "totalmente reembolsable hasta 7 días antes de la entrada.", modalita: "Formas de pago", bonifico: "Transferencia bancaria", intest: "Titular", causale: "Concepto", closing: "Quedamos a su disposición. ¡Hasta pronto!", quoteNo: "Presupuesto n.º", perStay: "por estancia", perNight: "por noche", perDay: "por día", perPerson: "por persona", extrasTitle: "Servicios y experiencias", extrasNote: "Precios orientativos — puedes añadirlos a la reserva.", extrasIntro: "Para hacer tu estancia inolvidable, hemos preparado una selección de servicios y experiencias a medida. Descubre nuestras propuestas y añade a tu reserva lo que desees: del resto nos ocupamos nosotros." },
 };
 
-type QuoteRoom = { roomTypeId: string; qty: number; price: number };
+// manual = prezzo €/notte scritto a mano: il ricalcolo dal calendario (cambio date/piano) non lo tocca.
+type QuoteRoom = { roomTypeId: string; qty: number; price: number; manual?: boolean };
+
+// Condizioni di cancellazione del piano tariffario scelto, nelle 5 lingue del preventivo (frase che segue "Cancellazione:").
+// Senza piano scelto resta il testo predefinito di QL (rimborsabile fino a 7 giorni prima).
+const CANC_TXT: Record<Lang, { non: string; days: string; free: string }> = {
+  it: { non: "tariffa non rimborsabile.", days: "cancellazione gratuita fino a {n} giorni prima del check-in.", free: "cancellazione gratuita." },
+  en: { non: "non-refundable rate.", days: "free cancellation up to {n} days before check-in.", free: "free cancellation." },
+  fr: { non: "tarif non remboursable.", days: "annulation gratuite jusqu'à {n} jours avant l'arrivée.", free: "annulation gratuite." },
+  de: { non: "nicht erstattbare Rate.", days: "kostenlose Stornierung bis {n} Tage vor Anreise.", free: "kostenlose Stornierung." },
+  es: { non: "tarifa no reembolsable.", days: "cancelación gratuita hasta {n} días antes de la entrada.", free: "cancelación gratuita." },
+};
+function cancTextFor(plan: RatePlan | undefined, lang: Lang, fallback: string): string {
+  if (!plan) return fallback;
+  const c = CANC_TXT[lang];
+  if (!plan.refundable) return c.non;
+  return plan.cancelDays && plan.cancelDays > 0 ? c.days.replace("{n}", String(plan.cancelDays)) : c.free;
+}
 interface Preventivo {
   id: string;
   number: number;
@@ -122,7 +140,8 @@ export default function PreventiviPage() {
   // Prezzo automatico dal calendario per una tipologia nel periodo, con lo scarto del piano scelto (poi modificabile).
   // Tariffa del giorno = stessa del calendario (override per tipologia, derivate, weekend della struttura).
   const autoPrice = (rtId: string) => { const base = roomTypes.find((r) => r.id === rtId)?.basePrice ?? 100; const wk = loadWeekendPct(); let sum = 0, cnt = 0; for (let d = checkIn; d && d < checkOut && cnt < 60; d = shiftISO(d, 1)) { sum += roomTypes.some((r) => r.id === rtId) ? rateForDay(rtId, d, roomTypes, rateOverrides, wk) : base; cnt++; } const avg = cnt > 0 ? sum / cnt : base; return Math.max(0, Math.round(avg * (1 + planAdj / 100))); };
-  const updateLine = (i: number, patch: Partial<QuoteRoom>) => setRoomLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  // Chi scrive il prezzo a mano (manual) lo protegge dal ricalcolo automatico dal calendario; cambiando tipologia il prezzo torna automatico.
+  const updateLine = (i: number, patch: Partial<QuoteRoom>) => setRoomLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch, manual: patch.price !== undefined ? patch.roomTypeId === undefined : l.manual } : l)));
   const addLine = () => setRoomLines((ls) => { const used = new Set(ls.map((l) => l.roomTypeId)); const next = typesOf.find((t) => !used.has(t.id)) ?? typesOf[0]; return next ? [...ls, { roomTypeId: next.id, qty: 1, price: autoPrice(next.id) }] : ls; });
   const removeLine = (i: number) => setRoomLines((ls) => ls.filter((_, j) => j !== i));
   const roomsTotal = roomLines.reduce((a, l) => a + l.qty, 0);
@@ -250,11 +269,18 @@ export default function PreventiviPage() {
   }, [structures, roomTypes]);
 
   // Tariffa automatica dalle tariffe del calendario per il periodo scelto (poi modificabile per riga).
+  // Si ricalcola solo se cambiano date, piano o il CONTENUTO delle tariffe (lo store rilegge rateOverrides come oggetto nuovo a ogni focus: non conta l'identità),
+  // e solo sulle righe non scritte a mano.
+  const rateKey = useMemo(() => { try { return JSON.stringify(rateOverrides); } catch { return ""; } }, [rateOverrides]);
   useEffect(() => {
     if (!checkIn || !checkOut || checkOut <= checkIn) return;
-    setRoomLines((ls) => ls.map((l) => ({ ...l, price: autoPrice(l.roomTypeId) })));
+    setRoomLines((ls) => {
+      let changed = false;
+      const next = ls.map((l) => { if (l.manual) return l; const p = autoPrice(l.roomTypeId); if (p === l.price) return l; changed = true; return { ...l, price: p }; });
+      return changed ? next : ls;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkIn, checkOut, rateOverrides, planId]);
+  }, [checkIn, checkOut, rateKey, planId]);
 
   const n = Math.max(0, nights(checkIn, checkOut));
   const accommodation = roomLines.reduce((a, l) => a + l.qty * l.price * n, 0);
@@ -278,9 +304,15 @@ export default function PreventiviPage() {
   const docIban = structure?.iban?.trim() || payIban;
 
   // Numerazione per anno (riparte ogni anno): n. progressivo/anno.
+  // Il numero è STABILE: se il preventivo è già in archivio (salvato o in modifica, o identico all'ultimo salvato) si usa il SUO numero,
+  // non "il prossimo": altrimenti dopo il salvataggio documento, PDF e link di pagamento uscirebbero con un numero diverso dall'archivio.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const curYear = new Date().getFullYear();
   const nextNumber = saved.filter((p) => new Date(p.createdAt).getFullYear() === curYear).reduce((m, p) => Math.max(m, p.number ?? 0), 0) + 1;
-  const quoteRef = `${nextNumber}/${curYear}`;
+  const dupOfLast = !!(saved[0] && saved[0].name === name.trim() && saved[0].checkIn === checkIn && saved[0].checkOut === checkOut && saved[0].total === total);
+  const quoteHome = (editingId ? saved.find((p) => p.id === editingId) : undefined) ?? (dupOfLast ? saved[0] : undefined);
+  const quoteRef = quoteHome?.number ? `${quoteHome.number}/${new Date(quoteHome.createdAt).getFullYear()}` : `${nextNumber}/${curYear}`;
+  const cancTxt = cancTextFor(activePlan, lang, QL[lang].cancText);
   const todayStr = fmt(toISO(new Date()));
   const message = useMemo(() => {
     const L = QL[lang];
@@ -316,7 +348,7 @@ export default function PreventiviPage() {
       ``,
       `${L.condizioni}:`,
       acc,
-      `• ${L.cancLabel}: ${L.cancText}`,
+      `• ${L.cancLabel}: ${cancTxt}`,
       ``,
       `${L.modalita}:`,
       payBlock,
@@ -328,7 +360,7 @@ export default function PreventiviPage() {
     ];
     return lines.filter((l) => l !== undefined).join("\n");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, lang, checkIn, checkOut, n, roomLines, accommodation, breakfast, breakfastPrice, parking, parkingPrice, wantsCot, cotPrice, cityTax, taxPersons, total, acconto, deposit, balance, note, docHolder, docIban, payExtra, structureName, quoteRef, todayStr]);
+  }, [name, lang, checkIn, checkOut, n, roomLines, accommodation, breakfast, breakfastPrice, parking, parkingPrice, wantsCot, cotPrice, cityTax, taxPersons, total, acconto, deposit, balance, note, docHolder, docIban, payExtra, structureName, quoteRef, todayStr, cancTxt]);
 
   // Testo (per invio WhatsApp/email); l'anteprima a schermo è il documento PDF.
   const outMsg = message;
@@ -339,7 +371,6 @@ export default function PreventiviPage() {
       setSaved((prev) => prev.filter((x) => x.id !== p.id));
     }
   };
-  const [editingId, setEditingId] = useState<string | null>(null);
   // Cambiando struttura in alto a destra, un NUOVO preventivo passa alla struttura attiva (non si tocca una modifica in corso).
   const prevActive = useRef(activeStructureId);
   useEffect(() => {
@@ -357,7 +388,7 @@ export default function PreventiviPage() {
     setFirstName(p.name.split(" ")[0] ?? ""); setLastName(p.name.split(" ").slice(1).join(" "));
     setEmail(p.email ?? ""); setPhone(p.phone ?? "");
     setStructureId(p.structureId);
-    setRoomLines(p.roomLines && p.roomLines.length ? p.roomLines : [{ roomTypeId: p.roomTypeId, qty: p.rooms ?? 1, price: p.price }]);
+    setRoomLines((p.roomLines && p.roomLines.length ? p.roomLines : [{ roomTypeId: p.roomTypeId, qty: p.rooms ?? 1, price: p.price }]).map((l) => ({ ...l, manual: true }))); // i prezzi salvati restano quelli del preventivo
     setCheckIn(p.checkIn); setCheckOut(p.checkOut);
     setAdults(p.adults); setChildren(p.children);
     setChildAges(p.childAges ?? Array.from({ length: p.children }, () => 8));
@@ -384,7 +415,7 @@ export default function PreventiviPage() {
   const quoteDocProps = {
     accent: structure?.photoColor || "#BE5D38", logo: structure?.logo,
     structureName, address: stAddress, contacts: stContacts, legal: stLegal, socials: stSocials,
-    L: QL[lang], quoteNo: quoteRef, date: todayStr, guest: name,
+    L: { ...QL[lang], cancText: cancTxt }, quoteNo: quoteRef, date: todayStr, guest: name,
     checkIn: fmt(checkIn), checkOut: fmt(checkOut), nights: n, nWord: n === 1 ? QL[lang].notte : QL[lang].notti,
     roomLines: mergedLines.map((l) => ({ label: `${l.qty} ${rtName(l.roomTypeId) || QL[lang].room}`, sub: `${eur(l.price)} ${QL[lang].aNotte} × ${n} ${n === 1 ? QL[lang].notte : QL[lang].notti}`, amount: eur(l.qty * l.price * n) })),
     breakfast, breakfastText: breakfastPrice > 0 ? `${eur(breakfastPrice)} ${QL[lang].aNotte}` : QL[lang].inclusa, parking, parkText: parkingPrice > 0 ? `${eur(parkingPrice)} ${QL[lang].aNotte}` : QL[lang].parkIncl,
@@ -512,7 +543,7 @@ export default function PreventiviPage() {
       setSaved((prev) => prev.map((p) => (p.id === editingId ? { ...p, ...fields, status: p.status === "bozza" && !asDraft ? ("inviato" as const) : p.status } : p)));
       return;
     }
-    const dup = saved[0] && saved[0].name === name.trim() && saved[0].checkIn === checkIn && saved[0].checkOut === checkOut && saved[0].total === total;
+    const dup = dupOfLast;
     if (dup) { setEditingId(saved[0].id); return; }
     const num = saved.filter((p) => new Date(p.createdAt).getFullYear() === curYear).reduce((m, p) => Math.max(m, p.number ?? 0), 0) + 1;
     addActivity("quote", `Preventivo n. ${num} ${asDraft ? "salvato" : "inviato"} — ${name.trim()}`);
@@ -528,16 +559,16 @@ export default function PreventiviPage() {
     save();
     const w = window.open("", "_blank", "width=820,height=1000");
     if (!w) return;
-    const esc = (v: string) => (v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const esc = (v: string) => (v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     const L = QL[lang];
     const nWord = n === 1 ? L.notte : L.notti;
     const parkTxt = parkingPrice > 0 ? `${eur(parkingPrice)} ${L.aNotte}` : L.parkIncl;
     const bkTxt = breakfastPrice > 0 ? `${eur(breakfastPrice)} ${L.aNotte}` : L.inclusa;
     const accText = acconto === 0 ? L.accNone.replace("{tot}", eur(total)) : acconto === 100 ? L.accFull.replace("{tot}", eur(total)) : L.accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance)).replace("{pct}", String(acconto));
     const causale = `${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim();
-    const accent = structure?.photoColor || "#BE5D38";
+    const accent = /^#[0-9a-f]{3,8}$/i.test(structure?.photoColor ?? "") ? structure!.photoColor! : "#BE5D38"; // finisce dentro il CSS della pagina stampata: solo un colore esadecimale
     const logoHtml = structure?.logo
-      ? `<img src="${structure.logo}" alt="" class="logoimg">`
+      ? `<img src="${esc(structure.logo)}" alt="" class="logoimg">`
       : `<div class="logo" style="background:${accent}">${esc((structureName || "S").slice(0, 1).toUpperCase())}</div>`;
 
     const dmy = (iso: string) => fmtDate(iso);
@@ -620,7 +651,7 @@ td.r{text-align:right;white-space:nowrap}
 <div class="total"><span class="tl">${esc(L.totale)}</span><span class="tv">${eur(total)}</span></div>
 <h2>${esc(L.condizioni)}</h2>
 <p class="cond">${esc(accText)}</p>
-<p class="canc">${esc(L.cancLabel)}: ${esc(L.cancText)}</p>
+<p class="canc">${esc(L.cancLabel)}: ${esc(cancTxt)}</p>
 ${payHtml}
 ${note ? `<p class="note">${esc(note)}</p>` : ""}
 <p class="closing">${esc(L.closing)}</p>
@@ -962,7 +993,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                         <button onClick={() => loadQuote(p)} className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Modifica")}</button>
                         {p.status === "confermato"
                           ? <span className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>{t("Prenotazione creata")}</span>
-                          : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: 50 }); }} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
+                          : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
                         <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="rounded-md border border-line px-2 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                       </div>
                     </td>
@@ -980,7 +1011,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         const deposit = Math.round(q.total * pct / 100);
         const balance = q.total - deposit;
         const confMsg = buildConfirm(q, pct);
-        const digits = (q.phone ?? "").replace(/\D/g, "");
+        const digits = waDigits(q.phone); // con il prefisso del Paese (default Italia) anche se scritto senza o come 0039…
         const wa = digits ? `https://wa.me/${digits}?text=${encodeURIComponent(confMsg)}` : "#";
         const mail = `mailto:${q.email ?? ""}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`;
         const confirmed = q.status === "confermato";

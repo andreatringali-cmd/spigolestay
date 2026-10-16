@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { parseISO, nights as nightsBetween, fmtDM } from "@/lib/dates";
 import { CHANNELS, type Booking, type Structure } from "@/lib/types";
 import { shortenLink } from "@/lib/guestlink";
+import { waDigits } from "@/lib/contacts-check";
 import {
   buildOfferMessage, guestLang, itemsFromPicks, KIND_LABEL, newOffer, patchAccept, patchRecordSent, PER_LABEL,
   potentialOf, proposable, type Proposal,
@@ -72,7 +73,9 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
 
   const sendWa = () => {
     if (!items.length) return;
-    window.open(`https://wa.me/${(g?.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+    const digits = waDigits(g?.phone, g?.country); // con il prefisso del Paese anche se scritto senza o come 0039…
+    if (!digits) { toast("L'ospite non ha un numero di telefono valido.", "error"); return; }
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, "_blank");
     record("whatsapp");
     toast("WhatsApp aperto con il testo pronto: offerta registrata.", "success");
   };
@@ -86,14 +89,16 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
     if (!g?.email) { toast("L'ospite non ha un'email.", "error"); return; }
     setBusy(true);
     const subject = "Servizi extra per il tuo soggiorno";
-    const gmail = () => window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g.email as string)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`, "_blank");
+    const gmail = (): boolean => !!window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g.email as string)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`, "_blank");
+    // Invio automatico fallito: si apre la bozza Gmail, ma l'offerta NON si registra come inviata (non si sa se l'host la manderà davvero).
+    const fallback = () => toast(gmail() ? "Invio automatico non riuscito: aperta la bozza Gmail. L'offerta non è registrata come inviata." : "Invio automatico non riuscito e bozza Gmail bloccata dal browser: nulla è stato inviato.", "error");
     try {
       // kind "guest_message": messaggio libero con carta intestata della struttura (NON "quote": quello allega un PDF di preventivo).
       const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", to: g.email, subject, text: msg, accent: st?.photoColor, replyTo: st?.email, brand: { name: st?.name, logo: st?.logo, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, email: st?.email, website: st?.website, accent: st?.photoColor, cin: st?.cin, vat: st?.vat } }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j?.ok) { toast(`Email inviata a ${g.email}.`, "success"); record("email"); }
-      else { gmail(); toast("Invio automatico non riuscito: aperta la bozza Gmail.", "info"); record("email"); }
-    } catch { gmail(); toast("Invio automatico non riuscito: aperta la bozza Gmail.", "info"); record("email"); }
+      else fallback();
+    } catch { fallback(); }
     setBusy(false);
   };
   const sellDirect = () => {

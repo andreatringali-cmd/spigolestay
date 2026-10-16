@@ -18,6 +18,8 @@ import { guestLangOf } from "@/lib/guest-lang";
 import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
 import { mergeSeedTemplates } from "@/lib/msg-templates";
+import { waDigits } from "@/lib/contacts-check";
+import { todayRome, addDaysYmd } from "@/lib/dates-rome";
 import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens } from "@/lib/auto-review";
 import { structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
 import { apiPost } from "@/lib/invoicing/client";
@@ -77,11 +79,13 @@ function useFitViewport(gap = 72, min = 380) {
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()));
 const relTime = (ts: number, t: (s: string) => string) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
-const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+const initials = (n: string = "") => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 const fmtD = (iso: string) => (iso ? fmtDM(iso) || iso : "—");
 // Colore avatar deterministico dal nome (piccolo accento — palette curata, tenue/elegante).
 const AVATAR_COLORS = ["#C15B57", "#C58A3B", "#3F9E82", "#3E7CB8", "#8A6EBE", "#B85C8E", "#4E9B5C", "#C77A3E", "#5A8FB0", "#9C7BAE"];
-const avatarColor = (n: string) => { let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; };
+// Nome ospite con ripiego: un'anagrafica creata da fonti esterne può non avere fullName (non deve mandare in errore la pagina).
+const gName = (g: { fullName?: string; firstName?: string; lastName?: string; phone?: string }) => g.fullName || [g.firstName, g.lastName].filter(Boolean).join(" ").trim() || (g as { name?: string }).name || "";
+const avatarColor = (n: string = "") => { let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; };
 // Etichetta giorno per i separatori del thread: Oggi / Ieri / data lunga.
 const dayLabel = (ts: number, t: (s: string) => string) => { const d = new Date(ts); const now = new Date(); const y = new Date(); y.setDate(now.getDate() - 1); if (d.toDateString() === now.toDateString()) return t("Oggi"); if (d.toDateString() === y.toDateString()) return t("Ieri"); return fmtDM(d); };
 // Anteprima ultimo messaggio per la lista (prefisso "Tu:" se in uscita), su una riga.
@@ -128,7 +132,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     } catch {}
     try { const s = localStorage.getItem(SENT_KEY); if (s) setSent(JSON.parse(s)); } catch {}
   }, []);
-  const saveSent = (list: typeof sent) => { setSent(list); try { localStorage.setItem(SENT_KEY, JSON.stringify(list)); } catch {} };
+  const saveSent = (list: typeof sent) => { sentRef.current = list; setSent(list); try { localStorage.setItem(SENT_KEY, JSON.stringify(list)); } catch {} };
+  // Registro invii sempre aggiornato anche dentro cicli asincroni ("Invia oggi"): senza, ogni invio riscriveva l'elenco del render in cui era partito e cancellava gli altri.
+  const sentRef = useRef(sent);
+  useEffect(() => { sentRef.current = sent; }, [sent]);
+  const addSent = (e: (typeof sent)[number]) => saveSent([e, ...sentRef.current.filter((s) => s.key !== e.key)].slice(0, 200));
+  const sendingRef = useRef<Set<string>>(new Set()); // invii in corso (anti doppio clic)
+  const [sendingAll, setSendingAll] = useState(false);
 
   // Archiviazione conversazioni (come WhatsApp): nasconde dalla lista principale, viste a parte.
   // Manuale (pulsante) oppure automatica: una chat senza messaggi da più di 5 giorni si archivia da sola, a prescindere dal check-in.
@@ -180,12 +190,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) continue;
       const g = guests.find((x) => x.id === b.guestId); if (!g) continue;
       const cur = map.get(g.id);
-      if (!cur || b.checkIn > cur.lastCheckIn) map.set(g.id, { id: g.id, name: g.fullName, phone: g.phone, email: g.email, struct: getStructure(b.structureId)?.name ?? "", lastCheckIn: b.checkIn, b });
+      if (!cur || b.checkIn > cur.lastCheckIn) map.set(g.id, { id: g.id, name: gName(g) || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: getStructure(b.structureId)?.name ?? "", lastCheckIn: b.checkIn, b });
     }
     // Chi scrive senza avere (ancora) una prenotazione: un numero WhatsApp nuovo, o un ospite che
     // ha scritto prima di prenotare. Senza questo, il messaggio arriva ed è salvato ma resta
     // invisibile in lista — l'ospite deve poter scrivere chiunque, non solo chi ha già prenotato.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayRome();
     // Per chi non ha (ancora) una prenotazione attiva, distingue un ospite già soggiornato in
     // passato (da valorizzare come cliente di ritorno) da un contatto mai visto prima.
     const pastStayOf = (guestId: string) => {
@@ -203,12 +213,21 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       // in un'altra struttura NON compare qui. Restano visibili in ogni struttura solo i contatti mai
       // legati a nessuna prenotazione (numero nuovo / richiesta prima di prenotare): non hanno una
       // struttura nota e vanno comunque visti, altrimenti il messaggio si perde.
-      if (activeStructureId !== "all" && bookings.some((b) => b.guestId === key && b.channel !== "blocked")) continue;
+      // Le prenotazioni annullate non contano come "legame" con un'altra struttura: chi ha solo prenotazioni annullate in QUESTA struttura
+      // (es. scrive "posso spostare le date?") resta visibile qui, altrimenti il messaggio non avrebbe nessuna chat da aprire.
+      if (activeStructureId !== "all") {
+        const gb = bookings.filter((b) => b.guestId === key && b.channel !== "blocked");
+        if (gb.length) {
+          const activeAnywhere = gb.some((b) => b.status !== "cancelled");
+          const here = gb.some((b) => b.structureId === activeStructureId);
+          if (activeAnywhere || !here) continue; // (con una prenotazione attiva qui sarebbe già nella lista dal primo ciclo)
+        }
+      }
       const g = guests.find((x) => x.id === key);
       if (g) {
         const past = pastStayOf(g.id);
         map.set(key, {
-          id: g.id, name: g.fullName || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: "", lastCheckIn: "",
+          id: g.id, name: gName(g) || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: "", lastCheckIn: "",
           isReturning: !!past,
           lastPastStay: past ? { date: past.checkIn, structName: getStructure(past.structureId)?.name ?? "" } : undefined,
         });
@@ -221,7 +240,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   }, [bookings, guests, activeStructureId, getStructure, threads]);
 
   // Una chat è archiviata se lo ha deciso l'utente, oppure se è inattiva da più di 5 giorni (e non è fissata né da leggere).
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayRome();
   const autoArchived = (p: { id: string; b?: Booking }) => {
     if (pinned.includes(p.id)) return false;
     const th = threads[p.id] ?? []; const last = th[th.length - 1];
@@ -286,7 +305,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const inList = people.find((p) => p.id === sel);
     if (inList) return inList;
     const g = guests.find((x) => x.id === sel);
-    return g ? { id: g.id, name: g.fullName, phone: g.phone, email: g.email, struct: "", lastCheckIn: "", b: undefined as Booking | undefined } : null;
+    return g ? { id: g.id, name: gName(g) || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: "", lastCheckIn: "", b: undefined as Booking | undefined } : null;
   }, [sel, people, guests]);
   const msgs = sel ? threads[sel] ?? [] : [];
   // Conversazione aperta = messaggi letti (spegne il badge nella barra laterale; vale anche per i messaggi che arrivano mentre è aperta).
@@ -434,27 +453,42 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     }, { config_id: WA_CONFIG_ID, response_type: "code", override_default_response_type: true, extras: { setup: {} } });
   };
 
-  const digits = (current?.phone ?? "").replace(/\D/g, "");
+  // Numero con il prefisso del Paese (anche se scritto senza, o come "0039…"): wa.me e Cloud API vogliono solo cifre internazionali.
+  const digits = waDigits(current?.phone, current ? guests.find((x) => x.id === current.id)?.country : undefined);
   const sendWa = async () => {
     if (!draft.trim()) return;
-    const text = draft; const gid = sel; const mid = add("out", text, "WhatsApp"); setDraft("");
-    if (waOn && digits) {
-      const r = await waSendReal(digits, text);
-      if (r.ok) { if (gid && mid && r.id) markSent(gid, mid, r.id); return; } // inviato via Cloud API
+    if (!digits) { window.alert(t("L'ospite non ha un numero di telefono.")); return; }
+    const text = draft; const gid = sel;
+    if (!waOn) {
+      // Senza WhatsApp collegato: wa.me si apre SUBITO (prima di qualsiasi await, altrimenti Safari lo blocca) e il testo va in chat.
+      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank");
+      add("out", text, "WhatsApp"); setDraft(""); return;
     }
-    if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    // Invio reale (Cloud API): il messaggio entra in chat solo se è partito davvero; altrimenti errore visibile e bozza intatta.
+    const r = await waSendReal(digits, text);
+    if (!r.ok) { window.alert(t("Invio WhatsApp non riuscito: il messaggio NON è stato inviato. Riprova o controlla il collegamento WhatsApp.")); return; }
+    const mid = gid ? addTo(gid, "out", text, "WhatsApp") : undefined;
+    if (gid && mid && r.id) markSent(gid, mid, r.id);
+    setDraft((d) => (d === text ? "" : d));
   };
   const sendMail = async () => {
     if (!draft.trim()) return;
     if (!current?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
-    const text = draft; const to = current.email;
-    add("out", draft, "Email"); setDraft("");
-    // Invio automatico dal server (Resend); ripiego Gmail se non configurato.
+    const text = draft; const to = current.email; const gid = sel;
+    // Invio automatico dal server (Resend); ripiego Gmail se non configurato. In chat solo dopo l'esito.
+    let ok = false;
     try {
       const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: t("Messaggio"), text }) });
       const j = await r.json().catch(() => ({}));
-      if (!(r.ok && j?.ok)) window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank");
-    } catch { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank"); }
+      ok = !!(r.ok && j?.ok);
+    } catch { ok = false; }
+    if (!ok) {
+      // Il ripiego si apre dopo un await: se il browser (Safari) lo blocca, si avvisa e non si registra nulla come inviato.
+      const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank");
+      if (!w) { window.alert(t("Invio email non riuscito: il messaggio NON è stato inviato.")); return; }
+    }
+    if (gid) addTo(gid, "out", text, "Email");
+    setDraft((d) => (d === text ? "" : d));
   };
   const logIn = () => { const text = draft.trim() || window.prompt(t("Testo della risposta ricevuta dall'ospite:")) || ""; if (text.trim()) { add("in", text, "manuale"); setDraft(""); } };
 
@@ -546,7 +580,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const access = unit?.accessInfo || st?.accessInfo || "—";
     const balance = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0);
     return raw
-      .replace(/\{ospite\}/g, g.fullName.split(" ")[0])
+      .replace(/\{ospite\}/g, gName(g).split(" ")[0])
       .replace(/\{struttura\}/g, st?.name ?? "")
       .replace(/\{camera\}/g, unit?.name ?? getRoomType(b.roomTypeId)?.name ?? "")
       .replace(/\{checkin\}/g, `${fmtLong(b.checkIn)}${st?.checkInFrom ? ` dalle ${st.checkInFrom}` : ""}`)
@@ -625,8 +659,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const bookingsWithGuest = useMemo(() => bookings
     .filter((b) => (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked")
     .map((b) => ({ b, g: guests.find((x) => x.id === b.guestId)! })).filter((x) => x.g), [bookings, guests, activeStructureId]);
-  const addDaysISO = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const addDaysISO = (iso: string, n: number) => addDaysYmd(iso, n); // aritmetica di calendario: niente salti attraverso il cambio dell'ora legale
+  const todayISO = todayRome();
   // Finestra di RECUPERO: includiamo anche gli invii "scaduti" degli ultimi giorni, così un
   // last-minute (prenotazione creata DOPO l'orario del modello, o lo stesso giorno) non viene
   // perso: compare come "In ritardo · da inviare subito" invece di sparire.
@@ -645,33 +679,54 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   const sendLinkFor = (tpl: MsgTemplate, b: Booking, g: Guest): { href: string; kind: "wa" | "email" } | null => {
     const body = fillFor(tpl.texts[langOf(g)] || tpl.texts.it || "", b, g);
-    const dg = (g.phone ?? "").replace(/\D/g, "");
+    const dg = waDigits(g.phone, g.country);
     if (dg) return { href: `https://wa.me/${dg}?text=${encodeURIComponent(body)}`, kind: "wa" };
     if (g.email) return { href: `mailto:${g.email}?subject=${encodeURIComponent(tpl.name)}&body=${encodeURIComponent(body)}`, kind: "email" };
     return null;
   };
   const sentKey = (x: { tpl: MsgTemplate; b: Booking; date: string }) => `${x.tpl.srcId || x.tpl.id}-${x.b.id}-${x.date}`;
   const isSent = (x: { tpl: MsgTemplate; b: Booking; date: string }) => sent.some((s) => s.key === sentKey(x));
-  const sendScheduled = async (x: { tpl: MsgTemplate; b: Booking; g: Guest; date: string }) => {
-    const l = sendLinkFor(x.tpl, x.b, x.g); if (!l) return;
-    const body = fillFor(x.tpl.texts[langOf(x.g)] || x.tpl.texts.it || "", x.b, x.g);
-    const dg = (x.g.phone ?? "").replace(/\D/g, "");
-    // WhatsApp collegato + numero → invio reale; email → invio reale via server (Resend), non bozza mailto.
-    let sentReal = false;
-    let wid: string | undefined;
-    if (l.kind === "wa") {
-      if (waOn && dg) { const r = await waSendReal(dg, body); sentReal = r.ok; wid = r.id; }
-    } else if (l.kind === "email" && x.g.email) {
-      const st = getStructure(x.b.structureId);
-      try {
-        const r = await apiPost<{ ok?: boolean }>("email", { kind: "guest_message", to: x.g.email, subject: x.tpl.name, text: body, booking: { structureName: st?.name, structureEmail: st?.email } });
-        sentReal = r?.ok !== false;
-      } catch { sentReal = false; }
-    }
-    if (!sentReal) window.open(l.href, "_blank", "noopener"); // fallback: apre wa.me/mailto se l'invio reale non è possibile
-    const mid = addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
-    if (mid && wid) markSent(x.g.id, mid, wid);
-    saveSent([{ key: sentKey(x), guest: x.g.fullName, tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() }, ...sent.filter((s) => s.key !== sentKey(x))].slice(0, 200));
+  // Ritorna true se il messaggio è partito (e registrato). In modalità bulk ("Invia oggi") non si aprono schede: chi richiede l'invio manuale resta in coda.
+  const sendScheduled = async (x: { tpl: MsgTemplate; b: Booking; g: Guest; date: string }, opts?: { bulk?: boolean }): Promise<boolean> => {
+    const l = sendLinkFor(x.tpl, x.b, x.g); if (!l) return false;
+    const key = sentKey(x);
+    if (sentRef.current.some((s) => s.key === key) || sendingRef.current.has(key)) return false; // già inviato o in corso (doppio clic, "Invia oggi" ripetuto)
+    sendingRef.current.add(key);
+    try {
+      const body = fillFor(x.tpl.texts[langOf(x.g)] || x.tpl.texts.it || "", x.b, x.g);
+      const dg = waDigits(x.g.phone, x.g.country);
+      // WhatsApp collegato + numero → invio reale; email → invio reale via server (Resend), non bozza mailto.
+      let sentReal = false;
+      let wid: string | undefined;
+      if (l.kind === "wa") {
+        if (waOn && dg) { const r = await waSendReal(dg, body); sentReal = r.ok; wid = r.id; }
+      } else if (l.kind === "email" && x.g.email) {
+        const st = getStructure(x.b.structureId);
+        try {
+          const r = await apiPost<{ ok?: boolean }>("email", { kind: "guest_message", to: x.g.email, subject: x.tpl.name, text: body, booking: { structureName: st?.name, structureEmail: st?.email } });
+          sentReal = r?.ok !== false;
+        } catch { sentReal = false; }
+      }
+      if (!sentReal) {
+        if (opts?.bulk) return false; // niente raffica di schede wa.me/mailto: questi si inviano uno alla volta con "Invia ora"
+        // fallback: apre wa.me/mailto se l'invio reale non è possibile; se il browser lo blocca non si registra come inviato
+        const w = window.open(l.href, "_blank");
+        if (w) { try { w.opener = null; } catch { /* niente */ } } else { window.alert(t("Il browser ha bloccato l'apertura: il messaggio NON risulta inviato.")); return false; }
+      }
+      const mid = addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
+      if (mid && wid) markSent(x.g.id, mid, wid);
+      addSent({ key, guest: gName(x.g), tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() });
+      return true;
+    } finally { sendingRef.current.delete(key); }
+  };
+  // "Invia oggi": uno dopo l'altro (mai in parallelo), con un registro sempre aggiornato.
+  const sendAllToday = async () => {
+    if (sendingAll) return;
+    setSendingAll(true);
+    let skipped = 0;
+    try { for (const x of todayQueue) { if (!(await sendScheduled(x, { bulk: true }))) skipped++; } }
+    finally { setSendingAll(false); }
+    if (skipped > 0) window.alert(`${skipped} ${t("invii non partiti in automatico (WhatsApp non collegato o invio non riuscito): usa «Invia ora» sulla singola riga.")}`);
   };
   // "Invia oggi" copre oggi + gli arretrati non ancora inviati (finestra di recupero).
   const todayQueue = queue.filter((x) => x.date <= todayISO && !isSent(x));
@@ -766,7 +821,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             <div className="mb-3 flex items-center gap-2">
               <button onClick={() => setShowInvii(false)} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">← {t("Indietro")}</button>
               <div className="min-w-0 flex-1 text-sm font-semibold text-txt">{t("Invii programmati")}</div>
-              <button onClick={() => todayQueue.forEach(sendScheduled)} disabled={todayQueue.length === 0} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Invia oggi")}{todayQueue.length ? ` (${todayQueue.length})` : ""}</button>
+              <button onClick={sendAllToday} disabled={todayQueue.length === 0 || sendingAll} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Invia oggi")}{todayQueue.length ? ` (${todayQueue.length})` : ""}</button>
             </div>
             {queue.length === 0 ? (
               <p className="text-sm text-faint">{t("Nessun invio in coda. Crea un modello automatico in «Modelli & automazioni», poi qui lo invii e lo tracci.")}</p>
@@ -775,7 +830,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {queue.map((x) => (
                   <div key={x.key} className="flex items-center gap-3 py-2">
                     <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{fmtDM(x.date)}</div><div className="text-[10px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
-                    <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{x.tpl.name}</b> → {x.g.fullName}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
+                    <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{x.tpl.name}</b> → {gName(x.g)}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
                     {isSent(x) ? (
                       <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("Inviato")} ✓</span>
                     ) : (() => { const l = sendLinkFor(x.tpl, x.b, x.g); return l ? <button onClick={() => sendScheduled(x)} className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: l.kind === "wa" ? "#25D366" : "var(--focus)" }}>{t("Invia ora")}</button> : <span className="shrink-0 text-[11px] text-faint">{t("no contatto")}</span>; })()}

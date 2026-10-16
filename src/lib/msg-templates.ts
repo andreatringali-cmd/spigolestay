@@ -6,6 +6,32 @@
 // (elenco dei link Google/Tripadvisor configurati; vedi lib/auto-review.ts).
 
 export const MSG_TEMPLATES_KEY = "spigolestay:msgtemplates";
+// Id dei modelli d'esempio eliminati dall'host (tombstone): senza, mergeSeedTemplates li riaggiungerebbe attivi a ogni apertura.
+// NB: per essere condivisa tra dispositivi/collaboratori la chiave va aggiunta a src/lib/workspace-keys.ts (EXACT: "msgtemplates:deleted").
+export const MSG_TEMPLATES_DELETED_KEY = "spigolestay:msgtemplates:deleted";
+
+export function loadDeletedSeedIds(): string[] {
+  try {
+    if (typeof localStorage === "undefined") return [];
+    const p = JSON.parse(localStorage.getItem(MSG_TEMPLATES_DELETED_KEY) || "[]");
+    return Array.isArray(p) ? p.filter((x): x is string => typeof x === "string") : [];
+  } catch { return []; }
+}
+/** Da chiamare quando l'host elimina un modello: se è un modello d'esempio ne ricorda l'id, così non viene rimesso. */
+export function markSeedDeleted(id: string): void {
+  try {
+    if (!DEFAULT_TEMPLATES.some((d) => d.id === id)) return;
+    const cur = loadDeletedSeedIds();
+    if (!cur.includes(id)) localStorage.setItem(MSG_TEMPLATES_DELETED_KEY, JSON.stringify([...cur, id]));
+  } catch { /* quota/privato: pazienza */ }
+}
+/** Se l'host rimette a mano un modello con quell'id (es. lo ricrea), l'id esce dai tombstone. */
+export function unmarkSeedDeleted(id: string): void {
+  try {
+    const cur = loadDeletedSeedIds();
+    if (cur.includes(id)) localStorage.setItem(MSG_TEMPLATES_DELETED_KEY, JSON.stringify(cur.filter((x) => x !== id)));
+  } catch { /* niente */ }
+}
 
 export interface MsgTemplateSeed {
   id: string;
@@ -106,8 +132,9 @@ const norm = (s: unknown) => (typeof s === "string" ? s.replace(/\r\n/g, "\n").t
  * Modelli salvati + modelli d'esempio: aggiunge quelli d'esempio mancanti (per id) e aggiorna i modelli d'esempio MAI MODIFICATI
  * (testi identici ai vecchi) alla versione nuova. Sostituisce solo i testi: attivazione, giorni, orario e strutture restano quelli dell'host.
  */
-export function mergeSeedTemplates<T extends { id: string; texts?: Record<string, string> }>(saved: T[]): T[] {
+export function mergeSeedTemplates<T extends { id: string; texts?: Record<string, string> }>(saved: T[], deletedSeedIds: string[] = loadDeletedSeedIds()): T[] {
   const have = new Set(saved.map((x) => x.id));
+  for (const id of deletedSeedIds) have.add(id); // un modello d'esempio eliminato dall'host non torna più (tombstone)
   const upgraded = saved.map((tp) => {
     const old = LEGACY_SEED_TEXTS[tp.id]; const seed = DEFAULT_TEMPLATES.find((d) => d.id === tp.id);
     if (!old || !seed || !tp.texts) return tp;

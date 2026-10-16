@@ -7,7 +7,7 @@ import DateField from "@/components/DateField";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
-import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS } from "@/lib/promos";
+import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS, promoRecipientEmail } from "@/lib/promos";
 import { GUEST_TAGS, type Channel } from "@/lib/types";
 import { commissionOf } from "@/lib/booking";
 import { inScope, newItemStructureId } from "@/lib/scope";
@@ -37,7 +37,7 @@ const SEGMENTS: { key: Segment; label: string; desc: string }[] = [
   { key: "abituali", label: "Ospiti abituali", desc: "Più di un soggiorno" },
   { key: "vip", label: "Ospiti VIP", desc: "Contrassegnati come VIP nella scheda ospite" },
   { key: "consenso", label: "Con consenso marketing", desc: "Hanno dato il consenso" },
-  { key: "tutti", label: "Tutti con email", desc: "Chiunque abbia un'email" },
+  { key: "tutti", label: "Tutti i contattabili", desc: "Chi ha un'email vera e il consenso marketing (o è iscritto alla newsletter)" },
 ];
 // Categorie ospite (tag della scheda): ogni tag diventa un destinatario selezionabile.
 const TAG_SEGMENTS: { key: Segment; label: string; desc: string }[] = GUEST_TAGS.map((tag) => ({ key: `tag:${tag}`, label: tag, desc: `Ospiti con la categoria «${tag}»` }));
@@ -124,9 +124,11 @@ export default function PromozioniPage() {
   // Il destinatario segue la struttura attiva (il select del modale è bloccato quando ne è selezionata una).
   useEffect(() => { setStructureId(activeStructureId); }, [activeStructureId]);
 
-  const audience = useMemo(() => {
+  // Destinatari del segmento. Si scrive SOLO a chi ha un'email vera (non gli indirizzi di inoltro di Booking/Airbnb/Expedia) e il consenso marketing
+  // (flag nella scheda o iscrizione alla newsletter); gli altri sono contati in "excluded" e non ricevono nulla.
+  const { audience, excluded } = useMemo(() => {
     const withStruct = (gid: string) => structureId === "all" || bookings.some((b) => b.guestId === gid && b.structureId === structureId);
-    return guests.filter((g) => {
+    const inSegment = guests.filter((g) => {
       if (!g.email || !withStruct(g.id)) return false;
       const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked");
       const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
@@ -140,6 +142,8 @@ export default function PromozioniPage() {
         default: return true;
       }
     });
+    const audience = inSegment.filter((g) => !!promoRecipientEmail(g));
+    return { audience, excluded: inSegment.length - audience.length };
   }, [guests, bookings, segment, structureId]);
 
   // Commissioni pagate alle OTA sullo storico: quanto potresti risparmiare riportando questi ospiti al diretto.
@@ -154,17 +158,24 @@ export default function PromozioniPage() {
   // Invio automatico dal server (Resend): una email personalizzata per ogni destinatario.
   const doSend = async () => {
     if (!sending || audience.length === 0 || limitReached || promoSending) return;
-    const st = structureId === "all" ? structures[0] : structures.find((s) => s.id === structureId);
-    const contatti = contactsOf(st);
+    // Brand e contatti sono quelli della struttura dell'OSPITE (la sua ultima prenotazione); con una struttura scelta, quella.
+    const stOf = (gid: string) => {
+      if (structureId !== "all") return structures.find((s) => s.id === structureId);
+      const last = bookings.filter((b) => b.guestId === gid && b.status !== "cancelled" && b.channel !== "blocked").sort((x, y) => (x.checkIn < y.checkIn ? 1 : -1))[0];
+      return structures.find((s) => s.id === last?.structureId) ?? structures[0];
+    };
     const subject = sending.subject?.trim() || sending.name;
     const scad = sending.validUntil ? fmtDate(sending.validUntil) : "";
     setPromoSending(true);
     let ok = 0, fail = 0;
     for (const g of audience) {
-      if (!g.email) continue;
+      const to = promoRecipientEmail(g);
+      if (!to) continue;
+      const st = stOf(g.id);
+      const contatti = contactsOf(st);
       const body = applyPromo(sending.body, { nome: g.firstName || g.fullName?.split(" ")[0] || "", sconto: sending.discountPct, codice: sending.code, scadenza: scad, struttura: st?.name, contatti });
       try {
-        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject, text: body, accent: st?.photoColor, replyTo: st?.email, brand: { name: st?.name, logo: st?.logo, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, email: st?.email, website: st?.website, accent: st?.photoColor, cin: st?.cin, vat: st?.vat } }) });
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject, text: body, accent: st?.photoColor, replyTo: st?.email, brand: { name: st?.name, logo: st?.logo, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, email: st?.email, website: st?.website, accent: st?.photoColor, cin: st?.cin, vat: st?.vat } }) });
         const j = await r.json().catch(() => ({}));
         if (r.ok && j?.ok) ok++; else fail++;
       } catch { fail++; }
@@ -180,7 +191,7 @@ export default function PromozioniPage() {
       <PageHeader title="Promozioni" subtitle="Crea le tue promo, salvale e inviale quando vuoi · max 4 invii l'anno" />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {([["Commissioni OTA (storico)", `€ ${Math.round(otaCommission).toLocaleString("it-IT")}`], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!g.email) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
+        {([["Commissioni OTA (storico)", `€ ${Math.round(otaCommission).toLocaleString("it-IT")}`], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!promoRecipientEmail(g)) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
           <StatCard key={lab} label={lab} value={val} />
         ))}
       </div>
@@ -284,7 +295,7 @@ export default function PromozioniPage() {
               <optgroup label="Per categoria">{TAG_SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
             </select></label>
             <label className="mt-3 block text-xs font-medium text-dim">Struttura<select value={structureId} disabled={activeStructureId !== "all"} onChange={(e) => setStructureId(e.target.value)} className={`${inp} mt-1 disabled:opacity-60`}><option value="all">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-            <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b></div>
+            <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b>{excluded > 0 && <span> · {excluded} esclusi (senza consenso marketing o con email di inoltro OTA)</span>}</div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
               <button onClick={doSend} disabled={audience.length === 0 || limitReached || promoSending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> {promoSending ? "Invio in corso…" : `Invia ora (${audience.length})`}</button>

@@ -7,7 +7,7 @@ import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
 import MediaImg from "@/components/MediaImg";
 import { eur } from "@/lib/format";
-import { effectiveBase, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
+import { effectiveClosed, rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { cityTaxOf } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
@@ -16,15 +16,21 @@ import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import AdsConsent from "@/components/AdsConsent";
 import DateField from "@/components/DateField";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, shiftISO, toISO } from "@/lib/dates";
 import { trackBookingConversion, resolveAdsConfig } from "@/lib/ads";
-import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
+import { loadPublicSite, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
-const toISO = (d: Date) => d.toISOString().slice(0, 10);
-const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
+// Codice prenotazione casuale (maiuscole e cifre senza caratteri ambigui: niente 0/O/1/I).
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 caratteri: nessun bias con byte & 31
+const randomBookingCode = (len: number): string => {
+  const bytes = new Uint8Array(len);
+  try { globalThis.crypto.getRandomValues(bytes); } catch { for (let i = 0; i < len; i++) bytes[i] = Math.floor(Math.random() * 256); }
+  return Array.from(bytes, (b) => CODE_CHARS[b & 31]).join("");
+};
+// Date SEMPRE in calendario locale (toISO/shiftISO di lib/dates): con toISOString() il giorno slitta di ora legale / fuso (es. 29.03 + 1 = 29.03).
+const addDays = shiftISO;
 const nightsBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
-const isWeekendISO = (iso: string) => { const day = new Date(iso).getDay(); return day === 5 || day === 6 || day === 0; };
 
 type Plan = RatePlan;
 const DEFAULT_PLANS: Plan[] = [
@@ -75,7 +81,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
 
   // Config salvata (piani, weekend) — fallback ai default.
   const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
-  const weekendPct = useMemo(() => { try { const r = lsGet("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  // % weekend di default (0 se l'host ha spento la maggiorazione); le regole per struttura le applica rateForDay.
+  const weekendPct = useMemo(() => loadWeekendPct(), []);
   const allPromos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
@@ -106,6 +113,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   // metasearch), mostra subito i risultati.
   const [searched, setSearched] = useState<boolean>(() => !!((qp("ci") || qp("checkin")) && (qp("co") || qp("checkout"))) || !!rtParam);
   const [processing, setProcessing] = useState(false); // invio prenotazione / redirect pagamento
+  const [noOnlinePayment, setNoOnlinePayment] = useState(false); // prenotazione registrata senza pagamento online (Stripe non collegato): nessun acconto incassato
   const [bookError, setBookError] = useState<string | null>(null); // esito negativo dell'invio: la conferma NON va mostrata
   // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
   // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
@@ -157,8 +165,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const masters = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
 
   const dayPrice = (rt: RoomType, iso: string, plan: Plan) => {
-    const base = effectiveBase(rt, roomTypes);
-    const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekendISO(iso) ? 1 + structureWeekendPct(rt.structureId, weekendPct) / 100 : 1));
+    // Stessa tariffa del Calendario e dei canali: override giornalieri (anche della madre per le derivate), weekend sab/dom e interruttore weekend; poi lo sconto/aumento del piano.
+    const raw = rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct);
     return Math.max(0, Math.round(raw * (1 + plan.adjPct / 100)));
   };
   const stayPrice = (rt: RoomType, plan: Plan) => { let t = 0; for (let i = 0; i < nights; i++) t += dayPrice(rt, addDays(checkIn, i), plan); return t; };
@@ -234,8 +242,18 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const total = accommodation + extrasTotal + cityTax - discount;
   const depositPct = selPlan ? planDepositPct(selPlan) : 0; // acconto secondo la politica di incasso del piano
   const deposit = Math.round(total * depositPct / 100);
+  const shownDeposit = noOnlinePayment ? 0 : deposit; // quanto risulta davvero incassato (per riepilogo e PDF)
 
   const guestValid = guest.firstName.trim() && guest.lastName.trim() && guest.email.trim() && guest.phone.trim() && privacy;
+
+  // Stripe Checkout non si apre dentro un iframe: nella versione incorporata si naviga la finestra principale.
+  const goToCheckout = (url: string) => {
+    if (embed) {
+      try { if (window.top && window.top !== window.self) { window.top.location.href = url; return; } } catch { /* iframe con sandbox: si prova con _top */ }
+      try { if (window.open(url, "_top")) return; } catch { /* niente */ }
+    }
+    window.location.href = url;
+  };
 
   const confirm = async () => {
     if (!selRt || !guestValid || processing) return;
@@ -258,7 +276,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     }
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
     const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", wantsCot ? "🍼 Culla richiesta" : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
-    const bkCode = `SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`;
+    const bkCode = `SPG-${new Date().getFullYear()}-${randomBookingCode(8)}`; // casuale: la vecchia somma dei caratteri produceva molte collisioni
     // Sito PUBBLICO: prima si tenta il PAGAMENTO online (Stripe della struttura); la
     // prenotazione si registra solo dopo l'incasso. Se Stripe non è collegato o non è
     // previsto un importo, si registra direttamente ("paga in struttura").
@@ -273,11 +291,12 @@ export function Engine({ embed = false }: { embed?: boolean }) {
         const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, token, guest: guestBody, ...policy }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || j?.ok === false) failure = bookingErrorMessage(r.status, j?.error);
-        else if (j?.payment && j?.url) { window.location.href = j.url as string; return; } // → Stripe
+        else if (j?.payment && j?.url) { goToCheckout(j.url as string); return; } // → Stripe
         else {
           const r2 = await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody, ...policy }) });
           const j2 = await r2.json().catch(() => ({}));
           if (!r2.ok || j2?.ok === false) failure = bookingErrorMessage(r2.status, j2?.error);
+          else setNoOnlinePayment(true); // registrata senza incasso online: la conferma non deve dire "acconto pagato"
         }
       } catch { failure = BOOKING_NETWORK_ERROR; }
       setProcessing(false);
@@ -356,10 +375,10 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     ["Check-out", fmtDate(checkOut)],
     ["Ospiti", `${adults} adulti${children ? ` · ${children} bambini` : ""}`],
     ["Totale", eur(total)],
-    ...((deposit > 0 && deposit < total
-      ? [["Acconto versato", eur(deposit)], ["Saldo in struttura", eur(total - deposit)]]
-      : deposit >= total && deposit > 0
-        ? [["Importo pagato", eur(deposit)]]
+    ...((shownDeposit > 0 && shownDeposit < total
+      ? [["Acconto versato", eur(shownDeposit)], ["Saldo in struttura", eur(total - shownDeposit)]]
+      : shownDeposit >= total && shownDeposit > 0
+        ? [["Importo pagato", eur(shownDeposit)]]
         : [["Saldo in struttura", eur(total)]]) as [string, string][]),
   ] as [string, string][]);
 
@@ -470,7 +489,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     const dStruct = doneSummary?.structureName || structure?.name;
     const dRoom = doneSummary?.roomName || selRt?.name;
     const dCi = doneSummary?.ci || checkIn, dCo = doneSummary?.co || checkOut;
-    const dTotal = doneSummary?.total ?? total, dDeposit = doneSummary?.deposit ?? deposit;
+    const dTotal = doneSummary?.total ?? total, dDeposit = noOnlinePayment ? 0 : (doneSummary?.deposit ?? deposit);
     const dFirst = doneSummary?.guestFirst || guest.firstName, dEmail = doneSummary?.email || guest.email;
     return (
       <div className={embed ? "flex flex-col" : "flex min-h-dvh flex-col bg-wash"}>

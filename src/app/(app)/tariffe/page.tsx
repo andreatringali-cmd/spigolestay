@@ -25,6 +25,18 @@ const RULES_KEY = "spigolestay:pricerules";
 const inp = "rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
 // Iconcine ospiti (occupazione della tariffa): es. "doppia uso singola" = 1, "tripla uso matrimoniale" = 2.
+// Prezzo base: si salva quando si esce dal campo (o con Invio), non a ogni tasto. Un campo svuotato non salva mai (niente prezzo 0 verso i portali) e torna al valore salvato.
+function BasePriceInput({ value, onCommit, className }: { value: number; onCommit: (v: number) => void; className: string }) {
+  const [draft, setDraft] = useState<string | null>(null); // null = non si sta scrivendo: mostra il valore salvato
+  const commit = () => {
+    if (draft === null) return;
+    const n = Number(draft);
+    if (draft.trim() !== "" && Number.isFinite(n) && n >= 0 && n !== value) onCommit(n);
+    setDraft(null);
+  };
+  return <input type="number" min={0} value={draft ?? String(value)} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} className={className} />;
+}
+
 function Occ({ n }: { n: number }) {
   const c = Math.max(1, Math.min(Math.round(n) || 1, 8));
   return (
@@ -147,7 +159,7 @@ export default function TariffePage() {
         </td>
         <td className="px-3 py-2.5">
           {!derived
-            ? <label className="flex items-center gap-1 text-xs text-dim">€<input type="number" min={0} value={rt.basePrice} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { const v = e.target.value; updateRoomType(rt.id, { basePrice: v === "" ? 0 : Math.max(0, Number(v)) }); }} className={`${inp} w-24`} /></label>
+            ? <label className="flex items-center gap-1 text-xs text-dim">€<BasePriceInput value={rt.basePrice} onCommit={(v) => updateRoomType(rt.id, { basePrice: v })} className={`${inp} w-24`} /></label>
             : <span className="text-xs text-faint">{t("da")} {srcName}</span>}
         </td>
         <td className="px-3 py-2.5 text-center">

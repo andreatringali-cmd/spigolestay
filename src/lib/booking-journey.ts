@@ -3,7 +3,7 @@
 
 import { fmtDM } from "./dates";
 import type { Booking, Guest, Structure } from "./types";
-import { bookingPaidTotal, cityTaxOf } from "./booking";
+import { bookingPaidTotal, cityTaxOfBooking } from "./booking";
 import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
 
 export type StepState = "done" | "todo" | "late" | "na";
@@ -25,7 +25,6 @@ export interface JourneyCtx {
 const expectedPax = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
 const primaryDone = (b: Booking) => b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
 const declaredPax = (b: Booking) => (primaryDone(b) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0);
-const nightsBetween = (a: string, b: string) => Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000));
 const daysTo = (iso: string, today: string) => Math.round((Date.parse(iso) - Date.parse(today)) / 86400000);
 const eurRound = (n: number) => `€ ${Math.round(n * 100) % 100 === 0 ? Math.round(n) : n.toFixed(2).replace(".", ",")}`;
 const fmtShort = (iso: string) => fmtDM(iso);
@@ -64,7 +63,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   });
 
   // 3 · Tassa di soggiorno (solo se la struttura la applica)
-  const tax = cityTaxOf(c.structure, b.adults, nightsBetween(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
+  const tax = cityTaxOfBooking(c.structure, b); // stessa cifra di elenco, fatture e check-in (paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti)
   if (tax > 0) steps.push({
     key: "tax", label: "Tassa soggiorno", href: "/tassa-soggiorno",
     state: b.cityTaxPaid ? "done" : departed ? "late" : "todo",

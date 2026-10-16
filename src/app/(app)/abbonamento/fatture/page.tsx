@@ -1,10 +1,11 @@
 "use client";
 
-// Fatture dell'abbonamento (dimostrativo). In produzione arrivano dal sistema di fatturazione
-// (Stripe + fattura elettronica). Qui generiamo un elenco d'esempio in base al piano attivo.
+// Fatture dell'abbonamento: SOLO quelle reali, lette da Stripe (/api/stripe/invoices).
+// Se Stripe non ne restituisce (errore di rete, Stripe non collegato, nessun abbonamento reale) si mostra un avviso o l'elenco vuoto:
+// niente fatture di esempio presentate come reali.
 
 import { fmtDate } from "@/lib/dates";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
@@ -15,10 +16,6 @@ interface RealInvoice { number: string; created: number | null; due: number | nu
 
 const VAT = 0.22; // IVA 22%
 
-interface Invoice { date: Date; due: Date; number: string; description: string; net: number; tax: number; amount: number; method: string; paidOn: Date | null }
-type InvStatus = "paid" | "due" | "overdue";
-const statusOf = (iv: Invoice): InvStatus => (iv.paidOn ? "paid" : (iv.due.getTime() < Date.now() ? "overdue" : "due"));
-
 export default function FatturePage() {
   const { t } = useLang();
   const [sub, setSub] = useState<SubSummary | null>(null);
@@ -27,122 +24,29 @@ export default function FatturePage() {
   const planName = sub?.label ?? "Basic";   // es. "Basic personalizzato"
   const monthly = sub?.monthlyTotal ?? 0;   // piano + moduli extra
   const added = sub?.addedModules ?? [];    // moduli non inclusi nel piano
-  const [billing, setBilling] = useState<{ businessName?: string; vat?: string; taxCode?: string; address?: string; sdi?: string; pec?: string; email?: string }>({});
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:billing"); if (r) setBilling(JSON.parse(r)); } catch {} }, []);
 
-  // Fatture reali dall'abbonamento Stripe (se configurato e presenti).
+  // Fatture reali dall'abbonamento Stripe.
   const { user } = useAuth();
   const [realInv, setRealInv] = useState<RealInvoice[]>([]);
+  // Esito del caricamento: "loading" | "ok" | "notconfigured" (Stripe non collegato) | "err" (errore di rete o di Stripe).
+  const [invState, setInvState] = useState<"loading" | "ok" | "notconfigured" | "err">("loading");
   useEffect(() => {
     const email = user?.email; if (!email) return;
-    fetch(`/api/stripe/invoices?email=${encodeURIComponent(email)}`).then((r) => r.json()).then((j) => { if (Array.isArray(j.invoices)) setRealInv(j.invoices); }).catch(() => {});
+    setInvState("loading");
+    fetch(`/api/stripe/invoices?email=${encodeURIComponent(email)}`).then((r) => r.json()).then((j) => {
+      if (Array.isArray(j.invoices)) setRealInv(j.invoices);
+      setInvState(j.configured === false ? "notconfigured" : j.error ? "err" : "ok");
+    }).catch(() => setInvState("err"));
   }, [user?.email]);
 
-  const fmtMonth = (d: Date) => d.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
   const fmtDay = (d: Date | null) => (d ? fmtDate(d) : "—");
 
-  // Fatture reali del ciclo: la PRIMA viene emessa alla fine della prova gratuita (primo pagamento),
-  // poi a ogni rinnovo mensile. Durante la prova NON esiste nessuna fattura.
-  const invoices = useMemo<Invoice[]>(() => {
-    if (!trial || trial.inTrial) return []; // in prova: nessuna fattura
-    const now = new Date();
-    const perYear: Record<number, number> = {};
-    const rows: Invoice[] = [];
-    // Date di fatturazione: fine prova, poi ogni mese, fino a oggi.
-    const dates: Date[] = [];
-    const d0 = new Date(trial.trialEnd);
-    for (let i = 0; i < 60; i++) {
-      const d = new Date(d0.getFullYear(), d0.getMonth() + i, d0.getDate());
-      if (d > now) break;
-      dates.push(d);
-    }
-    dates.forEach((d, idx) => {
-      const y = d.getFullYear();
-      perYear[y] = (perYear[y] ?? 0) + 1;
-      const amount = monthly;
-      const net = Math.round((amount / (1 + VAT)) * 100) / 100;
-      const tax = Math.round((amount - net) * 100) / 100;
-      const due = new Date(d.getFullYear(), d.getMonth() + 1, d.getDate());
-      const isLast = idx === dates.length - 1;
-      rows.push({
-        date: d,
-        due,
-        number: `${String(perYear[y]).padStart(4, "0")}/${y}`,
-        description: `${t("Abbonamento Xenora")} · ${t("Piano")} ${planName}${added.length ? ` · +${added.length} ${t("moduli extra")}` : ""}`,
-        net, tax, amount,
-        method: "Carta ••4242",
-        // Pagamento automatico all'emissione; l'ultima è "da incassare" se ancora entro scadenza.
-        paidOn: isLast && due.getTime() > Date.now() ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate()),
-      });
-    });
-    return rows.reverse(); // più recente in alto
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthly, planName, added, trial]);
-
-  const tot = invoices.reduce((a, iv) => ({ net: a.net + iv.net, tax: a.tax + iv.tax, amount: a.amount + iv.amount }), { net: 0, tax: 0, amount: 0 });
-
-  const stMeta = (s: InvStatus) => s === "paid" ? { label: t("Pagata"), c: "var(--ok)" } : s === "overdue" ? { label: t("Scaduta"), c: "var(--err)" } : { label: t("Da pagare"), c: "var(--warn)" };
-
-  // Stampa/scarica la singola fattura come documento.
-  const stampaFattura = (iv: Invoice) => {
-    const w = window.open("", "_blank", "width=800,height=1000");
-    if (!w) return;
-    const esc = (s: string) => (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const b = billing;
-    const clientRows = [
-      b.businessName ? `<div><b>${esc(b.businessName)}</b></div>` : "",
-      b.vat ? `<div>P.IVA ${esc(b.vat)}</div>` : "",
-      b.taxCode ? `<div>C.F. ${esc(b.taxCode)}</div>` : "",
-      b.address ? `<div>${esc(b.address)}</div>` : "",
-      b.sdi ? `<div>SDI ${esc(b.sdi)}</div>` : "",
-      b.pec ? `<div>PEC ${esc(b.pec)}</div>` : "",
-    ].filter(Boolean).join("");
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Fattura ${esc(iv.number)} · Xenora</title><style>
-@page{size:A4;margin:16mm}
-*{box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;color:#1f2430;margin:0;font-size:13px}
-.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #285f92;padding-bottom:14px}
-.brand{font-size:22px;font-weight:800;color:#285f92}
-.brand small{display:block;font-size:11px;font-weight:400;color:#6b7280;letter-spacing:.03em}
-.doc{text-align:right}
-.doc .n{font-size:20px;font-weight:800}
-.doc .d{color:#6b7280;font-size:12px}
-.parties{display:flex;justify-content:space-between;gap:20px;margin:22px 0}
-.parties h3{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ac;margin:0 0 6px}
-table{width:100%;border-collapse:collapse;margin-top:8px}
-th{text-align:left;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#9aa1ac;border-bottom:2px solid #e6e8ec;padding:9px 8px}
-td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
-.r{text-align:right}.mono{font-family:'Courier New',monospace}
-.tot{margin-top:14px;margin-left:auto;width:280px}
-.tot .row{display:flex;justify-content:space-between;padding:6px 8px;font-size:13px}
-.tot .grand{border-top:2px solid #e6e8ec;font-weight:800;font-size:16px;color:#285f92}
-.status{margin-top:22px;display:inline-block;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700}
-.foot{margin-top:32px;color:#9aa1ac;font-size:10px;border-top:1px solid #ece7df;padding-top:10px}
-</style></head><body>
-<div class="top">
-  <div class="brand">Xenora<small>Digital Solutions · Channel Manager & PMS</small></div>
-  <div class="doc"><div style="font-size:11px;letter-spacing:.12em;color:#9aa1ac;text-transform:uppercase;font-weight:700">Fattura</div><div class="n">${esc(iv.number)}</div><div class="d">Data ${fmtDay(iv.date)}</div><div class="d">Scadenza ${fmtDay(iv.due)}</div></div>
-</div>
-<div class="parties">
-  <div><h3>Fornitore</h3><div><b>Xenora Digital Solutions</b></div><div>xenora.it</div></div>
-  <div style="text-align:right"><h3>Cliente</h3>${clientRows || '<div style="color:#9aa1ac">— dati di fatturazione non impostati —</div>'}</div>
-</div>
-<table>
-  <thead><tr><th>Descrizione</th><th class="r">Prezzo netto</th><th class="r">IVA 22%</th><th class="r">Importo</th></tr></thead>
-  <tbody><tr><td>${esc(iv.description)}</td><td class="r mono">${eur(iv.net)}</td><td class="r mono">${eur(iv.tax)}</td><td class="r mono"><b>${eur(iv.amount)}</b></td></tr></tbody>
-</table>
-<div class="tot">
-  <div class="row"><span>Imponibile</span><span class="mono">${eur(iv.net)}</span></div>
-  <div class="row"><span>IVA 22%</span><span class="mono">${eur(iv.tax)}</span></div>
-  <div class="row grand"><span>Totale</span><span class="mono">${eur(iv.amount)}</span></div>
-</div>
-<div style="margin-top:14px;color:#6b7280;font-size:12px">Metodo di pagamento: <b style="color:#1f2430">${esc(iv.method)}</b></div>
-<div class="status" style="background:${iv.paidOn ? "#e6f4ea;color:#1a7f43" : "#fdf0e3;color:#b5720f"}">${iv.paidOn ? "Incassata il " + fmtDay(iv.paidOn) : "Da incassare"}</div>
-<div class="foot">Documento generato da Xenora. In produzione la fattura è emessa elettronicamente (SDI).</div>
-</body></html>`);
-    w.document.close(); w.focus();
-    setTimeout(() => w.print(), 300);
-  };
+  // Cosa scrivere quando non ci sono fatture reali da mostrare.
+  const emptyText = invState === "loading" ? t("Caricamento fatture…")
+    : invState === "err" ? t("Impossibile leggere le fatture da Stripe. Riprova più tardi: non vengono mostrate fatture di esempio.")
+    : invState === "notconfigured" ? t("Il sistema di pagamento non è ancora collegato: nessuna fattura disponibile.")
+    : trial?.inTrial ? t("Nessuna fattura durante la prova gratuita. La prima sarà emessa al termine della prova.")
+    : t("Nessuna fattura ancora emessa.");
 
   return (
     <div>
@@ -158,7 +62,8 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <Card className="!p-4"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{planName}</div>{added.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{added.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}</Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(monthly)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((monthly / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((monthly - monthly / (1 + VAT)) * 100) / 100)}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{trial?.inTrial ? t("Prima fattura") : t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{fmtDay(trial?.inTrial ? trial.firstInvoice : (invoices[0] ? invoices[0].due : trial?.firstInvoice ?? new Date()))}</div><div className="mt-0.5 text-[11px] text-faint">{trial?.inTrial ? t("Al termine della prova gratuita") : t("Rinnovo mensile")}</div></Card>
+        {/* Durante la prova la data della prima fattura è quella di fine prova; dopo, il rinnovo lo conosce solo Stripe: non si inventa una data. */}
+        <Card className="!p-4"><div className="text-xs text-dim">{trial?.inTrial ? t("Prima fattura") : t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{trial?.inTrial ? fmtDay(trial.firstInvoice) : "—"}</div><div className="mt-0.5 text-[11px] text-faint">{trial?.inTrial ? t("Al termine della prova gratuita") : t("Vedi la data di rinnovo nel portale pagamenti")}</div></Card>
       </div>
 
       <Card>
@@ -186,7 +91,7 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
               </tr>
             </thead>
             <tbody>
-              {/* Fatture REALI da Stripe: sono il registro effettivo quando presenti. */}
+              {/* Fatture REALI da Stripe: sono il registro effettivo. */}
               {realInv.map((iv) => (
                 <tr key={iv.number} className="border-b border-line last:border-0">
                   <td className="px-3 py-2.5 text-txt">{iv.created ? fmtDay(new Date(iv.created)) : "—"}</td>
@@ -202,40 +107,10 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
                   <td className="px-3 py-2.5 text-right">{iv.pdfUrl || iv.hostedUrl ? <a href={(iv.pdfUrl || iv.hostedUrl) as string} target="_blank" rel="noopener noreferrer" title={t("Scarica PDF")} className="inline-grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg></a> : "—"}</td>
                 </tr>
               ))}
-              {realInv.length === 0 && invoices.length === 0 && (
-                <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">{trial?.inTrial ? t("Nessuna fattura durante la prova gratuita. La prima sarà emessa al termine della prova.") : t("Nessuna fattura ancora emessa.")}</td></tr>
+              {realInv.length === 0 && (
+                <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">{emptyText}</td></tr>
               )}
-              {realInv.length === 0 && invoices.map((iv) => { const s = stMeta(statusOf(iv)); return (
-                <tr key={iv.number} className="border-b border-line last:border-0">
-                  <td className="px-3 py-2.5 text-txt">{fmtDay(iv.date)}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{iv.number}</td>
-                  <td className="px-3 py-2.5 capitalize text-txt">{iv.description}</td>
-                  <td className="px-3 py-2.5 text-dim">{fmtDay(iv.due)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-dim">{eur(iv.net)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-dim">{eur(iv.tax)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(iv.amount)}</td>
-                  <td className="px-3 py-2.5 text-dim">{iv.method}</td>
-                  <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${s.c} 16%, transparent)`, color: s.c }}>{s.label}</span></td>
-                  <td className="px-3 py-2.5 text-txt">{iv.paidOn ? fmtDay(iv.paidOn) : "—"}</td>
-                  <td className="px-3 py-2.5 text-right">
-                    <button onClick={() => stampaFattura(iv)} title={t("Stampa fattura")} aria-label={t("Stampa fattura")} className="inline-grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v8H6z" /></svg>
-                    </button>
-                  </td>
-                </tr>
-              ); })}
             </tbody>
-            {realInv.length === 0 && invoices.length > 1 && (
-            <tfoot>
-              <tr className="border-t-2 border-line font-semibold">
-                <td className="px-3 py-2.5 text-txt" colSpan={4}>{t("Totale")}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-txt">{eur(tot.net)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-txt">{eur(tot.tax)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-txt">{eur(tot.amount)}</td>
-                <td className="px-3 py-2.5" colSpan={4}></td>
-              </tr>
-            </tfoot>
-            )}
           </table>
         </div>
       </Card>

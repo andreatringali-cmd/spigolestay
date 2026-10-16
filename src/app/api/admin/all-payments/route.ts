@@ -27,11 +27,12 @@ export async function GET(req: Request) {
 
   const stripe = new Stripe(stripeKey);
   try {
-    const inv = await stripe.invoices.list({ limit: 100, expand: ["data.customer"] });
+    // Paginazione automatica (tetto 500 fatture): prima si leggevano solo le ultime 100 e i totali risultavano troncati.
+    const inv = await stripe.invoices.list({ limit: 100, expand: ["data.customer"] }).autoPagingToArray({ limit: 500 });
     // Solo ABBONAMENTI Xenora: escludi eventuali fatture non legate a una subscription
     // (i pagamenti degli OSPITI alle strutture passano da Stripe Connect come charge, non come
     // fatture di abbonamento, quindi NON devono comparire nel back-office).
-    const subInvoices = inv.data.filter((i) => (i.billing_reason || "").startsWith("subscription"));
+    const subInvoices = inv.filter((i) => (i.billing_reason || "").startsWith("subscription"));
     const invoices = subInvoices.map((i) => {
       // Il customer può essere: string (id), Stripe.Customer (espanso) o Stripe.DeletedCustomer.
       const cust = i.customer;
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
         customerEmail: customer?.email ?? i.customer_email ?? null,
         customerName: customer?.name ?? i.customer_name ?? "",
         date: i.created ? new Date(i.created * 1000).toISOString() : null,
-        amount: (i.amount_paid ?? i.amount_due ?? 0) / 100,
+        amount: (i.status === "paid" ? (i.amount_paid ?? 0) : (i.amount_remaining ?? i.amount_due ?? 0)) / 100, // pagata: incassato; altrimenti: residuo (amount_paid vale 0 su una fattura aperta)
         currency: (i.currency || "eur").toUpperCase(),
         status: i.status || null,               // paid | open | void | uncollectible | draft
         paid: i.status === "paid",

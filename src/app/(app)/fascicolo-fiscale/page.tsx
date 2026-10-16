@@ -8,6 +8,8 @@
 // Preventivi/Fatture), tabella "documents" per le fatture emesse (stessa di /documenti).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
+import { useTenantId } from "@/lib/tenant";
+import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { supabase } from "@/lib/supabase";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf, cityTaxOfBooking } from "@/lib/booking";
@@ -34,16 +36,21 @@ const ISSUED = new Set(["emessa", "inviata_intermediario", "consegnata"]);
 
 export default function FascicoloFiscalePage() {
   const { t } = useLang();
-  const { bookings, structures, units, activeStructureId, getStructure } = useData();
+  const tenantId = useTenantId(); // account di lavoro (per un collaboratore è quello del titolare)
+  const { bookings, structures, units, allStructures, selectedStructureIds, getStructure } = useData();
+  // Ambito dalla selezione vera (con 2+ strutture scelte `activeStructureId` resta "all"): "all" | id di una struttura | elenco di id.
+  const scope = useMemo(() => cashScopeOf(selectedStructureIds, allStructures.map((x) => x.id)), [selectedStructureIds, allStructures]);
+  const inScope = (sid: string | null | undefined) => scope === "all" || scopeVisible(sid, scope);
+  const packStructureId = typeof scope === "string" ? scope : "all"; // il riepilogo per il commercialista filtra per id singolo: per un sottoinsieme gli passo già i dati filtrati
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [generating, setGenerating] = useState(false);
 
   // Prenotazioni attive nello scope struttura (stesso filtro di Statistiche/Tassa di soggiorno).
-  const active = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId));
-  const scopedStructures = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
-  const scopedUnits = units.filter((u) => !u.outOfService && (activeStructureId === "all" || u.structureId === activeStructureId));
-  const structureLabel = activeStructureId === "all" ? t("Tutte le strutture") : (getStructure(activeStructureId)?.name ?? "");
+  const active = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && inScope(b.structureId));
+  const scopedStructures = structures.filter((s) => inScope(s.id));
+  const scopedUnits = units.filter((u) => !u.outOfService && inScope(u.structureId));
+  const structureLabel = scope === "all" ? t("Tutte le strutture") : typeof scope === "string" ? (getStructure(scope)?.name ?? "") : scope.length <= 3 ? scope.map((id) => getStructure(id)?.name ?? "").filter(Boolean).join(", ") : `${scope.length} ${t("strutture")}`;
 
   // Anni disponibili: quelli con almeno una prenotazione, più l'anno corrente.
   const yearOptions = useMemo(() => {
@@ -51,7 +58,7 @@ export default function FascicoloFiscalePage() {
     active.forEach((b) => ys.add(Number(b.checkIn.slice(0, 4))));
     return [...ys].filter((n) => n >= 2000).sort((a, b) => b - a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, activeStructureId]);
+  }, [bookings, scope]);
 
   const yearFrom = `${year}-01-01`;
   const yearTo = `${year + 1}-01-01`;
@@ -102,10 +109,11 @@ export default function FascicoloFiscalePage() {
   const [packWarn, setPackWarn] = useState<string[]>([]);
   useEffect(() => {
     if (!supabase) { setLoadingDocs(false); return; }
+    if (!tenantId) return; // un collaboratore aspetta di conoscere l'account di lavoro
     setLoadingDocs(true);
     Promise.all([
       supabase.from("documents").select("id, structure_id, doc_kind, stato, issue_date, created_at, number_label, counterpart, taxable_cents, vat_cents, out_of_scope_cents, bollo_cents, total_cents, regime, send_sdi, related_document_id, due_date"),
-      supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, default_provider").maybeSingle(),
+      supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, default_provider").eq("tenant_id", tenantId).maybeSingle(),
       supabase.from("document_payments").select("document_id, amount_cents, method, paid_at"),
       supabase.from("document_events").select("document_id, kind, message, meta, ts").eq("kind", "sent").order("ts", { ascending: false }),
       supabase.from("purchase_documents").select("id, structure_id, supplier_name, doc_number, doc_date, doc_type, category, taxable_cents, vat_cents, total_cents, due_date, paid, paid_at, payment_method"),
@@ -131,21 +139,26 @@ export default function FascicoloFiscalePage() {
       setPackWarn(w);
       setLoadingDocs(false);
     });
-  }, []);
+  }, [tenantId]);
+
+  // Dati del riepilogo per il commercialista nell'ambito scelto (per un sottoinsieme di strutture si filtrano qui: il pannello filtra solo per una struttura o per tutte).
+  const packDocs = useMemo(() => (typeof scope === "string" ? docRows : docRows.filter((r) => scopeVisible(r.structure_id, scope))), [docRows, scope]);
+  const packPays = useMemo(() => { if (typeof scope === "string") return payRows; const ids = new Set(packDocs.map((d) => d.id)); return payRows.filter((p) => ids.has(p.document_id)); }, [payRows, packDocs, scope]);
+  const packPurch = useMemo(() => (typeof scope === "string" ? purchaseRows : purchaseRows.filter((r) => scopeVisible(r.structure_id, scope))), [purchaseRows, scope]);
 
   // Anni selezionabili nel riepilogo per il commercialista: quelli con documenti/fatture passive, più quelli delle prenotazioni.
   const packYears = useMemo(() => {
     const ys = new Set<number>(yearOptions);
-    docRows.forEach((r) => ys.add(Number((r.issue_date ?? r.created_at ?? "").slice(0, 4))));
-    purchaseRows.forEach((r) => ys.add(Number((r.doc_date ?? "").slice(0, 4))));
+    packDocs.forEach((r) => ys.add(Number((r.issue_date ?? r.created_at ?? "").slice(0, 4))));
+    packPurch.forEach((r) => ys.add(Number((r.doc_date ?? "").slice(0, 4))));
     return [...ys].filter((n) => n >= 2000).sort((a, b) => b - a);
-  }, [yearOptions, docRows, purchaseRows]);
+  }, [yearOptions, packDocs, packPurch]);
 
   // Documenti dell'anno nello scope struttura (esclusi bozze e ricevute). "Emessi" = emessa/inviata/consegnata:
   // gli scartati dallo SdI non entrano nei totali (vengono solo contati e segnalati).
   const yearDocs = docRows.filter((r) => {
     if (r.stato === "bozza" || r.doc_kind === "ricevuta_non_fiscale") return false;
-    if (activeStructureId !== "all" && r.structure_id !== activeStructureId) return false;
+    if (!inScope(r.structure_id)) return false;
     const y = (r.issue_date ?? r.created_at ?? "").slice(0, 4);
     return y === String(year);
   });
@@ -174,7 +187,7 @@ export default function FascicoloFiscalePage() {
         centsToCsv(sg * r.taxable_cents), centsToCsv(sg * r.vat_cents), centsToCsv(sg * (r.out_of_scope_cents ?? 0)), centsToCsv(sg * (r.bollo_cents ?? 0)), centsToCsv(sg * r.total_cents),
       ];
     });
-    downloadCsv(`documenti-emessi-${year}${activeStructureId !== "all" ? `-${structureLabel.replace(/\s+/g, "-").toLowerCase()}` : ""}`,
+    downloadCsv(`documenti-emessi-${year}${scope !== "all" ? `-${structureLabel.replace(/[\s,]+/g, "-").toLowerCase()}` : ""}`,
       buildCsv(["Data", "Struttura", "Tipo", "Numero", "Cliente", "P.IVA", "Codice fiscale", "Imponibile", "IVA", "Fuori campo IVA", "Bollo", "Totale"], rowsCsv));
   };
 
@@ -197,7 +210,7 @@ export default function FascicoloFiscalePage() {
       const blob = await captureA4ToPdfBlob([pdfRef.current]);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `fascicolo-fiscale-${year}${activeStructureId !== "all" ? `-${structureLabel.replace(/\s+/g, "-").toLowerCase()}` : ""}.pdf`;
+      a.href = url; a.download = `fascicolo-fiscale-${year}${scope !== "all" ? `-${structureLabel.replace(/[\s,]+/g, "-").toLowerCase()}` : ""}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } finally { setGenerating(false); }
@@ -237,8 +250,8 @@ export default function FascicoloFiscalePage() {
       {docsErr && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{docsErr}</p></Card>}
 
       <AccountantPackPanel
-        docs={docRows} payments={payRows} trialIds={trialIds} purchases={purchaseRows} bookings={bookings} getStructure={getStructure}
-        structureId={activeStructureId} structureLabel={structureLabel} years={packYears} ficLinked={ficLinked} loading={loadingDocs} warnings={packWarn}
+        docs={packDocs} payments={packPays} trialIds={trialIds} purchases={packPurch} bookings={bookings} getStructure={getStructure}
+        structureId={packStructureId} structureLabel={structureLabel} years={packYears} ficLinked={ficLinked} loading={loadingDocs} warnings={packWarn}
       />
 
       {/* Anteprima a schermo — stessi numeri del PDF */}

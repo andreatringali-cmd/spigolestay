@@ -45,8 +45,9 @@ export async function POST(req: Request) {
     const adults = Math.max(1, parseInt(String(body?.adults ?? "1"), 10) || 1);
     const children = Math.max(0, parseInt(String(body?.children ?? "0"), 10) || 0);
     const childAges = Array.isArray(body?.childAges) ? (body.childAges as unknown[]).map((x) => Number(x)).filter((x) => !isNaN(x)) : [];
-    const total = Math.min(1_000_000, Math.max(0, Math.round(Number(body?.total) || 0))) || undefined;
-    const deposit = internal ? Math.max(0, Math.round(Number(body?.deposit) || 0)) || 0 : 0;
+    // Importi ai CENTESIMI (Stripe incassa ai centesimi: arrotondare all'euro falsava paid/total).
+    const total = Math.min(1_000_000, Math.max(0, Math.round((Number(body?.total) || 0) * 100) / 100)) || undefined;
+    const deposit = internal ? Math.max(0, Math.round((Number(body?.deposit) || 0) * 100) / 100) || 0 : 0;
     const note = String(body?.note || "").slice(0, 500);
     const token = String(body?.token || "").trim().slice(0, 80);
     // Politica di cancellazione + riferimenti pagamento Stripe (per rimborso self-service)
@@ -179,16 +180,34 @@ export async function POST(req: Request) {
     const { data: updated, error: wErr } = await write.select("rev");
     if (wErr) return NextResponse.json({ error: "write_error", message: wErr.message }, { status: 500 });
     if (!updated || updated.length === 0) {
-      const { data: row2 } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
+      const { data: row2 } = await admin.from("app_state").select("data, rev").eq("user_id", ownerId).maybeSingle();
+      const rev2 = typeof (row2 as { rev?: number } | null)?.rev === "number" ? (row2 as { rev: number }).rev : null;
       const blob2 = ((row2?.data ?? {}) as Record<string, string>) || {};
       let d2: Json = {}; try { d2 = JSON.parse(blob2[DATA_KEY] || "{}") as Json; } catch { d2 = {}; }
       const bk2 = (Array.isArray(d2.bookings) ? d2.bookings : []) as Booking[];
       if (bk2.some((b) => b.extId === extId)) return NextResponse.json({ ok: true, already: true });
       const gs2 = (Array.isArray(d2.guests) ? d2.guests : []) as (Json & { id: string })[];
       if (!gs2.some((x) => x.id === guestId)) { gs2.push({ id: guestId, fullName: `${gFirst} ${gLast}`.trim() || gEmail || "Ospite", email: gEmail || undefined } as Json & { id: string }); d2.guests = gs2; }
+      // Il proprietario ha salvato nel frattempo: la camera scelta prima potrebbe non essere più libera. Si rifà il controllo sui dati freschi.
+      const units2 = (Array.isArray(d2.units) ? d2.units : []) as Unit[];
+      const pool2 = parsePool(blob2[POOL_KEY]);
+      const poolOcc2 = inPool(pool2, sid) ? poolOccupancy(pool2, (Array.isArray(d2.roomTypes) ? d2.roomTypes : []) as never, units2, bk2) : null;
+      const ofType2 = units2.filter((u) => u.roomTypeId === rt && !u.outOfService);
+      const free2 = poolOcc2 && !poolOcc2.canSell(rt, ci, co) ? undefined : ofType2.find((u) => !bk2.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
+      if (free2) { booking.unitId = free2.id; }
+      else {
+        if (!internal) return NextResponse.json({ error: "no_availability" }, { status: 409 });
+        // Già pagato: si registra comunque, senza camera e con avviso, invece di sovrapporla a un'altra prenotazione.
+        booking.unitId = null;
+        if (ofType2.length && !String(booking.note || "").includes("nessuna camera libera")) booking.note = (String(booking.note || "") + " · ⚠ nessuna camera libera in quelle date: da assegnare a mano").trim();
+      }
       bk2.push(booking); d2.bookings = bk2; blob2[DATA_KEY] = JSON.stringify(d2);
-      const { error: wErr2 } = await admin.from("app_state").update({ data: blob2, updated_at: new Date().toISOString() }).eq("user_id", ownerId);
+      // Scrittura con lock sul rev appena riletto: se cambia ancora, si risponde 409 (il webhook Stripe ritenta, la scrittura è idempotente).
+      let write2 = admin.from("app_state").update({ data: blob2, updated_at: new Date().toISOString() }).eq("user_id", ownerId);
+      if (rev2 !== null) write2 = write2.eq("rev", rev2);
+      const { data: updated2, error: wErr2 } = await write2.select("rev");
       if (wErr2) return NextResponse.json({ error: "write_error", message: wErr2.message }, { status: 500 });
+      if (!updated2 || updated2.length === 0) return NextResponse.json({ error: "write_conflict" }, { status: 409 });
     }
 
     // 4) Email di conferma AUTOMATICA all'ospite (best-effort: non blocca la prenotazione).

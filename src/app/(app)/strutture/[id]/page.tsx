@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
 import { loadDeposit, type DepositCfg } from "@/lib/deposit";
 import Toggle from "@/components/Toggle";
+import NumInput from "@/components/NumInput";
 import GoogleHotelSection from "@/components/GoogleHotelSection";
 import { pushStructureContent } from "@/lib/google-content-client";
 
@@ -30,10 +31,54 @@ function Info({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+// Coordinata (latitudine/longitudine): si tiene il TESTO digitato (virgola o punto sono sempre decimali, mai migliaia: "37.065" è 37,065) e al padre arriva solo un numero valido nei limiti.
+function CoordInput({ value, onChange, min, max, className, placeholder, label }: { value: number | undefined; onChange: (v: number | undefined) => void; min: number; max: number; className?: string; placeholder?: string; label?: string }) {
+  const show = (n: number | undefined) => (typeof n === "number" && Number.isFinite(n) ? String(n).replace(".", ",") : "");
+  const [draft, setDraft] = useState(show(value));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (focused.current && draft.trim() !== "" && Number(draft.replace(",", ".")) === value) return; // "37," vale già 37: non toccare la bozza mentre si scrive
+    if (focused.current && draft.trim() === "" && value === undefined) return;
+    const next = show(value);
+    if (next !== draft) setDraft(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <input
+      type="text" inputMode="decimal" autoComplete="off" aria-label={label} placeholder={placeholder} className={className} value={draft}
+      onFocus={() => { focused.current = true; }}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (!/^-?\d*[.,]?\d*$/.test(raw)) return; // lettere e simboli non entrano
+        setDraft(raw);
+        if (raw.trim() === "") { onChange(undefined); return; }
+        const n = Number(raw.replace(",", "."));
+        if (Number.isFinite(n) && n >= min && n <= max) onChange(n);
+      }}
+      onBlur={() => { focused.current = false; setDraft(show(value)); }}
+    />
+  );
+}
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
 
 const blankStructure = (): Structure => ({ id: "", name: "", groupName: "", city: "Siracusa", province: "SR", region: "Sicilia", country: "Italia", active: true, type: "B&B", photoColor: AV_COLORS[1], services: [], payMethods: ["Contanti", "Carta / POS"], currency: "EUR", language: "it", cancelPolicy: "moderata", checkInFrom: "15:00", checkInTo: "20:00", checkOutBy: "10:30", cityTax: true, cityTaxMode: "percent", cityTaxPercent: 4, cityTaxCap: 5, cityTaxAmount: 2, cityTaxMaxNights: 7, cityTaxChildFreeUnder: 14, cityTaxComune: "Siracusa" });
+// Punto di partenza del form per una struttura ESISTENTE: i suoi dati così come sono, SENZA i predefiniti di blankStructure (tassa di soggiorno, SR, Sicilia…):
+// quei valori valgono solo per una struttura nuova, altrimenti il primo salvataggio li scriverebbe su strutture che non li avevano.
+const initialOf = (s?: Structure): Structure => ({ id: "", name: "", groupName: "", ...s });
+// Solo i campi cambiati rispetto alla baseline (confronto per valore): è ciò che si salva, così un campo modificato altrove nel frattempo non viene riscritto con un valore vecchio.
+function diffStructure(cur: Structure, base: Structure): Partial<Structure> {
+  const out: Record<string, unknown> = {};
+  const a = cur as unknown as Record<string, unknown>, b = base as unknown as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (k === "id") continue;
+    const x = a[k], y = b[k];
+    if (x === y) continue;
+    if (typeof x === "object" && x !== null && typeof y === "object" && y !== null && JSON.stringify(x) === JSON.stringify(y)) continue;
+    out[k] = x;
+  }
+  return out as Partial<Structure>;
+}
 
 export default function StrutturaSchedaPage() {
   const router = useRouter();
@@ -49,7 +94,7 @@ export default function StrutturaSchedaPage() {
   const openGuide = () => { if (!existing) return; setActiveStructure(existing.id); router.push("/guida-ospiti"); };
 
   const existing = structures.find((s) => s.id === params.id);
-  const [f, setF] = useState<Structure>(() => (isNew ? blankStructure() : { ...blankStructure(), ...existing }));
+  const [f, setF] = useState<Structure>(() => (isNew ? blankStructure() : initialOf(existing)));
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
   // Stripe Connect: collega il Stripe del proprietario di questa struttura (incassa lui).
   const [stripeSt, setStripeSt] = useState<{ loading?: boolean; enabled?: boolean; msg?: string }>({});
@@ -196,27 +241,19 @@ export default function StrutturaSchedaPage() {
   // La pagina può montarsi PRIMA che lo store abbia caricato i dati: quando la struttura diventa
   // disponibile, popola il form una volta (evita la scheda vuota al primo ingresso).
   const loadedRef = useRef(isNew);
+  const baseRef = useRef<Structure | null>(null); // com'era la scheda all'apertura / all'ultimo salvataggio: si salvano solo i campi che se ne discostano
   useEffect(() => {
     if (loadedRef.current || !existing) return;
     loadedRef.current = true;
-    setF({ ...blankStructure(), ...existing } as Structure);
+    const seed = initialOf(existing);
+    baseRef.current = seed;
+    setF(seed);
   }, [existing]);
 
-  // Precompila i contatti dall'account (dati della registrazione) quando la struttura non li ha ancora.
-  const prefilledRef = useRef(false);
-  useEffect(() => {
-    if (isNew || prefilledRef.current) return;
-    const acctEmail = authUser?.email || user?.email;
-    const acctPhone = (authUser?.user_metadata?.phone as string | undefined) || user?.phone;
-    if (!acctEmail && !acctPhone) return; // niente da precompilare finché l'account non è pronto
-    prefilledRef.current = true;
-    setF((p) => {
-      const next = { ...p };
-      if (!next.email && acctEmail) next.email = acctEmail;
-      if (!next.phone && acctPhone) next.phone = acctPhone;
-      return next;
-    });
-  }, [isNew, user, authUser]);
+  // I contatti dell'account (email/telefono della registrazione) si mostrano solo come suggerimento nel campo vuoto: NON si copiano nella struttura da soli
+  // (aprire la scheda non deve cambiare a chi arrivano le notifiche delle prenotazioni).
+  const acctEmail = authUser?.email || user?.email || "";
+  const acctPhone = (authUser?.user_metadata?.phone as string | undefined) || user?.phone || "";
 
   // Acconto richiesto: PER STRUTTURA (Structure.depositPct, salvato con la scheda). Finché la struttura
   // non ne ha uno proprio si mostra la vecchia voce globale come valore di partenza.
@@ -245,9 +282,11 @@ export default function StrutturaSchedaPage() {
     delete (patch as { id?: string }).id;
     if (isNew) { const sid = addStructure({ name: f.name.trim(), groupName: (f.groupName || f.name).trim(), city: f.city, address: f.address }); updateStructure(sid, patch); }
     else {
-      updateStructure(params.id, patch); addActivity("config", `Struttura modificata — ${f.name.trim()}`);
+      // Solo i campi cambiati rispetto alla baseline (non l'intera scheda).
+      const changed = diffStructure(f, baseRef.current ?? initialOf(existing));
+      if (Object.keys(changed).length) { updateStructure(params.id, changed); baseRef.current = f; addActivity("config", `Struttura modificata — ${f.name.trim()}`); }
       // Se la struttura è collegata ai portali, i dati per Google partono da soli (in background, senza aspettare).
-      void pushStructureContent({ ...(existing as Structure), ...patch } as Structure, roomTypes);
+      void pushStructureContent({ ...(existing as Structure), ...changed } as Structure, roomTypes);
     }
     router.push("/strutture");
   };
@@ -255,21 +294,19 @@ export default function StrutturaSchedaPage() {
   // Salvataggio automatico ogni 10s (solo su struttura esistente): non si perde nulla di quanto digitato.
   const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
   const updRef = useRef(updateStructure); updRef.current = updateStructure;
-  const savedJson = useRef<string | null>(null);
-  useEffect(() => { savedJson.current = JSON.stringify(f); /* baseline al montaggio */ // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   // Autosalvataggio con DEBOUNCE: salva ~1,5s dopo l'ultima modifica, non ogni 10s. Riduce
   // drasticamente la finestra in cui una sincronizzazione/ricarica in background poteva perdere
   // il testo appena scritto (es. la descrizione che "spariva").
   useEffect(() => {
     if (isNew) return;
-    const cur = JSON.stringify(f);
-    if (savedJson.current === null || cur === savedJson.current || !f.name?.trim()) return;
+    const base = baseRef.current;
+    if (!base || !f.name?.trim()) return;
+    const patch = diffStructure(f, base); // solo i campi che l'utente ha cambiato
+    if (!Object.keys(patch).length) return;
+    const snap = f;
     const h = window.setTimeout(() => {
-      const patch: Partial<Structure> = { ...f };
-      delete (patch as { id?: string }).id;
       updRef.current(params.id, patch);
-      savedJson.current = cur;
+      baseRef.current = snap;
       setAutoSavedAt(Date.now());
     }, 1500);
     return () => window.clearTimeout(h);
@@ -394,8 +431,8 @@ export default function StrutturaSchedaPage() {
           <Card>
             <SectionTitle>{t("Contatti")}</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
-              <label className={lbl}>{t("Email")}<input value={f.email ?? ""} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="info@…" /><span className="mt-1 block text-[11px] text-faint">{t("Email di contatto della struttura (precompilata dall'account, modificabile).")}</span></label>
-              <label className={lbl}>{t("Telefono")}<input value={f.phone ?? ""} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
+              <label className={lbl}>{t("Email")}<input value={f.email ?? ""} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder={acctEmail || "info@…"} /><span className="mt-1 block text-[11px] text-faint">{t("Email di contatto della struttura. Se la lasci vuota non viene copiata dall'account.")}</span></label>
+              <label className={lbl}>{t("Telefono")}<input value={f.phone ?? ""} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder={acctPhone || "+39…"} /></label>
               <label className={lbl}>WhatsApp<input value={f.whatsapp ?? ""} onChange={(e) => set("whatsapp", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
               <label className={lbl}>{t("Telefono 2")}<input value={f.phone2 ?? ""} onChange={(e) => set("phone2", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
               <label className={lbl}>{t("Sito web")}<input value={f.website ?? ""} onChange={(e) => set("website", e.target.value)} className={`${inp} mt-1`} placeholder="www.…" /></label>
@@ -423,8 +460,8 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Regione")}<input value={f.region ?? ""} onChange={(e) => set("region", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Nazione")}<input value={f.country ?? ""} onChange={(e) => set("country", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Zona")}<input value={f.zone ?? ""} onChange={(e) => set("zone", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Ortigia")} /></label>
-              <label className={lbl}>{t("Latitudine")}<input value={f.lat ?? ""} onChange={(e) => set("lat", num(e.target.value))} className={`${inp} mt-1`} placeholder="37.06" /></label>
-              <label className={lbl}>{t("Longitudine")}<input value={f.lng ?? ""} onChange={(e) => set("lng", num(e.target.value))} className={`${inp} mt-1`} placeholder="15.29" /></label>
+              <label className={lbl}>{t("Latitudine")}<CoordInput min={-90} max={90} value={f.lat} onChange={(v) => set("lat", v)} className={`${inp} mt-1`} placeholder="37,06" label={t("Latitudine")} /></label>
+              <label className={lbl}>{t("Longitudine")}<CoordInput min={-180} max={180} value={f.lng} onChange={(v) => set("lng", v)} className={`${inp} mt-1`} placeholder="15,29" label={t("Longitudine")} /></label>
               <div className="flex items-end">
                 <button type="button" onClick={geocode} disabled={geoBusy} title={t("Ricava latitudine e longitudine dall'indirizzo")} className="w-full rounded-lg border border-line px-2 py-2 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">{geoBusy ? `📍 ${t("Cerco…")}` : `📍 ${t("Ricava coordinate")}`}</button>
               </div>
@@ -534,7 +571,7 @@ export default function StrutturaSchedaPage() {
                     <>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <label className={lbl}>{t("% pernottamento")}<div className="relative mt-1"><input type="number" min={0} step={0.5} value={f.cityTaxPercent ?? ""} onChange={(e) => set("cityTaxPercent", num(e.target.value))} className={`${inp} pr-7`} placeholder="4" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-faint">%</span></div></label>
-                      <label className={lbl}>{t("Tetto € persona/notte")}<input value={f.cityTaxCap ?? ""} onChange={(e) => set("cityTaxCap", num(e.target.value))} className={`${inp} mt-1`} placeholder="5,00" /></label>
+                      <label className={lbl}>{t("Tetto € persona/notte")}<NumInput allowNull value={f.cityTaxCap ?? null} onChange={(v) => set("cityTaxCap", v ?? undefined)} className={`${inp} mt-1`} placeholder="5,00" aria-label={t("Tetto € persona/notte")} /></label>
                       <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} placeholder="7" /></label>
                       <label className={lbl}>{t("Minori esenti sotto")}<input type="number" min={0} max={18} value={f.cityTaxChildFreeUnder ?? ""} onChange={(e) => set("cityTaxChildFreeUnder", num(e.target.value))} className={`${inp} mt-1`} placeholder="14" /></label>
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
@@ -543,7 +580,7 @@ export default function StrutturaSchedaPage() {
                     </>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <label className={lbl}>{t("€ persona/notte")}<input value={f.cityTaxAmount ?? ""} onChange={(e) => set("cityTaxAmount", num(e.target.value))} className={`${inp} mt-1`} placeholder="2,00" /></label>
+                      <label className={lbl}>{t("€ persona/notte")}<NumInput allowNull value={f.cityTaxAmount ?? null} onChange={(v) => set("cityTaxAmount", v ?? undefined)} className={`${inp} mt-1`} placeholder="2,00" aria-label={t("€ persona/notte")} /></label>
                       <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} /></label>
                       <label className={lbl}>{t("Minori esenti sotto")}<input type="number" min={0} max={18} value={f.cityTaxChildFreeUnder ?? ""} onChange={(e) => set("cityTaxChildFreeUnder", num(e.target.value))} className={`${inp} mt-1`} placeholder="14" /></label>
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
@@ -567,7 +604,7 @@ export default function StrutturaSchedaPage() {
               ))}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className={lbl}>{t("Cauzione €")}<input value={f.deposit ?? ""} onChange={(e) => set("deposit", num(e.target.value))} className={`${inp} mt-1`} placeholder="0" /></label>
+              <label className={lbl}>{t("Cauzione €")}<NumInput allowNull value={f.deposit ?? null} onChange={(v) => set("deposit", v ?? undefined)} className={`${inp} mt-1`} placeholder="0" aria-label={t("Cauzione €")} /></label>
               <label className={lbl}>{t("Età minima check-in")}<input type="number" min={0} value={f.minAge ?? ""} onChange={(e) => set("minAge", num(e.target.value))} className={`${inp} mt-1`} placeholder="18" /></label>
               <label className={lbl}>{t("Silenzio dalle")}<input type="time" value={f.quietFrom ?? ""} onChange={(e) => set("quietFrom", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("alle")}<input type="time" value={f.quietTo ?? ""} onChange={(e) => set("quietTo", e.target.value)} className={`${inp} mt-1`} /></label>

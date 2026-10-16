@@ -1,0 +1,37 @@
+Ho corretto tutti i numeri che mi hai assegnato. `npx tsc --noEmit` passa senza errori. Il nuovo test `tests/qa-prenotazioni.test.ts` (13 test) e 114 test esistenti correlati passano. Non ho fatto commit, build, deploy né scritture sul database.
+
+**r0 – prenotazioni** (tutti FATTO)
+- **Emetti documento**: dopo la creazione la scheda si chiude e il pulsante si sblocca. Cambiando prenotazione si azzerano importo incasso, voucher e messaggi di emissione. Il file è `BookingDrawer.tsx`.
+- **Tassa con tutti gli ospiti**: ora `bookingGrandTotal` (`booking.ts`), `BookingAmounts.tsx`, la scheda (`BookingDrawer.tsx`, anche in modifica), `chat-pay.ts` e `booking-journey.ts` usano il calcolo unico con minori sopra soglia, divisore sugli ospiti totali e quota di gruppo. Nel tuo caso Siracusa (2 adulti + 2 bambini, 700 €) la tassa è 14 € e non più 28 €.
+- **Annullate e no_show**: restano nell'elenco, attenuate, ma sono fuori da KPI, totali, grafici ed Excel. Il piè di tabella indica quante ne sono escluse (`prenotazioni/page.tsx`).
+- **Residuo con tassa già incassata**: nuova `totalDue` in `incassi.ts`, usata da `balanceDue` e `paymentStatus`. Se `cityTaxPaid` è messo a mano, il residuo non chiede più la tassa.
+- **Blocchi calendario**: `NewBookingModal.tsx` ora li conta nella disponibilità.
+- **Weekend**: il modale e `nuova/page.tsx` usano `loadWeekendPct()`, e il modale usa anche `rateForDay`. Rispettano quindi "weekend disattivato", le regole per struttura e le tipologie derivate.
+- **Creazione silenziosa**: se le camere libere sono meno di quelle scelte, non si crea né ospite né prenotazione e compare un errore visibile (modale e `nuova/page.tsx`). Nel modale le quantità si riducono a ciò che è libero quando si cercano le date.
+- **Ricavo per notte dopo un prolungamento**: in `revenueInRange`/`nightlyRevenue` le notti senza tariffa dell'OTA si spartiscono il di più del totale. Il dettaglio notte per notte nella scheda usa lo stesso calcolo.
+- **Incoerenze nell'elenco**:
+  - Il netto totale è la somma dei netti di riga, e la % commissioni è calcolata sul lordo.
+  - L'ordinamento per Totale usa la cifra mostrata nella colonna; quello per Codice usa il codice mostrato.
+  - L'Excel esporta dall'elenco ordinato, senza annullate.
+  - Il PDF stampa tutte le righe con i filtri attivi, non solo le prime 150, ma l'ho solo scritto nel codice, non provato in stampa reale.
+- **Prezzo mancante**: la scheda mostra "Prezzo mancante" e non inventa più un totale (`BookingDrawer.tsx`).
+
+**r4 #6** (FATTO): le fatture usano `cityTaxOfBooking`, con lo stesso massimo notti e le persone paganti nella descrizione (`invoicing/service.ts`).
+
+**r5 e r1 #6 – check-in** (tutti FATTO, in `api/checkin/route.ts`)
+- La tassa del check-in usa `cityTaxOfBookingRaw`, quindi tiene conto dell'età dei minori.
+- Gli extra scelti dall'ospite sono validati con la nuova `sanitizeChosenExtras` (in `booking.ts`):
+  - accetta solo extra attivi del catalogo della struttura, per id o nome (anche col suffisso " ×2"), con nome e prezzo presi dal server;
+  - quantità intera da 1 a 20, mai oltre il massimo del catalogo, prezzo mai negativo, niente doppioni;
+  - un prezzo negativo del client non ha più alcun effetto.
+- Il GET anonimo azzera nel JSON i dati personali e del documento (ospite ed extraGuests). Ho azzerato anche `invoiceRequest`, che nell'elenco non c'era.
+- Aggiunto il rate limit per IP sul GET: 60 richieste al minuto, contro le 40 del POST.
+
+**Rischi e punti per Andrea**
+- **Campo `cityTaxInPaid`**: nel residuo ho dovuto distinguere due casi. La tassa pagata col link "tassa" finisce dentro `paid`, quella incassata in contanti no. Per distinguerli `applyChatPayment` (`chat-pay-core.ts`) ora aggiunge `cityTaxInPaid: true` quando si paga col link "tassa". Il campo è opzionale e retrocompatibile. Va aggiunto a `types.ts` e alle liste di campi conservati in `booking-heal.ts` e `channex-inbound.ts`, che sono fuori dal mio perimetro. Finché non c'è, un re-import Channex lo cancella e il residuo di quella prenotazione torna a essere sbagliato di quanto era la tassa.
+- **`pagamenti/page.tsx`** (fuori perimetro): calcola ancora l'importo dovuto con `bookingGrandTotal`, quindi con la tassa anche se già incassata a mano. Lo stato Saldato/Acconto è corretto, l'importo mostrato potrebbe non esserlo.
+- **ADR e card Ricavi**: ora sono sul lordo (soggiorno + pulizia + extra), come la colonna Totale. Prima erano sul solo soggiorno.
+- **Email prefill Stripe**: nel check-in dell'ospite anonimo l'email non è più nel JSON, quindi la pagina non la precompila più nella sessione Stripe (che la chiede all'ospite). È la conseguenza voluta dell'azzeramento richiesto.
+- **`nuova/page.tsx`**: la stima della tassa mostrata prima della creazione usa ancora solo gli adulti. Non era nelle segnalazioni e non l'ho toccata.
+
+File nuovi o modificati: `src/lib/booking.ts`, `incassi.ts`, `chat-pay.ts`, `chat-pay-core.ts`, `booking-journey.ts`, `invoicing/service.ts`, `src/app/api/checkin/route.ts`, `BookingDrawer.tsx`, `NewBookingModal.tsx`, `BookingAmounts.tsx`, `prenotazioni/page.tsx`, `prenotazioni/nuova/page.tsx`, più il nuovo `tests/qa-prenotazioni.test.ts`.

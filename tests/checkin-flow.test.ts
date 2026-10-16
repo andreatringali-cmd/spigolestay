@@ -5,7 +5,9 @@ import { register } from "node:module";
 register("./helpers/alias-loader.mjs", import.meta.url);
 const { checkinStatus, stepsWithMissing, needsMoreGuests, fieldId } = await import("../src/lib/checkin-flow.ts");
 
-const full = { firstName: "Anna", lastName: "Bianchi", birthDate: "1990-05-01", docNumber: "AX123" };
+const full = { firstName: "Anna", lastName: "Bianchi", sex: "F", birthDate: "1990-05-01", birthPlace: "Roma", citizenship: "Italia", docNumber: "AX123", docPlace: "Roma" };
+// co-ospite completo per la schedina (sesso, data e luogo di nascita, cittadinanza)
+const ex = (o: Record<string, unknown> = {}) => ({ firstName: "Luca", lastName: "Bianchi", sex: "M", birthDate: "2015-01-01", birthPlace: "Roma", citizenship: "Italia", ...o });
 const base = { doc: full, extras: [], photoFront: "data:x", consent: true, signature: "data:sig", isOperator: false, expectedGuests: 1, isGroup: false };
 
 test("tutto compilato: si può inviare, nessun consiglio", () => {
@@ -22,25 +24,25 @@ test("caso reale: dati e documenti caricati ma consenso non spuntato → l'unico
   assert.deepEqual([...stepsWithMissing(r.blocking)], [3]);
 });
 
-test("stessi requisiti di prima: nome, cognome, nascita, documento, consenso, firma (l'operatore non firma)", () => {
+test("requisiti: nome, cognome, sesso, nascita (data e luogo), cittadinanza, documento (numero e luogo di rilascio), consenso, firma (l'operatore non firma)", () => {
   const r = checkinStatus({ ...base, doc: { firstName: " ", lastName: "", birthDate: "", docNumber: "" }, consent: false, signature: undefined });
-  assert.deepEqual(r.blocking.map((m) => m.code), ["firstName", "lastName", "birthDate", "docNumber", "consent", "signature"]);
+  assert.deepEqual(r.blocking.map((m) => m.code), ["firstName", "lastName", "sex", "birthDate", "birthPlace", "citizenship", "docNumber", "docPlace", "consent", "signature"]);
   const op = checkinStatus({ ...base, isOperator: true, signature: undefined });
   assert.equal(op.valid, true);
-  assert.equal(checkinStatus({ ...base, doc: null }).blocking.length, 4); // senza scheda mancano i 4 campi dell'ospite principale
+  assert.equal(checkinStatus({ ...base, doc: null }).blocking.length, 8); // senza scheda mancano gli 8 campi dell'ospite principale
 });
 
 test("la foto del documento non blocca (consiglio), a meno che REQUIRE sia attivo", () => {
-  const r = checkinStatus({ ...base, photoFront: undefined, extras: [{ firstName: "Luca", lastName: "Bianchi" }], expectedGuests: 2 });
+  const r = checkinStatus({ ...base, photoFront: undefined, extras: [ex()], expectedGuests: 2 });
   assert.equal(r.valid, true);
   assert.deepEqual(r.advice, [{ code: "docPhoto", guest: 1 }, { code: "docPhoto", guest: 2 }]);
-  const strict = checkinStatus({ ...base, photoFront: undefined, extras: [{ firstName: "Luca", lastName: "Bianchi" }], expectedGuests: 2, requireDocPhotos: true });
+  const strict = checkinStatus({ ...base, photoFront: undefined, extras: [ex()], expectedGuests: 2, requireDocPhotos: true });
   assert.equal(strict.valid, false);
   assert.deepEqual(strict.blocking.map((m) => [m.code, m.step, m.id]), [["docPhoto", 2, "f-docPhoto-1"], ["docPhoto", 2, "f-docPhoto-2"]]);
 });
 
 test("meno ospiti del previsto: avviso (come prima, non blocca); ospite 2 con solo il nome: avviso", () => {
-  const few = checkinStatus({ ...base, expectedGuests: 3, extras: [{ firstName: "Luca", lastName: "B", photoFront: "x" }] });
+  const few = checkinStatus({ ...base, expectedGuests: 3, extras: [ex({ lastName: "B", photoFront: "x" })] });
   assert.equal(few.valid, true);
   assert.equal(few.entered, 2);
   assert.deepEqual(few.advice, [{ code: "fewGuests", entered: 2, total: 3 }]);
@@ -64,4 +66,18 @@ test("check-in già inviato: si riapre il modulo solo se mancano ospiti", () => 
 test("id dei campi da evidenziare", () => {
   assert.equal(fieldId("firstName"), "f-firstName");
   assert.equal(fieldId("docPhoto", 3), "f-docPhoto-3");
+});
+
+test("co-ospite compilato (nome e cognome): servono sesso, data e luogo di nascita, cittadinanza; ospite vuoto non blocca", () => {
+  const r = checkinStatus({ ...base, expectedGuests: 3, extras: [{ firstName: "Luca", lastName: "Bianchi" }, { firstName: "", lastName: "" }] });
+  assert.equal(r.valid, false);
+  assert.deepEqual(r.blocking.map((m) => [m.code, m.guest, m.id]), [["sex", 2, "f-sex-2"], ["birthDate", 2, "f-birthDate-2"], ["birthPlace", 2, "f-birthPlace-2"], ["citizenship", 2, "f-citizenship-2"]]);
+  const ok = checkinStatus({ ...base, expectedGuests: 2, extras: [{ firstName: "Luca", lastName: "Bianchi", sex: "M", birthDate: "2015-01-01", birthPlace: "Roma", citizenship: "Italia" }] });
+  assert.equal(ok.valid, true);
+});
+
+test("id dei campi per ospite: il principale mantiene gli id storici", () => {
+  assert.equal(fieldId("sex"), "f-sex");
+  assert.equal(fieldId("birthDate", 1), "f-birthDate");
+  assert.equal(fieldId("citizenship", 3), "f-citizenship-3");
 });

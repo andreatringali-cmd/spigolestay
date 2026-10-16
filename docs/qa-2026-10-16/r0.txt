@@ -1,0 +1,70 @@
+Ho verificato 12 problemi leggendo il codice. Non ho modificato nulla né eseguito test. Alcuni percorsi toccano file fuori perimetro (store, chat-pay, channex-inbound): li cito solo come prova.
+
+[ALTA] BookingDrawer.tsx:96-103 e 717 — "Emetti documento" lascia la scheda aperta e il pulsante bloccato
+Scenario: apro una prenotazione e clicco "Emetti documento". `invPost` riesce e fa `router.push('/documenti/ID')`. Non c'è `closeBooking()` e non c'è nessun reset di `setEmit({busy:true})`. BookingDrawer è montato in `AppShell`, che sta nel layout `(app)` e non si smonta durante la navigazione.
+Effetto: la scheda (`fixed inset-0`) resta sopra la pagina del documento appena creato. Il pulsante resta "Creazione…" e disabilitato per tutte le prenotazioni aperte dopo, fino al ricaricamento della pagina.
+Correzione: nel ramo di successo chiamare `closeBooking()` e `setEmit({})`. Azzerare `emit`, `voucher` e `incassoAmt` nell'effect su `selectedBookingId`.
+
+[ALTA] booking.ts:133 (stesso difetto in BookingAmounts.tsx:19, BookingDrawer.tsx:188, chat-pay.ts:17) — tassa di soggiorno percentuale calcolata senza il numero totale degli ospiti
+Scenario: Siracusa (4%, tetto 5 €, 7 notti), 2 adulti + 2 bambini di 8 anni, soggiorno 700 €. `cityTaxOfBookingRaw` passa `guests` = 4 e dà 1,00 × 2 × 7 = 14 €. `bookingGrandTotal` non lo passa, divide per i 2 paganti e dà 2,00 × 2 × 7 = 28 €.
+Effetto: `balanceDue`, la pagina Incassi e il link Stripe "saldo/tassa" chiedono 28 € invece di 14 €. La scheda mostra un'altra cifra ancora, perché usa solo `booking.adults`, ignorando i minori paganti.
+Correzione: in tutti questi punti usare `cityTaxOfBooking(structure, b)` (o `cityTaxOfBookingRaw`), che passa `guests` = adulti + bambini.
+
+[ALTA] prenotazioni/page.tsx:130-133, 256-266, 273-327 — annullate e no-show contano in KPI, totali, grafici ed Excel
+Scenario: elenco "In corso e future" con una prenotazione Booking annullata da 400 €. L'unico filtro scartato è `channel === "blocked"`; non esiste né un filtro né un'esclusione per stato.
+Effetto: contano nella card Prenotazioni, in Notti, ADR, Ricavi, commissioni, nel piè di tabella, nei grafici e nell'export Excel. I ricavi risultano gonfiati.
+Correzione: escludere `cancelled` e `no_show` dagli aggregati e dall'export, oppure aggiungere un filtro Stato che escluda le annullate di default.
+
+[MEDIA] incassi.ts:14-24 (+ chat-pay-core.ts:87-91) — il residuo include la tassa di soggiorno anche se è già incassata a mano
+Scenario: soggiorno 300 € + tassa 20 € incassata in contanti, con `cityTaxPaid=true` e `paid=300`. La scheda e `BookingAmounts` dicono "Saldato". `balanceDue` e `paymentStatus` ignorano `cityTaxPaid`, quindi danno residuo 20 € e "Acconto".
+Effetto: la pagina Incassi la elenca per sempre come "Scaduto" per 20 €. Il link "saldo" chiede all'ospite 20 € già pagati.
+Correzione: nel residuo togliere la tassa se `cityTaxPaid` (o `cityTaxExempt`). Oppure usare lo stesso criterio (soggiorno senza tassa) ovunque.
+
+[MEDIA] NewBookingModal.tsx:64 — la ricerca camere ignora i blocchi calendario
+Scenario: una camera è bloccata (prenotazione con `channel:"blocked"`) dal 20 al 25. Dal modale cerco quelle date. `availUnits` esclude esplicitamente `b.channel !== "blocked"`, mentre `nuova/page.tsx:103` i blocchi li conta.
+Effetto: la camera risulta libera e si crea la prenotazione sopra il blocco. `overlaps.ts` poi sposta la prenotazione in "Da assegnare" nel calendario.
+Correzione: togliere `b.channel !== "blocked"` dal controllo.
+
+[MEDIA] NewBookingModal.tsx:19,65 e nuova/page.tsx:31,107 — maggiorazione weekend applicata anche se è disattivata
+Scenario: in `spigolestay:pricerules` c'è `{weekendOn:false, weekendPct:25}`. Questi due punti leggono a mano `JSON.parse(r).weekendPct ?? 25` e ignorano `weekendOn`. Il calendario usa `loadWeekendPct()`, che dà 0.
+Effetto: le nuove prenotazioni hanno un prezzo +25% su venerdì, sabato e domenica rispetto al calendario. Il modale inoltre ricalcola i prezzi a mano (`dayPrice`, righe 65-66) invece di usare `rateForDay`. Una tipologia derivata non segue l'override del giorno sulla madre.
+Correzione: usare `loadWeekendPct()` e, nel modale, `rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct)`.
+
+[MEDIA] nuova/page.tsx:76,182,219 e NewBookingModal.tsx:75,97,106 — creazione silenziosa di meno prenotazioni (o di nessuna)
+Scenario A: link dal calendario con `?rt=…&ci=…&co=…`. La pagina imposta `qty` e va a "details" senza controllare la disponibilità. Se la camera è occupata, `availUnits` è vuoto, `flat` resta vuoto e `confirm()` crea/aggiorna l'ospite ma nessuna prenotazione. `primary` è undefined, quindi non compare alcun messaggio.
+Scenario B (modale): il carrello usa `qty` anche per tipologie non più disponibili dopo "Modifica" date. `Math.min(qty, free.length)` crea meno camere di quelle mostrate, o zero, e chiude il modale.
+Effetto: ospite orfano o doppioni e prenotazione mancante, senza errore visibile.
+Correzione: prima di creare, se `flat.length !== totalRooms` mostrare errore e non creare ospite né prenotazioni. Azzerare `qty` quando si cambiano le date.
+
+[MEDIA] booking.ts:229-232 (+ BookingDrawer.tsx:774-784) — ricavo per notte ignora `total` se esiste `nightlyRates`
+Scenario: Booking da 2 notti (`nightlyRates` {d1:100, d2:100}, `total` 200). Il gestore prolunga di 3 notti nella scheda e porta `total` a 500. `save` non tocca `nightlyRates`. `cassa.ts:122` conferma che questo caso esiste.
+Effetto: `revenueInRange` e `nightlyRevenue` (Dashboard e Statistiche) contano 200 invece di 500; le 3 notti nuove valgono 0. Anche il "Dettaglio notte per notte" mostra € 0 per le date nuove.
+Correzione: nel `save`, se cambiano date o `total`, riscalare o rimuovere `nightlyRates`. In `revenueInRange`, ripiegare sulla stima proporzionale quando la somma delle tariffe non copre tutte le notti.
+
+[MEDIA] prenotazioni/page.tsx:256-263, 611, 183, 173, 503, 528 — importi e ordinamenti incoerenti nell'elenco
+Scenario: prenotazione con soggiorno 200 + pulizia 50 e commissione 40. La riga mostra Totale 250 e Netto 210. Il piè di tabella e la card Ricavi calcolano `nettoTot = Σtotal − Σcomm` = 160 (e la % su 200). Quindi Totale − Commissioni ≠ Netto.
+Sul telefono la scheda mostra `b.total` (200), il desktop `grand(b)` (250). Ordinare per "Totale" usa `b.total`. Ordinare per "Codice" usa `b.id` e non il codice mostrato (XEN-2026-0001).
+Effetto: totali diversi tra viste e ordinamenti che sembrano sbagliati.
+Correzione: usare `Σ nettoOf(b)` e `Σ grand(b)` ovunque. Ordinare per `grand(b)` e per `bookingCode(b)`.
+
+[MEDIA] prenotazioni/page.tsx:392-396, 465, 223, 545 — l'export non segue davvero filtri e ordinamento
+Scenario: ordino per Totale e filtro un canale, poi esporto. Excel usa `filtered` (non `sorted`), quindi l'ordine è diverso dalla tabella, e include le annullate. Il PDF è `exportPdf()` = `window.print()` (export.ts:22) con la tabella in `max-h-[60dvh] overflow-auto` e solo 150 righe (`shownList`). Non ho trovato regole di stampa che tolgano il limite, e `@media print` in globals.css non lo fa.
+Effetto: il PDF stampa solo le righe visibili, non tutto ciò che risponde ai filtri. Da verificare in stampa reale su 440 px e su A4.
+Correzione: esportare da `sorted` (escluse le annullate). Per il PDF, generare un riepilogo dedicato oppure togliere limite e overflow sotto `@media print`.
+
+[MEDIA] BookingDrawer.tsx:107,133-140,302 — stato dell'incasso rimasto da una prenotazione precedente
+Scenario: nella prenotazione A apro "Incasso", scrivo 100 e chiudo senza registrare. Apro la B e clicco "Registra incasso". L'effect su `selectedBookingId` azzera `qa` e il form ma non `incassoAmt`, quindi il campo è già precompilato con 100. "Registra" scrive 100 € su B.
+Effetto: incasso registrato sulla prenotazione sbagliata (anche messaggi voucher/documento vecchi restano visibili).
+Correzione: `setIncassoAmt(null)`, `setVoucher({})`, `setEmit({})` nell'effect su `selectedBookingId`.
+
+[BASSA] BookingDrawer.tsx:184 (+ channex-inbound.ts:428) — totale inventato quando manca il prezzo
+Scenario: arriva una prenotazione OTA senza prezzo (`total: total || undefined`). L'elenco mostra "—" e `BookingAmounts` non mostra nulla. La scheda usa `booking.total ?? nView * (roomType?.basePrice ?? 100)`.
+Effetto: "Totale ospite", "Saldo dovuto", la ricevuta stampata e il pulsante "Registra incasso" lavorano su un importo mai incassato (es. 3 notti = 300 €).
+Correzione: usare `booking.total ?? 0` e mostrare "Prezzo mancante" invece del valore di ripiego.
+
+**Non incluse perché solo plausibili:**
+- booking.ts:80-89: nei gruppi di camere, le camere con `cityTaxExempt` restano nel conteggio degli ospiti del gruppo; la tassa risulterebbe addossata alle camere non esenti.
+- page.tsx:67-73: il confronto `paid >= due` è fatto su float non arrotondati.
+- BookingDrawer.tsx:163-164: nella memoria ospite le prenotazioni future contano come "precedenti" e come "ultima volta".
+
+**File letti:** `src/app/(app)/prenotazioni/` (`page.tsx`, `nuova/page.tsx`, `_dettaglio.tsx`, `_azioni.tsx`, `_stato.tsx`), `src/components/` (`BookingDrawer.tsx`, `NewBookingModal.tsx`, `BookingAmounts.tsx`), `src/lib/` (`booking.ts`, `incassi.ts`, `online-pay.ts`, `pay-method.ts`).

@@ -5,6 +5,7 @@ import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { dateLocale } from "@/lib/guest-i18n";
 import DateField from "@/components/DateField";
 import { fmtDate } from "@/lib/dates";
+import { eur as eurIT } from "@/lib/format";
 
 // Pagina PUBBLICA di gestione prenotazione per l'ospite (link nell'email di conferma).
 // Mostra riepilogo + condizioni di cancellazione e consente: annullare (con rimborso
@@ -13,7 +14,8 @@ import { fmtDate } from "@/lib/dates";
 const box = "rounded-xl border border-line bg-surface";
 const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
-const eur = (v: number, cur = "€") => `${cur} ${(v || 0).toLocaleString("it-IT")}`;
+// Importi in formato italiano con 2 decimali (€ 45,50 · € 1.234,00); con un'altra valuta cambia solo il simbolo.
+const eur = (v: number, cur = "€") => eurIT(v || 0).replace("€", cur);
 const fmtDL = (iso: string | undefined, locale: string) => { if (!iso) return ""; try { return `${new Date(iso + "T00:00:00").toLocaleDateString(locale, { weekday: "short" })} ${fmtDate(iso)}`; } catch { return iso; } };
 
 interface Info {

@@ -4,19 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
-import { effBase, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
+import { effectiveClosed, loadWeekendPct, rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, fmtDM } from "@/lib/dates";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
-const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
 const fmtDay = (iso: string) => fmtDM(iso) || iso;
 
 export default function NewBookingModal() {
   const { newBooking, closeNewBooking, structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, activeStructureId } = useData();
   const { t } = useLang();
-  const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  const weekendPct = useMemo(() => loadWeekendPct(), []); // regola weekend del calendario (rispetta "weekend disattivato" e le regole per struttura)
 
   const [step, setStep] = useState<"search" | "results">("search");
   const [lastName, setLastName] = useState("");
@@ -61,8 +60,8 @@ export default function NewBookingModal() {
   const nightsN = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000));
   const party = adults + children;
 
-  const availUnits = (rt: RoomType) => sortUnitsByName(units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)));
-  const dayPrice = (rt: RoomType, iso: string) => { const base = effBase(rt, roomTypes); const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(iso) ? 1 + structureWeekendPct(rt.structureId, weekendPct) / 100 : 1)); return Math.max(0, Math.round(raw)); };
+  const availUnits = (rt: RoomType) => sortUnitsByName(units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)));
+  const dayPrice = (rt: RoomType, iso: string) => rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct); // stessa tariffa del calendario (override, tipologie derivate, weekend)
   const stayPrice = (rt: RoomType) => { let s = 0; for (let i = 0; i < nightsN; i++) s += dayPrice(rt, shiftISO(checkIn, i)); return s; };
   const cap = (rt: RoomType) => rt.maxOccupancy ?? rt.beds ?? 2;
   const linePrice = (rt: RoomType) => priceOv[rt.id] ?? stayPrice(rt);
@@ -83,6 +82,8 @@ export default function NewBookingModal() {
 
   const goResults = () => {
     if (checkOut <= checkIn) return setErr(t("Il check-out deve essere dopo il check-in"));
+    // Cambiate le date, le quantità scelte prima possono non essere più disponibili: si riducono a quanto è libero (e si tolgono le righe a zero).
+    setQty((q) => { const next: Record<string, number> = {}; for (const rt of roomTypes) { const n = Math.min(q[rt.id] ?? 0, availUnits(rt).length); if (n > 0) next[rt.id] = n; } return next; });
     setErr("");
     setStep("results");
   };
@@ -90,11 +91,13 @@ export default function NewBookingModal() {
   const submit = () => {
     if (!lastName.trim() && !firstName.trim()) return setErr(t("Inserisci nome o cognome dell'ospite"));
     if (totalRooms < 1) return setErr(t("Seleziona almeno una camera"));
-    const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });
-    const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     // Espande le camere selezionate assegnando unità reali libere.
     const flat: { rt: RoomType; unitId: string | null }[] = [];
     selectedLines.forEach((rt) => { const free = availUnits(rt); const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) flat.push({ rt, unitId: free[k]?.id ?? null }); });
+    // Se le camere libere sono meno di quelle mostrate nel carrello NON si crea nulla (né ospite né prenotazioni parziali): errore visibile.
+    if (flat.length !== totalRooms) return setErr(t("Alcune camere scelte non sono più disponibili per queste date: controlla il riepilogo e riprova."));
+    const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });
+    const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     const nR = Math.max(1, flat.length);
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
     let ci = 0;

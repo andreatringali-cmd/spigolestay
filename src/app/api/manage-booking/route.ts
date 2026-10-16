@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 import { findBookingStore, refundEligible } from "@/lib/manage-booking";
 import { guestLangOrNull } from "@/lib/guest-lang";
 
@@ -16,6 +18,7 @@ export async function GET(req: Request) {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
+  if (rateLimited("mb:" + clientIp(req), 60, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
   try {
     const u = new URL(req.url);
     const slug = (u.searchParams.get("slug") || "").trim();

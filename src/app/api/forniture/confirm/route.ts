@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if (!sessionId || !orderId) return NextResponse.json({ error: "missing_params" }, { status: 400 });
 
   // L'ordine deve appartenere al tenant.
-  const { data: order } = await auth.admin.from("supply_orders").select("id, status").eq("id", orderId).eq("tenant_id", auth.tenantId).maybeSingle();
+  const { data: order } = await auth.admin.from("supply_orders").select("id, status, total_cents").eq("id", orderId).eq("tenant_id", auth.tenantId).maybeSingle();
   if (!order) return NextResponse.json({ error: "order_not_found" }, { status: 404 });
   if (order.status === "paid" || order.status === "processing" || order.status === "shipped" || order.status === "delivered") return NextResponse.json({ ok: true, already: true });
 
@@ -26,7 +26,16 @@ export async function POST(req: Request) {
     const stripe = new Stripe(key);
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status !== "paid") return NextResponse.json({ error: "not_paid", status: session.payment_status }, { status: 402 });
+    // La sessione deve essere QUELLA di questo ordine e per l'importo dell'ordine (non quella di un altro ordine).
+    const md = (session.metadata ?? {}) as Record<string, string>;
+    if (md.kind !== "supply_order" || md.order_id !== orderId) return NextResponse.json({ error: "session_order_mismatch" }, { status: 400 });
+    if (typeof order.total_cents === "number" && session.amount_total !== order.total_cents) return NextResponse.json({ error: "amount_mismatch" }, { status: 400 });
     const pi = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
+    // Lo stesso pagamento non può chiudere due ordini.
+    if (pi) {
+      const { data: dup } = await auth.admin.from("supply_orders").select("id").eq("stripe_payment_intent_id", pi).neq("id", orderId).limit(1);
+      if (dup && dup.length) return NextResponse.json({ error: "payment_already_used" }, { status: 409 });
+    }
     await auth.admin.from("supply_orders").update({ status: "paid", stripe_payment_intent_id: pi, updated_at: new Date().toISOString() }).eq("id", orderId).eq("tenant_id", auth.tenantId);
     return NextResponse.json({ ok: true });
   } catch (e) {

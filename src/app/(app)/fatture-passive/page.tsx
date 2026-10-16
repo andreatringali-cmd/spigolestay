@@ -19,6 +19,8 @@ import { apiPost } from "@/lib/invoicing/client";
 import type { PreviewItem } from "@/lib/invoicing/fic-received";
 import { groupTotals, dueSummary, matchesDue, toCashRow, findDuplicate, signedCents, csvCell, type DueFilter } from "@/lib/purchases";
 import { useTenantId } from "@/lib/tenant";
+import { parseDecimalIT, formatDecimalIT } from "@/lib/num-it";
+import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 
 // Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
 const OTA_META: Record<string, { name: string; country: string }> = {
@@ -40,7 +42,8 @@ function parseNum(s: string): number {
 const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "Forniture", "Consulenze", "Tasse e tributi", "Marketing", "Assicurazioni", "Altro"];
 const TIPI: Record<string, string> = { fattura: "Fattura", nota_credito: "Nota di credito", ricevuta: "Ricevuta", spesa: "Spesa" };
 const cents = (c?: number | null) => (c ?? 0) / 100;
-const numv = (v: string | number) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
+// Importo scritto a mano in formato italiano: "" = 0, testo non valido = null (da segnalare, mai 0 in silenzio).
+const parseEur = (v: string | number): number | null => (String(v ?? "").trim() === "" ? 0 : parseDecimalIT(v));
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y - 2]; })();
 
@@ -56,9 +59,12 @@ export default function FatturePassivePage() {
   const { user } = useAuth();
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const ask = useConfirm();
-  const { bookings: allBookings, structures, activeStructureId } = useData();
+  const { bookings: allBookings, structures, allStructures, selectedStructureIds } = useData();
+  // Ambito: una sola struttura selezionata, un sottoinsieme (2+ ma non tutte) o tutte. Con la selezione multipla `activeStructureId` resta "all": si usa la selezione vera.
+  const scope = useMemo(() => cashScopeOf(selectedStructureIds, allStructures.map((x) => x.id)), [selectedStructureIds, allStructures]);
+  const activeStructureId = typeof scope === "string" ? scope : "all";
   const single = activeStructureId !== "all";
-  // Le commissioni OTA tracciate (autofattura) valgono solo per la struttura attiva.
+  // Le commissioni OTA tracciate (autofattura) valgono solo per le strutture selezionate (allBookings è già filtrato dalla selezione).
   const bookings = useMemo(() => (single ? allBookings.filter((b) => b.structureId === activeStructureId) : allBookings), [allBookings, single, activeStructureId]);
   const structName = (id: string | null) => (id ? structures.find((s) => s.id === id)?.name ?? "—" : "Comune");
   // Modale "Autofattura OTA": #2 da commissioni tracciate, #3 import CSV.
@@ -120,7 +126,7 @@ export default function FatturePassivePage() {
 
   const t = todayISO();
   // Ambito struttura (stessa regola di prima: senza struttura = solo con "Tutte").
-  const scoped = useMemo(() => docs.filter((r) => !single || r.structure_id === activeStructureId), [docs, single, activeStructureId]);
+  const scoped = useMemo(() => docs.filter((r) => scope === "all" || scopeVisible(r.structure_id, scope)), [docs, scope]);
   // Scadenzario: su tutti i documenti non pagati dell'ambito, indipendentemente dai filtri.
   const due = useMemo(() => dueSummary(scoped, t), [scoped, t]);
   const supplierNames = useMemo(() => Array.from(new Set(scoped.map((r) => (r.supplier_name ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "it")), [scoped]);
@@ -157,9 +163,9 @@ export default function FatturePassivePage() {
   const resetFilters = () => { setQ(""); setTipo("all"); setPay("all"); setScad("all"); setCatF("all"); setSupF("all"); };
   const pickDue = (f: DueFilter) => { if (scad === f) { setScad("all"); return; } setScad(f); setPay("all"); setYear("all"); setView("elenco"); };
 
-  const defStructure = single ? activeStructureId : structures.length === 1 ? structures[0].id : "";
+  const defStructure = single ? activeStructureId : allStructures.length === 1 ? allStructures[0].id : "";
   const openNew = () => { setEdit(emptyForm(defStructure)); setAf({}); setAfMsg(""); };
-  const openEdit = (r: Doc) => { setEdit({ id: r.id, structureId: r.structure_id ?? "common", supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, supplierCountry: "", doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
+  const openEdit = (r: Doc) => { setEdit({ id: r.id, structureId: r.structure_id ?? "common", supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, supplierCountry: "", doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: formatDecimalIT(cents(r.taxable_cents)), vatEur: formatDecimalIT(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
 
   // Genera (ed eventualmente invia) l'autofattura TD17 reverse charge.
   const genAutofattura = async () => {
@@ -216,7 +222,11 @@ export default function FatturePassivePage() {
 
   const save = async () => {
     if (!supabase || !user || !edit) return;
-    if (!edit.structureId && structures.length > 1) { setErr("Scegli la struttura a cui appartiene la fattura (o «Comune a tutte»)."); return; }
+    if (!tenantId) { setErr("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
+    if (!edit.structureId && allStructures.length > 1) { setErr("Scegli la struttura a cui appartiene la fattura (o «Comune a tutte»)."); return; }
+    const taxableN = parseEur(edit.taxableEur), vatN = parseEur(edit.vatEur);
+    if (taxableN === null || vatN === null) { setErr("Importo non valido: scrivi un numero, per esempio 1234,56."); return; }
+    if (String(edit.taxableEur).trim() === "") { setErr("Inserisci l'imponibile."); return; }
     const dup = findDuplicate(docs, { id: edit.id || undefined, supplier_name: edit.supplierName, doc_number: edit.doc_number, doc_date: edit.doc_date });
     if (dup && !(await ask({ title: "Possibile duplicato", message: `Esiste già un documento n. ${dup.doc_number} di ${dup.supplier_name} del ${dup.doc_date ? fmtDate(dup.doc_date) : "—"}. Salvare comunque?`, confirmLabel: "Salva comunque" }))) return;
     setSaving(true); setErr("");
@@ -226,12 +236,12 @@ export default function FatturePassivePage() {
     if (nameTrim) {
       const existing = suppliers.find((s) => s.name.toLowerCase() === nameTrim.toLowerCase());
       if (existing) { supplierId = existing.id; if (edit.supplierCountry) await supabase.from("suppliers").update({ country: edit.supplierCountry }).eq("id", existing.id); }
-      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: tenantId ?? user.id, name: nameTrim, category: edit.category || null, country: edit.supplierCountry || null }).select("id").single(); supplierId = ns?.id ?? null; }
+      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: tenantId, name: nameTrim, category: edit.category || null, country: edit.supplierCountry || null }).select("id").single(); supplierId = ns?.id ?? null; }
     }
-    const taxable = Math.round(numv(edit.taxableEur) * 100);
-    const vat = Math.round(numv(edit.vatEur) * 100);
+    const taxable = Math.round(taxableN * 100);
+    const vat = Math.round(vatN * 100);
     const row = {
-      tenant_id: tenantId ?? user.id, structure_id: edit.structureId && edit.structureId !== "common" ? edit.structureId : null, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
+      tenant_id: tenantId, structure_id: edit.structureId && edit.structureId !== "common" ? edit.structureId : null, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
       doc_date: edit.doc_date || null, doc_type: edit.doc_type, category: edit.category || null,
       taxable_cents: taxable, vat_cents: vat, total_cents: taxable + vat, due_date: edit.due_date || null,
       paid: edit.paid, paid_at: edit.paid ? (edit.paid_at || todayISO()) : null, payment_method: edit.payment_method || null,
@@ -255,13 +265,15 @@ export default function FatturePassivePage() {
   // ---- Collegamento alla Cassa: il movimento ha lo stesso id del documento (nessun doppione possibile).
   const syncCash = async (d: Doc) => {
     if (!supabase || !user) return;
-    const row = toCashRow(d, tenantId ?? user.id, todayISO());
+    if (!tenantId) { setErr("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
+    const row = toCashRow(d, tenantId, todayISO());
     if (!row) { await supabase.from("cash_movements").delete().eq("id", d.id); return; }
     await supabase.from("cash_movements").upsert(row, { onConflict: "id" });
   };
   const registerCash = async (list: Doc[]) => {
     if (!supabase || !user) return;
-    const rows = list.map((d) => toCashRow(d, tenantId ?? user.id, todayISO())).filter((x): x is NonNullable<typeof x> => !!x);
+    if (!tenantId) { setErr("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
+    const rows = list.map((d) => toCashRow(d, tenantId, todayISO())).filter((x): x is NonNullable<typeof x> => !!x);
     if (!rows.length) { setInfo("Nessun documento pagato da registrare in Cassa."); return; }
     const { error } = await supabase.from("cash_movements").upsert(rows, { onConflict: "id" });
     if (error) { setErr(error.message); return; }
@@ -338,7 +350,8 @@ export default function FatturePassivePage() {
   const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
-  const totEur = numv(edit?.taxableEur ?? 0) + numv(edit?.vatEur ?? 0);
+  const totEur = (parseEur(edit?.taxableEur ?? "") ?? 0) + (parseEur(edit?.vatEur ?? "") ?? 0);
+  const amountBad = !!edit && (parseEur(edit.taxableEur) === null || parseEur(edit.vatEur) === null);
 
   return (
     <div>
@@ -603,14 +616,15 @@ export default function FatturePassivePage() {
               <label className={lbl}>Data<DateField value={edit.doc_date} onChange={(v) => setEdit({ ...edit, doc_date: v })} className={inp} /></label>
               <label className={lbl}>Tipo<select value={edit.doc_type} onChange={(e) => setEdit({ ...edit, doc_type: e.target.value })} className={inp}>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
               <label className={lbl}>Categoria<select value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} className={inp}><option value="">—</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
-              <label className={lbl}>Imponibile €<input value={edit.taxableEur} onChange={(e) => setEdit({ ...edit, taxableEur: e.target.value })} className={inp} inputMode="decimal" /></label>
-              <label className={lbl}>IVA €<input value={edit.vatEur} onChange={(e) => setEdit({ ...edit, vatEur: e.target.value })} className={inp} inputMode="decimal" /></label>
-              <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-wash px-3 py-2 text-sm"><span className="text-dim">Totale</span><span className="font-mono font-bold text-txt">{eur(totEur)}</span></div>
+              <label className={lbl}>Imponibile €<input value={edit.taxableEur} onChange={(e) => setEdit({ ...edit, taxableEur: e.target.value })} className={inp} inputMode="decimal" aria-invalid={parseEur(edit.taxableEur) === null} /></label>
+              <label className={lbl}>IVA €<input value={edit.vatEur} onChange={(e) => setEdit({ ...edit, vatEur: e.target.value })} className={inp} inputMode="decimal" aria-invalid={parseEur(edit.vatEur) === null} /></label>
+              <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-wash px-3 py-2 text-sm"><span className="text-dim">Totale</span><span className="font-mono font-bold text-txt">{amountBad ? "importo non valido" : eur(totEur)}</span></div>
               <label className={lbl}>Scadenza pagamento<DateField value={edit.due_date} onChange={(v) => setEdit({ ...edit, due_date: v })} className={inp} /></label>
               <label className={lbl}>Metodo<select value={edit.payment_method} onChange={(e) => setEdit({ ...edit, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>RID/SDD</option><option>PayPal</option></select></label>
               <label className="sm:col-span-2 flex items-center gap-2 pt-1"><input type="checkbox" checked={edit.paid} onChange={(e) => setEdit({ ...edit, paid: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-sm text-txt">Pagata</span>{edit.paid && <DateField value={edit.paid_at || todayISO()} onChange={(v) => setEdit({ ...edit, paid_at: v })} className="ml-auto rounded-lg border border-line bg-paper px-2 py-1 text-sm" />}</label>
               <label className={`${lbl} sm:col-span-2`}>Note<textarea value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} rows={2} className={inp} /></label>
             </div>
+            {err && <p className="mt-2 text-sm text-[color:var(--err)]">{err}</p>}
             {edit.id && (
               <div className="mt-3 rounded-lg border border-line bg-wash/50 p-3">
                 <div className="flex items-center justify-between">

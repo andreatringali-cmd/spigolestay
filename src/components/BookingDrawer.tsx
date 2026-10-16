@@ -21,7 +21,7 @@ import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL,
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO, fmtDate as fmtDateIt, fmtDM, fmtDateTime } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { cityTaxOf, groupTaxShareOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
+import { cityTaxOfBooking, cityTaxOfBookingRaw, nightlyRevenue, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -98,6 +98,8 @@ export default function BookingDrawer() {
     setEmit({ busy: true });
     try {
       const r = await invPost<{ documentId: string }>("create", { bookingId: booking.id });
+      setEmit({}); // la scheda resta montata nel layout: senza reset il pulsante resterebbe bloccato anche per le prenotazioni successive
+      closeBooking();
       router.push(`/documenti/${r.documentId}`);
     } catch (e) { setEmit({ msg: e instanceof Error ? e.message : "Errore" }); }
   };
@@ -134,6 +136,9 @@ export default function BookingDrawer() {
     setMode("view");
     setExpanded(false);
     setQa(null);
+    setIncassoAmt(null); // importo/messaggi di un'altra prenotazione non devono restare nei campi della nuova
+    setVoucher({});
+    setEmit({});
     setSaved(false);
     loadForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,11 +186,12 @@ export default function BookingDrawer() {
 
   // ── Conto in sola lettura (dai dati salvati) ──
   const nView = nights(booking.checkIn, booking.checkOut);
-  const accV = booking.total ?? nView * (roomType?.basePrice ?? 100);
+  const noPrice = !booking.total; // prezzo mancante (es. OTA senza importo): nessun totale inventato
+  const accV = booking.total ?? 0;
   const cleanV = booking.cleaningFee ?? 0;
   const extrasList = booking.extras ?? [];
   const extrasV = extrasList.reduce((a, e) => a + (e.price || 0), 0);
-  const taxV = groupTaxShareOf(booking.id) ?? cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);
+  const taxV = cityTaxOfBooking(structure, booking); // quota di gruppo, oppure paganti (adulti + minori sopra soglia) con divisore = tutti gli ospiti
   // "Totale ospite" = quanto pagato per il soggiorno (senza tassa di soggiorno, riscossa
   // localmente e mai transitata dall'OTA): torna con l'importo che mostra Booking.com ecc.
   const totalV = accV + cleanV + extrasV;
@@ -199,6 +205,7 @@ export default function BookingDrawer() {
   const balanceV = Math.max(0, totalV - paidV);
 
   const printReceipt = () => {
+    if (noPrice) { window.alert(t("Prezzo mancante: imposta l'importo del soggiorno prima di stampare la ricevuta.")); return; }
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
     const money = (x: number) => "€ " + x.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -371,11 +378,11 @@ export default function BookingDrawer() {
           <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
           <span className="inline-flex items-center gap-1.5">
             {underprice?.flagged && <span title={underpriceReason(booking, underprice)} className="font-sans text-base font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
-            <span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
           </span>
         </div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
-        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
+        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
         {extrasV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("di cui extra")}</span><span className="font-mono text-sm tabular-nums text-dim">{eur(extrasV)}</span></div>}
         <div className="mt-1.5">{payMethodRow}</div>
         {booking.nightlyRates && (
@@ -385,7 +392,7 @@ export default function BookingDrawer() {
               {Array.from({ length: nights(booking.checkIn, booking.checkOut) }, (_, i) => shiftISO(booking.checkIn, i)).map((iso) => (
                 <div key={iso} className="flex items-baseline justify-between gap-4 text-xs">
                   <span className="text-dim">{["dom", "lun", "mar", "mer", "gio", "ven", "sab"][parseISO(iso).getDay()]} {fmtDM(iso)}</span>
-                  <span className="font-mono font-medium tabular-nums text-txt">{eur(booking.nightlyRates?.[iso] ?? 0)}</span>
+                  <span className="font-mono font-medium tabular-nums text-txt">{eur(nightlyRevenue(booking, iso))}</span>
                 </div>
               ))}
             </div>
@@ -503,7 +510,7 @@ export default function BookingDrawer() {
         <div className="mt-1 rounded-xl bg-wash px-3 py-2.5">
           <div className="flex items-baseline justify-between gap-4">
             <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
-            <span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
           </div>
           <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
             <span className="text-dim">{t("Incassato")}</span>
@@ -511,7 +518,7 @@ export default function BookingDrawer() {
           </div>
           <div className="mt-1 flex items-baseline justify-between gap-4">
             <span className="text-sm text-dim">{t("Saldo dovuto")}</span>
-            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span>
+            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span>
           </div>
         </div>
         {payMethodRow}
@@ -762,7 +769,7 @@ export default function BookingDrawer() {
   // ─────────────── MODIFICA ───────────────
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
   const nEdit = form ? Math.max(0, nights(form.checkIn, form.checkOut)) : 0;
-  const taxEdit = form ? cityTaxOf(structure, form.adults, nEdit, form.total, form.cityTaxExempt) : 0;
+  const taxEdit = form ? cityTaxOfBookingRaw(structure, { adults: form.adults, children: form.children, childAges: booking.childAges, checkIn: form.checkIn, checkOut: form.checkOut, total: form.total, cityTaxExempt: form.cityTaxExempt }) : 0;
   // Totale ospite = soggiorno + pulizia + extra, come nella vista (la tassa di soggiorno si riscuote a parte e non rientra).
   const totalEdit = form ? form.total + form.cleaningFee + entriesTotal(form.extras) : 0;
   const pmEdit = effectivePayMethod(form ? { ...booking, channel: form.channel, paymentMethod: form.paymentMethod || undefined } : booking);

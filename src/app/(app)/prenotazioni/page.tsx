@@ -170,7 +170,7 @@ export default function PrenotazioniPage() {
   // Ordinamento tabella
   const sortVal = (b: (typeof filtered)[number], key: string): string | number => {
     switch (key) {
-      case "id": return b.id;
+      case "id": return bookingCode(b); // il codice mostrato nella colonna, non l'id interno
       case "bookedOn": return b.bookedOn ?? "";
       case "struttura": return getStructure(b.structureId)?.name ?? "";
       case "camera": return getUnit(b.unitId)?.name ?? "";
@@ -180,7 +180,7 @@ export default function PrenotazioniPage() {
       case "checkIn": return b.checkIn;
       case "checkOut": return b.checkOut;
       case "notti": return nights(b.checkIn, b.checkOut);
-      case "totale": return b.total ?? 0;
+      case "totale": return bookingPaidTotal(b); // la cifra mostrata nella colonna Totale (soggiorno + pulizia + extra)
       case "commissioni": return commissionOf(b);
       case "netto": return nettoOf(b);
       default: return "";
@@ -223,7 +223,9 @@ export default function PrenotazioniPage() {
   const shownList = displayList.slice(0, limit);
   // Righe per cui la colonna Stato calcola il percorso: solo quelle visibili (singole + camere dei gruppi aperti).
   const visibleIds = shownList.flatMap((it) => (it.kind === "single" ? [it.b.id] : groupOpen.has(it.gid) ? it.members.map((m) => m.id) : []));
-  const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => a + f(b), 0);
+  // Annullate e no-show restano nell'elenco con il loro stato, ma non entrano in KPI, totali, grafici ed export.
+  const isCounted = (b: { status: BookingStatus }) => b.status !== "cancelled" && b.status !== "no_show";
+  const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => (isCounted(b) ? a + f(b) : a), 0);
   const grand = (b: typeof sorted[number]) => bookingPaidTotal(b); // quanto ha pagato l'ospite (soggiorno+pulizia+extra), SENZA tassa di soggiorno — torna con l'OTA
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
   const renderCells = (b: typeof sorted[number], indent = false) => {
@@ -253,16 +255,17 @@ export default function PrenotazioniPage() {
   };
 
   // Riepiloghi sui risultati filtrati (card + mini-grafico).
-  const revenue = filtered.reduce((a, b) => a + (b.total ?? 0), 0);
+  const counted = useMemo(() => filtered.filter((b) => b.status !== "cancelled" && b.status !== "no_show"), [filtered]);
   // Somma della stessa colonna "Totale" mostrata riga per riga (grand(b): soggiorno + pulizia +
   // extra + tassa di soggiorno) — non "revenue", che è solo il soggiorno e quindi non torna
   // con il totale di riga quando c'è una pulizia o una tassa di soggiorno diversa da zero.
-  const grandTot = filtered.reduce((a, b) => a + grand(b), 0);
-  const commissionTot = filtered.reduce((a, b) => a + commissionOf(b), 0);
-  const commissionPctTot = revenue > 0 ? Math.round((commissionTot / revenue) * 1000) / 10 : 0; // % media pesata, come sui singoli canali
-  const nettoTot = revenue - commissionTot;
-  const nightsTot = filtered.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0);
-  const guestsTot = filtered.reduce((a, b) => a + b.adults + b.children, 0);
+  const grandTot = counted.reduce((a, b) => a + grand(b), 0);
+  const revenue = grandTot; // stessa cifra della colonna Totale: lordo (soggiorno + pulizia + extra), così Totale − Commissioni = Netto
+  const commissionTot = counted.reduce((a, b) => a + commissionOf(b), 0);
+  const commissionPctTot = revenue > 0 ? Math.round((commissionTot / revenue) * 1000) / 10 : 0; // % media pesata sul lordo, come sui singoli canali
+  const nettoTot = Math.round(counted.reduce((a, b) => a + nettoOf(b) * 100, 0)) / 100; // somma dei netti di riga
+  const nightsTot = counted.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0);
+  const guestsTot = counted.reduce((a, b) => a + b.adults + b.children, 0);
   const avgPrice = nightsTot ? revenue / nightsTot : 0;
   const nettoPerNight = nightsTot ? nettoTot / nightsTot : 0; // ricavo medio netto/notte (dopo commissione) — ADR resta sul lordo, standard di settore
 
@@ -274,16 +277,16 @@ export default function PrenotazioniPage() {
     const guestMap = new Map(guests.map((g) => [g.id, g]));
     const unitMap = new Map(units.map((u) => [u.id, u]));
     const rtMap = new Map(roomTypes.map((r) => [r.id, r.name]));
-  const byChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: filtered.filter((b) => b.channel === c).length, color: chColor(c) })).filter((x) => x.value > 0);
-  const byStructure = structures.map((s, i) => ({ label: s.name, value: filtered.filter((b) => b.structureId === s.id).length, color: PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
-  const revByChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: filtered.filter((b) => b.channel === c).reduce((a, b) => a + (b.total ?? 0), 0), color: chColor(c) })).filter((x) => x.value > 0);
+  const byChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: counted.filter((b) => b.channel === c).length, color: chColor(c) })).filter((x) => x.value > 0);
+  const byStructure = structures.map((s, i) => ({ label: s.name, value: counted.filter((b) => b.structureId === s.id).length, color: PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
+  const revByChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: counted.filter((b) => b.channel === c).reduce((a, b) => a + grand(b), 0), color: chColor(c) })).filter((x) => x.value > 0);
   // Dati unici per canale: prenotazioni + ricavi insieme (un solo grafico)
-  const channelRows = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, color: chColor(c), channel: c, count: filtered.filter((b) => b.channel === c).length, revenue: Math.round(filtered.filter((b) => b.channel === c).reduce((a, b) => a + (b.total ?? 0), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
-  const revByStructure = structures.map((s) => ({ label: s.name, value: filtered.filter((b) => b.structureId === s.id).reduce((a, b) => a + (b.total ?? 0), 0), color: "var(--ok)", fmt: eur })).filter((x) => x.value > 0);
+  const channelRows = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, color: chColor(c), channel: c, count: counted.filter((b) => b.channel === c).length, revenue: Math.round(counted.filter((b) => b.channel === c).reduce((a, b) => a + grand(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
+  const revByStructure = structures.map((s) => ({ label: s.name, value: counted.filter((b) => b.structureId === s.id).reduce((a, b) => a + grand(b), 0), color: "var(--ok)", fmt: eur })).filter((x) => x.value > 0);
   // Dati unici per struttura: prenotazioni + ricavi insieme (un solo grafico)
-  const structureRows = structures.map((s, i) => ({ label: s.name, color: PALETTE[i % PALETTE.length], count: filtered.filter((b) => b.structureId === s.id).length, revenue: Math.round(filtered.filter((b) => b.structureId === s.id).reduce((a, b) => a + (b.total ?? 0), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
+  const structureRows = structures.map((s, i) => ({ label: s.name, color: PALETTE[i % PALETTE.length], count: counted.filter((b) => b.structureId === s.id).length, revenue: Math.round(counted.filter((b) => b.structureId === s.id).reduce((a, b) => a + grand(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
   const stayBuckets: Record<string, number> = { "1 notte": 0, "2 notti": 0, "3 notti": 0, "4+ notti": 0 };
-  filtered.forEach((b) => { const n = nights(b.checkIn, b.checkOut); if (n <= 1) stayBuckets["1 notte"]++; else if (n === 2) stayBuckets["2 notti"]++; else if (n === 3) stayBuckets["3 notti"]++; else stayBuckets["4+ notti"]++; });
+  counted.forEach((b) => { const n = nights(b.checkIn, b.checkOut); if (n <= 1) stayBuckets["1 notte"]++; else if (n === 2) stayBuckets["2 notti"]++; else if (n === 3) stayBuckets["3 notti"]++; else stayBuckets["4+ notti"]++; });
   const STAY_GREENS = ["#2F9E6F", "#57B98A", "#8DD3B0", "#C3E8D6"];
   const stayDist = Object.entries(stayBuckets).map(([k, v], i) => ({ label: k, value: v, color: STAY_GREENS[i % STAY_GREENS.length] }));
   const MONTHS = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
@@ -292,7 +295,7 @@ export default function PrenotazioniPage() {
   const monthKeyOf = (b: { checkIn: string }) => (from && b.checkIn < from ? from : b.checkIn).slice(0, 7);
   const monthAgg: Record<string, number> = {};
   const revMonthAgg: Record<string, number> = {};
-  filtered.forEach((b) => { const k = monthKeyOf(b); monthAgg[k] = (monthAgg[k] || 0) + 1; revMonthAgg[k] = (revMonthAgg[k] || 0) + (b.total ?? 0); });
+  counted.forEach((b) => { const k = monthKeyOf(b); monthAgg[k] = (monthAgg[k] || 0) + 1; revMonthAgg[k] = (revMonthAgg[k] || 0) + grand(b); });
   const monthKeys = Object.keys(monthAgg).sort();
   const multiYear = new Set(monthKeys.map((k) => k.slice(0, 4))).size > 1;
   const monthLabelOf = (k: string) => `${MONTHS[Number(k.slice(5, 7)) - 1]}${multiYear ? ` ${k.slice(2, 4)}` : ""}`;
@@ -300,21 +303,21 @@ export default function PrenotazioniPage() {
   const revByMonth = monthKeys.map((k) => ({ label: monthLabelOf(k), value: Math.round(revMonthAgg[k]), color: "var(--ok)", fmt: eur }));
   // Per tipologia (somma le camere con lo stesso nome tipologia) e per paese di provenienza.
   const rtAgg: Record<string, { n: number; rev: number }> = {};
-  filtered.forEach((b) => { const u = b.unitId ? unitMap.get(b.unitId) : undefined; const name = u ? rtMap.get(u.roomTypeId) : null; if (!name) return; if (!rtAgg[name]) rtAgg[name] = { n: 0, rev: 0 }; rtAgg[name].n++; rtAgg[name].rev += b.total ?? 0; });
+  counted.forEach((b) => { const u = b.unitId ? unitMap.get(b.unitId) : undefined; const name = u ? rtMap.get(u.roomTypeId) : null; if (!name) return; if (!rtAgg[name]) rtAgg[name] = { n: 0, rev: 0 }; rtAgg[name].n++; rtAgg[name].rev += grand(b); });
   const byRoomType = Object.entries(rtAgg).map(([k, v], i) => ({ label: k, value: v.n, color: PALETTE[i % PALETTE.length] }));
   const revByRoomType = Object.entries(rtAgg).map(([k, v]) => ({ label: k, value: Math.round(v.rev), color: "var(--ok)", fmt: eur }));
   // Dati unici per tipologia: prenotazioni + ricavi insieme (un solo grafico)
   const roomTypeRows = Object.entries(rtAgg).map(([k, v], i) => ({ label: k, color: PALETTE[i % PALETTE.length], count: v.n, revenue: Math.round(v.rev) })).filter((r) => r.count > 0 || r.revenue > 0);
   const countryAgg: Record<string, number> = {};
-  filtered.forEach((b) => { const c = guestMap.get(b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
+  counted.forEach((b) => { const c = guestMap.get(b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
   const byCountry = Object.entries(countryAgg).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
     // Divisione per canale (colori delle OTA): per struttura, per tipologia e per mese.
     type Parts = Map<string, Map<Channel, { count: number; revenue: number }>>;
     const addPart = (m: Parts, key: string, ch: Channel, rev: number) => { let c = m.get(key); if (!c) { c = new Map(); m.set(key, c); } const x = c.get(ch) ?? { count: 0, revenue: 0 }; x.count++; x.revenue += rev; c.set(ch, x); };
     const stParts: Parts = new Map(), rtParts: Parts = new Map(), moParts: Parts = new Map();
     const stName = new Map(structures.map((s) => [s.id, s.name]));
-    filtered.forEach((b) => {
-      const rev = b.total ?? 0;
+    counted.forEach((b) => {
+      const rev = grand(b);
       const sn = stName.get(b.structureId); if (sn) addPart(stParts, sn, b.channel, rev);
       const u = b.unitId ? unitMap.get(b.unitId) : undefined; const tn = u ? rtMap.get(u.roomTypeId) : null; if (tn) addPart(rtParts, tn, b.channel, rev);
       addPart(moParts, monthKeyOf(b), b.channel, rev);
@@ -324,7 +327,7 @@ export default function PrenotazioniPage() {
     const roomTypeRowsCh = roomTypeRows.map((r) => ({ ...r, parts: partsOf(rtParts, r.label) }));
     const monthStack = monthKeys.map((k) => ({ label: monthLabelOf(k), segs: partsOf(moParts, k).map((p) => ({ channel: p.channel, value: p.count })) }));
     return { byChannel, channelRows, structureRows: structureRowsCh, stayDist, byMonth, revByMonth, roomTypeRows: roomTypeRowsCh, byCountry, monthStack };
-  }, [filtered, guests, units, roomTypes, structures, from]);
+  }, [counted, guests, units, roomTypes, structures, from]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Con una sola struttura selezionata i grafici "per struttura" non hanno senso: si nascondono.
@@ -389,10 +392,18 @@ export default function PrenotazioniPage() {
     { key: "note", label: "Note", default: false, get: (b) => b.note ?? "" },
     { key: "guestRequests", label: "Richieste ospite", default: false, get: (b) => b.guestRequests ?? "" },
   ];
+  // PDF = stampa della pagina: prima si mostrano TUTTE le righe che rispondono ai filtri (non solo le prime 150), poi si stampa e al termine si torna alla paginazione.
+  const printAll = () => {
+    if (displayList.length > limit) {
+      setLimit(displayList.length);
+      window.addEventListener("afterprint", () => setLimit(PAGE), { once: true });
+      window.setTimeout(exportPdf, 300);
+    } else exportPdf();
+  };
   const doExcel = (selected?: string[]) => {
     const keys = selected ?? excelFields.filter((f) => f.default !== false).map((f) => f.key);
     const fields = excelFields.filter((f) => keys.includes(f.key));
-    exportExcel("prenotazioni", fields.map((f) => t(f.label)), filtered.map((b) => fields.map((f) => f.get(b))));
+    exportExcel("prenotazioni", fields.map((f) => t(f.label)), sorted.filter(isCounted).map((b) => fields.map((f) => f.get(b)))); // stesso ordine della tabella, senza annullate/no-show
   };
 
   return (
@@ -401,7 +412,7 @@ export default function PrenotazioniPage() {
 
       {/* Card riepilogo */}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t("Prenotazioni")} value={String(filtered.length)} />
+        <StatCard label={t("Prenotazioni")} value={String(counted.length)} />
         <StatCard label={t("Notti totali")} value={String(nightsTot)} />
         <StatCard label={t("ADR (prezzo medio/notte)")} value={<>{eur(avgPrice)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoPerNight)})</span></>} />
         <StatCard label={t("Ricavi")} value={<>{eur(revenue)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoTot)})</span></>} />
@@ -462,7 +473,7 @@ export default function PrenotazioniPage() {
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
           <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
-          <ExportMenu onExcel={doExcel} onPdf={exportPdf} excelFields={excelFields} />
+          <ExportMenu onExcel={doExcel} onPdf={printAll} excelFields={excelFields} />
         </div>
         </div>
         </div>
@@ -500,7 +511,7 @@ export default function PrenotazioniPage() {
                     {members.map((m) => (
                       <button key={m.id} onClick={() => openBooking(m.id)} className="flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash">
                         <span className="truncate text-xs text-dim">{unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {m.adults + m.children} {t("osp.")}</span>
-                        <span className="shrink-0 font-mono text-xs text-txt">{m.total ? eur(m.total) : "—"}</span>
+                        <span className="shrink-0 font-mono text-xs text-txt">{m.total ? eur(grand(m)) : "—"}</span>
                       </button>
                     ))}
                   </div>
@@ -525,7 +536,7 @@ export default function PrenotazioniPage() {
               <div className="mt-1 flex items-center justify-between gap-2">
                 <span className="truncate text-xs text-dim">{unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {b.adults + b.children} {t("osp.")}</span>
                 <span className="shrink-0 font-mono font-semibold text-txt">
-                  {b.total ? eur(b.total) : "—"}
+                  {b.total ? eur(grand(b)) : "—"}
                   {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="ml-1 font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
                 </span>
               </div>
@@ -542,7 +553,7 @@ export default function PrenotazioniPage() {
 
       {/* Tabella (tablet/desktop) */}
       <StatoGate on={view === "compact"} ids={visibleIds}>
-      <div className="hidden max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block" style={view === "detail" ? { display: "none" } : undefined}>
+      <div className="hidden max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block print:block print:max-h-none print:overflow-visible" style={view === "detail" ? { display: "none" } : undefined}>
         <table className="w-max min-w-full whitespace-nowrap text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="text-left text-xs uppercase tracking-wide text-faint">
@@ -566,7 +577,7 @@ export default function PrenotazioniPage() {
             {shownList.map((item) => {
               if (item.kind === "single") {
                 const b = item.b;
-                return <tr key={b.id} onClick={() => openBooking(b.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">{renderCells(b)}</tr>;
+                return <tr key={b.id} onClick={() => openBooking(b.id)} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${isCounted(b) ? "" : "opacity-50"}`}>{renderCells(b)}</tr>;
               }
               const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
               const colSpan = activeStructureId === "all" ? 14 : 13;
@@ -589,7 +600,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
                   {open && members.map((m) => (
-                    <tr key={m.id} onClick={() => openBooking(m.id)} className="cursor-pointer border-b border-line bg-wash/40 hover:bg-wash">{renderCells(m, true)}</tr>
+                    <tr key={m.id} onClick={() => openBooking(m.id)} className={`cursor-pointer border-b border-line bg-wash/40 hover:bg-wash ${isCounted(m) ? "" : "opacity-50"}`}>{renderCells(m, true)}</tr>
                   ))}
                   {open && <tr className="border-b border-line"><td colSpan={colSpan} className="px-3 py-0.5" /></tr>}
                 </Fragment>
@@ -602,7 +613,7 @@ export default function PrenotazioniPage() {
           {filtered.length > 0 && (
             <tfoot className="sticky bottom-0 z-20">
               <tr className="border-t-2 border-line bg-wash text-sm font-semibold text-txt">
-                <td className="px-3 py-2.5" colSpan={activeStructureId === "all" ? 6 : 5}>{t("Totali")} · {filtered.length} {t("prenotazioni")}</td>
+                <td className="px-3 py-2.5" colSpan={activeStructureId === "all" ? 6 : 5}>{t("Totali")} · {counted.length} {t("prenotazioni")}{filtered.length > counted.length ? ` (${filtered.length - counted.length} ${t("annullate o no-show escluse")})` : ""}</td>
                 <td className="px-3 py-2.5 font-mono">{guestsTot}</td>
                 <td className="px-3 py-2.5" colSpan={2}></td>
                 <td className="px-3 py-2.5 font-mono">{nightsTot}</td>

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
 
 // Helper server-side per la GESTIONE prenotazione da parte dell'OSPITE (pagina /gestisci).
 // Una prenotazione può vivere in app_state (struttura personale) oppure in org_state
@@ -106,6 +107,9 @@ export async function mutateStore(admin: SupabaseClient, store: BookingStore, mu
 // Nota: a grande scala converrà una tabella-indice booking→store; per ora scan diretto.
 export async function findBookingStoreById(admin: SupabaseClient, bookingId: string): Promise<BookingStore | null> {
   if (!bookingId) return null;
+  // La ricerca senza slug scorre TUTTI i tenant (blob interi): con id inesistenti sarebbe un modo per saturare il database.
+  // Tetto globale (per istanza) alle ricerche di questo tipo; oltre, si risponde "non trovata" come per un id sconosciuto.
+  if (rateLimited("fbs:all", 60, 60_000)) return null;
   const { data: orgs } = await admin.from("org_state").select("org_id").limit(5000);
   for (const o of arr(orgs)) {
     const hit = await scan(admin, "org_state", "org_id", String((o as { org_id?: string }).org_id || ""), bookingId);

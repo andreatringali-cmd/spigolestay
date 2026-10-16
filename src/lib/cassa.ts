@@ -22,6 +22,18 @@ const e2c = (e: number) => Math.round(roundCents(e) * 100);
 const c2e = (c: number) => Math.round(c) / 100;
 const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
+/**
+ * Data di partenza (ISO) di una regola che riparte dal periodo SUCCESSIVO a `dateISO`. Il giorno si limita alla fine del mese:
+ * un pagamento mensile del 31/01 riparte il 28/02 (non il 03/03, che farebbe saltare febbraio), uno annuale del 29/02 il 28/02.
+ */
+export function nextRecurrenceStart(dateISO: string, freq: "monthly" | "weekly" | "yearly"): string {
+  const y = Number(dateISO.slice(0, 4)), m0 = Number(dateISO.slice(5, 7)) - 1, d = Number(dateISO.slice(8, 10));
+  if (freq === "weekly") { const dt = new Date(y, m0, d + 7); return fmt(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
+  const ty = freq === "yearly" ? y + 1 : m0 === 11 ? y + 1 : y;
+  const tm = freq === "yearly" ? m0 : (m0 + 1) % 12;
+  return fmt(ty, tm, Math.min(d, daysIn(ty, tm)));
+}
+
 // Date di ricorrenza di una regola nell'intervallo [from, to] (ISO inclusi).
 export function occurrences(r: Rule, fromISO: string, toISO: string): string[] {
   const res: string[] = [];
@@ -440,6 +452,14 @@ export function computeBalances(movs: Mov[], today: string, conti: string[], sco
     out[conto] = o;
   }
   return out;
+}
+
+/**
+ * Saldo teorico di UN conto a fine giornata `day` (Chiusura cassa): stessa regola della Cassa (computeBalances) ma "visto" dal giorno scelto, quindi senza i movimenti successivi.
+ * Con un saldo di partenza vale solo ciò che viene dopo quella data, per ogni coppia struttura/conto; senza, è la somma dei movimenti fino al giorno.
+ */
+export function closingBalance(movs: Mov[], day: string, conto: string, scope: CashScope = "all"): Balance {
+  return computeBalances(movs.filter((m) => m.date <= day), day, [conto], scope)[conto] ?? { saldo: 0 };
 }
 
 // ── Asse e etichette dei grafici ────────────────────────────────────────────────────────────────────────────────────────

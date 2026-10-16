@@ -3,6 +3,8 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
 import { onlinePaymentPatch } from "@/lib/online-pay";
 import { groupRowBalances } from "@/lib/booking";
@@ -25,6 +27,7 @@ export async function POST(req: Request) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!sbUrl || !service) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   if (!key) return NextResponse.json({ ok: false, error: "stripe_not_configured" }, { status: 503 });
+  if (rateLimited("cpc:" + clientIp(req), 30, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
   try {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();

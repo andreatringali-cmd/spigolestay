@@ -240,13 +240,15 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
   onSave: (p: RatePlan) => void; onDelete: () => void; onClose: () => void;
 }) {
   const { t } = useLang();
-  const [f, setF] = useState<RatePlan>({ ...plan });
+  // Un piano salvato con elenco vuoto vale per tutte le tipologie (come per i motori di prezzo): all'apertura lo si riporta a "tutte" (undefined).
+  const [f, setF] = useState<RatePlan>({ ...plan, roomTypeIds: plan.roomTypeIds && plan.roomTypeIds.length ? plan.roomTypeIds : undefined });
   // Tipologie selezionabili: quelle della struttura del piano (se ha una struttura), altrimenti quelle passate dalla pagina.
   const allTypes = useMemo(() => (f.structureId ? typesIn.filter((x) => !x.structureId || x.structureId === f.structureId) : typesIn), [typesIn, f.structureId]);
   const set = <K extends keyof RatePlan>(k: K, v: RatePlan[K]) => setF((p) => ({ ...p, [k]: v }));
-  const allSelected = !f.roomTypeIds || f.roomTypeIds.length === 0;
+  // undefined = tutte le tipologie; [] = nessuna scelta ancora ("Nessuna": si parte da zero e si spuntano le camere volute; non si può salvare così).
+  const allSelected = f.roomTypeIds === undefined;
   const toggleRoom = (id: string) => setF((p) => {
-    const cur = p.roomTypeIds && p.roomTypeIds.length ? p.roomTypeIds : allTypes.map((x) => x.id);
+    const cur = p.roomTypeIds ?? allTypes.map((x) => x.id);
     const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
     return { ...p, roomTypeIds: next.length === allTypes.length ? undefined : next };
   });
@@ -318,7 +320,7 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
           ); })}
           {allTypes.length === 0 && <span className="text-xs text-faint">{t("Nessuna tipologia disponibile.")}</span>}
         </div>
-        <p className="mt-1 text-[11px] text-faint">{allSelected ? t("Si applica a tutte le tipologie.") : `${selectedRooms.length} ${t("tipologie selezionate")}`}</p>
+        <p className="mt-1 text-[11px] text-faint">{allSelected ? t("Si applica a tutte le tipologie.") : selectedRooms.length === 0 ? t("Scegli almeno una tipologia, oppure premi Tutte.") : `${selectedRooms.length} ${t("tipologie selezionate")}`}</p>
       </div>
 
       {/* Descrizione */}
@@ -330,7 +332,7 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
         <button onClick={onDelete} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
         <label className="ml-1 flex items-center gap-2 text-sm text-dim">{t("Attivo")}<Toggle on={f.enabled !== false} onClick={() => set("enabled", f.enabled === false)} color="var(--ok)" /></label>
         <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-        <button onClick={() => onSave(f)} disabled={!f.name.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+        <button onClick={() => onSave(f)} disabled={!f.name.trim() || f.roomTypeIds?.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
       </div>
     </Modal>
   );

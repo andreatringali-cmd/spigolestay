@@ -1,0 +1,52 @@
+Riepilogo (tsc pulito, test mirati cassa e num-it: 86/86 verdi, inclusi i nuovi in `tests/cassa-chiusura-ricorrenza.test.ts`).
+
+**r4 #1 FATTO.**
+- `scadenzario-incassi`, `registro-bollo`, `fatture-passive`, `fascicolo-fiscale`, `documenti` e `documenti/[id]` ora filtrano con `selectedStructureIds`.
+- In scadenzario e in `documenti/[id]` l'incasso aggiorna `booking.paid` cercando in `raw.bookings`, quindi funziona anche per strutture fuori selezione.
+- `abbonamento` conta camere e strutture su `raw.units` e `allStructures`.
+- `fascicolo-fiscale`: `AccountantPackPanel` è fuori perimetro e filtra solo per una struttura o per tutte. Per un sottoinsieme gli passo documenti, pagamenti e acquisti già filtrati, e l'etichetta mostra i nomi.
+
+**r4 #2 FATTO.** `chiusura-cassa` usa la nuova `closingBalance()` in `src/lib/cassa.ts`, cioè `computeBalances` con saldi di partenza e solo i movimenti fino al giorno scelto. Il saldo di partenza non conta più come incasso del giorno.
+
+**r4 #3 e r2 #9 FATTO.**
+- `documenti/[id]`: quantità e prezzo delle righe usano `NumInput`.
+- `strutture/[id]`: tetto, tassa e cauzione usano `NumInput`.
+- Latitudine e longitudine usano un piccolo campo di testo locale (`CoordInput`). Con `NumInput` "15.291" sarebbe stato letto come 15291, perché con tre cifre dopo il punto `parseDecimalIT` lo tratta come migliaia.
+
+**r4 #4 FATTO.**
+- `fatture-passive`, `cassa`, `chiusura-cassa` e `documenti/[id]` usano `parseDecimalIT`.
+- Testo non valido o vuoto dà un errore visibile (messaggio dentro la modale in fatture passive, toast in cassa). In cassa il saldo di partenza con testo non valido blocca il salvataggio.
+- In fatture passive l'imponibile è obbligatorio. Nel parser CSV delle commissioni ho lasciato il `parseNum` che c'era.
+
+**r4 #5 FATTO.**
+- Cassa, scadenzario, fatture passive, `documenti/[id]`, chiusura cassa e `impostazioni-fattura` non scrivono senza `tenantId` e mostrano un errore.
+- La migrazione della cassa e il primo caricamento aspettano `tenantId`.
+- Le letture di `tenant_invoice_settings` in `impostazioni-fattura`, `documenti/[id]` e `fascicolo-fiscale` filtrano con `.eq("tenant_id", tenantId)`.
+- In `impostazioni-fattura` un errore di lettura ora disattiva il Salva, così non sovrascrive.
+
+**r4 #7 FATTO.** Nuova `nextRecurrenceStart()` in `cassa.ts`: il giorno si limita a fine mese. Vale anche per la regola annuale dal 29/02. Il test copre la scadenza di febbraio.
+
+**r4 #10 FATTO.** Con un abbonamento Stripe attivo, "Conferma cambio" non chiama più `choose()` e non mostra più "attivo dal prossimo rinnovo… carta salvata". Spiega che il cambio va richiesto al supporto (sales@xenora.app, l'indirizzo già usato nella pagina) o dal portale, e il pulsante porta a `/abbonamento/pagamento`.
+
+**r4 #11 FATTO.**
+- `abbonamento/fatture` non genera più fatture di esempio, e ho tolto anche la stampa del "documento Fattura" dalle sole fatture di esempio.
+- Mostra solo le fatture Stripe, con messaggi distinti per errore, Stripe non collegato e nessuna fattura.
+- Il "prossimo rinnovo" calcolato a mano è tolto da `abbonamento` e dalle fatture. Resta la data della prima fattura durante la prova, altrimenti "—" o un rimando al portale.
+
+**r4 #12 FATTO.**
+- `abbonamento/pagamento` normalizza P.IVA, codice fiscale, SDI, provincia e PEC come `impostazioni-fattura`.
+- Valida con `validateIssuerSettings` e non scrive dati non validi, mostrando l'errore. L'autosalvataggio ogni secondo significa che l'errore compare anche mentre si digita una P.IVA incompleta.
+- Aggiunto il campo CAP.
+
+**r2 #10 FATTO** (`strutture/[id]`).
+- Per le strutture esistenti non si applicano più i predefiniti di `blankStructure` (restano solo per "nuovo").
+- Autosalvataggio e Salva scrivono solo i campi cambiati rispetto alla baseline (`diffStructure`).
+- Email e telefono dell'account non si copiano più: compaiono solo come suggerimento nel campo vuoto.
+
+**Rischi e decisioni per Andrea**
+1. Con "1.200" digitato ora si legge 1200 € (prima 1,20). Un valore tipo "12.500" va inteso come 12.500 €.
+2. Le strutture che contavano sulla copia automatica di email e telefono dell'account (per le notifiche) ora hanno il campo vuoto. Va deciso se la notifica deve ripiegare sull'account lato server.
+3. Il rinnovo reale da Stripe richiede che `/api/stripe/customer` restituisca `current_period_end`, e un cambio piano automatico richiede una route che aggiorni la subscription. Sono entrambi in `src/app/api`, fuori perimetro.
+4. Restano fuori: l'attivazione demo quando Stripe risponde 503 (`startCheckout` chiama ancora `choose`) e l'attivazione degli add-on, che sono solo locali.
+5. Il civico e l'email della pagina pagamento non sono salvati sul server: non so se la tabella ha le colonne, e unire il civico a `address` rischiava di duplicarlo.
+6. `strutture/page.tsx` usa ancora `activeStructureId`, ma funziona perché `structures` è già filtrata dal contesto.

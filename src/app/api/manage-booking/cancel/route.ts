@@ -3,8 +3,11 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 import { findBookingStore, refundEligible, writeBookingPatch } from "@/lib/manage-booking";
 import { fmtDMY } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +30,7 @@ export async function POST(req: Request) {
     const slug = String(body?.slug || "").trim();
     const bid = String(body?.b || "").trim();
     if (!slug || !bid) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
+    if (rateLimited("mbc:" + clientIp(req), 20, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
     const store = await findBookingStore(admin, slug, bid);
@@ -41,23 +45,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, already: true, refunded: n(b.refundedAmount) });
     }
 
+    // L'ospite può annullare da solo solo prenotazioni DIRETTE e SOLO prima dell'arrivo (data di Roma):
+    // un soggiorno iniziato o finito non si annulla da un link (sparirebbe da incassi, report e ISTAT).
+    if (s(b.channel) !== "direct") {
+      return NextResponse.json({ ok: false, error: "not_cancellable", message: "Questa prenotazione non può essere annullata da qui: contatta la struttura." }, { status: 403 });
+    }
+    const ciDate = s(b.checkIn);
+    if (!ciDate || ciDate <= ymdRome(Date.now())) {
+      return NextResponse.json({ ok: false, error: "stay_started", message: "Il soggiorno è già iniziato o concluso: contatta la struttura." }, { status: 409 });
+    }
+
     const now = new Date().toISOString();
     const { free, freeUntil } = refundEligible(b, now);
     const paid = n(b.paid);
     const pi = s(b.stripePaymentIntent);
-    const acct = s(b.stripeAccountId);
 
     // Rimborso automatico se: entro finestra gratuita + pagamento online presente + Stripe ok.
+    // Il pagamento è una DESTINATION CHARGE sulla piattaforma: il rimborso si crea sull'account
+    // piattaforma (niente header stripeAccount) e reverse_transfer richiama i fondi dalla struttura.
     let refunded = 0;
-    let refundError = "";
-    if (free && paid > 0 && pi && acct && key) {
+    if (free && paid > 0 && pi) {
+      if (!key) return NextResponse.json({ ok: false, error: "stripe_not_configured", message: "Rimborso non disponibile al momento: riprova più tardi o contatta la struttura." }, { status: 503 });
       try {
         const stripe = new Stripe(key);
-        const r = await stripe.refunds.create({ payment_intent: pi, refund_application_fee: true }, { stripeAccount: acct });
+        // idempotencyKey: se la richiesta si ripete (es. conflitto di scrittura) non si rimborsa due volte.
+        const r = await stripe.refunds.create({ payment_intent: pi, reverse_transfer: true }, { idempotencyKey: "guest-cancel-" + pi });
         // amount è in centesimi; se non fornito rimborsa l'intero pagamento.
         refunded = typeof r.amount === "number" ? Math.round(r.amount) / 100 : paid;
       } catch (e) {
-        refundError = e instanceof Error ? e.message : "refund_error";
+        // Rimborso fallito: NON si annulla (l'ospite resterebbe senza soggiorno e senza rimborso). Errore chiaro, nessuna modifica.
+        console.error("[manage-booking/cancel] rimborso fallito", { booking: s(b.id), pi, error: e instanceof Error ? e.message : e });
+        return NextResponse.json({ ok: false, error: "refund_failed", message: "Non siamo riusciti a rimborsare il pagamento, quindi la prenotazione NON è stata annullata. Riprova tra qualche minuto o contatta la struttura." }, { status: 502 });
       }
     }
 
@@ -105,13 +123,13 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             kind: "quote", to: hostEmail, subject: `Annullamento ${code} · ${s(st.name)}`,
             accent: "#b4472e",
-            text: `L'ospite ha annullato la prenotazione ${code}.\n\nStruttura: ${s(st.name)}\nPeriodo: ${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || gEmail}\n\nRimborso emesso: ${refunded > 0 ? `${currency} ${refunded}` : "nessuno"}${refundError ? `\n\n⚠ Errore nel rimborso automatico: ${refundError} — verifica su Stripe.` : ""}`,
+            text: `L'ospite ha annullato la prenotazione ${code}.\n\nStruttura: ${s(st.name)}\nPeriodo: ${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || gEmail}\n\nRimborso emesso: ${refunded > 0 ? `${currency} ${refunded}` : "nessuno"}${free && paid > 0 && refunded === 0 ? "\n\n⚠ Era dovuto un rimborso ma non è stato emesso in automatico (nessun pagamento online registrato): da gestire a mano." : ""}`,
           }),
         });
       }
     } catch { /* email non critica */ }
 
-    return NextResponse.json({ ok: true, refunded, free, freeUntil, refundError: refundError || undefined });
+    return NextResponse.json({ ok: true, refunded, free, freeUntil });
   } catch (e) {
     return NextResponse.json({ ok: false, error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });
   }

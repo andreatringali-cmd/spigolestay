@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
+import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
@@ -29,7 +30,9 @@ const cpName = (r: DocRow) => `${r.counterpart?.name ?? ""} ${r.counterpart?.las
 
 export default function DocumentiPage() {
   const router = useRouter();
-  const { structures, activeStructureId } = useData();
+  const { allStructures, selectedStructureIds } = useData();
+  // Ambito dalla selezione vera (con 2+ strutture scelte `activeStructureId` resta "all").
+  const scope = useMemo(() => cashScopeOf(selectedStructureIds, allStructures.map((x) => x.id)), [selectedStructureIds, allStructures]);
   const [creating, setCreating] = useState(false);
   const [rows, setRows] = useState<DocRow[]>([]);
   const [paid, setPaid] = useState<Record<string, number>>({});
@@ -68,7 +71,7 @@ export default function DocumentiPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const structName = (id: string | null) => structures.find((s) => s.id === id)?.name ?? "—";
+  const structName = (id: string | null) => allStructures.find((s) => s.id === id)?.name ?? "—";
   const residui = useMemo(() => computeResidui(rows, paid), [rows, paid]);
   // Residuo mostrato solo per fatture/ricevute emesse e non scartate; NC e bozze non sono crediti.
   const residuoOf = (r: DocRow): number | null => (r.doc_kind !== "nota_di_credito" && ISSUED.has(r.stato) ? Math.max(0, residui[r.id]?.residuo ?? 0) : null);
@@ -83,7 +86,7 @@ export default function DocumentiPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
-      if (activeStructureId !== "all" && r.structure_id !== activeStructureId) return false;
+      if (scope !== "all" && !scopeVisible(r.structure_id, scope)) return false;
       const dt = dateOf(r);
       if (year !== "all" && dt.slice(0, 4) !== String(year)) return false;
       if (month !== "all" && Number(dt.slice(5, 7)) !== month) return false;
@@ -95,7 +98,7 @@ export default function DocumentiPage() {
       }
       return true;
     });
-  }, [rows, q, year, month, kind, stato, activeStructureId]);
+  }, [rows, q, year, month, kind, stato, scope]);
 
   // Riepilogo del periodo filtrato: SOLO documenti fiscali emessi (fatture − note di credito); niente bozze, scartate, stornate, ricevute.
   const summary = useMemo(() => {
@@ -136,7 +139,7 @@ export default function DocumentiPage() {
   // Nuovo documento VUOTO: la prenotazione si collega dopo dalla scheda.
   const createNew = async () => {
     // Con "Tutte" non indovino la struttura: se ce n'è più di una chiedo di sceglierla in alto a destra.
-    const structureId = activeStructureId !== "all" ? activeStructureId : structures.length === 1 ? structures[0].id : undefined;
+    const structureId = typeof scope === "string" && scope !== "all" ? scope : allStructures.length === 1 ? allStructures[0].id : undefined;
     if (!structureId) { setErr("Seleziona prima una struttura in alto a destra per creare un nuovo documento."); return; }
     setCreating(true); setErr("");
     try {

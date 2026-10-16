@@ -19,6 +19,8 @@ const RESEND = process.env.RESEND_API_KEY || "";
 
 type J = Record<string, unknown>;
 const arr = (x: unknown): J[] => (Array.isArray(x) ? (x as J[]) : []);
+// ilike senza caratteri jolly: "_" e "%" dell'email (es. mario_rossi@…) non devono combaciare con altri indirizzi.
+const likeEsc = (s: string) => s.replace(/[\\%_]/g, (c) => "\\" + c);
 const esc = (s: unknown) => String(s ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
 
 export async function POST(req: Request) {
@@ -46,12 +48,12 @@ export async function POST(req: Request) {
     // REGOLA DI SICUREZZA: si può invitare SOLO un'email già registrata su Xenora.
     // Così non si invita per errore un indirizzo sbagliato/non registrato (che, registrandosi
     // dopo, potrebbe entrare nella struttura). Il socio deve prima creare l'account con quell'email.
-    const { data: prof } = await admin.from("profiles").select("user_id").ilike("email", email).maybeSingle();
+    const { data: prof } = await admin.from("profiles").select("user_id").ilike("email", likeEsc(email)).maybeSingle();
     // Eccezione: un indirizzo che il titolare ha già abilitato in "Utenti" (elenco accessi) non è un errore di battitura: l'invito
     // resta in attesa e viene accettato in automatico al suo primo accesso.
     let allowlisted = false;
     if (!prof?.user_id && silent) {
-      const { data: al } = await admin.from("access_allowlist").select("email").ilike("email", email).maybeSingle();
+      const { data: al } = await admin.from("access_allowlist").select("email").ilike("email", likeEsc(email)).maybeSingle();
       allowlisted = !!al;
     }
     if (!prof?.user_id && !allowlisted) {
@@ -70,13 +72,19 @@ export async function POST(req: Request) {
     // Struttura NON nel personale: forse è già condivisa (in org_state). Trova l'org di cui il
     // chiamante è membro che contiene questa struttura, così può invitare un altro socio.
     if (!S) {
-      const { data: mships } = await admin.from("memberships").select("org_id").eq("user_id", caller.id);
+      const { data: mships } = await admin.from("memberships").select("org_id, role, active").eq("user_id", caller.id);
       for (const m of arr(mships)) {
         const oid = m.org_id as string;
         const { data: os } = await admin.from("org_state").select("data").eq("org_id", oid).maybeSingle();
         let od: J = {}; try { od = JSON.parse(((os?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
         const found = arr(od.structures).find((s) => s?.id === structureId) as J | undefined;
-        if (found) { S = found; orgId = oid; break; }
+        if (found) {
+          // Solo il PROPRIETARIO attivo può aggiungere altri soci (la UI lo mostra solo a lui): un co-gestore in sola lettura o in pausa no.
+          if (m.role !== "owner" || m.active === false) {
+            return NextResponse.json({ error: "not_owner", message: "Solo il proprietario della struttura può invitare altri soci." }, { status: 403 });
+          }
+          S = found; orgId = oid; break;
+        }
       }
     }
     if (!S) return NextResponse.json({ error: "structure_not_found", message: "Struttura non trovata nel tuo account. Ricarica la pagina e riprova." }, { status: 404 });
@@ -151,7 +159,7 @@ export async function POST(req: Request) {
       const { data: mem } = await admin.from("memberships").select("id").eq("org_id", orgId).eq("user_id", prof.user_id).maybeSingle();
       if (mem) return NextResponse.json({ ok: true, orgId, already: true, emailSent: false });
     }
-    const { data: pend } = await admin.from("org_invites").select("code").eq("org_id", orgId).eq("structure_id", structureId).ilike("email", email).eq("status", "pending").maybeSingle();
+    const { data: pend } = await admin.from("org_invites").select("code").eq("org_id", orgId).eq("structure_id", structureId).ilike("email", likeEsc(email)).eq("status", "pending").maybeSingle();
     const code = pend?.code ?? (globalThis.crypto?.randomUUID?.() ?? `inv_${Date.now()}`).replace(/-/g, "").slice(0, 24);
     if (!pend) {
       await admin.from("org_invites").insert({

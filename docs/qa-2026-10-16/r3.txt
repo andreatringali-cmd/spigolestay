@@ -1,0 +1,74 @@
+Ho trovato 12 problemi nel perimetro. Per il n. 12 ho controllato solo i dati reali: oggi nessun ospite è senza `fullName` (0 su 8.421 in `app_state` e 0 su 3.252 in `org_state`), quindi il crash c'è nel codice ma non è ancora scattato. Per i n. 2, 3 e 4 ho anche riprodotto il comportamento con prove su funzioni pure. Non ho modificato nulla.
+
+1. [ALTA] src/app/(app)/preventivi/page.tsx:402-403 — Importi del link "Conferma e paga" modificabili dall'ospite
+   - Scenario: `payUrl` mette `tot`, `dep`, `sid`, `uid`, `acct` nell'URL (`/preventivo?q=base64`). La pagina pubblica accetta ancora `?q=` (src/app/preventivo/page.tsx:57). `/api/stripe/quote` si fida di `amount`, `acct` e `metadata`. Un ospite decodifica il link, mette `dep:1` e `tot:1000`, e paga 1 €.
+   - Effetto: `/api/stripe/quote/confirm` (righe 85-125) crea una prenotazione `confirmed` con `total` 1000 e `paid` 1 sul calendario del proprietario. È possibile creare prenotazioni confermate quasi gratis.
+   - Correzione: non generare mai `?q=` (usare solo il codice breve). Lato server rileggere importo e struttura dalla tabella `quotes` tramite il codice, ignorando i valori del client.
+
+2. [ALTA] src/app/(app)/ospiti/[id]/page.tsx:42-51 e 83 — Il telefono con prefisso non in elenco viene riscritto come +39
+   - Scenario: `DIAL_CODES` ha 28 prefissi. Un numero come "+212 612345678" non corrisponde a nessuno e `parsePhone` restituisce dial "+39". All'apertura della scheda l'effetto alla riga 83 lo riscrive in "+39 212 612345678", e con Salva resta così. La prova su `parsePhone` dà lo stesso risultato per +971, +91, +972, +385, +82.
+   - Effetto: gli ospiti OTA di quei Paesi perdono il numero e WhatsApp scrive a un numero sbagliato. Succede anche salvando solo una nota.
+   - Correzione: se il prefisso non è in elenco, tenere il numero intero in `local` con dial vuoto o "altro". Non fare mai la normalizzazione automatica a +39.
+
+3. [ALTA] src/lib/msg-templates.ts:117 — I modelli eliminati tornano attivi
+   - Scenario: `mergeSeedTemplates` riaggiunge ogni seed mancante con `active:true`. Viene chiamata a ogni apertura di ConversazioniPanel.tsx:125 e ModelliPanel.tsx:51, che poi salvano. L'host elimina "Richiesta recensione" e riapre Messaggi: il modello è di nuovo attivo (provato con "seed-welcome": 4 salvati diventano 5, `active` true).
+   - Effetto: il cron `auto-messages` rimanda messaggi che l'host aveva tolto di proposito.
+   - Correzione: salvare l'elenco degli id seed eliminati (tombstone) e non riaggiungerli. In alternativa, inserire i seed solo la prima volta.
+
+4. [ALTA] src/components/messaging/ConversazioniPanel.tsx:655-675 e 769 — "Invia oggi" registra solo un invio e permette di inviare due volte
+   - Scenario: `todayQueue.forEach(sendScheduled)` avvia N invii con lo stesso `sent` di quel render. Ognuno chiama `saveSent([nuovo, ...sent...])` e sovrascrive gli altri. Con 5 messaggi solo l'ultimo risulta "Inviato ✓".
+   - Effetto: i 4 messaggi già partiti restano in coda e un secondo clic li manda di nuovo agli ospiti. Senza WhatsApp collegato apre anche N schede wa.me, tutte registrate come inviate.
+   - Correzione: inviare in sequenza con `await` e accumulare le chiavi in un unico `saveSent`, oppure usare `setSent(prev => …)` funzionale.
+
+5. [ALTA] src/app/(app)/ospiti/page.tsx:40-52 (con store.tsx:545-558) — Unione automatica dei doppioni, senza conferma e con perdita di dati
+   - Scenario: all'apertura di /ospiti `mergeGuestGroups` fonde chi ha stesso telefono o stesso nome senza Paese. Il `patch` copia solo 12 campi; di quello eliminato si perdono `vip`, `tags`, `notes`, `preferences`, `marketingConsent`, `sex`, `language`, `docPhotoFront/Back`, `province`, `streetNumber`. Due persone diverse con lo stesso numero (agenzia o genitore) vengono unite.
+   - Effetto: perdita di note, VIP, consenso marketing e foto documento; prenotazioni di persone diverse finiscono sulla stessa scheda.
+   - Correzione: chiedere conferma e mostrare l'anteprima delle unioni. Unire anche tutti i campi mancanti (non solo i 12), cioè tag in unione e `vip`/`marketingConsent` in OR. Non unire per solo telefono se i nomi sono diversi.
+
+6. [MEDIA] src/app/(app)/preventivi/page.tsx:253-257 — I prezzi €/notte modificati a mano tornano al prezzo del calendario
+   - Scenario: l'effetto dipende da `rateOverrides`. La rehydrate dello store (store.tsx:318-345, su `focus`, `visibilitychange` e `datasync`) fa `setRateOverrides(JSON.parse(..))`, quindi crea sempre un oggetto nuovo. L'operatore imposta 90 €/notte, passa a un'altra app o scheda e torna: tutte le righe si riportano a 120 €.
+   - Effetto: PDF, email e link di pagamento partono con il prezzo sbagliato senza avviso.
+   - Correzione: ricalcolare solo quando cambiano date o piano, e solo sulle righe non toccate a mano. Oppure confrontare il contenuto (`JSON.stringify`) invece dell'identità dell'oggetto.
+
+7. [MEDIA] src/app/(app)/preventivi/page.tsx:282-283 — Il numero del preventivo cambia dopo il salvataggio
+   - Scenario: `quoteRef` usa `nextNumber`, calcolato da `saved`. Salva crea il n. 7; al render successivo `quoteRef` diventa 8/2026. Invia, PDF e link di pagamento (`payData.ref`) escono come "n. 8", mentre l'archivio ha il 7. Lo stesso vale per "Modifica" da archivio.
+   - Effetto: numeri diversi tra documento e archivio. Alla conferma del pagamento, `confirm` (confirm/route.ts:157-163) segna confermato un preventivo sbagliato o nessuno.
+   - Correzione: se `editingId` è valorizzato, usare `saved.find(...).number`. Dopo il primo salvataggio bloccare il numero in uno stato.
+
+8. [MEDIA] src/app/(app)/preventivi/page.tsx:319, 623 e dizionario `QL.cancText` — Condizioni di cancellazione sempre "interamente rimborsabile fino a 7 giorni"
+   - Scenario: si sceglie un piano tariffario "Non rimborsabile" (`cancelText(activePlan)` compare solo a schermo, riga 776). Messaggio, PDF, email e HTML stampato usano comunque il testo fisso.
+   - Effetto: il cliente riceve per iscritto una promessa di rimborso che non vale.
+   - Correzione: usare `cancelText(activePlan)` tradotto nelle 5 lingue al posto di `L.cancText`.
+
+9. [MEDIA] ConversazioniPanel.tsx:437-458 e 648-663; recensioni/page.tsx:604; upselling/_proposals.tsx:75; preventivi/page.tsx:983 — Numero WhatsApp senza prefisso e invio fallito registrato come inviato
+   - Scenario: questi punti usano `replace(/\D/g,"")` invece di `waDigits(phone, country)`. "0039333…", "0-0-18574458226-" o un numero nazionale producono wa.me e chiamate API non validi. In `sendWa`/`sendMail`, se l'invio via API fallisce, il fallback `window.open` avviene dopo un `await` e Safari su iPhone lo blocca. Il messaggio resta in chat come "inviato"; l'offerta extra viene registrata come inviata anche quando l'invio fallisce (upselling:94-96).
+   - Effetto: messaggi mai arrivati che risultano consegnati e statistiche dell'upselling sbagliate.
+   - Correzione: usare `waDigits(g.phone, g.country)`. Registrare in chat solo dopo l'esito e mostrare l'errore, oppure aprire wa.me prima dell'`await`.
+
+10. [MEDIA] ConversazioniPanel.tsx:200-206 vs messaggi/page.tsx:33-37 — Messaggi di ospiti con prenotazione annullata scompaiono dalla lista
+    - Scenario: con una struttura selezionata, un ospite con la sola prenotazione annullata in quella struttura scrive "posso spostare le date?". Il primo ciclo salta le annullate. Il secondo salta chi ha una prenotazione (`bookings.some(... !== "blocked")`, annullate incluse). La conversazione non appare. Il badge in messaggi/page.tsx la conta come non letta, perché `inStruct` include le annullate.
+    - Effetto: badge "1" senza nessuna chat da aprire; il messaggio resta senza risposta.
+    - Correzione: nel secondo ciclo considerare solo prenotazioni non annullate (come nel primo). Usare la stessa regola nel badge.
+
+11. [MEDIA] promozioni/page.tsx:127-143, 157, 150-151, 81; ospiti/page.tsx:197-205 — Invio promo che ignora filtri, consenso e struttura
+    - Scenario:
+      - Tutti i segmenti tranne "consenso" mandano a chiunque abbia un'email: manca il controllo su `marketingConsent` (GDPR).
+      - Il segmento "ota" colpisce proprio gli indirizzi relay (`@guest.booking.com`), che le OTA vietano per il marketing.
+      - Con "Tutte le strutture" nome e contatti sono sempre quelli di `structures[0]`, anche per ospiti dell'altra struttura.
+      - Il limite "4 invii l'anno" si basa su `spigolestay:promolog`, assente da `workspace-keys.ts`: vale solo per dispositivo e il contatore riparte a 0 altrove.
+      - In /ospiti `sel` resta dopo aver cambiato ricerca o segmento, quindi "Invia promo (N)" scrive anche a chi non si vede più. Include newsletter e relay.
+    - Effetto: email promozionali a persone senza consenso o a indirizzi non utilizzabili, con il brand sbagliato.
+    - Correzione: filtrare per `marketingConsent` e per `realEmail`, usare la struttura dell'ospite, salvare il log sul server e svuotare `sel` quando cambiano i filtri.
+
+12. [MEDIA, latente] ospiti/page.tsx:112; ConversazioniPanel.tsx:183-184 e 267 — Pagina bianca per ospiti senza `fullName`
+    - Scenario: `api/stripe/quote/confirm/route.ts:101` crea l'ospite con `name` invece di `fullName`, e lo store non normalizza. Dopo un pagamento online di un preventivo, `a.guest.fullName.localeCompare` (ordinamento di default) va in errore e /ospiti va in schermata bianca. In /messaggi `avatarColor(undefined)` e `initials` vanno in errore anche loro.
+    - Effetto: due pagine inutilizzabili finché non si corregge il dato. Verificato solo nel codice; sul DB oggi non ci sono casi.
+    - Correzione: nella route usare `fullName` (e `firstName`/`lastName`). Nello store normalizzare con `fullName ??= name ?? ""`. Usare `(fullName ?? "")` nelle pagine.
+
+Segnalazioni più minori che ho verificato ma non incluse nel limite di 12:
+- **Forniture:** il carrello mostra il totale con la quantità digitata, ma il server (`api/forniture/order`) alza a `min_order_qty`, quindi lo Stripe addebita più del totale mostrato. Se Stripe non restituisce l'URL, la pagina dice "bozza" ma l'ordine è `pending_payment`.
+- **Forniture, altri punti:** cancellando il valore nell'input quantità la riga sparisce; `deleteDraft` (forniture/page.tsx:258) cancella le righe prima di controllare che l'ordine sia ancora bozza.
+- **Date:** `addDaysISO` in ConversazioniPanel.tsx:628 sbaglia di un giorno in avanti attraverso il cambio all'ora legale di marzo (con TZ=Europe/Rome, "2027-03-28" +1 dà "2027-03-28"). `todayISO` usa la data UTC.
+- **CSV recensioni:** `exportCsv` (recensioni/page.tsx:474) non neutralizza i valori che iniziano con `=`, `+`, `@`.
+- **HTML non validato:** `printPdf` (preventivi/page.tsx:531-565) scrive `logo`, `accent` e URL social senza escape di `"`. `map_url` in ConciergeKb.tsx:68 accetta `javascript:`.
+- **Conferma prenotazione da preventivo (`confirmBooking`, righe 676-697):** crea prenotazioni con solo camere × notti, senza parcheggio, colazione e tassa. Il modale parte sempre con acconto 50%, anche se il preventivo diceva 0 o 100.

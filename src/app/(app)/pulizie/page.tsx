@@ -24,6 +24,7 @@ import { isPulizieOnly } from "@/lib/pulizie-addetta";
 import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors";
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
+import { downscaleImage } from "@/lib/images";
 
 const fmt = (iso: string) => fmtDM(iso);
 const fmtShort = (iso: string) => fmtDM(iso);
@@ -88,16 +89,26 @@ export default function PuliziePage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [issues, setIssues] = useState<Issue[]>([]);
   useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setDone(JSON.parse(d)); const n = localStorage.getItem("spigolestay:pulizie:notes"); if (n) setNotes(JSON.parse(n)); const s = localStorage.getItem("spigolestay:pulizie:issues"); if (s) setIssues(JSON.parse(s)); } catch {} }, []);
-  const persistIssues = (next: Issue[]) => { setIssues(next); try { localStorage.setItem("spigolestay:pulizie:issues", JSON.stringify(next)); } catch {} };
+  // Salva le segnalazioni; se il browser rifiuta la scrittura (quota piena: succede con le foto) lo dice, invece di far sparire la segnalazione al prossimo caricamento.
+  const [issueSaveErr, setIssueSaveErr] = useState("");
+  const persistIssues = (next: Issue[]): boolean => {
+    try { localStorage.setItem("spigolestay:pulizie:issues", JSON.stringify(next)); setIssues(next); setIssueSaveErr(""); return true; } // a video solo ciò che è davvero salvato
+    catch { setIssueSaveErr(t("Salvataggio non riuscito: la memoria del browser è piena. La segnalazione NON è stata salvata: togli la foto o elimina segnalazioni vecchie.")); return false; }
+  };
   const [issueDraft, setIssueDraft] = useState<null | { unitId: string; unitName: string; structureName: string; type: string; note: string; photo?: string; date?: string }>(null);
   const [showResolved, setShowResolved] = useState(false);
-  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, structureId: units.find((u) => u.id === issueDraft.unitId)?.structureId, date: issueDraft.date ?? date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
+  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); if (!persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, structureId: units.find((u) => u.id === issueDraft.unitId)?.structureId, date: issueDraft.date ?? date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues])) return; playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
   const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true, resolvedAt: new Date().toISOString(), updatedAt: Date.now() } : i)));
   const reopenIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: false, resolvedAt: undefined, updatedAt: Date.now() } : i)));
   // Cancellazione = soft-delete (tombstone _deleted + updatedAt): la fusione LWW per id fa
   // vincere la cancellazione recente, così una segnalazione eliminata non risorge da un'altra copia.
   const deleteIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, _deleted: true, updatedAt: Date.now() } : i)));
-  const onIssuePhoto = (file: File | undefined) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setIssueDraft((d) => (d ? { ...d, photo: reader.result as string } : d)); reader.readAsDataURL(file); };
+  // La foto si ridimensiona (max 900 px, JPEG): una foto da telefono a piena risoluzione pesa 3-5 MB e non entrerebbe nella memoria del browser.
+  const onIssuePhoto = async (file: File | undefined) => {
+    if (!file) return;
+    try { const photo = await downscaleImage(file, 900, 0.72); setIssueDraft((d) => (d ? { ...d, photo } : d)); }
+    catch { setIssueSaveErr(t("Foto non leggibile: riprova con un'altra immagine.")); }
+  };
   // Le segnalazioni seguono la struttura selezionata; per quelle vecchie (senza structureId) la struttura si deriva dalla camera.
   const issueInScope = (i: Issue) => inScope(i.structureId ?? units.find((u) => u.id === i.unitId)?.structureId, activeStructureId);
   const openIssues = issues.filter((i) => !i.resolved && !i._deleted && issueInScope(i));
@@ -140,7 +151,11 @@ export default function PuliziePage() {
     } catch { /* localStorage non disponibile o dati non validi: si riparte dalle scorte predefinite */ }
     if (structures.length) { setStock(structures.flatMap((s) => DEFAULT_PRODUCTS.map((name, i) => ({ id: `${s.id}-p${i}`, name, structureId: s.id, supplier: "", min: 1, qty: 3 })))); stockSeeded.current = true; }
   }, [structures]);
-  const persistStock = (next: Prod[]) => { setStock(next); try { localStorage.setItem("spigolestay:pulizie:stock", JSON.stringify(next)); } catch {} };
+  // Ultima copia salvata (localStorage) di una lista: AddettaPurchases scrive la stessa chiave con useSyncedList, quindi lo stato React di questa pagina può essere vecchio.
+  // Una lista salvata vuota non conta (le scorte predefinite stanno solo in stato finché non si modifica qualcosa).
+  const latestList = <T,>(key: string, fallback: T[]): T[] => { try { const raw = localStorage.getItem(key); if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p as T[]; } } catch { /* storage non disponibile */ } return fallback; };
+  // Ogni scrittura parte SEMPRE dalla copia più recente: passando una funzione si applica la modifica a quella, non allo stato a video.
+  const persistStock = (next: Prod[] | ((cur: Prod[]) => Prod[])) => { const val = typeof next === "function" ? next(latestList<Prod>("spigolestay:pulizie:stock", stock)) : next; setStock(val); try { localStorage.setItem("spigolestay:pulizie:stock", JSON.stringify(val)); } catch {} };
   // Ogni struttura deve trovare subito i prodotti predefiniti: anche quella aggiunta DOPO (es. un secondo alloggio), non solo la prima.
   // Si parte solo a scorte già caricate (stock non vuoto) e solo per le strutture senza alcun prodotto (nemmeno cancellato: se li ha tolti lei, restano tolti).
   // Gli id sono fissi (<struttura>-p<n>): da due dispositivi la fusione per id non crea doppioni.
@@ -148,10 +163,10 @@ export default function PuliziePage() {
     if (!stockSeeded.current || stock.length === 0 || structures.length === 0) return;
     const missing = structures.filter((st) => !stock.some((p) => p.structureId === st.id));
     if (!missing.length) return;
-    persistStock([...stock, ...missing.flatMap((st) => DEFAULT_PRODUCTS.map((name, i) => ({ id: `${st.id}-p${i}`, name, structureId: st.id, supplier: "", min: 1, qty: 3, updatedAt: Date.now() })))]);
+    persistStock((cur) => [...cur, ...missing.filter((st) => !cur.some((p) => p.structureId === st.id)).flatMap((st) => DEFAULT_PRODUCTS.map((name, i) => ({ id: `${st.id}-p${i}`, name, structureId: st.id, supplier: "", min: 1, qty: 3, updatedAt: Date.now() })))]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structures, stock]);
-  const persistOrders = (next: Order[]) => { setOrders(next); try { localStorage.setItem("spigolestay:pulizie:orders", JSON.stringify(next)); } catch {} };
+  const persistOrders = (next: Order[] | ((cur: Order[]) => Order[])) => { const val = typeof next === "function" ? next(latestList<Order>("spigolestay:pulizie:orders", orders)) : next; setOrders(val); try { localStorage.setItem("spigolestay:pulizie:orders", JSON.stringify(val)); } catch {} };
   // Ri-lettura IN-PLACE quando la sincronizzazione col server aggiorna il localStorage
   // (evento spigolestay:datasync) o al ritorno sulla scheda. Senza, lo stato React di questa
   // pagina resterebbe "vecchio" e il salvataggio successivo (persistStock/persistOrders/…)
@@ -170,33 +185,35 @@ export default function PuliziePage() {
     };
     const onVis = () => { if (document.visibilityState === "visible") rehydrate(); };
     window.addEventListener("spigolestay:datasync", rehydrate);
+    window.addEventListener("spigolestay:pulizie-list", rehydrate); // acquisti/scorte scritti da AddettaPurchases nella stessa scheda
     window.addEventListener("focus", rehydrate);
     document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("spigolestay:datasync", rehydrate);
+      window.removeEventListener("spigolestay:pulizie-list", rehydrate);
       window.removeEventListener("focus", rehydrate);
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
-  const setQty = (id: string, qty: number) => persistStock(stock.map((p) => (p.id === id ? { ...p, qty: Math.max(0, qty), updatedAt: Date.now() } : p)));
+  const setQty = (id: string, qty: number) => persistStock((cur) => cur.map((p) => (p.id === id ? { ...p, qty: Math.max(0, qty), updatedAt: Date.now() } : p)));
   // Pulsanti rapidi (per la signora): impostano la giacenza in base allo stato scelto.
   const setStatusQuick = (p: Prod, s: StockStatus) => setQty(p.id, s === "out" ? 0 : s === "low" ? Math.max(1, p.min) : p.qty > p.min ? p.qty : p.min + 1);
   const newProdId = () => ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2));
   const saveProd = () => {
     const d = prodDraft; if (!d || !d.name.trim()) return;
     const name = d.name.trim(); const supplier = d.supplier.trim() || undefined; const qty = Math.max(0, d.qty); const min = Math.max(0, d.min);
-    if (d.id) persistStock(stock.map((p) => (p.id === d.id ? { ...p, name, structureId: d.structureId || p.structureId, supplier, qty, min, updatedAt: Date.now() } : p)));
-    else if (d.applyAll && activeStructureId === "all") persistStock([...stock, ...structures.map((s) => ({ id: newProdId(), name, structureId: s.id, supplier, qty, min, updatedAt: Date.now() }))]);
-    else { const sid = d.structureId || (activeStructureId !== "all" ? activeStructureId : structures[0]?.id) || ""; if (!sid) return; persistStock([...stock, { id: newProdId(), name, structureId: sid, supplier, qty, min, updatedAt: Date.now() }]); }
+    if (d.id) persistStock((cur) => cur.map((p) => (p.id === d.id ? { ...p, name, structureId: d.structureId || p.structureId, supplier, qty, min, updatedAt: Date.now() } : p)));
+    else if (d.applyAll && activeStructureId === "all") persistStock((cur) => [...cur, ...structures.map((s) => ({ id: newProdId(), name, structureId: s.id, supplier, qty, min, updatedAt: Date.now() }))]);
+    else { const sid = d.structureId || (activeStructureId !== "all" ? activeStructureId : structures[0]?.id) || ""; if (!sid) return; persistStock((cur) => [...cur, { id: newProdId(), name, structureId: sid, supplier, qty, min, updatedAt: Date.now() }]); }
     setProdDraft(null);
   };
   // Cancellazione = soft-delete (tombstone _deleted + updatedAt): la fusione LWW per id fa vincere
   // la cancellazione recente, così un prodotto eliminato non "risorge" da una copia stantìa.
-  const delProd = (id: string) => persistStock(stock.map((p) => (p.id === id ? { ...p, _deleted: true, updatedAt: Date.now() } : p)));
+  const delProd = (id: string) => persistStock((cur) => cur.map((p) => (p.id === id ? { ...p, _deleted: true, updatedAt: Date.now() } : p)));
   const [confirmDelProd, setConfirmDelProd] = useState<Prod | null>(null);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [restock, setRestock] = useState<null | { product: Prod; qty: number; cost: string }>(null);
-  const doRestock = () => { const r = restock; if (!r || r.qty <= 0) return; setQty(r.product.id, r.product.qty + r.qty); const c = r.cost.trim() ? Number(r.cost.replace(",", ".")) : undefined; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistOrders([{ id, productId: r.product.id, productName: r.product.name, structureId: r.product.structureId, date: new Date().toISOString(), qty: r.qty, cost: Number.isFinite(c as number) ? c : undefined, updatedAt: Date.now() }, ...orders]); setRestock(null); };
+  const doRestock = () => { const r = restock; if (!r || r.qty <= 0) return; persistStock((cur) => cur.map((p) => (p.id === r.product.id ? { ...p, qty: Math.max(0, p.qty + r.qty), updatedAt: Date.now() } : p))); const c = r.cost.trim() ? Number(r.cost.replace(",", ".")) : undefined; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistOrders((cur) => [{ id, productId: r.product.id, productName: r.product.name, structureId: r.product.structureId, date: new Date().toISOString(), qty: r.qty, cost: Number.isFinite(c as number) ? c : undefined, updatedAt: Date.now() }, ...cur]); setRestock(null); };
   // Ambito: se una struttura è attiva mostro solo le sue scorte; con "tutte" le mostro raggruppate.
   // I prodotti soft-eliminati (_deleted) restano nell'array (per la fusione anti-resurrezione) ma
   // non vengono mai mostrati né conteggiati.
@@ -246,7 +263,7 @@ export default function PuliziePage() {
   const hasDog = (id: string) => (guests.find((g) => g.id === id)?.tags ?? []).includes("Animali");
   const keyOf = (unitId: string) => `${unitId}:${date}`;
 
-  const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
+  const active = bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const scopedStructures = structures.filter((s) =>
     activeStructureId === "all" ? structFilter === "all" || s.id === structFilter : s.id === activeStructureId
   );
@@ -419,6 +436,7 @@ export default function PuliziePage() {
   return (
     <div>
       <PageHeader title={t("Planning pulizie")} subtitle={t("Cosa fare in ogni camera oggi, da condividere con chi pulisce")} hideHelp />
+      {issueSaveErr && !issueDraft && <div role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-[color:var(--err)] px-3 py-2 text-xs text-[color:var(--err)]" style={{ backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}><span className="flex-1">{issueSaveErr}</span><button onClick={() => setIssueSaveErr("")} className="font-bold">✕</button></div>}
 
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -441,7 +459,7 @@ export default function PuliziePage() {
           {(() => { const empty = shopList.length === 0; return (
             <div className="order-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-2">
               <div className="ml-auto flex items-center gap-2">
-                <button disabled={empty} onClick={() => persistStock(stock.map((p) => (!p._deleted && scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2, updatedAt: Date.now() } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
+                <button disabled={empty} onClick={() => persistStock((cur) => cur.map((p) => (!p._deleted && scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2, updatedAt: Date.now() } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
                 <div ref={shareRef} className="relative">
                   <button disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
                   {shareOpen && (
@@ -802,6 +820,7 @@ export default function PuliziePage() {
               </label>
               {issueDraft.photo && <img src={issueDraft.photo} alt="" className="h-10 w-10 rounded-md object-cover" />}
             </div>
+            {issueSaveErr && <p role="alert" className="mt-2 text-xs font-medium text-[color:var(--err)]">{issueSaveErr}</p>}
             <div className="mt-4 flex items-center justify-end gap-2">
               <button onClick={() => setIssueDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
               <button onClick={saveIssue} disabled={!issueDraft.note.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Invia segnalazione")}</button>

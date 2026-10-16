@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { effectiveBase, effectiveClosed, weekendPctFromRaw } from "@/lib/pricing";
+import { effectiveClosed, rateForDay, weekendPctFromRaw } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -27,7 +27,6 @@ const HORIZON_DAYS = 90;
 // coincide con quello mostrato all'ospite (parità tariffaria).
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDaysISO = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
-const isWeekendISO = (iso: string) => { const day = new Date(iso).getDay(); return day === 5 || day === 6 || day === 0; };
 
 type Blob = {
   structures?: Array<Record<string, unknown> & { id: string; name?: string; currency?: string; city?: string }>;
@@ -92,8 +91,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   // Estraggo lo snapshot dati (stesse chiavi del localStorage del proprietario).
   let blob: Blob = {};
   try { blob = JSON.parse(siteData[DATA_KEY] || "{}") as Blob; } catch { blob = {}; }
-  let weekendPct = 25;
-  try { const r = siteData["spigolestay:pricerules"]; if (r) weekendPct = JSON.parse(r).weekendPct ?? 25; } catch {}
 
   const allTypes: RoomType[] = Array.isArray(blob.roomTypes) ? blob.roomTypes : [];
   const structs = Array.isArray(blob.structures) ? blob.structures : [];
@@ -114,9 +111,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   // Prezzo standard del giorno per la tipologia (piano flessibile, senza sconti di
   // piano) — la stessa base che /prenota mostra come tariffa del giorno.
   const dayPrice = (rt: RoomType, iso: string): number => {
-    const base = effectiveBase(rt, allTypes);
-    const raw = overrides[`${rt.id}|${iso}`] ?? overrides[iso] ?? Math.round(base * (isWeekendISO(iso) ? 1 + weekendPctFromRaw(siteData["spigolestay:pricerules"], rt.structureId) / 100 : 1));
-    return Math.max(0, Math.round(raw));
+    // Stessa funzione del Calendario e di /prenota: override giornaliero (anche della madre per le derivate), weekend sab/dom e interruttore "weekend spento".
+    return rateForDay(rt.id, iso, allTypes, overrides, weekendPctFromRaw(siteData["spigolestay:pricerules"], rt.structureId));
   };
 
   // Camere disponibili della tipologia in una singola notte [iso, iso+1) —

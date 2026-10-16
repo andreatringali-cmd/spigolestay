@@ -2,7 +2,8 @@
 // così il numero mostrato coincide ovunque.
 //  Totale ospite = soggiorno (total) + pulizia (cleaningFee) + extra + tassa di soggiorno.
 import { nights, shiftISO } from "./dates";
-import { CHANNELS, type Channel, type Structure } from "./types";
+import { CHANNELS, type Channel, type ExtraService, type Structure } from "./types";
+import { entryMatches, entryName, isActive, unitAmount } from "./upselling";
 import { loadChannelCommissionPct } from "./channelOverrides";
 import { commissionEstimateFor, isNetPayout } from "./commission-estimate";
 export { isNetPayout };
@@ -32,9 +33,11 @@ export function cityTaxOf(structure: Structure | undefined, adults: number, n: n
   return Math.round(persons * taxedNights * rate * 100) / 100;
 }
 
-type BookingLike = {
+export type BookingLike = {
   id?: string; checkIn: string; checkOut: string; adults?: number; children?: number; childAges?: number[];
   total?: number; cleaningFee?: number; extras?: { price?: number }[]; cityTaxExempt?: boolean;
+  /** tassa già incassata a parte (a mano): non fa parte del residuo (vedi incassi.ts) */
+  cityTaxPaid?: boolean; cityTaxInPaid?: boolean;
 };
 
 // Persone paganti la tassa: adulti + minori NON esenti (età >= soglia comunale).
@@ -124,13 +127,47 @@ export function bookingExtrasTotal(b: { extras?: { price?: number }[] }): number
   return Array.isArray(b.extras) ? b.extras.reduce((a, e) => a + (e?.price || 0), 0) : 0;
 }
 
+/**
+ * Extra scelti dall'ospite nel check-in online: input NON fidato (POST anonimo). Si accettano SOLO extra attivi del catalogo della struttura, riconosciuti per id
+ * (extraId/id) oppure per nome (anche con il suffisso " ×2" che aggiunge la pagina); nome e prezzo vengono dal server (prezzo unitario del catalogo × quantità,
+ * con la stessa regola a notte/a persona/a soggiorno del resto dell'app), mai dal client. Quantità intera 1-20 (e non oltre il maxQty del catalogo),
+ * prezzo sempre >= 0, nessun doppione nella richiesta né rispetto agli extra già presenti sulla prenotazione.
+ */
+export function sanitizeChosenExtras(
+  raw: unknown, catalog: ExtraService[] | undefined,
+  stay: { checkIn: string; checkOut: string; adults: number },
+  existing: { name?: unknown; extraId?: unknown }[] = [],
+): { name: string; price: number; extraId: string; qty: number }[] {
+  const out: { name: string; price: number; extraId: string; qty: number }[] = [];
+  if (!Array.isArray(raw)) return out;
+  const cat = (catalog ?? []).filter((e) => e && typeof e.id === "string" && typeof e.name === "string" && isActive(e) && Number.isFinite(e.price) && e.price >= 0);
+  const taken = new Set<string>();
+  for (const it of raw.slice(0, 50)) {
+    if (!it || typeof it !== "object") continue;
+    const r = it as Record<string, unknown>;
+    const id = typeof r.extraId === "string" ? r.extraId : typeof r.id === "string" ? r.id : "";
+    const rawName = typeof r.name === "string" ? r.name : "";
+    const suffix = /\s×\s?(\d+)$/u.exec(rawName);
+    const base = rawName.replace(/\s×\s?\d+$/u, "").trim().toLowerCase();
+    const ex = (id ? cat.find((e) => e.id === id) : undefined) ?? (base ? cat.find((e) => e.name.trim().toLowerCase() === base) : undefined);
+    if (!ex || taken.has(ex.id)) continue;
+    const q0 = Number(r.qty ?? suffix?.[1] ?? 1);
+    if (!Number.isFinite(q0)) continue;
+    const q = Math.min(20, Math.max(1, Math.round(ex.maxQty ?? 20)), Math.round(q0));
+    if (q < 1) continue;
+    if (existing.some((x) => entryMatches({ name: typeof x.name === "string" ? x.name : "", price: 0, extraId: typeof x.extraId === "string" ? x.extraId : undefined }, ex))) continue;
+    taken.add(ex.id);
+    out.push({ name: entryName(ex.name, q), price: Math.round(unitAmount(ex, stay) * q * 100) / 100, extraId: ex.id, qty: q });
+  }
+  return out;
+}
+
 // Totale "quanto paga l'ospite". Se non c'è un prezzo soggiorno (total), ritorna 0.
 export function bookingGrandTotal(b: BookingLike, structure: Structure | undefined): number {
   const acc = b.total ?? 0;
   if (!acc) return 0;
   const clean = b.cleaningFee ?? 0;
-  const share = b.id ? groupTaxShares.get(b.id) : undefined; // camera di un gruppo: quota della tassa del gruppo
-  const tax = share !== undefined ? share : cityTaxOf(structure, cityTaxPayers(structure, b), nights(b.checkIn, b.checkOut), acc, b.cityTaxExempt);
+  const tax = cityTaxOfBooking(structure, b); // quota di gruppo se è una camera di gruppo; altrimenti paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti
   return acc + clean + bookingExtrasTotal(b) + tax;
 }
 
@@ -227,8 +264,13 @@ export function revenueInRange(b: NightlyBookingLike, from: string, to: string):
   const e = b.checkOut < to ? b.checkOut : to;
   if (e <= s) return 0;
   if (b.nightlyRates) {
+    // Notti senza tariffa dell'OTA (soggiorno prolungato a mano, total aumentato dopo l'import): si spartisce su di esse
+    // quanto il totale ha in più rispetto alle notti note, invece di contarle 0.
+    let known = 0, missing = 0;
+    for (let d = b.checkIn; d < b.checkOut; d = shiftISO(d, 1)) { const r = b.nightlyRates[d]; if (typeof r === "number" && Number.isFinite(r)) known += r; else missing++; }
+    const fill = missing > 0 ? Math.max(0, (b.total ?? 0) - known) / missing : 0;
     let sum = 0;
-    for (let d = s; d < e; d = shiftISO(d, 1)) sum += b.nightlyRates[d] ?? 0;
+    for (let d = s; d < e; d = shiftISO(d, 1)) { const r = b.nightlyRates[d]; sum += typeof r === "number" && Number.isFinite(r) ? r : fill; }
     return sum;
   }
   const totalNights = Math.max(1, nights(b.checkIn, b.checkOut));

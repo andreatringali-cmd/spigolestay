@@ -60,7 +60,17 @@ const Badge = ({ children, tone }: { children: React.ReactNode; tone?: "auto" | 
   >{children}</span>
 );
 
-function Actions({ phone, mapUrl, tel, waUrl }: { phone?: string | null; mapUrl: string; tel: string; waUrl: string }) {
+// Solo link http(s): un indirizzo tipo "javascript:…" non deve mai finire in un href. Senza schema si presume https.
+function safeHttpUrl(u?: string | null): string {
+  const v = (u ?? "").trim();
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return ""; // altro schema (javascript:, data:…)
+  return "https://" + v.replace(/^\/+/, "");
+}
+
+function Actions({ phone, mapUrl: rawMapUrl, tel, waUrl }: { phone?: string | null; mapUrl: string; tel: string; waUrl: string }) {
+  const mapUrl = safeHttpUrl(rawMapUrl);
   if (!mapUrl && !phone) return null;
   const cls = "rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash";
   return (
@@ -209,7 +219,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
   const payload = (d: Draft) => ({
     category: d.category, lang: d.lang, field_type: d.field_type, auto_source: d.field_type === "auto" ? d.auto_source : null,
     title: d.title.trim(), body: d.body.trim(),
-    phone: d.phone.trim() || null, address: d.address.trim() || null, map_url: d.map_url.trim() || null,
+    phone: d.phone.trim() || null, address: d.address.trim() || null, map_url: safeHttpUrl(d.map_url) || null,
     sort_order: Number.isFinite(parseInt(d.sort_order, 10)) ? parseInt(d.sort_order, 10) : 0,
   });
 
@@ -243,7 +253,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
     setErr("");
     const { error } = await supabase.from("concierge_entries").insert({
       level: e.level, property_id: e.property_id, category: e.category, field_type: e.field_type, auto_source: e.auto_source,
-      title: e.title, body: e.body, lang: other, sort_order: e.sort_order, phone: e.phone ?? null, address: e.address ?? null, map_url: e.map_url ?? null,
+      title: e.title, body: e.body, lang: other, sort_order: e.sort_order, phone: e.phone ?? null, address: e.address ?? null, map_url: safeHttpUrl(e.map_url) || null,
     });
     if (error) { setErr(`Duplicazione non riuscita: ${error.message}`); return; }
     await load();

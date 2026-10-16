@@ -3,6 +3,7 @@
 import { POOL_KEY, parsePool } from "@/lib/inventory-pool";
 import { RATEMODEL_KEY, parseRateModel } from "@/lib/rate-model";
 import { useEffect, useRef } from "react";
+import { weekendPctFromRaw } from "@/lib/pricing";
 import { useData } from "@/lib/store";
 import { liveSingleDiscounts, hasPersonPlan } from "@/lib/person-plan";
 import { ensurePersonPlan, personPlanMother } from "@/lib/person-plan-client";
@@ -108,8 +109,8 @@ export default function ChannexAutoSync() {
         if (await refreshChannexMap(hasLinkedStructures(chxMap) ? 6 * 60 * 60 * 1000 : 5 * 60 * 1000)) chxMap = readChannexMap();
         const linked = Object.entries(chxMap).filter(([, m]) => m?.propertyId && m?.rooms);
         if (linked.length === 0) return; // nessuna struttura collegata a Channex
-        let weekendPct = 25;
-        try { weekendPct = JSON.parse(localStorage.getItem("spigolestay:pricerules") || "{}").weekendPct ?? 25; } catch {}
+        // % weekend effettiva (rispetta l'interruttore "weekend spento" come il Calendario); le regole per struttura le applica poi buildAriPayload.
+        const weekendPct = weekendPctFromRaw(localStorage.getItem("spigolestay:pricerules"));
         let closes: Record<string, number> = {};
         try { closes = JSON.parse(localStorage.getItem(CLOSES_KEY) || "{}"); } catch {}
         // Restrizioni OTA impostate dall'owner (chiuso all'arrivo / alla partenza), fuori dallo stato condiviso.

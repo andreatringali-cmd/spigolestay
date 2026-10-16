@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 import { findBookingStore, writeBookingPatch } from "@/lib/manage-booking";
 import { fmtDMY } from "@/lib/dates";
 
@@ -18,6 +20,7 @@ export async function POST(req: Request) {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
+  if (rateLimited("mbm:" + clientIp(req), 20, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
   try {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();

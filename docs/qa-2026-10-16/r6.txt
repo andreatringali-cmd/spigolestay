@@ -1,0 +1,71 @@
+Ho trovato 12 problemi nel perimetro, tutti verificati leggendo il codice. Sui punti 1, 2 e 4 ho verificato il comportamento con ragionamento sul codice e, per il punto 4, anche con una prova su funzione pura. Non ho modificato file né toccato il database. Ho creato un test temporaneo e l'ho rimosso: `git status` è pulito.
+
+**1. [ALTA] src/components/CalendarGrid.tsx:378-381 (e 353) — Maggiorazione weekend applicata due volte nella modale "Modifica tariffa"**
+- Scenario: base 100, weekend +25%. Seleziono 15 giorni con dei weekend dentro, modalità "Variazione %" +10, e lascio la spunta weekend attiva (è già attiva di default). `rateFor()` contiene già il +25% del sabato (125), il +10% dà 138, poi `saveRate` moltiplica ancora ×1,25: il sabato diventa 172 invece di 138.
+- Stesso difetto in modalità "Importo fisso": se il primo giorno selezionato è sabato o domenica, il valore proposto è già 125, e premendo Applica senza toccare nulla il weekend diventa 156.
+- L'anteprima della modale parte dal primo giorno e non mostra il valore realmente scritto.
+- Effetto: override giornalieri sbagliati, che poi partono verso Channex.
+- Correzione: in modalità % non applicare `weekendBoost`. In modalità fissa proporre come valore di partenza il prezzo feriale (senza maggiorazione).
+
+**2. [ALTA] src/app/(app)/camere/tipologia/[id]/page.tsx:80-86 e src/app/(app)/tariffe-derivate/page.tsx:495 (cascata in src/lib/store.tsx:489-513) — Eliminare una tipologia o una derivata cancella prenotazioni, anche pagate, senza avviso**
+- Scenario A: "Matrimoniale" non ha prenotazioni, ma la sua derivata "Matrimoniale · Non rimb." ne ha 5 (`roomTypeId` = id della derivata, create da `prenotazioni/nuova`). La guardia conta solo le prenotazioni della tipologia madre e delle sue camere, quindi lascia eliminare. `deleteRoomType` toglie anche le derivate e tutte le loro prenotazioni, con le lapidi.
+- Scenario B: nella modale della derivata, "Elimina" chiede solo `Eliminare "X"?`. Cancella tutte le prenotazioni con quel `roomTypeId`, passate e incassate comprese.
+- Effetto: perdita di storico e incassi, Cassa e statistiche alterate.
+- Correzione: contare nella guardia anche i discendenti (usare la stessa logica di cascata dello store) e applicare lo stesso blocco alla modale della derivata.
+
+**3. [ALTA] src/components/CalendarGrid.tsx:648, 660, 672 — La Disponibilità e l'Occupazione del Calendario contano le prenotazioni annullate e ignorano quelle senza camera**
+- Il filtro è `b.unitId && … checkIn<=iso<checkOut`, senza controllare lo stato. Le barre invece escludono le annullate (riga 833), e `buildAriPayload` (`src/lib/channex-ari.ts:71`) le esclude e conta anche le prenotazioni senza camera sulla loro tipologia.
+- Scenario: tipologia con 2 camere, una prenotazione annullata con `unitId` ancora valorizzato. Il Calendario mostra "1" (o "0" con i doppioni Octorate annullati dall'healer, che conservano la camera), mentre a Channex partono 2. L'occupazione media, il Copilota e il KPI sono gonfiati. Una prenotazione senza camera sposta la differenza nell'altro verso.
+- Effetto: numeri diversi tra schermo e portali, vendite chiuse a mano per errore.
+- Correzione: filtrare `status !== "cancelled"` e contare le prenotazioni senza camera per `roomTypeId`, come in `buildAriPayload` (o riusare `poolOccupancy` anche senza gruppo).
+
+**4. [ALTA] src/components/ChannexAutoSync.tsx:112 — I prezzi inviati ai portali ignorano l'interruttore "weekend spento"**
+- La riga legge `JSON.parse(pricerules).weekendPct ?? 25` e scarta `weekendOn:false`. Il Calendario usa `loadWeekendPct()`, che in quel caso dà 0.
+- Scenario: in Tariffe con "Tutte le strutture" spengo la maggiorazione weekend (resta `weekendPct:25`, `weekendOn:false`) e nessuna struttura ha una regola propria. Il Calendario mostra 100 anche il sabato, a Channex partono 125. Stessa lettura grezza in `prenotazioni/nuova/page.tsx:31`, `NewBookingModal.tsx:19`, `prenota/page.tsx:78`, `api/metasearch/feed/[slug]/route.ts:96`.
+- Effetto: prezzi sulle OTA diversi da quelli del Calendario.
+- Correzione: usare `weekendPctFromRaw(raw)` al posto della lettura grezza.
+
+**5. [MEDIA] src/components/CalendarGrid.tsx:1737 e 1773 (data svuotabile con "Cancella"), 402-407 — Schermata di errore e evento con date vuote**
+- Nella modale "Modifica tariffa", "Dal"/"Al" usano `DateField`, che ha il pulsante "Cancella" e restituisce `""`.
+- Scenario: apro Dal e premo "Cancella". `futureIsos` restituisce `[]`, `sample` è `undefined`, e il render chiama `rateFor(typeId, undefined)`, che arriva a `parseISO(undefined).split` e lancia un `TypeError`. L'utente vede la pagina di errore.
+- Stesso difetto nell'editor evento: `saveEvent` controlla solo il nome. Un evento con `from:""` viene salvato e `from <= iso` è vero per ogni giorno, quindi colora tutta l'intestazione fino a `to`.
+- Correzione: ignorare `v === ""` nei campi data della modale tariffa e dell'evento (come già fa `availEdit`), oppure disabilitare "Applica" senza giorni validi.
+
+**6. [MEDIA] src/lib/overlaps.ts:50 — "Sistema le sovrapposizioni" ignora la capienza della camera**
+- `planOverlapFix` sceglie la prima camera libera della struttura ordinando solo per stessa tipologia, senza controllare `adults+children` contro `rt.beds`. Il trascinamento invece lo vieta (`validate`, CalendarGrid:527).
+- Scenario: una prenotazione da 4 persone che perde la camera viene spostata automaticamente in una Singola da 2 posti, senza avviso.
+- Correzione: aggiungere ai candidati `pax <= beds` (o `maxOccupancy`) e, se nessuno basta, mandare la prenotazione in "Da assegnare".
+
+**7. [MEDIA] src/lib/store.tsx:569-576 (usato da src/app/(app)/importa/page.tsx:469) — Codici prenotazione duplicati nelle creazioni in sequenza**
+- `maxN` si calcola sulla chiusura `bookings`, cioè lo stato di quel render. Più `addBooking` nello stesso gestore ricevono lo stesso `maxN`.
+- Scenario: importo 30 righe CSV senza colonna "code": tutte prendono `XEN-2026-0042`. Succede anche per le camere dei gruppi, dove forse è voluto.
+- Effetto: codici non univoci in ricerca, email e documenti.
+- Correzione: tenere un contatore in un `useRef` incrementato a ogni chiamata (oppure passare `code` esplicito dall'import).
+
+**8. [MEDIA] src/lib/store.tsx:518 (con la fusione in src/lib/authsync.tsx, `merge3`) — Eliminare una camera lascia prenotazioni orfane sugli altri dispositivi**
+- `deleteUnit` mette `unitId:null` sulle prenotazioni ma non aggiorna `updatedAt`. Nel merge `s && tsOf(s) > tsOf(it) ? s : it` il pareggio vince il locale.
+- Scenario: il titolare elimina la camera 3, Greta ha lo stato precedente. Al suo prossimo sync tiene `unitId` della camera 3, che è tombstonata e quindi sparisce. Le prenotazioni risultano assegnate a una camera inesistente, non compaiono né in nessuna riga né in "Da assegnare", e Greta le riscrive sul server.
+- Correzione: in `deleteUnit` aggiungere `updatedAt: Date.now()` alle prenotazioni modificate.
+
+**9. [MEDIA] src/app/(app)/tariffe/page.tsx:150 con src/lib/store.tsx:462 — Il prezzo base viene salvato a ogni tasto**
+- `updateRoomType` parte a ogni `onChange` e `logAct` crea una voce con suono a ogni cambio. Scrivere "150" sopra "100" produce tre voci (€1, €15, €150) e tre suoni.
+- Se svuoto il campo (`""` diventa 0) e mi fermo più di 4 s, `ChannexAutoSync` può inviare prezzo 0 o 1 alle OTA.
+- Correzione: salvare su `onBlur` o con debounce, usando un valore locale mentre si digita.
+
+**10. [MEDIA, da verificare l'intento] src/components/CalendarGrid.tsx:1575-1588, 353, 387, 666 — Vista "Compatta" unisce per nome le tipologie di strutture diverse**
+- Il raggruppamento è per `rt.name` su tutte le strutture visibili. Con la vista Compatta salvata, modificare la tariffa di "Matrimoniale" scrive gli override su tutte le tipologie omonime, comprese quelle di un'altra struttura.
+- La cella mostra solo il prezzo della prima tipologia (`typeIds[0]`). "Ripristina base" cancella solo la prima.
+- Scenario: House a 80, Rooms a 120, imposto 100 in Compatta, e anche Rooms passa a 100. Il Gruppo (disponibilità condivisa) è un'altra funzione.
+- Da verificare: se l'unione è voluta per le sole strutture del gruppo. Per le altre, limitare l'unione alle strutture nel gruppo o alla stessa struttura. In ogni caso `resetRate` deve ripulire tutti i membri.
+
+**11. [BASSA] src/components/CalendarGrid.tsx:709 e 583-587 — I blocchi "fuori servizio" sono trattati come notti libere o spostabili**
+- I "Buchi da riempire" escludono `channel:"blocked"`, quindi A termina lunedì, blocco lunedì-martedì, B arriva mercoledì: viene proposto un "buco di 2 notti" e il Copilota suggerisce −15%.
+- `validate` non controlla i blocchi: trascinare una barra "Fuori servizio" su "Da assegnare" chiama `updateBooking(id,{unitId:null})`. La camera torna vendibile e il blocco diventa una prenotazione dashed chiamata "Ospite".
+- Correzione: contare i blocchi come occupazione nei buchi e rifiutare il drop dei blocchi su "Da assegnare".
+
+**12. [BASSA] Incoerenze di etichette e regole**
+- src/components/CalendarGrid.tsx:527-528: il drag controlla `pax > rt.beds`, mentre nuova prenotazione usa `maxOccupancy ?? beds` (`prenotazioni/nuova/page.tsx`). Con 3 ospiti in una camera 2 posti più un letto extra il Calendario rifiuta "Max 2 posti" e la nuova prenotazione accetta.
+- src/components/CalendarGrid.tsx:1765 e src/app/(app)/tariffe/page.tsx:305: le etichette dicono "ven/sab/dom", ma `isWeekend` vale solo sabato e domenica.
+- src/app/(app)/piani-tariffari/page.tsx:247 e 312: il pulsante "Nessuna" imposta `roomTypeIds=[]`, che `allSelected` interpreta come "tutte". Il piano resta applicato a tutte le tipologie e le spunte si riaccendono. Correzione: distinguere `undefined` (tutte) da `[]` (nessuna).
+
+Controllati e senza problemi: `booking-heal.ts`, `_modello.ts`, `_dettaglio.tsx`, `_giorni.tsx`, `_libere.tsx` e `disponibilita-gruppo/page.tsx` (nessun difetto che avrei potuto dimostrare). Ho escluso un sospetto: i prezzi delle tariffe derivate verso Channex divergono dal Calendario, ma Canali mappa solo le tipologie non derivate, quindi non si presenta.

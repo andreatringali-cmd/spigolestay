@@ -1,0 +1,33 @@
+Ho corretto tutte le segnalazioni assegnate tranne due che ho chiuso solo in parte (r6 #12, r7 #3). `npx tsc --noEmit` dà un solo errore, in `src/lib/booking.ts:160`, file di un altro agente. Tutti i test passano (1114 su 1118, gli altri 4 sono "todo" di altri file). Ho aggiunto test per `planOverlapFix` (capienza) e per la cascata di eliminazione.
+
+**r6**
+- **#1 FATTO** (`CalendarGrid.tsx`). Il weekend non si applica più nella modalità "Variazione %", perché il prezzo di partenza lo contiene già. In "Importo fisso" si parte dal prezzo feriale quando l'intervallo ha più giorni e contiene dei weekend. Con un solo giorno non si applica la maggiorazione, perché la spunta non è visibile. Passando da % a fisso il valore viene rigenerato (prima restava "10").
+- **#2 FATTO** (`camere/tipologia/[id]/page.tsx`, `tariffe-derivate/page.tsx`, `pricing.ts`, `store.tsx`). Ho aggiunto in `pricing.ts` due funzioni, `roomTypeCascadeIds` e `bookingsLostWithRoomType`, e lo store ora usa la prima. Le guardie sulla tipologia e sulle derivate (vista mappa e modale) contano anche le prenotazioni dei discendenti e bloccano con un avviso.
+- **#3 FATTO** (`CalendarGrid.tsx`). Disponibilità e Occupazione escludono le annullate e contano le senza camera per tipologia, come `buildAriPayload`. Nell'occupazione il valore è limitato al 100%.
+- **#4 FATTO** (`ChannexAutoSync.tsx`, `metasearch/feed/[slug]/route.ts`, `prenota/page.tsx`).
+  - Ora si usa `weekendPctFromRaw` / `loadWeekendPct`.
+  - Nel feed il prezzo viene da `rateForDay`. Prima anche il venerdì contava come weekend.
+  - Nel feed ho tolto anche una variabile non più usata.
+- **#5 FATTO** (`CalendarGrid.tsx`). I valori vuoti dei campi data vengono ignorati nella modale tariffa e nell'editor evento. "Applica" è disabilitato senza giorni validi. `saveEvent` richiede date valide con "Al" dopo "Dal".
+- **#6 FATTO** (`overlaps.ts`). La camera di destinazione deve avere posto per `adults + children`. La capienza è `maxOccupancy ?? beds`, e se nessuna basta la prenotazione va in "Da assegnare".
+- **#8 FATTO** (`store.tsx`). `deleteUnit` aggiorna `updatedAt` delle prenotazioni toccate.
+- **#9 FATTO** (`tariffe/page.tsx`). Il prezzo base si salva all'uscita dal campo o con Invio. Un campo vuoto non salva mai e torna al valore precedente, quindi niente log né suoni a ogni tasto e niente prezzo 0.
+- **#12 (solo "Nessuna") FATTO IN PARTE** (`piani-tariffari/page.tsx`).
+  - Ora `undefined` significa tutte e `[]` nessuna scelta.
+  - "Nessuna" parte da zero e "Salva" resta disabilitato con `[]`.
+  - Un piano già salvato con `[]` si riapre come "tutte".
+  - Il motore `planApplies` in `src/lib/rate-plans.ts:44` tratta ancora `[]` come tutte: ho evitato di salvare `[]`, ma una vera semantica "nessuna" richiede una modifica a quel file, fuori perimetro.
+
+**r7**
+- **#3 FATTO** (`prenota/page.tsx`). Prezzi con `rateForDay` e il suo `weekendPct`: valgono l'override della madre per le derivate, il weekend su sabato e domenica e l'interruttore "weekend spento". Poi si applica lo sconto del piano.
+- **Codice prenotazione FATTO.** Ora è `SPG-aaaa-` più 8 caratteri casuali generati con `crypto.getRandomValues`, senza 0, O, 1, I.
+- **Date in UTC FATTO.** Si usano `shiftISO` e `toISO` di `lib/dates.ts`.
+- **Stripe nell'embed FATTO.** In modalità embed si naviga la finestra principale (`window.top`, poi `_top`, poi il fallback precedente).
+- **Conferma senza incasso FATTO.** Se la prenotazione è registrata senza pagamento online, la schermata di conferma e il PDF non dicono più "Acconto pagato" e il saldo è l'intero totale. Non ho toccato la parte sugli extra di esempio, come da istruzioni.
+
+**Rischi e decisioni per Andrea**
+- **Riconoscimento "Sito":** `src/lib/direct-origin.ts:37` riconosce l'origine "Sito" dai codici `SPG-aaaa-<solo cifre>`. I nuovi codici alfanumerici non passano da quella regola, ma restano riconosciuti dalla nota "Sito diretto ·", da `extId` e dal piano tariffario. Una piccola modifica a quella regex eviterebbe dubbi.
+- **Dopo il pagamento Stripe:** il `success_url` di `api/stripe/book` non porta `embed=1`, quindi dopo il pagamento l'ospite torna sulla pagina `/prenota` intera, non nell'iframe. È in un file fuori perimetro.
+- **Capienza:** il trascinamento nel calendario usa `rt.beds`, mentre "Sistema le sovrapposizioni" ora usa `maxOccupancy ?? beds`, come la nuova prenotazione. Se si vuole un solo criterio, è la decisione aperta della r6 #12.
+- **Nuovi prezzi pubblici:** il motore pubblico /prenota e il feed Meta Search ora danno un prezzo diverso dal precedente in due casi. Il venerdì non è più weekend. Le derivate seguono il prezzo giornaliero della madre. Il prezzo è quindi uguale a quello del Calendario.
+- **Fine riga:** alcuni file hanno righe miste CRLF/LF (`CalendarGrid.tsx` ora è tutto LF). Git normalizza, non c'è impatto sul diff.

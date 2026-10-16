@@ -7,16 +7,17 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE } from "@/lib/plans";
+import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE, trialInfo, type TrialInfo } from "@/lib/plans";
 import QRCode from "qrcode";
 import { supabase } from "@/lib/supabase";
 
 export default function AbbonamentoPage() {
   const { t } = useLang();
-  const { units, structures } = useData();
+  // Il piano si calcola su TUTTE le strutture e camere dell'account, non su quelle filtrate dalla selezione in alto (con 2+ strutture scelte le liste del contesto sono ridotte).
+  const { allStructures, raw } = useData();
   const { user } = useAuth();
-  const rooms = units.filter((u) => !u.outOfService).length;
-  const nStruct = Math.max(1, structures.length);
+  const rooms = raw.units.filter((u) => !u.outOfService).length;
+  const nStruct = Math.max(1, allStructures.length);
 
   const [selectedTier, setSelectedTier] = useState<string>("basic");
   const [annual, setAnnual] = useState(false);
@@ -99,6 +100,8 @@ export default function AbbonamentoPage() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hasRealSub, setHasRealSub] = useState(false); // abbonamento Stripe REALE attivo (non solo il flag locale)
+  const [trial, setTrial] = useState<TrialInfo | null>(null);
+  useEffect(() => { try { setTrial(trialInfo()); } catch { /* storage non disponibile */ } }, []);
   // Form di contatto per il piano "Su misura".
   const [contactOpen, setContactOpen] = useState(false);
   const [contactState, setContactState] = useState<"idle" | "sending" | "sent" | "err">("idle");
@@ -470,7 +473,8 @@ export default function AbbonamentoPage() {
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-display text-base font-bold text-txt">{tier.name}{isCustom ? ` ${t("personalizzato")}` : ""}{annual ? ` · ${t("annuale")}` : ` · ${t("mensile")}`}</span>
               {isCustom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
-              <span className="text-[11px] text-dim">· {t("Prossimo rinnovo")}: <b className="font-semibold text-txt">{(() => { const d = new Date(); if (annual) d.setFullYear(d.getFullYear() + 1); else d.setMonth(d.getMonth() + 1, 1); return fmtDate(d); })()}</b></span>
+              {/* Una data di rinnovo calcolata a mano sarebbe inventata: durante la prova si mostra la data della prima fattura, con un abbonamento reale il rinnovo è nel portale pagamenti. */}
+              {trial?.inTrial ? <span className="text-[11px] text-dim">· {t("Prima fattura")}: <b className="font-semibold text-txt">{fmtDate(trial.firstInvoice)}</b></span> : hasRealSub ? <span className="text-[11px] text-dim">· {t("Data di rinnovo: nel portale pagamenti")}</span> : null}
             </div>
             {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
           </div>
@@ -510,12 +514,12 @@ export default function AbbonamentoPage() {
               </div>
               <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
                 <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
-                <span>{hasRealSub ? t("Hai già una carta salvata: il nuovo piano si attiva dal prossimo rinnovo, senza nuovo pagamento. L'addebito aggiornato parte dal prossimo mese.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
+                <span>{hasRealSub ? t("Hai già un abbonamento attivo: il cambio di piano non è automatico, perché l'addebito si modifica solo su Stripe. Contatta il supporto (sales@xenora.app) indicando il piano desiderato, oppure gestisci l'abbonamento dal portale pagamenti. Finché non è confermato, i moduli del tuo piano non cambiano.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
-              <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
+              {!hasRealSub && <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>}
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { choose(k); setPendingTier(null); setNotice(`${t("Piano aggiornato a")} ${pt.name} — ${t("attivo dal prossimo rinnovo, senza nuovo pagamento (usiamo la carta salvata).")}`); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Conferma cambio") : t("Vai al pagamento"))}</button>
+                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</button>
               </div>
             </div>
           </div>

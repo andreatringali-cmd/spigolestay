@@ -15,10 +15,11 @@ import { contactReportCached } from "@/lib/contacts-check";
 import { guestLangOf } from "@/lib/guest-lang";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
+import { type Promo, loadPromos, promosForStructure, promoMailto, promoRecipientEmail } from "@/lib/promos";
 import { useEffect } from "react";
 import MediaImg from "@/components/MediaImg";
 import MediaLink from "@/components/MediaLink";
+import { DIAL_CODES, parsePhone, combinePhone } from "../_phone";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -26,30 +27,6 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
   return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
 }
 const nights = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
-
-// Prefissi internazionali: il numero va salvato in formato internazionale (+39 …),
-// altrimenti WhatsApp (wa.me) non riconosce il numero e il link non si apre.
-const DIAL_CODES: [string, string][] = [
-  ["+39", "🇮🇹 Italia"], ["+41", "🇨🇭 Svizzera"], ["+44", "🇬🇧 Regno Unito"], ["+33", "🇫🇷 Francia"],
-  ["+49", "🇩🇪 Germania"], ["+34", "🇪🇸 Spagna"], ["+43", "🇦🇹 Austria"], ["+32", "🇧🇪 Belgio"],
-  ["+31", "🇳🇱 Paesi Bassi"], ["+351", "🇵🇹 Portogallo"], ["+353", "🇮🇪 Irlanda"], ["+30", "🇬🇷 Grecia"],
-  ["+45", "🇩🇰 Danimarca"], ["+46", "🇸🇪 Svezia"], ["+47", "🇳🇴 Norvegia"], ["+358", "🇫🇮 Finlandia"],
-  ["+48", "🇵🇱 Polonia"], ["+420", "🇨🇿 Rep. Ceca"], ["+36", "🇭🇺 Ungheria"], ["+40", "🇷🇴 Romania"],
-  ["+1", "🇺🇸 USA / Canada"], ["+7", "🇷🇺 Russia"], ["+380", "🇺🇦 Ucraina"], ["+90", "🇹🇷 Turchia"],
-  ["+61", "🇦🇺 Australia"], ["+81", "🇯🇵 Giappone"], ["+86", "🇨🇳 Cina"], ["+55", "🇧🇷 Brasile"],
-];
-const DIALS_BY_LEN = DIAL_CODES.map((d) => d[0]).sort((a, b) => b.length - a.length);
-function parsePhone(raw?: string): { dial: string; local: string } {
-  const s = (raw ?? "").trim();
-  if (!s) return { dial: "+39", local: "" };
-  const norm = s.startsWith("00") ? "+" + s.slice(2) : s;
-  if (norm.startsWith("+")) {
-    for (const d of DIALS_BY_LEN) if (norm.startsWith(d)) return { dial: d, local: norm.slice(d.length).trim() };
-    return { dial: "+39", local: norm.replace(/^\+/, "").trim() };
-  }
-  return { dial: "+39", local: s };
-}
-const combinePhone = (dial: string, local: string) => { const loc = local.trim(); return loc ? `${dial} ${loc}` : ""; };
 
 // Esito del controllo sotto il campo: cosa non va, o conferma che va bene. "Usa…" applica la correzione proposta.
 function Hint({ tone, children, action }: { tone: "ok" | "warn" | "err" | "dim"; children: React.ReactNode; action?: { label: string; onClick: () => void } }) {
@@ -75,12 +52,12 @@ export default function OspiteSchedaPage() {
   const set = <K extends keyof Guest>(k: K, v: Guest[K]) => setG((p) => ({ ...p, [k]: v }));
   const cr = contactReportCached({ phone: g.phone, email: g.email, country: g.country }); // controllo di telefono ed email mentre si scrive
   // Telefono scomposto in prefisso + numero; salvo sempre il formato internazionale in g.phone.
-  const [dial, setDial] = useState(() => parsePhone(existing?.phone).dial);
-  const [localPhone, setLocalPhone] = useState(() => parsePhone(existing?.phone).local);
+  const [dial, setDial] = useState(() => parsePhone(existing?.phone, existing?.country).dial);
+  const [localPhone, setLocalPhone] = useState(() => parsePhone(existing?.phone, existing?.country).local);
   const setDialCode = (d: string) => { setDial(d); set("phone", combinePhone(d, localPhone)); };
   const setLocalPhoneVal = (v: string) => { setLocalPhone(v); set("phone", combinePhone(dial, v)); };
   // All'apertura normalizza un numero già salvato senza prefisso (così il link WhatsApp funziona).
-  useEffect(() => { const p = parsePhone(existing?.phone); const c = combinePhone(p.dial, p.local); if (c && c !== existing?.phone) set("phone", c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { const p = parsePhone(existing?.phone, existing?.country); const c = combinePhone(p.dial, p.local); if (c && c !== existing?.phone) set("phone", c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   // Se i dati arrivano DOPO il primo render (store non ancora idratato, o sync in corso — es.
   // self check-in appena completato dall'ospite), la scheda ricarica dai dati freschi. Il
   // guard precedente confrontava solo g.id === existing.id: siccome g parte già inizializzato
@@ -96,7 +73,7 @@ export default function OspiteSchedaPage() {
     if (loadedVersionRef.current === version) return;
     loadedVersionRef.current = version;
     setG(withSplitNames(existing));
-    const p = parsePhone(existing.phone); setDial(p.dial); setLocalPhone(p.local);
+    const p = parsePhone(existing.phone, existing.country); setDial(p.dial); setLocalPhone(p.local);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing, isNew]);
   const toggleTag = (t: string) => setG((p) => { const cur = p.tags ?? []; return { ...p, tags: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] }; });
@@ -117,7 +94,8 @@ export default function OspiteSchedaPage() {
   useEffect(() => { setPromos(promosForStructure(loadPromos(), activeStructureId)); }, [activeStructureId]);
   const lastSt = stays[0] ? getStructure(stays[0].structureId) : undefined;
   const sendPromo = (p: Promo) => {
-    if (g.email) { const contatti = [lastSt?.phone, lastSt?.email, lastSt?.website].filter(Boolean).join(" · "); window.open(promoMailto([g.email], p, { nome: g.firstName, struttura: lastSt?.name, contatti }), "_blank"); }
+    const to = promoRecipientEmail(g); // solo email vera + consenso marketing / newsletter
+    if (to) { const contatti = [lastSt?.phone, lastSt?.email, lastSt?.website].filter(Boolean).join(" · "); window.open(promoMailto([to], p, { nome: g.firstName, struttura: lastSt?.name, contatti }), "_blank"); }
     setPickPromo(false);
   };
 
@@ -171,7 +149,7 @@ export default function OspiteSchedaPage() {
         subtitle={isNew ? t("Aggiungi un'anagrafica ospite") : `${fullName}${g.country ? ` · ${g.country}` : ""}`}
         actions={
           <div className="flex items-center gap-2">
-            {!isNew && g.email && <button onClick={() => setPickPromo(true)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">✉ {t("Invia promo")}</button>}
+            {!isNew && g.email && <button onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash disabled:opacity-40">✉ {t("Invia promo")}</button>}
             {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea ospite") : t("Salva")}</button>
@@ -230,6 +208,7 @@ export default function OspiteSchedaPage() {
               <label className={`${lbl} col-span-2`}>{t("Telefono")} <span className="font-normal text-faint">· {t("prefisso + numero (serve a WhatsApp)")}</span>
                 <div className="mt-1 flex gap-1.5">
                   <select value={dial} onChange={(e) => setDialCode(e.target.value)} className="w-[7.5rem] shrink-0 rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+                    <option value="">{t("Altro (numero completo)")}</option>
                     {DIAL_CODES.map(([code, label]) => <option key={code} value={code}>{label} {code}</option>)}
                   </select>
                   <input value={localPhone} onChange={(e) => setLocalPhoneVal(e.target.value)} inputMode="tel" className={inp} placeholder="333 1234567" />
@@ -237,7 +216,7 @@ export default function OspiteSchedaPage() {
                 {cr.phone.status === "ok" && <Hint tone="ok">✓ {t("Numero valido")} · {cr.phone.pretty} · {t("se abbia WhatsApp si vede al primo invio")}</Hint>}
                 {cr.phone.status === "landline" && <Hint tone="warn">{t("Numero fisso: di solito non ha WhatsApp")}</Hint>}
                 {cr.phone.status === "invalid" && (
-                  <Hint tone="err" action={cr.phone.fix ? { label: `${t("Usa")} ${cr.phone.fix.value}`, onClick: () => { const v = cr.phone.fix!.value; set("phone", v); const pp = parsePhone(v); setDial(pp.dial); setLocalPhone(pp.local); } } : undefined}>
+                  <Hint tone="err" action={cr.phone.fix ? { label: `${t("Usa")} ${cr.phone.fix.value}`, onClick: () => { const v = cr.phone.fix!.value; set("phone", v); const pp = parsePhone(v, g.country); setDial(pp.dial); setLocalPhone(pp.local); } } : undefined}>
                     {t("Numero non valido")}: {cr.phone.reason}{cr.phone.fix ? ` · ${cr.phone.fix.reason}` : ""}
                   </Hint>
                 )}

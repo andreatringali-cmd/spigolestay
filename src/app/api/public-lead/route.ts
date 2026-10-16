@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     if (!slug || (!email && !phone)) return NextResponse.json({ error: "bad_request" }, { status: 400 });
     // Lunghezze massime dei campi di testo (un modulo reale non le raggiunge mai) e forma minima dell'email.
     if (slug.length > 80 || firstName.length > 60 || lastName.length > 60 || email.length > 120 || phone.length > 40) return NextResponse.json({ error: "bad_request" }, { status: 400 });
-    if (email && !/^[^s@]+@[^s@]+$/.test(email)) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "bad_request" }, { status: 400 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 

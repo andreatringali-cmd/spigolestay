@@ -28,13 +28,14 @@ export default function MessaggiPage() {
         const th = JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}") as Record<string, { dir: string; ts?: number }[]>;
         const arch = JSON.parse(localStorage.getItem("spigolestay:archived") || "[]") as string[];
         const manual = JSON.parse(localStorage.getItem("spigolestay:manualunread") || "[]") as string[];
-        // Ospiti con prenotazioni nella struttura attiva (con "Tutte" valgono tutti).
-        const inStruct = new Set<string>(); const anyBooking = new Set<string>();
-        for (const b of bookings) { if (b.channel === "blocked") continue; anyBooking.add(b.guestId); if (activeStructureId === "all" || b.structureId === activeStructureId) inStruct.add(b.guestId); }
+        // Ospiti con prenotazioni nella struttura attiva (con "Tutte" valgono tutti). Stessa regola dell'elenco in ConversazioniPanel:
+        // le prenotazioni annullate non legano l'ospite a un'altra struttura (chi ha solo annullate qui resta visibile qui).
+        const activeAny = new Set<string>(); const anyBooking = new Set<string>(); const hereAny = new Set<string>(); const hereActive = new Set<string>();
+        for (const b of bookings) { if (b.channel === "blocked") continue; anyBooking.add(b.guestId); if (b.status !== "cancelled") activeAny.add(b.guestId); if (activeStructureId === "all" || b.structureId === activeStructureId) { hereAny.add(b.guestId); if (b.status !== "cancelled") hereActive.add(b.guestId); } }
         let n = 0;
         for (const gid of Object.keys(th)) {
           if (arch.includes(gid)) continue;
-          if (activeStructureId !== "all" && !inStruct.has(gid) && anyBooking.has(gid)) continue;
+          if (activeStructureId !== "all" && anyBooking.has(gid) && (activeAny.has(gid) ? !hereActive.has(gid) : !hereAny.has(gid))) continue;
           if (manual.includes(gid) || isThreadUnread(gid, th[gid])) n++;
         }
         setUnread(n);
