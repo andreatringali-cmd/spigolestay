@@ -4,15 +4,15 @@
 import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
-import { commissionOf, bookingExtrasTotal } from "./booking";
+import { commissionOf, commissionShareOf, bookingExtrasTotal } from "./booking";
 import { cassaContoFor } from "./pay-method";
 import { shiftISO } from "./dates";
-import { payoutDate, loadPayoutSettings, type PayoutSettingsMap } from "./payouts";
+import { payoutDate, loadPayoutSettings, commissionRuleFor, commissionMonthOf, commissionDateFor, type PayoutSettingsMap } from "./payouts";
 import { roundCents, sumCents } from "./money";
 import { onlineIncasso } from "./online-pay";
 
 export type Kind = "in" | "out";
-export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; bookingStructureId?: string /* struttura della prenotazione da cui nasce (movimenti automatici): serve a non mescolare strutture nei bonifici unici */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */; variable?: boolean /* scadenza a importo variabile: l'importo è una stima */ }
+export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; bookingStructureId?: string /* struttura della prenotazione da cui nasce (movimenti automatici): serve a non mescolare strutture nei bonifici unici */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */; variable?: boolean /* scadenza a importo variabile: l'importo è una stima */; commRefs?: string[] /* commissioni mensili tutte insieme: id delle prenotazioni incluse */ }
 export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string; variable?: boolean /* importo variabile: l'importo è una stima, alla scadenza si registra quello reale */ }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -60,13 +60,37 @@ export const REST_IN_PREFIX = "auto-in-resto-";
 /** Conto della parte NON pagata online: segue la scelta del gestore; senza scelta è quello storico (diretta → contanti), non la carta dedotta dal pagamento online. */
 const restContoFor = (b: Booking, principal: string, validConti: string[]) => cassaContoFor({ ...b, stripePaymentIntent: undefined }, principal, validConti);
 
+/** Id dei movimenti "commissioni mensili tutte insieme": auto-commm-<struttura>-<canale>-<aaaa-mm>. NB: diverso da `auto-comm-` (commissione della singola prenotazione), che non deve combaciare. */
+export const COMM_MONTH_PREFIX = "auto-commm-";
+const MONTHS_IT = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+export const monthNameIT = (ym: string) => `${MONTHS_IT[Number(ym.slice(5, 7)) - 1] ?? ym.slice(5, 7)} ${ym.slice(0, 4)}`;
+
+/**
+ * Commissione di una prenotazione che il portale trattiene "tutte insieme" (modalità mensile): importo, % reale e data della trattenuta.
+ * Serve al registro per mostrarla in forma INFORMATIVA accanto all'incasso; undefined se la struttura/portale non usa la modalità mensile o non c'è commissione.
+ */
+export function monthlyCommissionInfo(b: Booking, payouts: PayoutSettingsMap): { amount: number; pct: number; date: string } | undefined {
+  if (b.status === "cancelled" || b.channel === "blocked") return undefined;
+  const rule = commissionRuleFor(payouts, b.channel, b.structureId);
+  if (!rule) return undefined;
+  const amount = roundCents(commissionOf(b));
+  if (amount <= 0) return undefined;
+  return { amount, pct: commissionShareOf(b), date: commissionDateFor(commissionMonthOf(b), rule.day) };
+}
+
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
+// Commissioni: di norma un movimento per prenotazione, alla data dell'incasso. Se la struttura ha impostato per quel portale "commissioni tutte insieme il giorno N
+// del mese dopo" (PayoutRule.commission), NON c'è più il movimento per prenotazione: c'è UN movimento per (struttura, canale, mese del CHECK-OUT) datato il giorno N
+// del mese successivo, con la somma delle commissioni (ai centesimi) delle prenotazioni non annullate di quel mese. L'incasso resta lordo e invariato.
 // Diretta pagata online (Stripe): la parte pagata online è datata al giorno del pagamento (booking.paidAt), non all'arrivo.
 export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
+  const batches = new Map<string, { structureId: string; channel: Booking["channel"]; ym: string; day: number; items: { id: string; checkOut: string; comm: number }[] }>();
+  const structIds = new Set<string>(); // strutture delle prenotazioni visibili: se più di una, il nome struttura entra nella descrizione delle commissioni mensili
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (active !== "all" && b.structureId !== active) continue;
+    structIds.add(b.structureId);
     const when = payoutDate(b, payouts); // data in cui i soldi arrivano davvero (impostazioni del canale, della struttura della prenotazione)
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
@@ -81,7 +105,25 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
       if (online.rest > 0) out.push({ id: `${REST_IN_PREFIX}${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.rest, conto: restContoFor(b, principal, validConti), auto: true, ref: b.id });
     } else if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
-    if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
+    const mrule = commissionRuleFor(payouts, b.channel, b.structureId);
+    if (mrule) {
+      // commissioni tutte insieme: si accumulano nel movimento del mese di check-out
+      if (comm > 0) {
+        const ym = commissionMonthOf(b);
+        const key = `${b.structureId}|${b.channel}|${ym}`;
+        let bt = batches.get(key);
+        if (!bt) { bt = { structureId: b.structureId, channel: b.channel, ym, day: mrule.day, items: [] }; batches.set(key, bt); }
+        bt.items.push({ id: b.id, checkOut: b.checkOut || b.checkIn, comm });
+      }
+    } else if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
+  }
+  for (const bt of batches.values()) {
+    const amount = sumCents(bt.items.map((i) => i.comm));
+    if (amount <= 0) continue;
+    const items = bt.items.slice().sort((a, b) => (a.checkOut < b.checkOut ? -1 : a.checkOut > b.checkOut ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const stName = structIds.size > 1 ? getStructure(bt.structureId)?.name : undefined;
+    const n = items.length;
+    out.push({ id: `${COMM_MONTH_PREFIX}${bt.structureId}-${bt.channel}-${bt.ym}`, date: commissionDateFor(bt.ym, bt.day), channel: bt.channel, bookingStructureId: bt.structureId, kind: "out", cat: "commissioni", desc: `Commissioni ${CHANNELS[bt.channel].label}${stName ? ` · ${stName}` : ""} · ${monthNameIT(bt.ym)} · ${n} ${n === 1 ? "prenotazione" : "prenotazioni"}`, amount, conto: principal, auto: true, commRefs: items.map((i) => i.id) });
   }
   return out;
 }

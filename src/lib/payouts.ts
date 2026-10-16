@@ -6,11 +6,16 @@ import type { Channel } from "./types";
 import { shiftISO } from "./dates";
 
 export type PayoutMode = "arrival" | "checkout" | "weekly" | "monthly";
+/** Commissioni del portale trattenute TUTTE INSIEME: il giorno `day` (1..28) del mese dopo il mese del check-out (es. Booking.com fattura il 15 le prenotazioni del mese prima). */
+export interface CommissionRule { mode: "monthly"; day: number }
+export const COMMISSION_DEFAULT_DAY = 15;
+export const COMMISSION_MAX_DAY = 28; // fino al 28: esiste in ogni mese, nessun giorno "oltre la fine del mese"
 export interface PayoutRule {
   mode: PayoutMode;
   days?: number;     // checkout: giorni dopo il check-out (0 = il giorno stesso)
   weekday?: number;  // weekly: giorno del bonifico, 0 = domenica … 6 = sabato
   monthDay?: number; // monthly: giorno del mese successivo al check-out in cui arriva il bonifico
+  commission?: CommissionRule; // assente = commissioni "insieme all'incasso" (come sempre); presente = un'unica trattenuta mensile (vedi computeAuto)
 }
 /** Impostazioni di UNA struttura: regola per canale. */
 export type PayoutSettings = Partial<Record<Channel, PayoutRule>>;
@@ -30,7 +35,11 @@ export function cleanRule(r: unknown): PayoutRule {
   const o = (r && typeof r === "object" ? r : {}) as Partial<PayoutRule>;
   const mode: PayoutMode = MODES.includes(o.mode as PayoutMode) ? (o.mode as PayoutMode) : "arrival";
   const int = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : d);
-  return { mode, days: int(o.days, 0, 60, 0), weekday: int(o.weekday, 0, 6, 4), monthDay: int(o.monthDay, 1, 31, 1) };
+  const out: PayoutRule = { mode, days: int(o.days, 0, 60, 0), weekday: int(o.weekday, 0, 6, 4), monthDay: int(o.monthDay, 1, 31, 1) };
+  // Le commissioni mensili si salvano solo se impostate: chi non le usa mantiene lo stesso formato di prima.
+  const c = o.commission as unknown;
+  if (c && typeof c === "object" && (c as { mode?: unknown }).mode === "monthly") out.commission = { mode: "monthly", day: int((c as { day?: unknown }).day, 1, COMMISSION_MAX_DAY, COMMISSION_DEFAULT_DAY) };
+  return out;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -91,10 +100,29 @@ export function payoutDate(b: { channel: Channel; checkIn: string; checkOut: str
   return `${y}-${pad(m)}-${pad(Math.min(rule.monthDay ?? 1, daysInMonth(y, m)))}`;
 }
 
+/** Regola "commissioni tutte insieme" di un portale in una struttura (undefined = commissioni insieme all'incasso, come sempre). */
+export function commissionRuleFor(map: PayoutSettingsMap, channel: string, structureId: string | undefined | null): CommissionRule | undefined {
+  if (channel === "direct" || channel === "blocked") return undefined;
+  const rule = (payoutSettingsFor(map, structureId) as Record<string, PayoutRule | undefined>)[channel];
+  return rule?.commission?.mode === "monthly" ? rule.commission : undefined;
+}
+/**
+ * Mese a cui appartiene una prenotazione per la fatturazione delle commissioni: quello del CHECK-OUT (ipotesi: è così che Booking.com fattura, il 15 di febbraio
+ * le prenotazioni con check-out a gennaio). Formato "aaaa-mm".
+ */
+export const commissionMonthOf = (b: { checkIn: string; checkOut: string }) => (b.checkOut || b.checkIn).slice(0, 7);
+/** Data in cui il portale trattiene le commissioni del mese "aaaa-mm": il giorno scelto del mese successivo. */
+export function commissionDateFor(ym: string, day: number): string {
+  let y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7)) + 1;
+  if (m > 12) { m = 1; y += 1; }
+  return `${y}-${pad(m)}-${pad(Math.min(Math.max(1, day), daysInMonth(y, m)))}`;
+}
+
 /** Descrizione breve ("Bonifico settimanale · giovedì"). */
 export function payoutSummary(rule: PayoutRule | undefined): string {
-  if (!rule || rule.mode === "arrival") return "Alla data di arrivo";
-  if (rule.mode === "checkout") return rule.days ? `${rule.days} giorni dopo il check-out` : "Al check-out";
-  if (rule.mode === "weekly") return `Bonifico settimanale · ${WEEKDAY_LABELS[rule.weekday ?? 4].toLowerCase()}`;
-  return `Bonifico mensile · il ${rule.monthDay ?? 1} del mese dopo`;
+  const comm = rule?.commission ? ` · commissioni il ${rule.commission.day} del mese dopo` : "";
+  if (!rule || rule.mode === "arrival") return "Alla data di arrivo" + comm;
+  if (rule.mode === "checkout") return (rule.days ? `${rule.days} giorni dopo il check-out` : "Al check-out") + comm;
+  if (rule.mode === "weekly") return `Bonifico settimanale · ${WEEKDAY_LABELS[rule.weekday ?? 4].toLowerCase()}` + comm;
+  return `Bonifico mensile · il ${rule.monthDay ?? 1} del mese dopo` + comm;
 }

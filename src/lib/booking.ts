@@ -77,7 +77,7 @@ export function bookingPaidTotal(b: BookingLike): number {
 // Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
-type CommissionBookingLike = { total?: number; cleaningFee?: number; extras?: { price?: number }[]; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string; netTotal?: boolean; extId?: string };
+type CommissionBookingLike = { total?: number; cleaningFee?: number; extras?: { price?: number }[]; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string; netTotal?: boolean; extId?: string; otaCard?: { present?: boolean; balance?: number; currency?: string; charged?: boolean } };
 /**
  * Percentuale da usare quando una prenotazione NON ha la cifra reale: 1) quella impostata a mano in Canali, 2) la stima dai dati reali (media pesata
  * delle commissioni vere dello stesso canale e struttura nell'ultimo anno, vedi commission-estimate.ts), 3) la percentuale standard del canale.
@@ -103,7 +103,26 @@ export function commissionBaseOf(b: CommissionBookingLike): number {
 }
 /** Commissioni totali trattenute dall'OTA: intermediazione + costo d'incasso (es. "Payment charge" di Booking.com). È la cifra della colonna Commissioni. */
 export function commissionOf(b: CommissionBookingLike): number {
-  return Math.round((commissionBaseOf(b) + paymentFeeOf(b)) * 100) / 100;
+  return Math.round((commissionBaseOf(b) + paymentFeeOf(b) + otaAdjustmentOf(b)) * 100) / 100;
+}
+/**
+ * Sconti che l'OTA applica da sé e che la commissione dichiarata non contiene (es. HotelBeds «Agency Booster» −5%): lo si vede perché la carta virtuale
+ * (otaCard.balance, ancora DA addebitare, in euro) è più bassa del netto atteso (lordo − commissione − costo d'incasso). La carta è la cifra vera che si incassa,
+ * quindi la differenza conta come trattenuta e il netto torna con la carta. 0 se non c'è carta, è già addebitata, la valuta non è euro, la cifra non è più bassa
+ * (almeno 50 centesimi, per non inseguire arrotondamenti) o lo scarto è inverosimile (oltre metà del lordo: la carta potrebbe coprire solo una parte).
+ */
+export function otaAdjustmentOf(b: CommissionBookingLike): number {
+  if (isNetPayout(b)) return 0;
+  const c = b.otaCard;
+  if (!c?.present || c.charged) return 0;
+  if (c.currency && c.currency.toUpperCase() !== "EUR") return 0;
+  const bal = c.balance;
+  if (!(typeof bal === "number" && bal > 0)) return 0;
+  const lordo = lordoOf(b);
+  if (!lordo) return 0;
+  const gap = lordo - commissionBaseOf(b) - paymentFeeOf(b) - bal;
+  if (gap < 0.5 || gap > lordo / 2) return 0;
+  return Math.round(gap * 100) / 100;
 }
 /** Costo d'incasso trattenuto dall'OTA (es. "Payment charge" di Booking.com), separato dalla commissione. */
 export function paymentFeeOf(b: CommissionBookingLike): number {

@@ -15,6 +15,8 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
 import { useEffect } from "react";
+import MediaImg from "@/components/MediaImg";
+import MediaLink from "@/components/MediaLink";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -255,11 +257,10 @@ export default function OspiteSchedaPage() {
                 <div className="mb-1.5 text-xs font-medium text-dim">{t("Foto documento")} <span className="text-faint">{t("(dal check-in online)")}</span></div>
                 <div className="grid grid-cols-2 gap-2">
                   {([["Fronte", g.docPhotoFront], ["Retro", g.docPhotoBack]] as const).filter(([, v]) => !!v).map(([label, v]) => (
-                    <a key={label} href={v!} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={v!} alt={label} className="aspect-[1.586] w-full object-cover" />
+                    <MediaLink key={label} src={v!} className="block overflow-hidden rounded-lg border border-line">
+                      <MediaImg src={v!} alt={label} className="aspect-[1.586] w-full object-cover" />
                       <div className="px-2 py-1 text-[11px] text-faint">{t(label)}</div>
-                    </a>
+                    </MediaLink>
                   ))}
                 </div>
               </div>

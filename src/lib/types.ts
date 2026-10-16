@@ -277,8 +277,8 @@ export interface Guest {
   docNumber?: string;   // numero documento
   docPlace?: string;    // luogo di rilascio
   docExpiry?: string;   // scadenza documento (ISO)
-  docPhotoFront?: string; // foto documento fronte (dataURL) — salvata dal check-in, riusata al ritorno
-  docPhotoBack?: string;  // foto documento retro (dataURL)
+  docPhotoFront?: string; // foto documento fronte — riferimento privato "media:xenora-private:…" (vecchi dati: data URI) — salvata dal check-in, riusata al ritorno
+  docPhotoBack?: string;  // foto documento retro (riferimento privato, o data URI nei vecchi dati)
   address?: string;     // residenza (via/indirizzo)
   streetNumber?: string; // numero civico
   province?: string;    // provincia (es. SR)
@@ -370,9 +370,9 @@ export interface Booking {
   webCheckin?: boolean; // l'ospite ha completato il check-in online
   movedFrom?: { structureId: string; structureName: string; at: string }; // spostata dal calendario da un'altra struttura (avviso)
   arrivalTime?: string; // orario di arrivo comunicato
-  docPhotoFront?: string; // foto documento fronte (dataURL, dal check-in online)
-  docPhotoBack?: string;  // foto documento retro (dataURL)
-  signature?: string;     // firma dell'ospite (dataURL, dal check-in online)
+  docPhotoFront?: string; // foto documento fronte — riferimento privato "media:xenora-private:…" (vecchi dati: data URI), dal check-in online
+  docPhotoBack?: string;  // foto documento retro (riferimento privato, o data URI nei vecchi dati)
+  signature?: string;     // firma dell'ospite (riferimento privato, o data URI nei vecchi dati; dal check-in online)
   invoiceNo?: string;   // numero fattura emessa
   extraGuests?: { firstName: string; lastName: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }[]; // co-ospiti (dal web check-in o aggiunti a mano)
   primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web

@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled } from "./supabase";
 import MfaChallenge from "@/components/MfaChallenge";
+import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -472,6 +473,15 @@ function mergeSnapshots(
   if (lPrev !== undefined || sPrev !== undefined) {
     const m = mergePreventivi(lPrev, sPrev);
     if (m !== null) merged[PREVENTIVI_KEY] = m;
+  }
+
+  // Foto del sito (e immagini ausiliarie): dopo la migrazione su Storage il server ha i riferimenti, mentre un browser con una copia VECCHIA
+  // ha ancora le data URI e, con "vince il locale", le riscriverebbe sul server. Se il locale è identico al server tranne che nelle foto,
+  // si adotta la versione del server (nessuna modifica dell'utente viene scartata: vedi adoptMigratedMedia in media-migrate-plan.ts).
+  for (const key of Object.keys(local)) {
+    if (!isMediaFlatKey(key)) continue;
+    const adopted = adoptMigratedMedia(local[key], server?.[key]);
+    if (adopted !== null) merged[key] = adopted;
   }
   return merged;
 }

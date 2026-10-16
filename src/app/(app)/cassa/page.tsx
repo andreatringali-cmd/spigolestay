@@ -14,16 +14,16 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
 import { fmtDMY } from "@/lib/dates";
 import ChannelLogo from "@/components/ChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { type PayoutMode, type PayoutSettingsMap, PAYOUT_CHANNELS, WEEKDAY_LABELS, DEFAULT_PAYOUTS_ID, cleanRule, isGroupedPayout, loadPayoutSettings, payoutSettingsFor, savePayoutSettings } from "@/lib/payouts";
+import { type PayoutMode, type PayoutSettingsMap, PAYOUT_CHANNELS, WEEKDAY_LABELS, DEFAULT_PAYOUTS_ID, COMMISSION_DEFAULT_DAY, COMMISSION_MAX_DAY, cleanRule, isGroupedPayout, loadPayoutSettings, payoutSettingsFor, savePayoutSettings } from "@/lib/payouts";
 import { formatDecimalIT, parseDecimalIT } from "@/lib/num-it";
-import { commissionShareOf } from "@/lib/booking";
+import { commissionShareOf, commissionOf, lordoOf } from "@/lib/booking";
 import { useTenantId } from "@/lib/tenant";
 import { useSyncedList } from "@/components/pulizie/useSyncedList";
 import { KEY_ORDERS, type PulizieOrder } from "@/lib/pulizie-addetta";
@@ -187,7 +187,7 @@ export default function CassaPage() {
     if (tipo === "all") return true;
     if (m.cat === OPENING_CAT) return false; // il saldo di partenza non è un movimento del periodo
     if (tipo === "in" || tipo === "out") return m.kind === tipo;
-    if (tipo === "booking") return /^(auto-in|auto-comm|fc-in)-/.test(m.id);
+    if (tipo === "booking") return /^(auto-in|auto-comm|auto-commm|fc-in)-/.test(m.id);
     if (tipo === "sched") return !!m.sched;
     return !m.auto && !m.sched && !m.forecast; // inseriti a mano
   };
@@ -233,6 +233,9 @@ export default function CassaPage() {
   const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...ledgerManual, ...forecastView]), [auto, scheduled, ledgerManual, forecastView]);
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
+  // Commissioni trattenute dal portale TUTTE INSIEME (modalità mensile): sulla riga dell'incasso restano solo come nota informativa, il movimento vero è l'aggregato mensile.
+  const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
+  const infoText = (i: { amount: number; pct: number; date: string }) => `${t("commissione")} − ${eur(i.amount)} (${String(i.pct).replace(".", ",")}%) · ${t("trattenuta il")} ${fmtDMY(i.date)}`;
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
   const listRows = groupBookingRows(rowsOrdered, groupPayout);
   // cella "saldo conti" (riusata dalle voci bonifico)
@@ -628,6 +631,7 @@ export default function CassaPage() {
                 const els = listRows.map((r) => {
                   if (r.type === "payout") {
                     const open = openPayouts.has(r.id);
+                    const infoSum = sumCents(r.items.map((it) => (it.type === "mov" ? infoOf(it.mov)?.amount : it.type === "booking" ? infoOf(it.income)?.amount : 0)));
                     const lastId = r.movIds.reduce((best, id) => ((ledger.order.get(id) ?? 0) > (ledger.order.get(best) ?? 0) ? id : best), r.movIds[0]);
                     const ch = r.channel as Channel;
                     return (
@@ -641,7 +645,7 @@ export default function CassaPage() {
                             <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
                           </div>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>
+                          {r.comm === 0 && infoSum > 0 ? <span className="text-right font-mono text-[11px] italic text-faint max-md:hidden" title={t("Commissioni trattenute dal portale tutte insieme, a parte: non cambiano il saldo.")}>(− {eur(infoSum)})</span> : <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>}
                           <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
@@ -652,12 +656,13 @@ export default function CassaPage() {
                           const gn = ib ? (guests.find((g) => g.id === ib.guestId)?.fullName || "Ospite") : im.desc;
                           const g2 = it.type === "booking" ? it.gross : im.kind === "in" ? im.amount : 0;
                           const c2 = it.type === "booking" ? it.comm : im.kind === "out" ? im.amount : 0;
+                          const inf2 = !c2 ? infoOf(im) : undefined;
                           return (
                             <div key={"i-" + im.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
                               <span />
                               <span className="truncate pl-9">{gn}{ib ? <span className="text-faint"> · {t("check-out")} {fmtDMY(ib.checkOut)}</span> : null}</span>
                               <span className="text-right font-mono max-md:hidden">{g2 ? `+ ${eur(g2)}` : ""}</span>
-                              <span className="text-right font-mono max-md:hidden">{c2 ? `− ${eur(c2)}` : ""}</span>
+                              <span className={"text-right font-mono max-md:hidden" + (inf2 ? " text-[11px] italic text-faint" : "")} title={inf2 ? infoText(inf2) : undefined}>{c2 ? `− ${eur(c2)}` : inf2 ? `(− ${eur(inf2.amount)})` : ""}</span>
                               <span className="text-right font-mono">{eur(roundCents(g2 - c2))}</span>
                               <div className="-my-1 self-stretch border-l border-line" />
                             </div>
@@ -666,8 +671,58 @@ export default function CassaPage() {
                       </div>
                     );
                   }
+                  if (r.type === "mov" && r.mov.commRefs) {
+                    // commissioni di un mese pagate TUTTE INSIEME dal portale (un movimento vero, espandibile sulle prenotazioni incluse)
+                    const m = r.mov;
+                    const open = openPayouts.has(m.id);
+                    const ch = (m.channel ?? "other") as Channel;
+                    const det = m.commRefs!.map((id) => bookings.find((b) => b.id === id)).filter((b): b is NonNullable<typeof b> => !!b);
+                    const totComm = sumCents(det.map((b) => commissionOf(b)));
+                    const totLordo = sumCents(det.map((b) => lordoOf(b)));
+                    const pctOf = (c: number, l: number) => (l > 0 ? String(Math.round((c / l) * 1000) / 10).replace(".", ",") + "%" : "");
+                    return (
+                      <div key={m.id}>
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni incluse in queste commissioni")} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                          <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
+                            <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
+                            <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>
+                            <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
+                          </div>
+                          <span className="max-md:hidden" />
+                          <span className="max-md:hidden" />
+                          <span className="text-right font-mono text-sm font-semibold" style={{ color: "var(--err)" }}>− {eur(m.amount)}</span>
+                          {balCell(ledger.balanceAfter.get(m.id) ?? null, ledger.included.has(m.id))}
+                        </div>
+                        {open && (
+                          <>
+                            {det.map((b) => (
+                              <div key={"cm-" + b.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                                <span />
+                                <span className="truncate pl-9">{guests.find((g) => g.id === b.guestId)?.fullName || "Ospite"}<span className="text-faint"> · {t("check-out")} {fmtDMY(b.checkOut)}</span></span>
+                                <span className="text-right font-mono max-md:hidden">{lordoOf(b) ? `+ ${eur(lordoOf(b))}` : ""}</span>
+                                <span className="text-right font-mono max-md:hidden" title={t("Commissioni ÷ lordo")}>{String(commissionShareOf(b)).replace(".", ",")}%</span>
+                                <span className="text-right font-mono">− {eur(roundCents(commissionOf(b)))}</span>
+                                <div className="-my-1 self-stretch border-l border-line" />
+                              </div>
+                            ))}
+                            <div className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs font-semibold text-dim">
+                              <span />
+                              <span className="truncate pl-9">{t("Totale")} · {det.length} {det.length === 1 ? t("prenotazione") : t("prenotazioni")}</span>
+                              <span className="text-right font-mono max-md:hidden">{totLordo ? `+ ${eur(totLordo)}` : ""}</span>
+                              <span className="text-right font-mono max-md:hidden" title={t("Commissioni ÷ lordo")}>{pctOf(totComm, totLordo)}</span>
+                              <span className="text-right font-mono">− {eur(totComm)}</span>
+                              <div className="-my-1 self-stretch border-l border-line" />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  }
                   const isBooking = r.type === "booking";
                   const m = isBooking ? r.income : r.mov;
+                  const inf = isBooking ? undefined : infoOf(m);
                   const c = catOf(m.cat);
                   const bk = bkOf(m);
                   const gname = bk ? (guests.find((g) => g.id === bk.guestId)?.fullName || "Ospite") : "";
@@ -679,7 +734,8 @@ export default function CassaPage() {
                   const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
-                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                    <div key={isBooking ? "b-" + r.id : m.id}>
+                    <div onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2">
                         {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
@@ -709,6 +765,8 @@ export default function CassaPage() {
                         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
                         : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
                       </div>
+                    </div>
+                    {inf && <div className="-mt-0.5 pb-1 pl-[70px] text-[11px] italic leading-tight text-faint md:pl-[96px]" title={t("Il portale trattiene le commissioni tutte insieme: non è un movimento di questa riga e non cambia il saldo.")}>{infoText(inf)}</div>}
                     </div>
                   );
                 });
@@ -839,8 +897,9 @@ export default function CassaPage() {
                   : rule.mode === "checkout" ? (dd ? `${t("Incasso")} ${dd} ${t("giorni dopo il check-out dell'ospite (es. carta virtuale).")}` : t("Incasso il giorno del check-out (es. carta virtuale)."))
                   : rule.mode === "weekly" ? `${t("Un unico bonifico ogni")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()}: ${t("copre i check-out dal")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()} ${t("della settimana prima al giorno precedente.")}`
                   : `${t("Un unico bonifico il")} ${md} ${t("del mese successivo: copre tutti i check-out del mese, dal 1 all'ultimo giorno.")}`;
+                const tipFull = rule.commission ? `${tip} ${t("Le commissioni sono trattenute tutte insieme il")} ${rule.commission.day} ${t("del mese dopo, per le prenotazioni con check-out del mese precedente.")}` : tip;
                 return (
-                  <div key={ch} title={tip} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
+                  <div key={ch} title={tipFull} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
                     <div className="flex w-[128px] shrink-0 items-center gap-2"><ChannelLogo channel={ch} size={20} title={CHANNELS[ch].label} /><span className="truncate text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
                     <select aria-label={t("Quando arriva il pagamento")} value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className="w-[210px] rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
                       <option value="arrival">{t("Alla data di arrivo")}</option>
@@ -851,6 +910,14 @@ export default function CassaPage() {
                     {rule.mode === "checkout" && <span className="flex items-center gap-1.5 text-xs text-dim"><input type="number" min={0} max={60} aria-label={t("Giorni dopo il check-out")} value={dd} onChange={(e) => setPayoutRule(ch, { days: Number(e.target.value) || 0 })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("giorni dopo")}</span>}
                     {rule.mode === "weekly" && <select aria-label={t("Giorno del bonifico")} value={wd} onChange={(e) => setPayoutRule(ch, { weekday: Number(e.target.value) })} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">{WEEKDAY_LABELS.map((w, i) => <option key={w} value={i}>{t(w)}</option>)}</select>}
                     {rule.mode === "monthly" && <span className="flex items-center gap-1.5 text-xs text-dim">{t("il")}<input type="number" min={1} max={31} aria-label={t("Giorno del mese successivo")} value={md} onChange={(e) => setPayoutRule(ch, { monthDay: Number(e.target.value) || 1 })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("del mese dopo")}</span>}
+                    <div className="flex basis-full flex-wrap items-center gap-x-1.5 gap-y-1 pl-[136px] text-xs text-dim max-md:pl-0">
+                      <span>{t("Commissioni")}</span>
+                      <select aria-label={t("Quando il portale trattiene le commissioni")} value={rule.commission ? "monthly" : "together"} onChange={(e) => setPayoutRule(ch, { commission: e.target.value === "monthly" ? { mode: "monthly", day: rule.commission?.day ?? COMMISSION_DEFAULT_DAY } : undefined })} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus">
+                        <option value="together">{t("Insieme all'incasso")}</option>
+                        <option value="monthly">{t("Tutte insieme, il mese dopo")}</option>
+                      </select>
+                      {rule.commission && <span className="flex items-center gap-1.5" title={t("Un'unica trattenuta per le prenotazioni con check-out nello stesso mese (es. il 15 febbraio per quelle di gennaio). L'incasso resta per intero.")}>{t("il")}<input type="number" min={1} max={COMMISSION_MAX_DAY} aria-label={t("Giorno del mese dopo")} value={rule.commission.day} onChange={(e) => setPayoutRule(ch, { commission: { mode: "monthly", day: Math.min(COMMISSION_MAX_DAY, Math.max(1, Math.round(Number(e.target.value)) || 1)) } })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus" />{t("del mese dopo")}</span>}
+                    </div>
                   </div>
                 );
               })}

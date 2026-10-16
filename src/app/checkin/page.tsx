@@ -6,6 +6,9 @@ import { downscaleImage } from "@/lib/images";
 import { eur } from "@/lib/format";
 import SignaturePad from "@/components/SignaturePad";
 import { supabase } from "@/lib/supabase";
+import MediaImg from "@/components/MediaImg";
+import { isMediaRef } from "@/lib/media";
+import { mapPool, photoAsDataUri, uploadCheckinAttachment, type AttachmentKind } from "@/lib/checkin-upload-client";
 import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { dateLocale } from "@/lib/guest-i18n";
 import { REQUIRE_DOC_PHOTOS, checkinStatus, needsMoreGuests, stepsWithMissing, type CheckinStep, type Miss } from "@/lib/checkin-flow";
@@ -49,8 +52,7 @@ function DocFace({ label, photo, onPick, onRemove, onReread, extracting, aiOff, 
   if (photo) {
     return (
       <div className="flex items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo} alt={label} className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
+        <MediaImg src={photo} alt={label} className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
         <div className="flex flex-col items-start gap-1">
           <span className="text-[11px] font-medium text-dim">✓ {label}</span>
           {onReread && !aiOff && <button type="button" onClick={onReread} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50">{extracting ? t("Leggo…") : t("✨ Rileggi dal documento")}</button>}
@@ -175,12 +177,24 @@ function Engine() {
     try { const dl = await downscaleImage(file, 900, 0.72); setExtra(i, "photoBack", dl); } catch {}
   };
 
+  // Foto documento e firma già salvate le riceve solo l'operatore loggato (l'ospite anonimo compila sempre da capo): il bearer serve a questo.
+  const operatorAuthHeader = async (): Promise<Record<string, string>> => {
+    try { const tk = (await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } }))).data.session?.access_token; return tk ? { Authorization: `Bearer ${tk}` } : {}; } catch { return {}; }
+  };
+  // Carica su Storage (privato) le foto/la firma appena fatte, una per volta, e restituisce i riferimenti + i token da mandare al salvataggio.
+  const uploadAll = async (bid: string, list: { src?: string; kind: AttachmentKind }[]) => {
+    const res = await mapPool(list, 4, (x) => uploadCheckinAttachment(x.src, x.kind, { slug: params.slug, b: bid }));
+    const uploads: Record<string, string> = {};
+    for (const r of res) if (r?.token) uploads[r.ref] = r.token;
+    return { refs: res.map((r) => r?.ref), uploads };
+  };
+
   // Carica la prenotazione dal server.
   const load = async () => {
     if (!params.b) { setLoadErr("Link non valido: apri il check-in dal link ricevuto via email."); setLoading(false); return; }
     setLoading(true);
     try {
-      const r = await fetch(`/api/checkin?b=${encodeURIComponent(params.b)}${params.slug ? `&slug=${encodeURIComponent(params.slug)}` : ""}`);
+      const r = await fetch(`/api/checkin?b=${encodeURIComponent(params.b)}${params.slug ? `&slug=${encodeURIComponent(params.slug)}` : ""}`, { headers: await operatorAuthHeader() });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j?.ok) { setLoadErr(j?.error === "not_found" ? "Prenotazione non trovata." : "Impossibile caricare la prenotazione."); setInfo(null); }
       else {
@@ -342,14 +356,16 @@ function Engine() {
         const primary = inRoom[0];
         const others = inRoom.slice(1);
         const isMain = r.b === params.b;
+        // Foto e firma su Storage privato (uno per volta); il salvataggio riceve solo i riferimenti.
+        const att = await uploadAll(r.b, [{ src: primary.pf, kind: "photo" }, { src: primary.pb, kind: "photo" }, { src: signature, kind: "signature" }, ...others.flatMap((o) => [{ src: o.pf, kind: "photo" as const }, { src: o.pb, kind: "photo" as const }])]);
         const resp = await fetch("/api/checkin", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             slug: params.slug, b: r.b,
             doc: { firstName: primary.d.firstName.trim(), lastName: primary.d.lastName.trim(), sex: primary.d.sex || undefined, birthDate: primary.d.birthDate, birthPlace: primary.d.birthPlace, citizenship: primary.d.citizenship, docType: primary.d.docType, docNumber: (primary.d.docNumber || "").trim(), docPlace: primary.d.docPlace },
             arrival, guestRequests: isMain ? (guestReq.trim() || undefined) : undefined,
-            extraGuests: others.map((o) => ({ firstName: o.d.firstName, lastName: o.d.lastName, sex: o.d.sex, birthDate: o.d.birthDate, birthPlace: o.d.birthPlace, citizenship: o.d.citizenship, docType: o.d.docType, docNumber: o.d.docNumber, docPlace: o.d.docPlace, docPhotoFront: o.pf, docPhotoBack: o.pb })),
-            docPhotoFront: primary.pf, docPhotoBack: primary.pb, signature,
+            extraGuests: others.map((o, oi) => ({ firstName: o.d.firstName, lastName: o.d.lastName, sex: o.d.sex, birthDate: o.d.birthDate, birthPlace: o.d.birthPlace, citizenship: o.d.citizenship, docType: o.d.docType, docNumber: o.d.docNumber, docPlace: o.d.docPlace, docPhotoFront: att.refs[3 + 2 * oi], docPhotoBack: att.refs[4 + 2 * oi] })),
+            docPhotoFront: att.refs[0], docPhotoBack: att.refs[1], signature: att.refs[2], uploads: att.uploads,
             invoiceRequest: isMain ? invoicePayload : undefined,
             chosenExtras: isMain ? upsellItems : [],
           }),
@@ -376,14 +392,16 @@ function Engine() {
     }
     setSubmitting(true); setSubmitErr(null);
     try {
+      const sendExtras = extras.filter((e) => e.firstName.trim() && e.lastName.trim());
+      const att = await uploadAll(params.b, [{ src: photoFront, kind: "photo" }, { src: photoBack, kind: "photo" }, { src: signature, kind: "signature" }, ...sendExtras.flatMap((e) => [{ src: e.photoFront || undefined, kind: "photo" as const }, { src: e.photoBack || undefined, kind: "photo" as const }])]);
       const r = await fetch("/api/checkin", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           slug: params.slug, b: params.b,
           doc: { firstName: doc.firstName.trim(), lastName: doc.lastName.trim(), sex: doc.sex || undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber.trim(), docPlace: doc.docPlace },
           arrival, guestRequests: guestReq.trim() || undefined,
-          extraGuests: extras.filter((e) => e.firstName.trim() && e.lastName.trim()),
-          docPhotoFront: photoFront, docPhotoBack: photoBack, signature,
+          extraGuests: sendExtras.map((e, i) => ({ ...e, photoFront: undefined, photoBack: undefined, docPhotoFront: att.refs[3 + 2 * i], docPhotoBack: att.refs[4 + 2 * i] })),
+          docPhotoFront: att.refs[0], docPhotoBack: att.refs[1], signature: att.refs[2], uploads: att.uploads,
           invoiceRequest: invoicePayload,
           chosenExtras: upsellItems,
         }),
@@ -683,7 +701,7 @@ function Engine() {
               <div className="rounded-lg border border-line p-3">
                 <div className="mb-2 text-xs font-semibold text-dim">{personName(1)}</div>
                 <div id="f-docPhoto-1" tabIndex={-1} className="flex flex-wrap items-start gap-4">
-                  <DocFace t={t} label={t("Fronte documento")} photo={photoFront} onPick={(f) => onPhoto(f, setPhotoFront, true)} onRemove={() => setPhotoFront(undefined)} onReread={() => { if (photoFront) extractDoc(photoFront); }} extracting={extracting} aiOff={aiOff} />
+                  <DocFace t={t} label={t("Fronte documento")} photo={photoFront} onPick={(f) => onPhoto(f, setPhotoFront, true)} onRemove={() => setPhotoFront(undefined)} onReread={() => { if (photoFront) void photoAsDataUri(photoFront).then(extractDoc).catch(() => setExtractMsg("Lettura non riuscita: compila i campi a mano.")); }} extracting={extracting} aiOff={aiOff} />
                   <DocFace t={t} label={t("Retro documento")} photo={photoBack} onPick={(f) => onPhoto(f, setPhotoBack)} onRemove={() => setPhotoBack(undefined)} extracting={extracting} aiOff={aiOff} />
                 </div>
               </div>
@@ -691,7 +709,7 @@ function Engine() {
                 <div key={i} className="rounded-lg border border-line p-3">
                   <div className="mb-2 text-xs font-semibold text-dim">{personName(i + 2)}</div>
                   <div id={`f-docPhoto-${i + 2}`} tabIndex={-1} className="flex flex-wrap items-start gap-3">
-                    <DocFace t={t} label={t("Fronte documento")} photo={e.photoFront || undefined} onPick={(f) => onExtraPhoto(f, i)} onRemove={() => setExtra(i, "photoFront", "")} onReread={() => { if (e.photoFront) extractExtra(e.photoFront, i); }} extracting={extracting} aiOff={aiOff} />
+                    <DocFace t={t} label={t("Fronte documento")} photo={e.photoFront || undefined} onPick={(f) => onExtraPhoto(f, i)} onRemove={() => setExtra(i, "photoFront", "")} onReread={() => { if (e.photoFront) void photoAsDataUri(e.photoFront).then((d) => extractExtra(d, i)).catch(() => setExtractMsg("Lettura non riuscita: compila i campi a mano.")); }} extracting={extracting} aiOff={aiOff} />
                     <DocFace t={t} label={t("Retro documento")} photo={e.photoBack || undefined} onPick={(f) => onExtraPhotoBack(f, i)} onRemove={() => setExtra(i, "photoBack", "")} extracting={extracting} aiOff={aiOff} />
                   </div>
                 </div>
@@ -794,7 +812,9 @@ function Engine() {
             <div id="f-signature" tabIndex={-1} className={`${box} mb-4 p-4`} style={showErr && missIds.has("f-signature") ? { borderColor: "var(--err)", boxShadow: "0 0 0 1px var(--err)" } : undefined}>
               <h2 className="mb-1 font-display text-base font-bold text-txt">{t("Firma")} <span style={{ color: "var(--err)" }}>*</span></h2>
               <p className="mb-3 text-xs text-dim">{t("Firma per confermare la correttezza dei dati e l'accettazione delle condizioni.")}</p>
-              <SignaturePad value={signature} onChange={setSignature} placeholder={t("Firma qui col dito o col mouse")} clearLabel={t("Cancella firma")} />
+              {signature && isMediaRef(signature)
+                ? <div className="flex items-end gap-3"><MediaImg src={signature} alt={t("Firma")} className="h-24 rounded-lg border border-line bg-white p-1" /><button type="button" onClick={() => setSignature(undefined)} className="text-[11px] font-medium text-dim hover:text-[color:var(--err)]">{t("Cancella firma")}</button></div>
+                : <SignaturePad value={signature} onChange={setSignature} placeholder={t("Firma qui col dito o col mouse")} clearLabel={t("Cancella firma")} />}
               {showErr && missIds.has("f-signature") && <p className="mt-1 text-xs font-medium" style={{ color: "var(--err)" }}>{t("Firma nel riquadro")}</p>}
             </div>
           )}

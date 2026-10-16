@@ -18,7 +18,7 @@ import { entriesTotal } from "@/lib/booking-extras";
 import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
-import { cityTaxOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, paymentFeeOf } from "@/lib/booking";
+import { cityTaxOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -30,6 +30,8 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
 import Icon from "@/components/Icon";
+import MediaImg from "@/components/MediaImg";
+import MediaLink from "@/components/MediaLink";
 import QRCode from "qrcode";
 
 const fmtDate = (iso: string) =>
@@ -189,6 +191,7 @@ export default function BookingDrawer() {
   const commTotV = commissionOf(booking);
   const commV = commissionBaseOf(booking);
   const payFeeV = paymentFeeOf(booking);
+  const adjV = otaAdjustmentOf(booking); // sconti applicati dall'OTA (differenza con la carta virtuale)
   const nettoV = nettoOf(booking);
   const paidV = booking.paid ?? 0;
   const balanceV = Math.max(0, totalV - paidV);
@@ -512,8 +515,9 @@ export default function BookingDrawer() {
         {payMethodRow}
         <div className="my-1 border-t border-line" />
         {commTotV > 0 && <Row label={`${t("Commissioni")} (${String(commPctV).replace(".", ",")}%)`} value={eur(commTotV)} mono />}
-        {commV > 0 && payFeeV > 0 && <Row label={`↳ ${t("Commissione")}`} value={eur(commV)} mono />}
+        {commV > 0 && (payFeeV > 0 || adjV > 0) && <Row label={`↳ ${t("Commissione")}`} value={eur(commV)} mono />}
         {payFeeV > 0 && <Row label={`↳ ${t("Costo incasso")}`} value={eur(payFeeV)} mono />}
+        {adjV > 0 && <Row label={`↳ ${t("Sconti OTA (carta virtuale)")}`} value={eur(adjV)} mono />}
         <Row label={t("Netto struttura")} value={eur(nettoV)} mono strong />
       </Section>
 
@@ -667,8 +671,7 @@ export default function BookingDrawer() {
         {(booking.docPhotoFront || booking.docPhotoBack) && (
           <div className="mt-2 grid grid-cols-2 gap-2">
             {[booking.docPhotoFront, booking.docPhotoBack].filter(Boolean).map((src, i) => (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <a key={i} href={src as string} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line"><img src={src as string} alt={t("Documento")} className="h-24 w-full object-cover" /></a>
+              <MediaLink key={i} src={src as string} className="block overflow-hidden rounded-lg border border-line"><MediaImg src={src as string} alt={t("Documento")} className="h-24 w-full object-cover" /></MediaLink>
             ))}
           </div>
         )}
@@ -694,8 +697,7 @@ export default function BookingDrawer() {
         {booking.signature && (
           <div className="mt-2">
             <div className="mb-1 text-xs text-dim">{t("Firma ospite")}</div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={booking.signature} alt={t("Firma")} className="h-16 rounded-lg border border-line bg-white p-1" />
+            <MediaImg src={booking.signature} alt={t("Firma")} className="h-16 rounded-lg border border-line bg-white p-1" />
           </div>
         )}
       </Section>

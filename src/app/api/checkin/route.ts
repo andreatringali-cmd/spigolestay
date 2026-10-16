@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
 import { cityTaxOf } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
 import { guestLangOrNull } from "@/lib/guest-lang";
+import { authTenant, isResponse } from "@/lib/invoicing/api";
+import { clientIp } from "@/lib/server-booking-guard";
+import { rateLimited } from "@/lib/server-auth";
+import { PRIVATE_BUCKET } from "@/lib/media";
+import { memberOrgIds, putMedia, removeMedia } from "@/lib/media-server";
+import { privateRefsIn, orphanedRefs } from "@/lib/media-orphans";
+import { AttachmentError, MAX_EXTRA_GUESTS, canViewStore, createAttachmentResolver, storeMediaTarget, uploadSecret } from "@/lib/checkin-media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +21,19 @@ type Json = Record<string, unknown>;
 const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 const s = (v: unknown) => (typeof v === "string" ? v : "");
 const n = (v: unknown) => (typeof v === "number" ? v : 0);
+
+// Chi apre il link da ospite (anonimo) NON deve ricevere foto documento né firma (nemmeno i riferimenti): la pagina le ignora comunque.
+// Le vede solo chi è loggato in Xenora e appartiene a quella struttura (proprietario/collaboratore o socio dell'organizzazione).
+async function viewerCanSeeDocs(req: Request, admin: SupabaseClient, store: { table: "app_state" | "org_state"; keyVal: string }): Promise<boolean> {
+  if (!req.headers.get("authorization")) return false;
+  try {
+    const a = await authTenant(req);
+    if (isResponse(a)) return false;
+    const orgIds = store.table === "org_state" ? await memberOrgIds(admin, [a.userId, a.tenantId]) : [];
+    return canViewStore(store, { tenantId: a.tenantId, userId: a.userId, orgIds });
+  } catch { return false; }
+}
+const withoutDocPhotos = (o: Json): Json => { const c = { ...o }; delete c.docPhotoFront; delete c.docPhotoBack; return c; };
 
 // GET: dati per rendere la pagina di check-in a un ospite ANONIMO (dal link email).
 export async function GET(req: Request) {
@@ -36,6 +56,7 @@ export async function GET(req: Request) {
     const st = (store.structure ?? {}) as Json;
     const rt = (store.roomType ?? {}) as Json;
     const g = (store.guest ?? {}) as Json;
+    const seeDocs = await viewerCanSeeDocs(req, admin, store);
     const unit = arr(store.data.units).find((x) => (x as { id?: string }).id === s(b.unitId)) as Json | undefined;
     // Tassa di soggiorno calcolata sul server (dipende dalla configurazione struttura).
     const nightsTot = (() => { try { return Math.max(1, Math.round((Date.parse(s(b.checkOut)) - Date.parse(s(b.checkIn))) / 86400000)); } catch { return 1; } })();
@@ -70,11 +91,11 @@ export async function GET(req: Request) {
         total: n(b.total), paid: n(b.paid), cleaningFee: n(b.cleaningFee), cityTax,
         cityTaxExempt: b.cityTaxExempt === true,
         webCheckin: b.webCheckin === true, arrivalTime: s(b.arrivalTime), guestRequests: s(b.guestRequests),
-        extras: arr(b.extras), extraGuests: arr(b.extraGuests),
-        docPhotoFront: s(b.docPhotoFront) || null, docPhotoBack: s(b.docPhotoBack) || null, signature: s(b.signature) || null,
+        extras: arr(b.extras), extraGuests: seeDocs ? arr(b.extraGuests) : arr(b.extraGuests).map(withoutDocPhotos),
+        docPhotoFront: seeDocs ? s(b.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(b.docPhotoBack) || null : null, signature: seeDocs ? s(b.signature) || null : null,
         invoiceRequest: (b.invoiceRequest as Json) || null,
       },
-      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace), docPhotoFront: s(g.docPhotoFront) || null, docPhotoBack: s(g.docPhotoBack) || null,
+      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace), docPhotoFront: seeDocs ? s(g.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(g.docPhotoBack) || null : null,
         // Lingua della pagina: scheda ospite → Paese → prefisso del telefono. null se non c'è nessun dato (allora decide il browser).
         lang: guestLangOrNull({ language: s(g.language), lang: s(g.lang), country: s(g.country), phone: s(g.phone) }) },
       // Ospite "di ritorno": ha già dati documento da un soggiorno precedente → check-in veloce.
@@ -103,6 +124,7 @@ export async function POST(req: Request) {
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   try {
+    if (rateLimited("ci:" + clientIp(req), 40, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();
     const bid = String(body?.b || "").trim();
@@ -112,7 +134,8 @@ export async function POST(req: Request) {
     if (!s(doc.firstName).trim() || !s(doc.lastName).trim()) return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
     const arrival = String(body?.arrival || "").slice(0, 40);
     const guestRequests = String(body?.guestRequests || "").slice(0, 800);
-    const extraGuests = arr(body?.extraGuests).map((e) => {
+    // Ospiti aggiuntivi: i campi anagrafici si ripuliscono subito; foto documento (riferimenti o, solo per pagine vecchie, data URI) si risolvono dopo, quando si sa dove vive la prenotazione.
+    const extraRaw = arr(body?.extraGuests).slice(0, MAX_EXTRA_GUESTS).map((e) => {
       const g = e as Json;
       const pf = typeof g.docPhotoFront === "string" ? g.docPhotoFront : (typeof g.photoFront === "string" ? g.photoFront : "");
       const pb = typeof g.docPhotoBack === "string" ? g.docPhotoBack : (typeof g.photoBack === "string" ? g.photoBack : "");
@@ -123,9 +146,10 @@ export async function POST(req: Request) {
         docPhotoFront: pf || undefined, docPhotoBack: pb || undefined,
       };
     }).filter((e) => e.firstName && e.lastName);
-    const docPhotoFront = typeof body?.docPhotoFront === "string" ? body.docPhotoFront : undefined;
-    const docPhotoBack = typeof body?.docPhotoBack === "string" ? body.docPhotoBack : undefined;
-    const signature = typeof body?.signature === "string" ? body.signature : undefined;
+    const rawFront = typeof body?.docPhotoFront === "string" ? body.docPhotoFront : undefined;
+    const rawBack = typeof body?.docPhotoBack === "string" ? body.docPhotoBack : undefined;
+    const rawSignature = typeof body?.signature === "string" ? body.signature : undefined;
+    const uploadTokens = (body?.uploads && typeof body.uploads === "object" && !Array.isArray(body.uploads) ? body.uploads : {}) as Record<string, unknown>;
     const invoiceRequest = (body?.invoiceRequest ?? undefined) as Json | undefined;
     const chosenExtras = arr(body?.chosenExtras).map((e) => ({ name: s((e as Json).name).slice(0, 120), price: n((e as Json).price) })).filter((e) => e.name);
 
@@ -135,10 +159,36 @@ export async function POST(req: Request) {
     if (!store) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
     const guestId = s((store.booking as Json).guestId);
 
+    // Allegati (foto documento, firma) -> riferimenti nel bucket PRIVATO. Il client ha già caricato i file da /api/checkin/upload e manda
+    // solo i riferimenti + i token; qui si accettano solo quelli di QUESTA prenotazione (stesso proprietario, già presenti o con token valido).
+    const target = storeMediaTarget(store);
+    const resolver = createAttachmentResolver({
+      bookingId: bid, target, tokens: uploadTokens, secret: uploadSecret(),
+      allowed: privateRefsIn(store.booking, store.guest),
+      put: (bytes, mime) => putMedia(admin, { bucket: PRIVATE_BUCKET, scope: target.scope, id: target.id, mime, bytes }),
+    });
+    let docPhotoFront: string | undefined, docPhotoBack: string | undefined, signature: string | undefined;
+    const extraGuests: (typeof extraRaw[number])[] = [];
+    try {
+      docPhotoFront = await resolver.resolve(rawFront, "photo");
+      docPhotoBack = await resolver.resolve(rawBack, "photo");
+      signature = await resolver.resolve(rawSignature, "signature");
+      for (const e of extraRaw) {
+        extraGuests.push({ ...e, docPhotoFront: await resolver.resolve(e.docPhotoFront, "photo"), docPhotoBack: await resolver.resolve(e.docPhotoBack, "photo") });
+      }
+    } catch (e) {
+      for (const r of resolver.uploadedNow) await removeMedia(admin, r).catch(() => false);
+      if (e instanceof AttachmentError) return NextResponse.json({ ok: false, error: e.code, message: e.message }, { status: 400 });
+      throw e;
+    }
+    let orphans: string[] = []; // file che dopo questo salvataggio non servono più a nessuno (foto sostituite)
+
     const wrote = await mutateStore(admin, store, (data, idx) => {
       const bookings = arr(data.bookings);
       if (idx < 0 || idx >= bookings.length) return false;
       const bk = bookings[idx] as Json;
+      const guestBefore = arr(data.guests).find((x) => (x as { id?: string }).id === guestId);
+      const refsBefore = privateRefsIn(bk, guestBefore);
       // Merge extra (upsell) senza duplicati.
       const baseExtras = arr(bk.extras) as { name: string; price: number }[];
       const merged = [...baseExtras];
@@ -163,9 +213,15 @@ export async function POST(req: Request) {
           updatedAt: Date.now() };
         data.guests = guests;
       }
+      orphans = orphanedRefs(refsBefore, data);
       return true;
     });
-    if (!wrote) return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
+    if (!wrote) {
+      for (const r of resolver.uploadedNow) await removeMedia(admin, r).catch(() => false);
+      return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
+    }
+    // Foto sostituite (o ospiti aggiuntivi tolti): via anche dallo Storage, se nessun'altra prenotazione/ospite le usa ancora.
+    for (const r of orphans) await removeMedia(admin, r).catch(() => false);
 
     // Genera la schedina Alloggiati Web per questa struttura (best-effort): così dopo il check-in
     // online la schedina risulta subito "pronta da inviare" alla Questura (niente sync manuale).
@@ -182,7 +238,7 @@ export async function POST(req: Request) {
       const hostEmail = s(st.email);
       if (hostEmail) {
         const origin = siteOrigin(req);
-        const guests = [{ firstName: s(doc.firstName), lastName: s(doc.lastName), sex: doc.sex, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber, docPlace: doc.docPlace }, ...extraGuests];
+        const guests = [{ firstName: s(doc.firstName), lastName: s(doc.lastName), sex: doc.sex, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber, docPlace: doc.docPlace }, ...extraGuests.map(({ docPhotoFront: _f, docPhotoBack: _b, ...rest }) => rest)]; // l'email non porta le foto dei documenti
         await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ kind: "checkin", operatorEmail: hostEmail, arrival, guests, booking: { code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor), guestName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), guestEmail: s((store.guest as Json)?.email), roomType: s(rt.name), checkIn: s(b.checkIn), checkOut: s(b.checkOut) } }),
