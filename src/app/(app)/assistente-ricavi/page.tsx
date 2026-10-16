@@ -1,8 +1,9 @@
 "use client";
 
+import DateField from "@/components/DateField";
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { toISO, shiftISO, parseISO } from "@/lib/dates";
+import { toISO, shiftISO, parseISO, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { inScope, newItemStructureId } from "@/lib/scope";
@@ -10,7 +11,7 @@ import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
-const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
+const fmt = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 // Eventi locali: li aggiunge il gestore a mano (sagre, concerti, crociere…) — nessuna fonte
 // esterna/automatica. Ogni evento appartiene alla struttura selezionata al momento della creazione
@@ -112,12 +113,7 @@ export default function AssistenteRicaviPage() {
             placeholder="Nome evento (sagra, concerto…)"
             className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus"
           />
-          <input
-            type="date"
-            value={newEvDate}
-            onChange={(e) => setNewEvDate(e.target.value)}
-            className="rounded-lg border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus"
-          />
+          <DateField value={newEvDate} onChange={(v) => setNewEvDate(v)} className="rounded-lg border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
           <select
             value={newEvImpact}
             onChange={(e) => setNewEvImpact(e.target.value as "alto" | "medio")}

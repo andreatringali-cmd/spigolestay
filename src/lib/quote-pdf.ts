@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { fmtDMY } from "./dates";
 
 // Genera il PDF del preventivo (A4, carta intestata) da allegare all'email.
 // Stessa libreria e stesso stile di voucher-pdf.ts (pure-JS pdf-lib, nessuna dipendenza nativa).
@@ -32,7 +33,7 @@ function tint(c: RGB, amt: number) {
 }
 function fmtDate(iso?: string) {
   if (!iso) return "";
-  try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
+  try { return `${new Date(iso + "T00:00:00Z").toLocaleDateString("it-IT", { weekday: "long", timeZone: "UTC" })} ${fmtDMY(iso)}`; } catch { return fmtDMY(iso); }
 }
 function drawCentered(page: PDFPage, text: string, y: number, size: number, font: PDFFont, color: RGB, W: number) {
   const tw = font.widthOfTextAtSize(text, size);

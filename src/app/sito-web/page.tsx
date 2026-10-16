@@ -10,6 +10,8 @@ import { cssBgUrl } from "@/lib/media-client";
 import { toExternalUrl } from "@/lib/media";
 import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
+import DateField from "@/components/DateField";
+import { fmtDate } from "@/lib/dates";
 import { amenityIcon } from "@/lib/amenities";
 import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw } from "@/lib/publicdata";
 import { inScope } from "@/lib/scope";
@@ -342,8 +344,8 @@ export function Site() {
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
             <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
-              <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={ci} min={today} onChange={(e) => { setCi(e.target.value); if (e.target.value >= co) setCo(addDays(e.target.value, 1)); }} className={`${field} mt-0.5 w-full`} /></label>
-              <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={co} min={addDays(ci, 1)} onChange={(e) => setCo(e.target.value)} className={`${field} mt-0.5 w-full`} /></label>
+              <label className="block text-[11px] font-medium text-dim">Arrivo<DateField value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-[11px] font-medium text-dim">Partenza<DateField value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
               <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
               <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
               <button onClick={() => go()} className="mt-auto rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
@@ -499,8 +501,8 @@ export function Site() {
                   {p.description && <p className="mt-1.5 text-sm text-dim">{p.description}</p>}
                   {(p.features ?? []).length > 0 && <ul className="mt-2 flex-1 space-y-1 text-[13px] text-dim">{(p.features ?? []).map((f, i) => <li key={i} className="flex items-start gap-1.5"><span style={{ color: accent }}>✓</span>{f}</li>)}</ul>}
                   <div className="mt-2 text-xs text-dim">{T("Codice")}: <b className="font-mono text-txt">{p.code}</b></div>
-                  {(p.validFrom || p.validTo) && <div className="mt-1 text-[11px] text-faint">{T("Valida per soggiorni")}{p.validFrom ? ` ${T("dal")} ${new Date(p.validFrom).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}{p.validTo ? ` ${T("al")} ${new Date(p.validTo).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}</div>}
-                  {p.validUntil && <div className="text-[11px] text-faint">{T("Prenota entro il")} {new Date(p.validUntil).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div>}
+                  {(p.validFrom || p.validTo) && <div className="mt-1 text-[11px] text-faint">{T("Valida per soggiorni")}{p.validFrom ? ` ${T("dal")} ${fmtDate(p.validFrom)}` : ""}{p.validTo ? ` ${T("al")} ${fmtDate(p.validTo)}` : ""}</div>}
+                  {p.validUntil && <div className="text-[11px] text-faint">{T("Prenota entro il")} {fmtDate(p.validUntil)}</div>}
                   <button onClick={() => go(p.code ? `&promo=${encodeURIComponent(p.code)}` : "")} className="group mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>{T("Prenota")} <span className="transition-transform group-hover:translate-x-0.5">→</span></button>
                 </div>
               ))}

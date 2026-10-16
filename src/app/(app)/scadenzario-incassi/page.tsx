@@ -19,6 +19,7 @@ import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, daysOverdue, todayLocalISO, agingBucket, AGING_LABEL, type AgingKey } from "@/lib/invoicing/receivables";
 import { reminderText, reminderSubject, waReminderLink, mailReminderLink, waDigits } from "@/lib/invoicing/reminders";
 import { useTenantId } from "@/lib/tenant";
+import { fmtDate } from "@/lib/dates";
 
 interface Doc {
   id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number;
@@ -27,7 +28,7 @@ interface Doc {
 }
 interface Reminder { count: number; last: string }
 const cents = (c: number) => c / 100;
-const dmy = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "");
+const dmy = (iso: string | null) => (iso ? fmtDate(iso) : "");
 const BUCKETS: AgingKey[] = ["future", "nodue", "d30", "d60", "d90", "over90"];
 
 export default function ScadenzarioIncassiPage() {
@@ -137,7 +138,7 @@ export default function ScadenzarioIncassiPage() {
   const exportCsv = () => {
     const head = ["Scadenza", "Giorni di ritardo", "Fascia", "Numero", "Data documento", "Cliente", "Prenotazione", "Totale", "Incassato", "Stornato da NC", "Residuo", "Solleciti inviati", "Ultimo sollecito"];
     const lines = rows.map((r) => [dmy(r.due_date), r.days || "", AGING_LABEL[r.bucket], r.number_label ?? "", dmy(r.issue_date), nameOf(r), r.booking_code ?? "",
-      centsToCsv(r.total_cents), centsToCsv(paid[r.id] ?? 0), centsToCsv(r.credited), centsToCsv(r.residuo), reminders[r.id]?.count ?? 0, reminders[r.id] ? new Date(reminders[r.id].last).toLocaleDateString("it-IT") : ""]);
+      centsToCsv(r.total_cents), centsToCsv(paid[r.id] ?? 0), centsToCsv(r.credited), centsToCsv(r.residuo), reminders[r.id]?.count ?? 0, reminders[r.id] ? fmtDate(reminders[r.id].last) : ""]);
     downloadCsv(`scadenzario-incassi-${t}`, buildCsv(head, lines));
   };
 
@@ -180,7 +181,7 @@ export default function ScadenzarioIncassiPage() {
                   <tr onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                     <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? dmy(r.due_date) : "senza scadenza"}{overdue && <div className="text-[10px]">{r.days} gg di ritardo</div>}</td>
                     <td className="px-3 py-2.5 font-mono text-txt">{r.number_label}</td>
-                    <td className="px-3 py-2.5"><div className="text-txt">{nameOf(r) || "—"}</div>{r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}{rem && <div className="text-[10px] text-faint">Solleciti: {rem.count} · ultimo {new Date(rem.last).toLocaleDateString("it-IT")}</div>}</td>
+                    <td className="px-3 py-2.5"><div className="text-txt">{nameOf(r) || "—"}</div>{r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}{rem && <div className="text-[10px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.total_cents))}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(r.residuo))}{r.credited > 0 && <div className="text-[10px] font-normal text-faint">dopo NC −{eur(cents(r.credited))}</div>}</td>
                     <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: overdue ? "var(--err)" : "var(--warn)" }}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</span></td>

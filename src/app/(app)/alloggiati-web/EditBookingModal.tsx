@@ -1,5 +1,6 @@
 "use client";
 
+import DateField from "@/components/DateField";
 import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { DOC_TYPES } from "@/lib/types";
@@ -102,7 +103,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
             <F label="Cognome"><input className={inp} value={g?.lastName ?? ""} onChange={(e) => setPrimaryOf({ lastName: e.target.value })} /></F>
             <F label="Nome"><input className={inp} value={g?.firstName ?? ""} onChange={(e) => setPrimaryOf({ firstName: e.target.value })} /></F>
             <F label="Sesso"><select className={inp} value={g?.sex ?? ""} onChange={(e) => setPrimaryOf({ sex: e.target.value || undefined })}><option value="">—</option><option value="M">M</option><option value="F">F</option></select></F>
-            <F label="Data di nascita"><input type="date" className={inp} value={g?.birthDate ?? ""} onChange={(e) => setPrimaryOf({ birthDate: e.target.value })} /></F>
+            <F label="Data di nascita"><DateField className={inp} value={g?.birthDate ?? ""} onChange={(v) => setPrimaryOf({ birthDate: v })} /></F>
             <F label="Luogo di nascita"><input className={inp} value={g?.birthPlace ?? ""} onChange={(e) => setPrimaryOf({ birthPlace: e.target.value })} placeholder="Comune o Stato" /></F>
             <F label="Cittadinanza"><input className={inp} value={g?.citizenship ?? ""} onChange={(e) => setPrimaryOf({ citizenship: e.target.value })} placeholder="Es. ITALIA" /></F>
             <F label="Tipo documento"><select className={inp} value={g?.docType ?? ""} onChange={(e) => setPrimaryOf({ docType: e.target.value || undefined })}><option value="">—</option>{DOC_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}</select></F>
@@ -125,7 +126,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
                 <F label="Cognome"><input className={inp} value={c.lastName} onChange={(e) => setCo(i, { lastName: e.target.value })} /></F>
                 <F label="Nome"><input className={inp} value={c.firstName} onChange={(e) => setCo(i, { firstName: e.target.value })} /></F>
                 <F label="Sesso"><select className={inp} value={c.sex ?? ""} onChange={(e) => setCo(i, { sex: (e.target.value || undefined) as Co["sex"] })}><option value="">—</option><option value="M">M</option><option value="F">F</option></select></F>
-                <F label="Data di nascita"><input type="date" className={inp} value={c.birthDate ?? ""} onChange={(e) => setCo(i, { birthDate: e.target.value })} /></F>
+                <F label="Data di nascita"><DateField className={inp} value={c.birthDate ?? ""} onChange={(v) => setCo(i, { birthDate: v })} /></F>
                 <F label="Luogo di nascita"><input className={inp} value={c.birthPlace ?? ""} onChange={(e) => setCo(i, { birthPlace: e.target.value })} placeholder="Comune o Stato" /></F>
                 <F label="Cittadinanza"><input className={inp} value={c.citizenship ?? ""} onChange={(e) => setCo(i, { citizenship: e.target.value })} placeholder="Es. ITALIA" /></F>
               </div>

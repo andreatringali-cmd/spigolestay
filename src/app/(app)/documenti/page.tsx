@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -118,12 +119,12 @@ export default function DocumentiPage() {
       const sg = r.doc_kind === "nota_di_credito" ? -1 : 1; // le note di credito escono con segno negativo
       const x = residui[r.id];
       return [
-        r.issue_date ? r.issue_date.split("-").reverse().join("/") : "", structName(r.structure_id), DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind,
+        r.issue_date ? fmtDate(r.issue_date) : "", structName(r.structure_id), DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind,
         r.number_label ?? "", STATO[r.stato]?.label ?? r.stato, cpName(r), r.counterpart?.vat ?? "", r.counterpart?.tax_code ?? "", r.counterpart?.country ?? "",
         r.booking_code ?? "", r.regime ?? "",
         centsToCsv(sg * r.taxable_cents), centsToCsv(sg * r.vat_cents), centsToCsv(sg * r.out_of_scope_cents), centsToCsv(sg * (r.bollo_cents ?? 0)), centsToCsv(sg * r.total_cents),
         sg === 1 ? centsToCsv(x?.paid ?? 0) : "", sg === 1 ? centsToCsv(x?.credited ?? 0) : "",
-        residuoOf(r) === null ? "" : centsToCsv(residuoOf(r)), r.due_date ? r.due_date.split("-").reverse().join("/") : "",
+        residuoOf(r) === null ? "" : centsToCsv(residuoOf(r)), r.due_date ? fmtDate(r.due_date) : "",
       ];
     });
     downloadCsv(`documenti-${year}${month !== "all" ? `-${String(month).padStart(2, "0")}` : ""}`, buildCsv(head, lines));
@@ -223,7 +224,7 @@ export default function DocumentiPage() {
               const isNc = r.doc_kind === "nota_di_credito";
               return (
                 <tr key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                  <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.issue_date ? new Date(r.issue_date).toLocaleDateString("it-IT") : <span className="text-faint">bozza</span>}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.issue_date ? fmtDate(r.issue_date) : <span className="text-faint">bozza</span>}</td>
                   <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>
                   <td className="px-3 py-2.5 text-dim">{DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-mono text-txt">{r.number_label ?? "—"}</td>

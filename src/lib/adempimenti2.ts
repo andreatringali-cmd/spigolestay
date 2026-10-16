@@ -16,9 +16,8 @@ const localISO = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pa
 
 export const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 export const nWord = (n: number, one: string, many: string): string => `${n} ${plural(n, one, many)}`;
-const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 const GIORNI = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
-export const shortDate = (iso: string): string => `${Number(iso.slice(8, 10))} ${MESI[Number(iso.slice(5, 7)) - 1]}`;
+export const shortDate = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 export const dowShort = (iso: string): string => GIORNI[new Date(dayNum(iso) * DAY).getUTCDay()];
 
 /** "oggi" · "domani" · "ieri" · "tra 3 giorni" · "3 giorni fa". */

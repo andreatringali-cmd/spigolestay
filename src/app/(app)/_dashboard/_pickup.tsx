@@ -1,12 +1,12 @@
 "use client";
 
 // Pickup: prenotazioni ricevute ogni giorno negli ultimi 30 giorni. Colonne sottili, ultimi 7 giorni evidenziati, confronto con la settimana prima.
+import { fmtDM } from "@/lib/dates";
 import { type PickupStats } from "@/lib/dashboard";
 import { tint } from "../_ui";
 import { Columns, CountUp, P, Tile, TileHead, Tip, useChartHover } from "./_kit";
 
 const WD = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
-const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 
 export default function Pickup({ pickup, delay = 0 }: { pickup: PickupStats; delay?: number }) {
   const n = pickup.days.length;
@@ -34,7 +34,7 @@ export default function Pickup({ pickup, delay = 0 }: { pickup: PickupStats; del
             <Columns values={pickup.days.map((x) => x.count)} colors={colors} height={84} gap={2} hover={idx} delay={150} />
             {hc && (
               <Tip xPct={((idx! + 0.5) / n) * 100}>
-                <div className="font-semibold">{WD[new Date(hc.iso + "T00:00:00Z").getUTCDay()]} {Number(hc.iso.slice(8))} {MESI[Number(hc.iso.slice(5, 7)) - 1]}</div>
+                <div className="font-semibold">{WD[new Date(hc.iso + "T00:00:00Z").getUTCDay()]} {fmtDM(hc.iso)}</div>
                 <div className="font-mono"><strong>{hc.count}</strong> <span className="text-faint">{hc.count === 1 ? "prenotazione" : "prenotazioni"}</span></div>
               </Tip>
             )}

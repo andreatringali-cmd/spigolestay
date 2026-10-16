@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
-import { toISO, nights, parseISO } from "@/lib/dates";
+import { toISO, nights, parseISO, fmtDM } from "@/lib/dates";
 import { bookingPaidTotal, cityTaxOfBooking } from "@/lib/booking";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
@@ -154,7 +154,7 @@ export default function Adempimenti2() {
   const modalStep = resolve ? modalSteps.find((s) => s.key === resolve.step) : undefined;
 
   // ── Testi ──
-  const dateLabel = cap(parseISO(today).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }));
+  const dateLabel = cap(`${parseISO(today).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(today)}`);
   const scopeLabel = selectedStructureIds.length === 1 ? getStructure(selectedStructureIds[0])?.name ?? "" : selectedStructureIds.length >= allStructures.length ? (structures.length > 1 ? "Tutte le strutture" : structures[0]?.name ?? "") : `${selectedStructureIds.length} strutture`;
   const loading = !dati.ready;
 

@@ -6,7 +6,8 @@ import { useData } from "@/lib/store";
 import { scopeFilter } from "@/lib/scope";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
-import { toISO, shiftISO, nights } from "@/lib/dates";
+import { toISO, shiftISO, nights, fmtDM, fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { eur } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
@@ -306,8 +307,8 @@ export default function NettarePage() {
         {period && (
           <div className="mt-4 grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-[1fr_auto_auto_auto]" style={{ background: "var(--wash)" }}>
             <input value={period.name} onChange={(e) => updScope({ name: e.target.value })} className="rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} aria-label={t("Nome periodo")} />
-            <label className="flex items-center gap-1.5 text-xs text-dim">{t("dal")}<input type="date" value={period.from} onChange={(e) => updScope({ from: e.target.value })} className="rounded-lg border border-line px-2 py-1.5 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} /></label>
-            <label className="flex items-center gap-1.5 text-xs text-dim">{t("al")}<input type="date" value={period.to} min={period.from} onChange={(e) => updScope({ to: e.target.value })} className="rounded-lg border border-line px-2 py-1.5 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} /></label>
+            <label className="flex items-center gap-1.5 text-xs text-dim">{t("dal")}<DateField value={period.from} onChange={(v) => updScope({ from: v })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt" /></label>
+            <label className="flex items-center gap-1.5 text-xs text-dim">{t("al")}<DateField value={period.to} min={period.from} onChange={(v) => updScope({ to: v })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt" /></label>
             <button onClick={delPeriod} className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ color: "var(--err)" }}>{t("Elimina")}</button>
           </div>
         )}
@@ -386,7 +387,7 @@ export default function NettarePage() {
             <button onClick={() => setStart((s) => (shiftISO(s, -GRID_DAYS) < today ? today : shiftISO(s, -GRID_DAYS)))} disabled={start <= today} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim disabled:opacity-40" style={{ background: "var(--surface)" }} aria-label={t("30 giorni prima")}>‹</button>
             <button onClick={() => setStart(today)} className="h-8 rounded-lg border border-line px-3 text-xs font-semibold text-txt" style={{ background: "var(--surface)" }}>{t("Oggi")}</button>
             <button onClick={() => setStart((s) => shiftISO(s, GRID_DAYS))} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim" style={{ background: "var(--surface)" }} aria-label={t("30 giorni dopo")}>›</button>
-            <input type="date" value={start} min={today} onChange={(e) => e.target.value && setStart(e.target.value < today ? today : e.target.value)} className="h-8 rounded-lg border border-line px-2 text-xs" style={{ background: "var(--surface)", color: "var(--txt)" }} />
+            <DateField value={start} min={today} onChange={(v) => v && setStart(v < today ? today : v)} className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-txt" />
           </div>
         </div>
 
@@ -401,7 +402,7 @@ export default function NettarePage() {
                     return (
                       <th key={d} className="border-b border-line px-1 py-2 text-center" style={{ width: COL, minWidth: COL, background: isToday ? "var(--focus)" : we ? "color-mix(in srgb,var(--focus) 9%,var(--surface))" : "var(--surface)", color: isToday ? "#fff" : "var(--txt)" }}>
                         <div className="text-[10px] font-bold uppercase tracking-wide" style={{ opacity: isToday ? 1 : 0.7 }}>{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
-                        <div className="text-[12px] font-semibold">{dt.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}</div>
+                        <div className="text-[12px] font-semibold">{fmtDM(d)}</div>
                       </th>
                     );
                   })}
@@ -523,7 +524,7 @@ export default function NettarePage() {
         title={t("Applica prezzi Nèttare")}
         subtitle={`${struct.name} · ${t("prossimi")} ${FUTURE} ${t("giorni")}`}
         impact={impact}
-        examples={[...plan].sort((a, b) => Math.abs(b.next - b.cur) - Math.abs(a.next - a.cur)).slice(0, 5).map((x) => ({ label: `${x.rtName} · ${new Date(x.iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}`, from: x.cur, to: x.next }))}
+        examples={[...plan].sort((a, b) => Math.abs(b.next - b.cur) - Math.abs(a.next - a.cur)).slice(0, 5).map((x) => ({ label: `${x.rtName} · ${wdDM(x.iso)}`, from: x.cur, to: x.next }))}
         notes={[t("Imposta i prezzi consigliati (con i tuoi modificatori) solo per questa struttura. Potrai modificarli a mano quando vuoi.")]}
         confirmLabel={t("Applica")}
         onConfirm={applyPrices}
@@ -581,7 +582,7 @@ function CellPanel({ c, rtName, published, floor, t, onClose, onSave, onReset }:
       <div className="absolute inset-0" style={{ background: "rgba(15,15,30,.28)" }} onClick={onClose} />
       <div className="relative flex h-full w-full max-w-[400px] flex-col overflow-y-auto shadow-2xl" style={{ background: "var(--paper)" }}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4" style={{ background: "var(--surface)" }}>
-          <div><div className="text-lg font-bold text-txt">{rtName}</div><div className="text-xs capitalize text-dim">{dt.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div></div>
+          <div><div className="text-lg font-bold text-txt">{rtName}</div><div className="text-xs capitalize text-dim">{dt.toLocaleDateString("it-IT", { weekday: "long" })} {fmtDate(c.date)}</div></div>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-[var(--wash)]" aria-label={t("Chiudi")}>✕</button>
         </div>
 
@@ -636,7 +637,8 @@ function CellPanel({ c, rtName, published, floor, t, onClose, onSave, onReset }:
   );
 }
 
-const fmtShort = (iso: string) => (iso ? new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }) : "…");
+const fmtShort = (iso: string) => (iso ? fmtDM(iso) : "…");
+const wdDM = (iso: string) => `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 function Card({ title, desc, open, onToggle, children }: { title: string; desc: string; open: boolean; onToggle: () => void; children: ReactNode }) {
   return (
@@ -751,7 +753,7 @@ function PriceChart({ dates, series, periods, t }: { dates: string[]; series: Se
         </svg>
         {hi != null && (
           <div className="pointer-events-none absolute z-10 min-w-[170px] rounded-xl border border-line px-3 py-2 text-[12px] shadow-lg" style={{ background: "var(--surface)", top: 6, left: x(hi) > w * 0.6 ? x(hi) - 186 : x(hi) + 12 }}>
-            <div className="mb-1 font-semibold capitalize text-txt">{new Date(dates[hi] + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })}</div>
+            <div className="mb-1 font-semibold capitalize text-txt">{wdDM(dates[hi])}</div>
             {vis.map((s) => (
               <div key={s.key} className="flex items-center justify-between gap-4">
                 <span className="flex items-center gap-1.5 text-dim"><svg width="12" height="6" aria-hidden><line x1="1" y1="3" x2="11" y2="3" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash ? "3 2" : undefined} /></svg>{s.label}</span>

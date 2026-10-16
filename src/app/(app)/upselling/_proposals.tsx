@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { parseISO, nights as nightsBetween } from "@/lib/dates";
+import { parseISO, nights as nightsBetween, fmtDM } from "@/lib/dates";
 import { CHANNELS, type Booking, type Structure } from "@/lib/types";
 import { shortenLink } from "@/lib/guestlink";
 import {
@@ -19,7 +19,7 @@ import Icon from "@/components/Icon";
 import EmptyState from "@/components/EmptyState";
 import { useToast } from "@/components/ToastProvider";
 
-const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+const fmt = (iso: string) => fmtDM(iso);
 
 export interface Candidate { booking: Booking; proposals: Proposal[]; structure?: Structure }
 

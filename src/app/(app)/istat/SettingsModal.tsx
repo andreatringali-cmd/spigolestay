@@ -1,5 +1,6 @@
 "use client";
 
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
@@ -77,7 +78,7 @@ export default function IstatSettingsModal({ sid, onClose }: { sid: string; onCl
               </button>
             </div>
           </label>
-          <label className="block"><span className={lbl}>Elabora i dati a partire dal</span><input type="date" value={s.start_from?.slice(0, 10) ?? ""} onChange={(e) => set({ start_from: e.target.value })} className={inp} /></label>
+          <label className="block"><span className={lbl}>Elabora i dati a partire dal</span><DateField value={s.start_from?.slice(0, 10) ?? ""} onChange={(v) => set({ start_from: v })} className={inp} /></label>
           <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
           <label className="flex items-center justify-between"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => setAuto(e.target.checked)} disabled={!!busy} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
           <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: il movimento viene chiuso e inviato ogni giorno in automatico." : "Spento: chiudi e invii tu con «Invia / chiudi»."}</span>

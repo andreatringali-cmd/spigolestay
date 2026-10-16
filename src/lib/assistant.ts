@@ -1,6 +1,7 @@
 // Assistente in linguaggio naturale (locale, senza backend): interpreta domande in
 // italiano e risponde sui dati reali dello store. Deterministico, istantaneo, privato.
 
+import { fmtDate, fmtDM } from "./dates";
 import type { Booking, Guest, Structure, Unit, RoomType } from "./types";
 import { eur } from "./format";
 import { bookingExtrasTotal } from "./booking";
@@ -35,7 +36,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
-const fmtD = (i: string) => { const [y, m, d] = i.split("-"); return `${+d} ${MONTHS[+m - 1].slice(0, 3)}${y !== String(new Date().getFullYear()) ? " " + y : ""}`; };
+const fmtD = (i: string) => fmtDate(i);
 const nights = (a: string, b: string) => Math.max(1, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
 
 export const SUGGESTIONS = [
@@ -68,9 +69,9 @@ function parseDay(q: string, today: Date): { iso: string; label: string } | null
   if (/ieri/.test(q)) return { iso: iso(addDays(today, -1)), label: "ieri" };
   if (/oggi|stasera|stamattina|stanotte/.test(q)) return { iso: iso(today), label: "oggi" };
   const md = q.match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/);
-  if (md) { const m = MONTHS.indexOf(md[2]); const ym = q.match(/\b(20\d\d)\b/); const y = ym ? +ym[1] : today.getFullYear(); return { iso: iso(new Date(y, m, +md[1])), label: `il ${+md[1]} ${md[2]}` }; }
+  if (md) { const m = MONTHS.indexOf(md[2]); const ym = q.match(/\b(20\d\d)\b/); const y = ym ? +ym[1] : today.getFullYear(); return { iso: iso(new Date(y, m, +md[1])), label: `il ${fmtDM(iso(new Date(y, m, +md[1])))}` }; }
   const dm = q.match(/\b(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?\b/);
-  if (dm) { let y = today.getFullYear(); if (dm[3]) y = dm[3].length === 2 ? 2000 + +dm[3] : +dm[3]; const d = new Date(y, +dm[2] - 1, +dm[1]); return { iso: iso(d), label: `il ${+dm[1]}/${+dm[2]}` }; }
+  if (dm) { let y = today.getFullYear(); if (dm[3]) y = dm[3].length === 2 ? 2000 + +dm[3] : +dm[3]; const d = new Date(y, +dm[2] - 1, +dm[1]); return { iso: iso(d), label: `il ${fmtDM(iso(d))}` }; }
   return null;
 }
 

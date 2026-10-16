@@ -37,7 +37,7 @@ export function periodRange(p: PackPeriod): PackRange {
   return { from: `${p.year}-${p2(startM + 1)}-01`, to, label: `${p.q}º trimestre ${p.year}`, lastDay: dayBefore(to) };
 }
 export const inRange = (iso: string | null | undefined, r: PackRange): boolean => { const d = (iso ?? "").slice(0, 10); return d.length === 10 && d >= r.from && d < r.to; };
-export const dmy = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "");
+export const dmy = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10).split("-").reverse().join(".") : "");
 export const slug = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 export const fmtEurCents = (c: number): string => `${c < 0 ? "−" : ""}${(Math.abs(c) / 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 

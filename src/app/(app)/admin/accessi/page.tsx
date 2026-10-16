@@ -4,6 +4,7 @@
 // Xenora non è a registrazione aperta: solo le email in questa lista (più owner, utenti già
 // esistenti, membri e invitati) possono entrare. Qui l'owner approva/rimuove le email.
 
+import { fmtDate as fmtDateShared } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Card } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
@@ -73,7 +74,7 @@ export default function AccessiPage() {
     </div>
   );
 
-  const fmtDate = (s: string) => { const d = new Date(s); return isNaN(+d) ? s : d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); };
+  const fmtDate = (s: string) => { const d = new Date(s); return isNaN(+d) ? s : fmtDateShared(d); };
 
   return (
     <div>

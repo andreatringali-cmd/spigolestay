@@ -9,13 +9,14 @@ import { useData } from "@/lib/store";
 import { PageHeader, StatCard, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
+import { fmtDate } from "@/lib/dates";
 import { STATO, DOC_KIND_LABEL } from "@/lib/invoicing/client";
 import { bolloQuarters, quarterOf } from "@/lib/invoicing/bollo";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { todayLocalISO } from "@/lib/invoicing/receivables";
 
 interface Row { id: string; number_label: string | null; issue_date: string | null; bollo_cents: number; counterpart: { name?: string; lastName?: string } | null; structure_id: string | null; stato: string; doc_kind: string; regime: string | null }
-const dmy = (iso: string) => iso.split("-").reverse().join("/");
+const dmy = (iso: string) => fmtDate(iso);
 
 export default function RegistroBolloPage() {
   const router = useRouter();
@@ -100,7 +101,7 @@ export default function RegistroBolloPage() {
               const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" };
               return (
                 <tr key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                  <td className="px-3 py-2.5 text-dim">{r.issue_date ? new Date(r.issue_date).toLocaleDateString("it-IT") : "—"}</td>
+                  <td className="px-3 py-2.5 text-dim">{r.issue_date ? fmtDate(r.issue_date) : "—"}</td>
                   <td className="px-3 py-2.5 text-dim">{quarterOf(r.issue_date)}º</td>
                   <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>
                   <td className="px-3 py-2.5 font-mono text-txt">{r.number_label}</td>

@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { inScope as inScopeOf, scopeFilter } from "@/lib/scope";
-import { toISO, shiftISO, parseISO } from "@/lib/dates";
+import { toISO, shiftISO, parseISO, fmtDM, fmtDate } from "@/lib/dates";
 import { journeyOf, isLiveBooking, stepOpensModal, type JourneyStep } from "@/lib/booking-journey";
 import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
@@ -32,8 +32,8 @@ import { blocksIn, daysBetween, dayStats, freeUnits, nightOf, occupies } from ".
 type Row = { b: Booking; j: Journey };
 type Col = "arr" | "stay" | "dep";
 
-const dayShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
-const dayLong = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const dayShort = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
+const dayLong = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDate(iso)}`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function relDay(iso: string, today: string) {

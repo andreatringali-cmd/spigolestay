@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDate, fmtDM } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -77,12 +78,12 @@ function useFitViewport(gap = 72, min = 380) {
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()));
 const relTime = (ts: number, t: (s: string) => string) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-const fmtD = (iso: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
+const fmtD = (iso: string) => (iso ? fmtDM(iso) || iso : "—");
 // Colore avatar deterministico dal nome (piccolo accento — palette curata, tenue/elegante).
 const AVATAR_COLORS = ["#C15B57", "#C58A3B", "#3F9E82", "#3E7CB8", "#8A6EBE", "#B85C8E", "#4E9B5C", "#C77A3E", "#5A8FB0", "#9C7BAE"];
 const avatarColor = (n: string) => { let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; };
 // Etichetta giorno per i separatori del thread: Oggi / Ieri / data lunga.
-const dayLabel = (ts: number, t: (s: string) => string) => { const d = new Date(ts); const now = new Date(); const y = new Date(); y.setDate(now.getDate() - 1); if (d.toDateString() === now.toDateString()) return t("Oggi"); if (d.toDateString() === y.toDateString()) return t("Ieri"); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "long" }); };
+const dayLabel = (ts: number, t: (s: string) => string) => { const d = new Date(ts); const now = new Date(); const y = new Date(); y.setDate(now.getDate() - 1); if (d.toDateString() === now.toDateString()) return t("Oggi"); if (d.toDateString() === y.toDateString()) return t("Ieri"); return fmtDM(d); };
 // Anteprima ultimo messaggio per la lista (prefisso "Tu:" se in uscita), su una riga.
 const preview = (m: Msg | undefined, t: (s: string) => string) => (m ? `${m.dir === "out" ? `${t("Tu")}: ` : ""}${m.text.replace(/\s+/g, " ").trim()}` : "");
 
@@ -532,7 +533,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   };
   const checkinUrlFor = (b: Booking) => `${typeof window !== "undefined" ? window.location.origin : ""}/checkin?b=${encodeURIComponent(b.id)}`;
   const nightsOf = (b: Booking) => Math.max(1, Math.round((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 86400000));
-  const fmtLong = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long" });
+  const fmtLong = (iso: string) => fmtDate(iso);
   // Link ai portali per la richiesta di recensione (impostazioni in Modelli & automazioni; Google dal Place ID o dalla guida).
   const reviewLinksOf = (b: Booking) => {
     let guideReviewUrl = "";
@@ -773,7 +774,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {queue.map((x) => (
                   <div key={x.key} className="flex items-center gap-3 py-2">
-                    <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{new Date(x.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div><div className="text-[10px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
+                    <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{fmtDM(x.date)}</div><div className="text-[10px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
                     <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{x.tpl.name}</b> → {x.g.fullName}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
                     {isSent(x) ? (
                       <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("Inviato")} ✓</span>
@@ -824,7 +825,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                         <div className="flex flex-col gap-1.5">
                           {guestQueue.slice(0, 5).map((x) => (
                             <div key={x.key} className="flex items-center gap-2 text-xs">
-                              <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{new Date(x.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
+                              <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{fmtDM(x.date)}</span>
                               <span className="min-w-0 flex-1 truncate text-txt">{x.tpl.name}</span>
                               <button onClick={() => { sendScheduled(x); setQueueOpen(false); }} className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: (x.g.phone ? "#25D366" : "var(--focus)") }}>{t("Invia ora")}</button>
                             </div>

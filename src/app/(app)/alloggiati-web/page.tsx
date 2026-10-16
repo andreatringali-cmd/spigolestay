@@ -1,5 +1,7 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -161,7 +163,7 @@ export default function AlloggiatiWebPage() {
       {/* Riga filtri (sotto le card): filtro arrivo, ricevuta, invio e ingranaggio → Impostazioni */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
-        <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className={fieldCls} />
+        <DateField value={filterDate} onChange={(v) => setFilterDate(v)} className={fieldCls} />
         {filterDate && <button onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Link href="/alloggiati-web/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: riscarica o stampa le ricevute quando vuoi">📁 Archivio ricevute</Link>
@@ -237,7 +239,7 @@ export default function AlloggiatiWebPage() {
                         <span>· 👤 {pax}{pax === 1 ? " ospite" : " ospiti"}{rows.length !== pax ? ` (${rows.length}/${pax} schedine)` : ""}</span>
                         {chLab && <span>· {chLab}</span>}
                       </div>
-                      <div className="text-[11px] text-faint">📅 {arrival ? new Date(arrival).toLocaleDateString("it-IT") : "—"}{bk?.checkOut ? ` → ${new Date(bk.checkOut).toLocaleDateString("it-IT")}` : ""}{nights ? ` · ${nights} ${nights === 1 ? "notte" : "notti"}` : ""}{bk?.arrivalTime ? ` · arrivo h ${bk.arrivalTime}` : ""}{gStato !== "inviata" && arrival ? (isFuture(arrival) ? " · in preparazione" : <> · <span style={{ color: urgColor(cdTone(arrival)), fontWeight: 600 }}>{cdTone(arrival) === "over" ? "⚠ " : "⏱ "}{cdText(arrival)}</span></>) : ""}</div>
+                      <div className="text-[11px] text-faint">📅 {arrival ? fmtDate(arrival) : "—"}{bk?.checkOut ? ` → ${fmtDate(bk.checkOut)}` : ""}{nights ? ` · ${nights} ${nights === 1 ? "notte" : "notti"}` : ""}{bk?.arrivalTime ? ` · arrivo h ${bk.arrivalTime}` : ""}{gStato !== "inviata" && arrival ? (isFuture(arrival) ? " · in preparazione" : <> · <span style={{ color: urgColor(cdTone(arrival)), fontWeight: 600 }}>{cdTone(arrival) === "over" ? "⚠ " : "⏱ "}{cdText(arrival)}</span></>) : ""}</div>
                     </div>
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${gst.c} 16%, transparent)`, color: gst.c }}>{gst.l}</span>
                     <span className="shrink-0 text-faint">{opened ? "▾" : "▸"}</span>
@@ -246,7 +248,7 @@ export default function AlloggiatiWebPage() {
                     <div className="pb-2 pl-6">
                       {rows.map((x, ri) => { const g = x.guest ?? {};
                         const isCapo = ["16", "17", "18"].includes(x.ruolo);
-                        const dob = g.dataNascita ? new Date(g.dataNascita).toLocaleDateString("it-IT") : "";
+                        const dob = g.dataNascita ? fmtDate(g.dataNascita) : "";
                         const luogoNascita = [g.comuneNascita, g.provinciaNascita && `(${g.provinciaNascita})`].filter(Boolean).join(" ") || g.statoNascita || "";
                         return (
                         <div key={x.id} className={`py-2 ${ri > 0 ? "border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)]" : ""}`}>

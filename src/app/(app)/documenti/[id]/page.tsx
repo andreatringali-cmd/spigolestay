@@ -1,5 +1,6 @@
 "use client";
 
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -9,7 +10,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
-import { nights } from "@/lib/dates";
+import { nights, fmtDate, fmtDateTime } from "@/lib/dates";
 import { cityTaxOfBooking } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
 import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
@@ -194,7 +195,7 @@ export default function DocumentoPage() {
   const delLine = (i: number) => setLines((p) => p.filter((_, j) => j !== i));
   const delCityTax = () => setLines((p) => p.filter((l) => l.vat !== "N1" && l.sourceKind !== "city_tax"));
 
-  const dmy = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : iso; };
+  const dmy = (iso: string) => fmtDate(iso);
   const attachBooking = (bid: string) => {
     const b = bookings.find((x) => x.id === bid); if (!b) return;
     const rt = getRoomType(b.roomTypeId); const structure = getStructure(b.structureId); const g = getGuest(b.guestId);
@@ -345,7 +346,7 @@ export default function DocumentoPage() {
       return [...g.values()];
     })();
     const origin = related.find((r) => r.role === "Documento di origine");
-    const dmyLong = (iso: string) => (iso ? new Date(iso + "T00:00:00").toLocaleDateString("it-IT") : "");
+    const dmyLong = (iso: string) => (iso ? fmtDate(iso) : "");
     const e = (c: number) => eur(centsEur(c));
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
     const rows = lines.map((l) => `<tr><td>${esc(l.description)}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.vat === "N1" || l.vat === "N2.2" ? l.vat : l.vat + "%"}</td><td style="text-align:right">${eur(l.unitEur * (l.qty || 0))}</td></tr>`).join("");
@@ -359,7 +360,7 @@ export default function DocumentoPage() {
       table{width:100%;border-collapse:collapse;margin-top:10px}th,td{padding:8px 6px;border-bottom:1px solid #e3e6ef}th{text-align:left;font-size:11px;text-transform:uppercase;color:#5c6479}td[style*="right"],.tot div span:last-child{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
       .tot{margin:14px 0 0;margin-left:auto;width:280px}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .g{border-top:2px solid #285f92;font-weight:700;font-size:15px;margin-top:6px;padding-top:8px}
       .note{margin-top:26px;font-size:11px;color:#7a8194;border-top:1px solid #e3e6ef;padding-top:12px}@media print{body{padding:24px 30px}}</style></head><body>
-      <div class="head"><div>${emit || '<div>Emittente da configurare</div>'}</div><div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind]}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div>${f.issue_date ? new Date(f.issue_date).toLocaleDateString("it-IT") : ""}</div></div></div>
+      <div class="head"><div>${emit || '<div>Emittente da configurare</div>'}</div><div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind]}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div>${f.issue_date ? fmtDate(f.issue_date) : ""}</div></div></div>
       <div class="p"><div><h4>Cliente</h4>${cli}</div>${doc.booking_code ? `<div style="text-align:right"><h4>Prenotazione</h4><div>${esc(doc.booking_code)}</div></div>` : ""}</div>
       <table><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">IVA</th><th style="text-align:right">Totale</th></tr></thead><tbody>${rows}</tbody></table>
       ${origin ? `<div class="note" style="border-top:0;margin-top:10px;padding-top:0">Storna il documento n. ${esc(origin.number_label ?? "")}</div>` : ""}
@@ -410,7 +411,7 @@ export default function DocumentoPage() {
             <div className="mt-2 flex-1 overflow-y-auto">
               {bookingList.map((b) => (
                 <button key={b.id} onClick={() => attachBooking(b.id)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left hover:border-focus hover:bg-wash">
-                  <div className="min-w-0"><div className="truncate text-sm font-medium text-txt">{getGuest(b.guestId)?.fullName || "Ospite"} <span className="text-faint">· {b.code}</span></div><div className="text-[11px] text-faint">{new Date(b.checkIn).toLocaleDateString("it-IT")}–{new Date(b.checkOut).toLocaleDateString("it-IT")}</div></div>
+                  <div className="min-w-0"><div className="truncate text-sm font-medium text-txt">{getGuest(b.guestId)?.fullName || "Ospite"} <span className="text-faint">· {b.code}</span></div><div className="text-[11px] text-faint">{fmtDate(b.checkIn)}–{fmtDate(b.checkOut)}</div></div>
                   <span className="shrink-0 font-mono text-sm text-txt">{eur(b.total ?? 0)}</span>
                 </button>
               ))}
@@ -429,8 +430,8 @@ export default function DocumentoPage() {
           {frozen ? (
             <div className="mt-2 space-y-1 text-sm text-dim">
               <div>Tipo: <b className="text-txt">{DOC_KIND_LABEL[doc.doc_kind]}</b> · {doc.sdi_type}</div>
-              <div>Numero: <b className="text-txt">{doc.number_label}</b> · {doc.issue_date && new Date(doc.issue_date).toLocaleDateString("it-IT")}</div>
-              <div>Pagamento: {doc.payment_method} · scad. {doc.due_date ? new Date(doc.due_date).toLocaleDateString("it-IT") : "—"}</div>
+              <div>Numero: <b className="text-txt">{doc.number_label}</b> · {doc.issue_date && fmtDate(doc.issue_date)}</div>
+              <div>Pagamento: {doc.payment_method} · scad. {doc.due_date ? fmtDate(doc.due_date) : "—"}</div>
             </div>
           ) : (
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -445,8 +446,8 @@ export default function DocumentoPage() {
                 </div>
               </div>
               <label className={lbl}>Tipologia<select value={f.doc_kind} onChange={(e) => setF({ ...f, doc_kind: e.target.value })} className={inp}><option value="fattura">Fattura</option><option value="nota_di_credito">Nota di credito</option><option value="ricevuta_non_fiscale">Ricevuta</option></select></label>
-              <label className={lbl}>Data emissione<input type="date" value={f.issue_date} onChange={(e) => setF({ ...f, issue_date: e.target.value })} className={inp} /></label>
-              <div><span className={lbl}>Scadenza pagamento</span><div className="mt-1 flex gap-1"><input type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt" />{[0, 15, 30, 60].map((d) => <button key={d} onClick={() => setDue(d)} className="shrink-0 rounded-lg bg-wash px-2 text-xs font-semibold text-dim hover:bg-line" title={d === 0 ? "Scadenza = data di emissione" : `Scadenza = emissione + ${d} giorni`}>{d === 0 ? "ora" : `+${d}`}</button>)}</div></div>
+              <label className={lbl}>Data emissione<DateField value={f.issue_date} onChange={(v) => setF({ ...f, issue_date: v })} className={inp} /></label>
+              <div><span className={lbl}>Scadenza pagamento</span><div className="mt-1 flex gap-1"><DateField value={f.due_date} onChange={(v) => setF({ ...f, due_date: v })} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt" />{[0, 15, 30, 60].map((d) => <button key={d} onClick={() => setDue(d)} className="shrink-0 rounded-lg bg-wash px-2 text-xs font-semibold text-dim hover:bg-line" title={d === 0 ? "Scadenza = data di emissione" : `Scadenza = emissione + ${d} giorni`}>{d === 0 ? "ora" : `+${d}`}</button>)}</div></div>
               <label className={lbl}>Metodo di pagamento<select value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select></label>
               <details className="sm:col-span-2 mt-1">
                 <summary className="cursor-pointer text-xs font-semibold text-focus">Altre opzioni</summary>
@@ -541,7 +542,7 @@ export default function DocumentoPage() {
         <Card>
           <div className="mb-2 flex items-center justify-between"><SectionTitle>Stato e incassi</SectionTitle><span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></div>
           <div className="flex flex-col gap-1.5">
-            {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-24 shrink-0 text-[11px] text-faint">{new Date(ev.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>{(() => { const d = eventDisplay(ev.message); return <span className="text-txt">{d.text}{d.warn && <span className="mt-0.5 block text-[12px] font-medium text-[color:var(--warn)]">{d.warn}</span>}</span>; })()}</div>)}
+            {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-28 shrink-0 text-[11px] text-faint">{fmtDateTime(ev.ts)}</span>{(() => { const d = eventDisplay(ev.message); return <span className="text-txt">{d.text}{d.warn && <span className="mt-0.5 block text-[12px] font-medium text-[color:var(--warn)]">{d.warn}</span>}</span>; })()}</div>)}
           </div>
           {doc.stato === "inviata_intermediario" && (trial
             ? <p className="mt-2 rounded-lg px-3 py-2 text-[12px] font-medium text-dim" style={{ backgroundColor: "color-mix(in srgb, var(--dim) 12%, transparent)" }}>{TRIAL_NOTE} Verificala su Fatture in Cloud: l&apos;esito dello SdI non arriverà finché non viene inviata davvero.</p>
@@ -553,7 +554,7 @@ export default function DocumentoPage() {
               <p className="text-[12px] text-dim">La nota di credito riduce l&apos;importo dovuto dal documento di origine: non ha incassi propri.</p>
             ) : (<>
               <div className="mb-1 flex items-center justify-between"><span className="text-sm font-semibold text-txt">Incassi</span>{residuo > 0 ? <span className="text-[11px] font-semibold text-[color:var(--warn)]">Residuo {e2(residuo)}</span> : <span className="text-[11px] font-semibold text-[color:var(--ok)]">Saldato ✓</span>}</div>
-              {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
+              {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{fmtDate(p.paid_at)} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
               {credited > 0 && <div className="flex justify-between text-sm text-dim"><span>Stornato da note di credito</span><span className="font-mono">−{e2(credited)}</span></div>}
               {residuo < 0 && <p className="mt-1 text-[11px] font-semibold text-[color:var(--warn)]">Incassato/stornato oltre il totale di {e2(-residuo)}: verifica gli incassi.</p>}
               {ficNote && <p className="mt-1 text-[11px] font-medium" style={{ color: ficNote.ok ? "var(--ok)" : "var(--dim)" }}>{ficNote.text}</p>}

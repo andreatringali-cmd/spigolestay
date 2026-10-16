@@ -8,6 +8,7 @@ import { stepsOfTemplate } from "@/lib/auto-schedule";
 import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens, reviewDecision, usesReviewLinks, oneLine } from "@/lib/auto-review";
 import { buildGuideUrl, structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
 import { guestLangOf } from "@/lib/guest-lang";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ function romeNow(): { ymd: string; minutes: number } {
 }
 const addDaysISO = (iso: string, d: number) => { const dt = new Date(iso + "T00:00:00"); dt.setDate(dt.getDate() + d); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`; };
 const nights = (ci?: string, co?: string) => { if (!ci || !co) return 0; return Math.max(0, Math.round((Date.parse(co) - Date.parse(ci)) / 86400000)); };
-const fmtIT = (iso?: string) => { try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso ?? ""; } };
+const fmtIT = (iso?: string) => fmtDMY(iso);
 
 // Data-slot prevista per un modello rispetto alla prenotazione.
 function slotDate(tpl: Tpl, checkIn: string, checkOut: string): string | null {

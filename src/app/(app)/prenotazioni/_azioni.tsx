@@ -16,6 +16,7 @@ import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INT
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
+import { fmtDM } from "@/lib/dates";
 import Icon from "@/components/Icon";
 
 export interface StepActionsProps {
@@ -253,7 +254,7 @@ export default function StepActions(p: StepActionsProps) {
     </>);
   } else if (step.key === "checkout") {
     const hi = greeting(lang, guest).trim();
-    const dm = (() => { const [, m, d] = b.checkOut.split("-"); return `${+d}/${+m}`; })();
+    const dm = fmtDM(b.checkOut);
     const build = async () => ({ text: `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">Manda all&apos;ospite il promemoria della partenza: data e orario del check-out, come contattarti per qualsiasi necessità e un ringraziamento.</p>

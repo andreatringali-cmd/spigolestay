@@ -2,6 +2,8 @@
 
 // Fatture passive (acquisti/fornitori). CRUD lato client via Supabase (RLS tenant).
 // Importi in centesimi; input in euro. Ispirato a Octorate, semplificato.
+import { fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
@@ -216,7 +218,7 @@ export default function FatturePassivePage() {
     if (!supabase || !user || !edit) return;
     if (!edit.structureId && structures.length > 1) { setErr("Scegli la struttura a cui appartiene la fattura (o «Comune a tutte»)."); return; }
     const dup = findDuplicate(docs, { id: edit.id || undefined, supplier_name: edit.supplierName, doc_number: edit.doc_number, doc_date: edit.doc_date });
-    if (dup && !(await ask({ title: "Possibile duplicato", message: `Esiste già un documento n. ${dup.doc_number} di ${dup.supplier_name} del ${dup.doc_date ? new Date(dup.doc_date).toLocaleDateString("it-IT") : "—"}. Salvare comunque?`, confirmLabel: "Salva comunque" }))) return;
+    if (dup && !(await ask({ title: "Possibile duplicato", message: `Esiste già un documento n. ${dup.doc_number} di ${dup.supplier_name} del ${dup.doc_date ? fmtDate(dup.doc_date) : "—"}. Salvare comunque?`, confirmLabel: "Salva comunque" }))) return;
     setSaving(true); setErr("");
     // Fornitore: usa quello scelto o crea/riusa per nome.
     let supplierId = edit.supplierId;
@@ -291,7 +293,7 @@ export default function FatturePassivePage() {
   const money = (c: number) => (c / 100).toFixed(2).replace(".", ",");
   const exportCsv = () => {
     const head = ["Data", "Struttura", "Fornitore", "Numero", "Tipo", "Categoria", "Imponibile", "IVA", "Totale", "Scadenza", "Pagata", "Data pagamento", "Metodo", "In Cassa"];
-    const lines = filtered.map((r) => [r.doc_date ?? "", structName(r.structure_id), r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", money(signedCents(r, r.taxable_cents)), money(signedCents(r, r.vat_cents)), money(signedCents(r, r.total_cents)), r.due_date ?? "", r.paid ? "sì" : "no", r.paid_at ?? "", r.payment_method ?? "", inCassa.has(r.id) ? "sì" : "no"].map(csvCell).join(";"));
+    const lines = filtered.map((r) => [fmtDate(r.doc_date), structName(r.structure_id), r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", money(signedCents(r, r.taxable_cents)), money(signedCents(r, r.vat_cents)), money(signedCents(r, r.total_cents)), fmtDate(r.due_date), r.paid ? "sì" : "no", fmtDate(r.paid_at), r.payment_method ?? "", inCassa.has(r.id) ? "sì" : "no"].map(csvCell).join(";"));
     dl(`fatture-passive-${year}.csv`, [head.map(csvCell).join(";"), ...lines]);
   };
   const exportSummary = () => {
@@ -460,7 +462,7 @@ export default function FatturePassivePage() {
               return (
                 <tr key={r.id} onClick={() => openEdit(r)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label="Seleziona" checked={sel.has(r.id)} onChange={(e) => setSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} /></td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.doc_date ? new Date(r.doc_date).toLocaleDateString("it-IT") : "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.doc_date ? fmtDate(r.doc_date) : "—"}</td>
                   {!single && <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>}
                   <td className="px-3 py-2.5 font-medium text-txt">{r.supplier_name || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-dim">{r.doc_number || "—"}</td>
@@ -469,7 +471,7 @@ export default function FatturePassivePage() {
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(signedCents(r, r.taxable_cents)))}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(signedCents(r, r.vat_cents)))}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(signedCents(r, r.total_cents)))}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? new Date(r.due_date).toLocaleDateString("it-IT") : "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? fmtDate(r.due_date) : "—"}</td>
                   <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); if (!credit) togglePaid(r); }}>
                     <span className={`${credit ? "" : "cursor-pointer"} rounded-full px-2 py-0.5 text-[11px] font-semibold`} style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
                     {inCassa.has(r.id) && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
@@ -491,8 +493,8 @@ export default function FatturePassivePage() {
             <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button onClick={() => setFic(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-3 text-[11px] text-faint">Legge le fatture e le spese dei fornitori che Fatture in Cloud ha ricevuto (anche dal cassetto fiscale). Sola lettura: su Fatture in Cloud non viene modificato nulla.</p>
             <div className="flex flex-wrap items-end gap-2">
-              <label className={lbl}>Dal<input type="date" value={fic.from} max={fic.to} onChange={(e) => setFic({ ...fic, from: e.target.value, items: null })} className={inp} /></label>
-              <label className={lbl}>Al<input type="date" value={fic.to} min={fic.from} onChange={(e) => setFic({ ...fic, to: e.target.value, items: null })} className={inp} /></label>
+              <label className={lbl}>Dal<DateField value={fic.from} max={fic.to} onChange={(v) => setFic({ ...fic, from: v, items: null })} className={inp} /></label>
+              <label className={lbl}>Al<DateField value={fic.to} min={fic.from} onChange={(v) => setFic({ ...fic, to: v, items: null })} className={inp} /></label>
               <button onClick={ficPreview} disabled={fic.busy !== "" || !fic.from || !fic.to} className="rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{fic.busy === "list" ? "Leggo…" : "Mostra anteprima"}</button>
             </div>
             {fic.msg && (
@@ -522,7 +524,7 @@ export default function FatturePassivePage() {
                       {fic.items.map((i) => (
                         <tr key={i.ficId} className={`border-b border-line last:border-0 ${i.status === "imported" ? "opacity-50" : ""}`}>
                           <td className="px-2 py-1.5"><input type="checkbox" aria-label="Seleziona" disabled={i.status === "imported"} checked={fic.pick.has(i.ficId)} onChange={(e) => setFic((p) => { if (!p) return p; const n = new Set(p.pick); if (e.target.checked) n.add(i.ficId); else n.delete(i.ficId); return { ...p, pick: n }; })} /></td>
-                          <td className="whitespace-nowrap px-2 py-1.5 text-dim">{i.doc_date ? new Date(i.doc_date).toLocaleDateString("it-IT") : "—"}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-dim">{i.doc_date ? fmtDate(i.doc_date) : "—"}</td>
                           <td className="px-2 py-1.5 font-medium text-txt">{i.supplier_name || "—"}</td>
                           <td className="whitespace-nowrap px-2 py-1.5 font-mono text-dim">{i.doc_number || "—"}{i.doc_type === "nota_credito" ? " · NC" : ""}</td>
                           <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono font-semibold text-txt">{eur(cents(i.doc_type === "nota_credito" ? -i.total_cents : i.total_cents))}</td>
@@ -598,15 +600,15 @@ export default function FatturePassivePage() {
                 <datalist id="sup-list">{suppliers.map((s) => <option key={s.id} value={s.name} />)}</datalist>
               </label>
               <label className={lbl}>Numero documento<input value={edit.doc_number} onChange={(e) => setEdit({ ...edit, doc_number: e.target.value })} className={inp} /></label>
-              <label className={lbl}>Data<input type="date" value={edit.doc_date} onChange={(e) => setEdit({ ...edit, doc_date: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Data<DateField value={edit.doc_date} onChange={(v) => setEdit({ ...edit, doc_date: v })} className={inp} /></label>
               <label className={lbl}>Tipo<select value={edit.doc_type} onChange={(e) => setEdit({ ...edit, doc_type: e.target.value })} className={inp}>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
               <label className={lbl}>Categoria<select value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} className={inp}><option value="">—</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
               <label className={lbl}>Imponibile €<input value={edit.taxableEur} onChange={(e) => setEdit({ ...edit, taxableEur: e.target.value })} className={inp} inputMode="decimal" /></label>
               <label className={lbl}>IVA €<input value={edit.vatEur} onChange={(e) => setEdit({ ...edit, vatEur: e.target.value })} className={inp} inputMode="decimal" /></label>
               <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-wash px-3 py-2 text-sm"><span className="text-dim">Totale</span><span className="font-mono font-bold text-txt">{eur(totEur)}</span></div>
-              <label className={lbl}>Scadenza pagamento<input type="date" value={edit.due_date} onChange={(e) => setEdit({ ...edit, due_date: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Scadenza pagamento<DateField value={edit.due_date} onChange={(v) => setEdit({ ...edit, due_date: v })} className={inp} /></label>
               <label className={lbl}>Metodo<select value={edit.payment_method} onChange={(e) => setEdit({ ...edit, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>RID/SDD</option><option>PayPal</option></select></label>
-              <label className="sm:col-span-2 flex items-center gap-2 pt-1"><input type="checkbox" checked={edit.paid} onChange={(e) => setEdit({ ...edit, paid: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-sm text-txt">Pagata</span>{edit.paid && <input type="date" value={edit.paid_at || todayISO()} onChange={(e) => setEdit({ ...edit, paid_at: e.target.value })} className="ml-auto rounded-lg border border-line bg-paper px-2 py-1 text-sm" />}</label>
+              <label className="sm:col-span-2 flex items-center gap-2 pt-1"><input type="checkbox" checked={edit.paid} onChange={(e) => setEdit({ ...edit, paid: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-sm text-txt">Pagata</span>{edit.paid && <DateField value={edit.paid_at || todayISO()} onChange={(v) => setEdit({ ...edit, paid_at: v })} className="ml-auto rounded-lg border border-line bg-paper px-2 py-1 text-sm" />}</label>
               <label className={`${lbl} sm:col-span-2`}>Note<textarea value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} rows={2} className={inp} /></label>
             </div>
             {edit.id && (

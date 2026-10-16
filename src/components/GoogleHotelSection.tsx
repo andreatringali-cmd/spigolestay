@@ -4,6 +4,7 @@
 //  · cosa manca per comparire su Google, calcolato dai dati della scheda mentre li scrivi;
 //  · le foto (l'unico dato che la scheda non aveva): anteprime, "＋ Carica", "Elimina";
 //  · l'esito dell'ultimo invio. I dati partono da soli quando si salva la scheda: nessun pulsante da premere.
+import { fmtDateTime } from "@/lib/dates";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import { useData } from "@/lib/store";
@@ -78,7 +79,7 @@ export default function GoogleHotelSection({ structure }: { structure: Structure
   const resend = async () => { setResending(true); await pushStructureContent(structure, roomTypes); setResending(false); };
 
   const okColor = "var(--ok)", warnColor = "var(--warn)";
-  const when = last ? new Date(last.at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  const when = last ? fmtDateTime(last.at) : "";
   return (
     <Card className="mt-4">
       <SectionTitle>{t("Google Hotel")}</SectionTitle>

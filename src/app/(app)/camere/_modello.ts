@@ -1,7 +1,7 @@
 // Logica pura della vista Camere · Dettagliata: stato di oggi, prossimo arrivo, occupazione, segnalazioni.
 // Nessuna scrittura e nessuna dipendenza da React: parte solo da camere e prenotazioni già in scope.
 import type { Booking, RoomType, Unit } from "@/lib/types";
-import { shiftISO, toISO } from "@/lib/dates";
+import { shiftISO, toISO, fmtDM } from "@/lib/dates";
 import { isBlock, nightOf, occupies } from "@/app/(app)/calendario/_modello";
 
 export type Tone = "ok" | "focus" | "warn" | "err" | "dim";
@@ -12,7 +12,7 @@ export const TONE_VAR: Record<Tone, string> = { ok: "var(--ok)", focus: "var(--f
 
 export type GuestNameFn = (b: Booking) => string;
 
-const fmtDay = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const fmtDay = (iso: string) => `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 export const dayLabel = fmtDay;
 
 export interface Snapshot {

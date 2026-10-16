@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseISO, toISO } from "@/lib/dates";
+import { parseISO, toISO, fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -15,7 +16,7 @@ import type { NormalizedReview } from "@/lib/reviews/google";
 import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChannel, type ReviewScore, type ScoreSummary } from "@/lib/channex-review-scores";
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 
-const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
+const fmt = (iso: string) => fmtDate(iso);
 
 // Fonti recensioni: Google (reale via API) + OTA (collegamento partner in arrivo, per ora inserimento manuale).
 const SOURCES = [
@@ -471,7 +472,7 @@ export default function RecensioniPage() {
   const exportCsv = () => {
     const head = ["Data", "Fonte", "Ospite", "Voto (0-10)", "Testo", "Risposta"];
     const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
-    const lines = shown.map((r) => [r.date, SRC[r.source as SourceKey]?.label ?? r.source, r.guest, r.rating, r.text, replies[r.id] ?? ""].map(q).join(";"));
+    const lines = shown.map((r) => [fmtDate(r.date), SRC[r.source as SourceKey]?.label ?? r.source, r.guest, r.rating, r.text, replies[r.id] ?? ""].map(q).join(";"));
     const csv = "\ufeff" + [head.map(q).join(";"), ...lines].join("\r\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     a.download = `recensioni-${(structures.find((s) => s.id === selStructureId)?.name || "struttura").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${toISO(new Date())}.csv`; a.click(); URL.revokeObjectURL(a.href);
@@ -955,7 +956,7 @@ export default function RecensioniPage() {
             </label>
             <label className="text-sm">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Data</span>
-              <input type="date" value={mForm.date} onChange={(e) => setMForm((f) => ({ ...f, date: e.target.value }))} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+              <DateField value={mForm.date} onChange={(v) => setMForm((f) => ({ ...f, date: v }))} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-left text-sm text-txt outline-none focus:border-focus" />
             </label>
             <label className="text-sm">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Voto (0–10): {mForm.rating}</span>

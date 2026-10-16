@@ -6,6 +6,8 @@ import { buildQuotePdf, type QuotePdfRoom, type QuotePdfExtra } from "@/lib/quot
 import { uploadPublicAsset, dataUrlToBytes } from "@/lib/email-assets";
 import { et, emailLang, cancelPolicyIn, cityTaxRuleIn, dateLocale, type CityTaxRule } from "@/lib/email-i18n";
 import type { GuestLang } from "@/lib/phone-country";
+import { fmtDMY } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 
@@ -16,7 +18,8 @@ const KEY = process.env.RESEND_API_KEY || "";
 const esc = (s: unknown) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] || c));
 const fmtDate = (iso?: string, lang: GuestLang = "it") => {
   if (!iso) return "";
-  try { return new Date(iso + "T00:00:00").toLocaleDateString(dateLocale(lang), { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
+  // Formato unico gg.mm.aaaa (con il nome del giorno nella lingua dell'ospite davanti).
+  try { return `${new Date(iso + "T00:00:00Z").toLocaleDateString(dateLocale(lang), { weekday: "short", timeZone: "UTC" }).replace(/\.$/, "")} ${fmtDMY(iso)}`; } catch { return fmtDMY(iso); }
 };
 
 interface BookingPayload {
@@ -239,7 +242,7 @@ async function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: 
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         ${row("Nome", esc([g.firstName, g.lastName].filter(Boolean).join(" ")))}
         ${g.sex ? row("Sesso", esc(g.sex)) : ""}
-        ${g.birthDate ? row("Nascita", esc(g.birthDate) + (g.birthPlace ? ` · ${esc(g.birthPlace)}` : "")) : ""}
+        ${g.birthDate ? row("Nascita", esc(fmtDMY(g.birthDate)) + (g.birthPlace ? ` · ${esc(g.birthPlace)}` : "")) : ""}
         ${g.citizenship ? row("Cittadinanza", esc(g.citizenship)) : ""}
         ${g.docNumber ? row("Documento", esc([g.docType, g.docNumber].filter(Boolean).join(" · ")) + (g.docPlace ? ` · ${esc(g.docPlace)}` : "")) : ""}
       </table>
@@ -287,7 +290,7 @@ function subReceiptHtml(s: SubReceiptPayload) {
   const cur = (s.currency || "EUR").toUpperCase() === "EUR" ? "€" : (s.currency || "EUR");
   const amount = typeof s.totalCents === "number" ? `${cur} ${(s.totalCents / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })}` : "";
   const plan = s.planName || (s.plan ? s.plan.charAt(0).toUpperCase() + s.plan.slice(1) : "");
-  const fmt = (u?: number | null) => { if (!u) return ""; try { return new Date(u * 1000).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return ""; } };
+  const fmt = (u?: number | null) => { if (!u) return ""; try { return fmtDMY(ymdRome(u * 1000)); } catch { return ""; } };
   const periodo = s.periodStart && s.periodEnd ? `${fmt(s.periodStart)} → ${fmt(s.periodEnd)}` : "";
   const inner = `
     <p style="margin:0 0 4px;font-size:16px;">Grazie,</p>

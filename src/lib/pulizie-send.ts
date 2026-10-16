@@ -38,7 +38,7 @@ export async function deliverPuliziePlan(a: {
   const detailedF = buildPuliziePlanFields({ ...planArgs, detailed: true });
   const detailedLen = Object.values(detailedF).reduce((n, v) => n + v.length, 0);
   const f = detailedLen <= DETAIL_MAX ? detailedF : buildPuliziePlanFields(planArgs);
-  const dateLong = fmtLongIT(date);                                         // "domenica 11 ottobre" invece di "2026-10-11"
+  const dateLong = fmtLongIT(date);                                         // "domenica 11.10.2026" invece di "2026-10-11"
   const subject = `Planning pulizie · ${name} · ${dateLong}`;
   const out: PulizieSendResult[] = [];
 

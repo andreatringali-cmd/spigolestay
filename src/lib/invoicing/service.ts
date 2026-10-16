@@ -40,7 +40,7 @@ const DATA_KEY = "spigolestay:data:v1";
 type Blob = { structures?: Structure[]; roomTypes?: RoomType[]; bookings?: Booking[]; guests?: Guest[] };
 interface Ctx { booking: Booking; structure?: Structure; roomType?: RoomType; guest?: Guest }
 
-const dmy = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : iso; };
+const dmy = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}.${m}.${y}` : iso; };
 
 // Legge la prenotazione dal personale del tenant; se non c'è, cerca nelle org di cui è membro.
 async function loadBookingContext(admin: SupabaseClient, tenantId: string, bookingId: string): Promise<Ctx | null> {

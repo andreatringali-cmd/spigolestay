@@ -3,6 +3,7 @@
 // Pannello "Adempimenti" nella scheda prenotazione: stato di Check-in, Schedine
 // Alloggiati, ISTAT, Documenti, Pagamenti per QUESTA prenotazione, con azione rapida.
 // Legge da Supabase (RLS) le righe collegate a booking_id.
+import { fmtDM } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -83,7 +84,7 @@ export default function AdempimentiPanel({ booking }: { booking: Booking }) {
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Attività</div>
           <div className="flex flex-col gap-1">
             {timeline.map((e) => (
-              <div key={e.id} className="flex gap-2 text-[12px]"><span className="w-16 shrink-0 text-faint">{new Date(e.ts).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}</span><span className="text-dim">{e.message}</span></div>
+              <div key={e.id} className="flex gap-2 text-[12px]"><span className="w-16 shrink-0 text-faint">{fmtDM(e.ts)}</span><span className="text-dim">{e.message}</span></div>
             ))}
           </div>
         </div>

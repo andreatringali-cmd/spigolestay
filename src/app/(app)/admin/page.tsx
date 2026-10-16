@@ -5,6 +5,7 @@
 // a tendina. In più: vista "tutti i registrati", contatti rapidi, filtri scadenze, export CSV.
 // I dati arrivano da /api/admin/overview e /api/admin/payments (service_role lato server).
 
+import { fmtDate } from "@/lib/dates";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,7 +36,7 @@ const isActive = (r: Row) => ACTIVE.includes(statusOf(r));
 const isTrial = (r: Row) => TRIALING.includes(statusOf(r));
 const isPastDue = (r: Row) => PAST_DUE.includes(statusOf(r));
 
-const dmy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(+d)) return "—"; return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
+const dmy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(+d)) return "—"; return fmtDate(d); };
 const daysUntil = (iso: string | null) => { if (!iso) return null; const d = new Date(iso); if (isNaN(+d)) return null; return Math.round((+d - Date.now()) / 86400000); };
 const tierOf = (plan: string | null) => TIERS.find((t) => t.key === (plan || "").toLowerCase());
 const tierName = (plan: string | null) => tierOf(plan)?.name || (plan ? plan : "—");

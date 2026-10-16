@@ -7,6 +7,8 @@ import { eur } from "@/lib/format";
 import { PageHeader, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { inScope, newItemStructureId } from "@/lib/scope";
 
 const BOARDS = ["Solo pernottamento", "Colazione", "Mezza pensione", "Pensione completa"];
@@ -46,7 +48,7 @@ const cancelLabel = (p: RatePlan, t: (s: string) => string) =>
   p.refundable ? (p.cancelDays ? `${t("Rimborsabile")} · ${p.cancelDays}gg` : t("Rimborsabile")) : t("Non rimborsabile");
 const fmtRange = (p: RatePlan, t: (s: string) => string) => {
   if (!p.dateFrom && !p.dateTo) return t("Sempre");
-  const d = (s?: string) => (s ? s.split("-").reverse().join("/") : "…");
+  const d = (s?: string) => (s ? fmtDate(s) : "…");
   return `${d(p.dateFrom)} → ${d(p.dateTo)}`;
 };
 
@@ -295,9 +297,9 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
           {(f.dateFrom || f.dateTo) && <button onClick={() => setF((p) => ({ ...p, dateFrom: undefined, dateTo: undefined }))} className="text-[11px] font-medium text-focus hover:underline">{t("Azzera")}</button>}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <input type="date" value={f.dateFrom ?? ""} onChange={(e) => set("dateFrom", e.target.value || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
+          <DateField value={f.dateFrom ?? ""} onChange={(v) => set("dateFrom", v || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
           <span className="text-dim">→</span>
-          <input type="date" value={f.dateTo ?? ""} onChange={(e) => set("dateTo", e.target.value || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
+          <DateField value={f.dateTo ?? ""} onChange={(v) => set("dateTo", v || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
         </div>
       </div>
 

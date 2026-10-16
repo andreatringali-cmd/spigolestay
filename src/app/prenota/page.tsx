@@ -15,6 +15,8 @@ import { loadPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import AdsConsent from "@/components/AdsConsent";
+import DateField from "@/components/DateField";
+import { fmtDate } from "@/lib/dates";
 import { trackBookingConversion, resolveAdsConfig } from "@/lib/ads";
 import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
@@ -138,8 +140,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     const p = promos.find((x) => (x.code || "").toUpperCase() === c && !!x.discountPct);
     if (!p) { setAppliedPromo(null); setPromoErr("Codice non valido."); return; }
     if (p.validUntil && today > p.validUntil) { setAppliedPromo(null); setPromoErr("Offerta scaduta."); return; }
-    if (p.validFrom && checkIn < p.validFrom) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni dal ${new Date(p.validFrom).toLocaleDateString("it-IT")}.`); return; }
-    if (p.validTo && checkIn > p.validTo) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni fino al ${new Date(p.validTo).toLocaleDateString("it-IT")}.`); return; }
+    if (p.validFrom && checkIn < p.validFrom) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni dal ${fmtDate(p.validFrom)}.`); return; }
+    if (p.validTo && checkIn > p.validTo) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni fino al ${fmtDate(p.validTo)}.`); return; }
     setAppliedPromo({ name: p.name, code: (p.code || "").toUpperCase(), pct: p.discountPct! });
   };
   // Applica automaticamente il codice arrivato dall'offerta (?promo=).
@@ -350,8 +352,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     ["Struttura", structure?.name ?? ""],
     ["Camera", `${selRt?.name ?? ""}${selPlan ? " · " + selPlan.name : ""}`],
     ["Ospite", `${guest.firstName} ${guest.lastName}`.trim()],
-    ["Check-in", new Date(checkIn).toLocaleDateString("it-IT")],
-    ["Check-out", new Date(checkOut).toLocaleDateString("it-IT")],
+    ["Check-in", fmtDate(checkIn)],
+    ["Check-out", fmtDate(checkOut)],
     ["Ospiti", `${adults} adulti${children ? ` · ${children} bambini` : ""}`],
     ["Totale", eur(total)],
     ...((deposit > 0 && deposit < total
@@ -438,8 +440,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const searchBar = (
     <div className={`${box} mb-4 p-3`}>
       <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
-        <label className="block text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} min={today} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(addDays(e.target.value, 1)); setSearched(false); }} className={`${field} mt-1`} /></label>
-        <label className="block text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => { setCheckOut(e.target.value); setSearched(false); }} className={`${field} mt-1`} /></label>
+        <label className="block text-xs font-medium text-dim">Arrivo<DateField value={checkIn} min={today} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(addDays(v, 1)); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
+        <label className="block text-xs font-medium text-dim">Partenza<DateField value={checkOut} min={addDays(checkIn, 1)} onChange={(v) => { setCheckOut(v); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
         <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
         <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
         <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg bg-focus px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Verifica disponibilità</button>
@@ -482,7 +484,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
               <div className="flex justify-between"><span className="text-dim">Codice</span><span className="font-mono font-bold text-txt">{dCode}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-dim">Struttura</span><span className="text-txt">{dStruct}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-dim">Camera</span><span className="text-txt">{dRoom}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{new Date(dCi).toLocaleDateString("it-IT")} → {new Date(dCo).toLocaleDateString("it-IT")}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{fmtDate(dCi)} → {fmtDate(dCo)}</span></div>
               <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(dTotal)}</span></div>
               {dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">{dDeposit < dTotal ? "Acconto pagato" : "Importo pagato"}</span><span className="font-mono text-txt">{eur(dDeposit)}</span></div>}
               {dTotal - dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(dTotal - dDeposit)}</span></div>}
@@ -698,7 +700,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
             {/* Riepilogo */}
             <div className="lg:sticky lg:top-20 lg:self-start">
               <div className={`${box} p-4`}>
-                <div className="mb-2 text-sm font-semibold text-txt">{new Date(checkIn).toLocaleDateString("it-IT")} → {new Date(checkOut).toLocaleDateString("it-IT")}</div>
+                <div className="mb-2 text-sm font-semibold text-txt">{fmtDate(checkIn)} → {fmtDate(checkOut)}</div>
                 <div className="text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>
                 <div className="my-3 border-t border-line" />
                 <Line label={`${selRt.name} · ${selPlan.name}`} value={eur(accommodation)} />

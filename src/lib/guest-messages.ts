@@ -194,7 +194,7 @@ export function useReminderLog(bookings: { id: string; guestId: string }[]): Rem
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
-/** "oggi 10:12" · "ieri 18:40" · "3/10 09:05" */
+/** "oggi 10:12" · "ieri 18:40" · "03.10 09:05" */
 export function whenLabel(ts: number, now = Date.now()): string {
   const d = new Date(ts), n = new Date(now);
   const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
@@ -202,7 +202,7 @@ export function whenLabel(ts: number, now = Date.now()): string {
   const today = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
   if (day === today) return `oggi ${hm}`;
   if (day === today - 86400000) return `ieri ${hm}`;
-  return `${d.getDate()}/${d.getMonth() + 1} ${hm}`;
+  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)} ${hm}`;
 }
 /** "5 minuti fa" · "2 ore fa" · "3 giorni fa" */
 export function agoLabel(ts: number, now = Date.now()): string {

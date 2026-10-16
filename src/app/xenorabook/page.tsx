@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import DateField from "@/components/DateField";
 import { type Listing, stars, ListingImage } from "@/lib/xenorabook/data";
 
 type Stats = { structures: number; cities: number; reviews: number };
@@ -141,14 +142,14 @@ export default function XenoraBookPublicPage() {
                   {cityOptions.map((c) => <option key={c} value={c}>{c === "Tutte" ? "Ovunque in Sicilia SE" : c}</option>)}
                 </select>
               </label>
-              <label className="rounded-xl px-3 py-2 hover:bg-wash">
+              <div className="rounded-xl px-3 py-2 hover:bg-wash">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-in</div>
-                <input type="date" value={from} min={today} onChange={(e) => setFrom(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-txt outline-none" />
-              </label>
-              <label className="rounded-xl px-3 py-2 hover:bg-wash">
+                <DateField value={from} min={today} onChange={(v) => setFrom(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
+              </div>
+              <div className="rounded-xl px-3 py-2 hover:bg-wash">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-out</div>
-                <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-txt outline-none" />
-              </label>
+                <DateField value={to} min={from} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
+              </div>
               <div className="relative" ref={guestsRef}>
                 <button onClick={() => setGuestsOpen((o) => !o)} className="h-full w-full rounded-xl px-3 py-2 text-left hover:bg-wash">
                   <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Ospiti</div>

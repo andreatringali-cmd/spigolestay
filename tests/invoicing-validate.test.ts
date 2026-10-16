@@ -88,7 +88,7 @@ test("bollo per trimestre", () => {
 
 test("solleciti e link", () => {
   const t = reminderText({ customerName: "Mario Rossi", docLabel: "fattura 12/2026", issueDate: "2026-08-01", dueDate: "2026-09-01", residuoCents: 123456, daysLate: 31, senderName: "Spigole House" });
-  assert.match(t, /€ 1\.234,56/); assert.match(t, /01\/09\/2026/); assert.match(t, /Spigole House/);
+  assert.match(t, /€ 1\.234,56/); assert.match(t, /01\.09\.2026/); assert.match(t, /Spigole House/);
   assert.equal(waDigits("333 123 4567"), "393331234567");
   assert.equal(waDigits("+39 333 1234567"), "393331234567");
   assert.equal(waDigits("0049 170 123"), "49170123");

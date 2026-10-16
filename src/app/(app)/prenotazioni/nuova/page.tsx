@@ -10,7 +10,8 @@ import { captureA4ToPdfBlob, blobToBase64 } from "@/lib/pdf-capture";
 import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { shortenLink } from "@/lib/guestlink";
 import { rateForDay } from "@/lib/pricing";
-import { shiftISO, toISO, nights } from "@/lib/dates";
+import { shiftISO, toISO, nights, fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import NumInput from "@/components/NumInput";
@@ -22,7 +23,7 @@ import QRCode from "qrcode";
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 // Normalizza il telefono in formato internazionale (default +39) così WhatsApp funziona sempre.
 const normPhone = (p: string): string | undefined => { const s = (p ?? "").trim(); if (!s) return undefined; if (s.startsWith("+")) return s; if (s.startsWith("00")) return "+" + s.slice(2); return `+39 ${s}`; };
-const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
+const fmtDay = (iso: string) => fmtDate(iso);
 
 export default function NuovaPrenotazionePage() {
   const router = useRouter();
@@ -245,11 +246,11 @@ export default function NuovaPrenotazionePage() {
     const stAddress = [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" ");
     const stContacts = [st?.phone, st?.email, st?.website].filter(Boolean).join("  ·  ");
     const guestName = `${firstName} ${lastName}`.trim() || "Ospite";
-    const todayStr = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
+    const todayStr = fmtDate(new Date());
     const logoHtml = st?.logo
       ? `<img src="${st.logo}" alt="" class="logoimg">`
       : `<div class="logo" style="background:${accent}">${esc(structureName.slice(0, 1).toUpperCase())}</div>`;
-    const dmy = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+    const dmy = (iso: string) => fmtDate(iso);
     const periodCards = ([["Check-in", dmy(checkIn)], ["Check-out", dmy(checkOut)], ["Durata", `${nightsN} ${nWord}`], ["Ospiti", `${adults}${children > 0 ? ` + ${children}` : ""}`]] as [string, string][])
       .map(([k, v]) => `<div class="pc"><div class="pk">${esc(k)}</div><div class="pv">${esc(v)}</div></div>`).join("");
     const rows: string[] = [];
@@ -376,8 +377,8 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         <Card className="mb-5">
           {/* Date, ospiti e azione (in linea) */}
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></label>
-            <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></label>
+            <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Arrivo<DateField value={checkIn} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(shiftISO(v, 1)); }} className={`${inp} text-left`} /></label>
+            <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Partenza<DateField value={checkOut} min={shiftISO(checkIn, 1)} onChange={(v) => setCheckOut(v)} className={`${inp} text-left`} /></label>
             <label className="flex w-[88px] flex-col gap-1.5 text-xs font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={inp} /></label>
             <label className="flex w-[88px] flex-col gap-1.5 text-xs font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={inp} /></label>
             <button onClick={doSearch} className="rounded-lg bg-focus px-6 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ height: 38 }}>Verifica disponibilità</button>
@@ -613,7 +614,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         const g = getGuest(created.guestId);
         const first = g?.firstName || (g?.fullName ? g.fullName.split(" ")[0] : "") || "";
         const structName = taxStruct?.name || "la struttura";
-        const dmy = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+        const dmy = (iso: string) => fmtDate(iso);
         // Messaggio di conferma completo: saluto, riepilogo e link di gestione.
         const msg = [
           `Ciao ${first},`,
@@ -697,7 +698,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 // Data lunga in italiano, coerente con lo stile degli altri documenti (preventivo/voucher).
 function fmtLongDate(iso?: string): string {
   if (!iso) return "";
-  try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
+  try { return `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDate(iso)}`; } catch { return iso; }
 }
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";

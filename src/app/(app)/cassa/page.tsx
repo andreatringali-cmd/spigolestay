@@ -18,7 +18,7 @@ import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurren
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
-import { fmtDMY } from "@/lib/dates";
+import { fmtDMY, fmtDate, fmtDM } from "@/lib/dates";
 import ChannelLogo from "@/components/ChannelLogo";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
@@ -582,7 +582,7 @@ export default function CassaPage() {
   const periodLabel = from || to ? `${from || "inizio"}_${to || "in-poi"}` : "storico";
   const doExcel = () => {
     const headers = [t("Data"), t("Tipo"), t("Categoria"), t("Descrizione"), t("Conto"), t("Struttura"), `${t("Entrata")} €`, `${t("Uscita")} €`];
-    const body = rows.map((m) => [m.date, m.kind === "in" ? t("Entrata") : t("Uscita"), catOf(m.cat)?.label ? t(catOf(m.cat)!.label) : m.cat, m.desc + (m.sched ? ` (${t("programmato")})` : m.auto ? ` (${t("auto")})` : ""), CONTI.find((x) => x.key === m.conto)?.label ? t(CONTI.find((x) => x.key === m.conto)!.label) : m.conto, structNameOf(movSid(m)), m.kind === "in" ? m.amount : "", m.kind === "out" ? m.amount : ""]);
+    const body = rows.map((m) => [fmtDMY(m.date), m.kind === "in" ? t("Entrata") : t("Uscita"), catOf(m.cat)?.label ? t(catOf(m.cat)!.label) : m.cat, m.desc + (m.sched ? ` (${t("programmato")})` : m.auto ? ` (${t("auto")})` : ""), CONTI.find((x) => x.key === m.conto)?.label ? t(CONTI.find((x) => x.key === m.conto)!.label) : m.conto, structNameOf(movSid(m)), m.kind === "in" ? m.amount : "", m.kind === "out" ? m.amount : ""]);
     body.push(["", "", "", "", "", t("TOTALI"), entrate, uscite]);
     body.push(["", "", "", "", "", t("SALDO"), saldo, ""]);
     exportExcel(`cassa-${periodLabel}`, headers, body);
@@ -946,7 +946,7 @@ export default function CassaPage() {
                         <div className="truncate text-sm font-medium text-txt">{rule.desc}</div>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
                           <span className="rounded px-1.5 py-0.5 font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 18%, transparent)", color: "var(--warn)" }}>{t("SCADUTA")}</span>
-                          <span className="text-faint">{new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" })}</span>
+                          <span className="text-faint">{fmtDate(iso)}</span>
                         </div>
                       </div>
                       {rule.variable ? (
@@ -1040,7 +1040,7 @@ export default function CassaPage() {
               </div>
             </div>}
             <label className="mt-3 block"><span className="text-xs text-dim">{t("Valido dal giorno")}</span>
-              <input type="date" value={opening.date} onChange={(e) => setOpening((o) => (o ? { ...o, date: e.target.value } : o))} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+              <DateField value={opening.date} onChange={(v) => setOpening((o) => (o ? { ...o, date: v } : o))} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
             </label>
             <label className="mt-2 flex items-start gap-2 text-xs text-dim">
               <input type="checkbox" checked={opening.startOfDay} onChange={(e) => setOpening((o) => (o ? { ...o, startOfDay: e.target.checked } : o))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" />
@@ -1148,7 +1148,7 @@ export default function CassaPage() {
                               <span className="truncate text-sm font-medium text-txt">{r.desc}</span>
                               <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.variable ? t("variabile") : r.auto ? t("auto") : t("manuale")}</span>
                             </div>
-                            <div className="mt-0.5 text-[11px] text-faint">{t(FREQ[r.freq])}{r.freq === "monthly" ? ` · ${t("il")} ${r.day}` : ""}{r.end ? ` · ${t("fino al")} ${new Date(r.end).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}{next ? ` · ${t("prossima")} ${new Date(next).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}</div>
+                            <div className="mt-0.5 text-[11px] text-faint">{t(FREQ[r.freq])}{r.freq === "monthly" ? ` · ${t("il")} ${r.day}` : ""}{r.end ? ` · ${t("fino al")} ${fmtDate(r.end)}` : ""}{next ? ` · ${t("prossima")} ${fmtDM(next)}` : ""}</div>
                           </div>
                           <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: r.kind === "in" ? "var(--ok)" : "var(--err)" }}>{r.variable ? "~ " : ""}{r.kind === "in" ? "+" : "−"} {eur(r.amount)}</span>
                           </button>
@@ -1177,7 +1177,7 @@ export default function CassaPage() {
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
               <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={form.conto} onChange={(e) => setForm((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{contoOptions(form.struttura, form.conto).map((c) => <option key={c.key} value={c.key}>{contoOptLabel(c, form.struttura)}</option>)}</select></label>
-              <label className="block"><span className="text-xs text-dim">{t("Data")}</span><input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+              <label className="block"><span className="text-xs text-dim">{t("Data")}</span><DateField value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             </div>
             {!singleSid && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")} *</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className={"mt-0.5 w-full rounded-lg border bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus " + (form.struttura ? "border-line" : "border-[color:var(--warn)]")}><option value="">{t("Scegli la struttura…")}</option>{form.struttura === "all" && <option value="all">{t("Comune (tutte)")}</option>}{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
@@ -1261,15 +1261,15 @@ export default function CassaPage() {
               {rf.freq === "monthly" ? (
                 <label className="block"><span className="text-xs text-dim">{t("Giorno del mese")}</span><input type="number" min={1} max={31} value={rf.day} onChange={(e) => setRf((f) => ({ ...f, day: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
               ) : (
-                <label className="block"><span className="text-xs text-dim">{t("Data inizio")}</span><input type="date" value={rf.start} onChange={(e) => setRf((f) => ({ ...f, start: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block"><span className="text-xs text-dim">{t("Data inizio")}</span><DateField value={rf.start} onChange={(v) => setRf((f) => ({ ...f, start: v }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
               )}
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
               <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={rf.conto} onChange={(e) => setRf((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{contoOptions(rf.struttura, rf.conto).map((c) => <option key={c.key} value={c.key}>{contoOptLabel(c, rf.struttura)}</option>)}</select></label>
               {!singleSid && <label className="block"><span className="text-xs text-dim">{t("Struttura")} *</span><select value={rf.struttura} onChange={(e) => setRf((f) => ({ ...f, struttura: e.target.value }))} className={"mt-0.5 w-full rounded-lg border bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus " + (rf.struttura ? "border-line" : "border-[color:var(--warn)]")}><option value="">{t("Scegli la struttura…")}</option>{rf.struttura === "all" && <option value="all">{t("Comune (tutte)")}</option>}{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
             </div>
-            {rf.freq === "monthly" && <label className="mb-2 block"><span className="text-xs text-dim">{t("A partire da")}</span><input type="date" value={rf.start} onChange={(e) => setRf((f) => ({ ...f, start: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>}
-            <label className="mb-2 block"><span className="text-xs text-dim">{t("Termina ripetizione")}</span><input type="date" value={rf.end} onChange={(e) => setRf((f) => ({ ...f, end: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><span className="mt-0.5 block text-[11px] text-faint">{t("Lascia vuoto per «Mai».")}</span></label>
+            {rf.freq === "monthly" && <label className="mb-2 block"><span className="text-xs text-dim">{t("A partire da")}</span><DateField value={rf.start} onChange={(v) => setRf((f) => ({ ...f, start: v }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>}
+            <label className="mb-2 block"><span className="text-xs text-dim">{t("Termina ripetizione")}</span><DateField value={rf.end} onChange={(v) => setRf((f) => ({ ...f, end: v }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><span className="mt-0.5 block text-[11px] text-faint">{t("Lascia vuoto per «Mai».")}</span></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Nota (facoltativa)")}</span><input value={rf.note ?? ""} onChange={(e) => setRf((f) => ({ ...f, note: e.target.value }))} placeholder={t("es. IBAN, numero pratica…")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <button type="button" onClick={() => setRf((f) => ({ ...f, variable: !f.variable, auto: f.variable ? f.auto : false }))} className="mb-2 flex w-full items-center justify-between rounded-lg border border-line px-3 py-2.5 text-left hover:bg-wash">
               <span><span className="text-sm font-medium text-txt">{t("Importo variabile")}</span><span className="mt-0.5 block text-[11px] text-faint">{rf.variable ? t("L'importo qui sopra è una stima per la previsione. Alla scadenza ti chiedo quanto hai speso davvero.") : t("Per spese che cambiano ogni mese: pulizie, biancheria, colazioni…")}</span></span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import type { ImportOutcome, ImportReport } from "@/lib/import/reconcile";
 import RiepilogoImport from "./_riepilogo";
@@ -625,8 +626,8 @@ export default function ImportaPage() {
                     {events.slice(0, 6).map((e, i) => (
                       <tr key={i} className="border-b border-line last:border-0">
                         <td className="px-2 py-2 font-medium text-txt">{e.blocked ? t("Non disponibile") : (e.guest || t("Ospite (da ICS)"))}</td>
-                        <td className="px-2 py-2 font-mono text-xs text-txt">{e.checkIn || t("data?")}</td>
-                        <td className="px-2 py-2 font-mono text-xs text-txt">{e.checkOut || t("data?")}</td>
+                        <td className="px-2 py-2 font-mono text-xs text-txt">{fmtDate(e.checkIn) || t("data?")}</td>
+                        <td className="px-2 py-2 font-mono text-xs text-txt">{fmtDate(e.checkOut) || t("data?")}</td>
                         <td className="px-2 py-2 text-dim">{e.blocked ? t("Bloccato") : CHANNELS[toChannel(e.channelText)].label}</td>
                       </tr>
                     ))}
@@ -723,8 +724,8 @@ export default function ImportaPage() {
                     {preview.map((p, i) => (
                       <tr key={i} className="border-b border-line last:border-0">
                         <td className="px-2 py-2 font-medium text-txt">{p.guest || "—"}</td>
-                        <td className="px-2 py-2 font-mono text-xs" style={{ color: p.checkIn ? "var(--txt)" : "var(--err)" }}>{p.checkIn || t("data?")}</td>
-                        <td className="px-2 py-2 font-mono text-xs" style={{ color: p.checkOut ? "var(--txt)" : "var(--err)" }}>{p.checkOut || t("data?")}</td>
+                        <td className="px-2 py-2 font-mono text-xs" style={{ color: p.checkIn ? "var(--txt)" : "var(--err)" }}>{fmtDate(p.checkIn) || t("data?")}</td>
+                        <td className="px-2 py-2 font-mono text-xs" style={{ color: p.checkOut ? "var(--txt)" : "var(--err)" }}>{fmtDate(p.checkOut) || t("data?")}</td>
                         <td className="px-2 py-2 text-dim">{p.room || "—"}</td>
                         <td className="px-2 py-2 font-medium text-txt">{p.roomResolved}</td>
                         <td className="px-2 py-2 text-dim">{p.channel}</td>

@@ -11,7 +11,7 @@ import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf, cityTaxOfBooking } from "@/lib/booking";
-import { nights, toISO } from "@/lib/dates";
+import { nights, toISO, fmtDate } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
@@ -169,7 +169,7 @@ export default function FascicoloFiscalePage() {
       const sg = r.doc_kind === "nota_di_credito" ? -1 : 1;
       const cp = r.counterpart;
       return [
-        r.issue_date ? r.issue_date.split("-").reverse().join("/") : "", getStructure(r.structure_id ?? "")?.name ?? "", r.doc_kind === "nota_di_credito" ? "Nota di credito" : "Fattura", r.number_label ?? "",
+        r.issue_date ? fmtDate(r.issue_date) : "", getStructure(r.structure_id ?? "")?.name ?? "", r.doc_kind === "nota_di_credito" ? "Nota di credito" : "Fattura", r.number_label ?? "",
         `${cp?.name ?? ""} ${cp?.lastName ?? ""}`.trim(), cp?.vat ?? "", cp?.tax_code ?? "",
         centsToCsv(sg * r.taxable_cents), centsToCsv(sg * r.vat_cents), centsToCsv(sg * (r.out_of_scope_cents ?? 0)), centsToCsv(sg * (r.bollo_cents ?? 0)), centsToCsv(sg * r.total_cents),
       ];
@@ -180,7 +180,7 @@ export default function FascicoloFiscalePage() {
 
   // ---- Generazione PDF: cattura l'anteprima reale fuori schermo (stessa tecnica di Planning pulizie/Preventivi) ----
   const pdfRef = useRef<HTMLDivElement>(null);
-  const generatedLabel = `${t("generato da Xenora il")} ${new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" })}`;
+  const generatedLabel = `${t("generato da Xenora il")} ${fmtDate(new Date())}`;
   const docProps = {
     structureName: structureLabel, anno: year, generatedLabel,
     nottiVendute, occupazioneMedia, ricaviLordi, ricaviNetti,

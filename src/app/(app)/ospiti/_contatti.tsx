@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
-import { toISO, parseISO } from "@/lib/dates";
+import { toISO, fmtDM } from "@/lib/dates";
 import { CHANNELS } from "@/lib/types";
 import { contactReportCached, isRelayEmail } from "@/lib/contacts-check";
 import { guestLangOf } from "@/lib/guest-lang";
@@ -16,7 +16,7 @@ const OTA = new Set(["booking", "airbnb", "expedia", "agoda", "google", "hotelbe
 const LIMIT = 6;
 
 const whenLabel = (days: number, iso: string) => {
-  const d = parseISO(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+  const d = fmtDM(iso);
   return days === 0 ? "arriva oggi" : days === 1 ? "arriva domani" : `arriva tra ${days} giorni (${d})`;
 };
 

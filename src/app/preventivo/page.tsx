@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { eur } from "@/lib/format";
+import { fmtDMY } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 
 type QData = {
@@ -23,7 +24,7 @@ type QData = {
   extras?: { id?: string; name: string; desc?: string; price: number; per?: string }[];
 };
 
-const fmtDate = (iso?: string) => { if (!iso) return "—"; try { return new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
+const fmtDate = (iso?: string) => { if (!iso) return "—"; try { return `${new Date(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDMY(iso)}`; } catch { return iso; } };
 const PER_LABEL: Record<string, string> = { stay: "a soggiorno", night: "a notte", day: "a giornata", person: "a persona" };
 
 export default function PreventivoPubblico() {

@@ -2,12 +2,13 @@
 
 // Riconciliazione a fine importazione: confronta il FILE con quello che c'è davvero in Xenora (righe e importi) e mostra
 // cosa è arrivato, cosa c'era già, cosa è stato scartato e perché. Si può scaricare l'elenco riga per riga.
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import type { Booking, Guest } from "@/lib/types";
 import { verifyOutcomes, skipReasons, outcomesToCsv, type ImportReport } from "@/lib/import/reconcile";
 import { eur } from "@/lib/format";
 
-const fmtD = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "—");
+const fmtD = (iso: string) => (iso ? fmtDate(iso) : "—");
 
 export default function RiepilogoImport({ report, bookings, guests, structureNames = {} }: { report: ImportReport; bookings: Booking[]; guests: Guest[]; structureNames?: Record<string, string> }) {
   // Si attende un attimo che l'archivio abbia assorbito le nuove prenotazioni, poi si confronta.

@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import { apiPost } from "@/lib/invoicing/client";
@@ -217,7 +218,7 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{catLabel(m.category)}</span>
                     {m.field_type === "auto" && <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>Automatico</span>}
                     <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${STATE_COLOR[st]} 14%, transparent)`, color: STATE_COLOR[st] }}>{STATE_LABEL[st]}</span>
-                    {it && <span className="text-[10px] text-faint">tradotta il {new Date(it.ts).toLocaleDateString("it-IT")}</span>}
+                    {it && <span className="text-[10px] text-faint">tradotta il {fmtDate(it.ts)}</span>}
                   </div>
                   <div className="mt-1.5 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>

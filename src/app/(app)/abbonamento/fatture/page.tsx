@@ -3,6 +3,7 @@
 // Fatture dell'abbonamento (dimostrativo). In produzione arrivano dal sistema di fatturazione
 // (Stripe + fattura elettronica). Qui generiamo un elenco d'esempio in base al piano attivo.
 
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
@@ -38,7 +39,7 @@ export default function FatturePage() {
   }, [user?.email]);
 
   const fmtMonth = (d: Date) => d.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
-  const fmtDay = (d: Date | null) => (d ? d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
+  const fmtDay = (d: Date | null) => (d ? fmtDate(d) : "—");
 
   // Fatture reali del ciclo: la PRIMA viene emessa alla fine della prova gratuita (primo pagamento),
   // poi a ogni rinnovo mensile. Durante la prova NON esiste nessuna fattura.

@@ -2,6 +2,7 @@
 // Produce un XML strutturato conforme allo schema SdI a partire da prenotazione + struttura + ospite.
 // NB: per l'invio reale allo SdI serve firma digitale e i dati fiscali completi della struttura.
 
+import { fmtDMY } from "./dates";
 import type { Booking, Structure, Guest } from "./types";
 
 export interface InvoiceAmounts {
@@ -32,7 +33,7 @@ export function buildFatturaPA(booking: Booking, structure: Structure | undefine
   const accImp = forfettario ? amt.accommodation : Math.round((amt.accommodation / 1.1) * 100) / 100;
   const cleanImp = forfettario ? amt.cleaning : Math.round((amt.cleaning / 1.1) * 100) / 100;
   const nn = Math.max(1, Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000));
-  lines.push({ desc: `Soggiorno turistico dal ${booking.checkIn} al ${booking.checkOut} (${nn} notti)`, imponibile: accImp, aliquota: forfettario ? 0 : 10, natura: forfettario ? "N2.2" : undefined, norma: forfettario ? "Regime forfettario art.1 c.54-89 L.190/2014" : undefined });
+  lines.push({ desc: `Soggiorno turistico dal ${fmtDMY(booking.checkIn)} al ${fmtDMY(booking.checkOut)} (${nn} notti)`, imponibile: accImp, aliquota: forfettario ? 0 : 10, natura: forfettario ? "N2.2" : undefined, norma: forfettario ? "Regime forfettario art.1 c.54-89 L.190/2014" : undefined });
   if (amt.cleaning > 0) lines.push({ desc: "Pulizia finale", imponibile: cleanImp, aliquota: forfettario ? 0 : 10, natura: forfettario ? "N2.2" : undefined, norma: forfettario ? "Regime forfettario art.1 c.54-89 L.190/2014" : undefined });
   if (amt.cityTax > 0) lines.push({ desc: `Imposta di soggiorno riscossa per conto del Comune di ${structure?.cityTaxComune || structure?.city || "—"}`, imponibile: amt.cityTax, aliquota: 0, natura: "N1", norma: "Escluse ex art.15 DPR 633/72 — riscossa per conto del Comune" });
 

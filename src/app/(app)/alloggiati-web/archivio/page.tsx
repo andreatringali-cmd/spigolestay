@@ -1,5 +1,7 @@
 "use client";
 
+import { fmtDateTime } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
@@ -62,7 +64,7 @@ export default function AlloggiatiArchivioPage() {
     setBusy("");
   };
 
-  const fmt = (iso: string) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmt = (iso: string) => fmtDateTime(iso);
   const okStato = (s: string) => s === "sent";
   const shown = items.filter((it) => {
     const d = it.created_at.slice(0, 10);
@@ -82,9 +84,9 @@ export default function AlloggiatiArchivioPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {structures.length > 1 && activeStructureId === "all" && <select value={sid} onChange={(e) => setSid(e.target.value)} className={fieldCls}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
         <span className="text-[11px] font-medium text-dim">Dal</span>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} />
+        <DateField value={from} onChange={(v) => setFrom(v)} className={fieldCls} />
         <span className="text-[11px] font-medium text-dim">Al</span>
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldCls} />
+        <DateField value={to} onChange={(v) => setTo(v)} className={fieldCls} />
         <select value={stato} onChange={(e) => setStato(e.target.value)} className={fieldCls}>
           <option value="all">Tutti gli stati</option>
           <option value="sent">Inviati</option>

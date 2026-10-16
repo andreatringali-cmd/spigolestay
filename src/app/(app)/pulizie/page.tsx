@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { inScope } from "@/lib/scope";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type Booking } from "@/lib/types";
-import { toISO, parseISO, addDays, nights } from "@/lib/dates";
+import { toISO, parseISO, addDays, nights, fmtDM } from "@/lib/dates";
 import { playSound } from "@/lib/sound";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -25,9 +25,9 @@ import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 
-const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
-const fmtShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
-const fmtLong = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long" });
+const fmt = (iso: string) => fmtDM(iso);
+const fmtShort = (iso: string) => fmtDM(iso);
+const fmtLong = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(iso)}`;
 
 // Colore identificativo per struttura (per distinguerle nella vista "Tutte le strutture").
 const STRUCT_COLORS = ["#4F46E5", "#2F9E6F", "#C08A3A", "#B3453A", "#0891B2", "#DB2777"];
@@ -666,7 +666,7 @@ export default function PuliziePage() {
                     <div className="flex flex-wrap items-center gap-1.5 text-xs"><span className="font-bold text-txt">{iss.unitName}</span><span className="text-faint">· {iss.structureName}</span><span className="rounded-full px-1.5 text-[10px] font-bold text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>✓ {t("risolta")}</span></div>
                     <div className="text-[11px] font-semibold" style={{ color: m.color }}>{t(m.label)}</div>
                     <div className="break-words text-xs text-dim">{iss.note}</div>
-                    <div className="mt-0.5 text-[10px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
+                    <div className="mt-0.5 text-[10px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return fmtDM(d) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">
                     <button onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>

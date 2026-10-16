@@ -24,7 +24,7 @@ test("il testo è ordinato per lavoro, con le camere in ordine naturale e le vuo
   const t = buildPuliziePlanText({ ...args, style: "plain" } as never);
   assert.ok(t.indexOf("CAMBIO COMPLETO") < t.indexOf("DOPO LA PARTENZA"));
   assert.ok(t.indexOf("DOPO LA PARTENZA") < t.indexOf("RIASSETTO"));
-  assert.match(t, /• 1 — esce SUN HE · entra Karl Josef \(2 pers\., fino al 13\/10\)/);
+  assert.match(t, /• 1 — esce SUN HE · entra Karl Josef \(2 pers\., fino al 13\.10\)/);
   assert.match(t, /NIENTE DA FARE: 2/);
   assert.match(t, /FUORI SERVIZIO\n• 5 — perdita d'acqua/);
   assert.match(t, /3 camere da fare/);
@@ -61,9 +61,9 @@ test("campi per il modello WhatsApp a righe: una voce per lavoro, mai vuota, per
 
 test("campi dettagliati: come il messaggio condiviso a mano (chi esce, chi entra, persone, fino a quando), una riga e mai vuoti", () => {
   const f = buildPuliziePlanFields({ ...(args as object), detailed: true } as never);
-  assert.equal(f.cambio, "1 — esce SUN HE · entra Karl Josef (2 pers., fino al 13/10)");
+  assert.equal(f.cambio, "1 — esce SUN HE · entra Karl Josef (2 pers., fino al 13.10)");
   assert.equal(f.partenze, "3 — esce SUN HE");
-  assert.equal(f.riassetto, "10 — Thomas Pies (1 pers., fino al 13/10)");
+  assert.equal(f.riassetto, "10 — Thomas Pies (1 pers., fino al 13.10)");
   assert.equal(f.fuori, "5 — perdita d'acqua");
   assert.equal(f.arrivi, "nessuna");
   for (const v of Object.values(f)) assert.ok(v.length > 0 && !/[\r\n\t]/.test(v) && !/ {5}/.test(v));
@@ -73,5 +73,5 @@ test("campi dettagliati: più camere dello stesso lavoro separate da punto e vir
   const two = [...(rooms as unknown[]), room("4", "turnover", { dep: bk("b5", "g3", "2026-10-09", "2026-10-11"), arr: bk("b6", "g1", "2026-10-11", "2026-10-14") })];
   const f = buildPuliziePlanFields({ date: "2026-10-11", scopedStructures: [S], rooms: two, guests, detailed: true } as never);
   assert.equal(f.cambio.split("; ").length, 2);
-  assert.match(f.cambio, /^1 — .*; 4 — esce Thomas Pies · entra SUN HE \(2 pers\., fino al 14\/10\)$/);
+  assert.match(f.cambio, /^1 — .*; 4 — esce Thomas Pies · entra SUN HE \(2 pers\., fino al 14\.10\)$/);
 });

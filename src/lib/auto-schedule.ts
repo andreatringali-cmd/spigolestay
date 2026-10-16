@@ -73,7 +73,7 @@ export function whenText(ts: number, now: number): string | null {
   if (t.ymd === n.ymd) return `previsto alle ${t.hm}`;
   if (t.ymd === ymdAdd(n.ymd, 1)) return `previsto domani alle ${t.hm}`;
   const [, m, d] = t.ymd.split("-");
-  return `previsto il ${+d}/${+m} alle ${t.hm}`;
+  return `previsto il ${d}.${m} alle ${t.hm}`;
 }
 
 export interface AutoBooking { structureId: string; checkIn: string; checkOut: string }

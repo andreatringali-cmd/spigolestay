@@ -32,7 +32,7 @@ test("Booking.com: note, orario, età bambini, pagamento, penali, totale ai cent
   assert.equal(g.otaInfo!.mealPlan, "Breakfast is included in the room rate.");
   // penali ordinate per data
   assert.deepEqual(g.otaInfo!.cancelPenalties!.map((p) => p.amount), [0, 76.5]);
-  assert.equal(describeCancelPenalties(g.otaInfo!.cancelPenalties), "Cancellazione gratuita fino al 12/11/2020; poi penale di 76,50 GBP");
+  assert.equal(describeCancelPenalties(g.otaInfo!.cancelPenalties), "Cancellazione gratuita fino al 12.11.2020; poi penale di 76,50 GBP");
 });
 
 test("Expedia: free_text uguale a notes non duplicato, payment_instruction e preferenze", () => {
@@ -105,5 +105,5 @@ test("mergeOtaOverCarried: il testo dell'ospite non viene perso, l'OTA aggiorna 
 test("describeCancelPenalties: penale immediata e nessuna penale", () => {
   assert.equal(describeCancelPenalties(undefined), undefined);
   assert.equal(describeCancelPenalties([{ amount: 0, from: "2026-01-01T00:00:00" }]), "Cancellazione senza penale");
-  assert.equal(describeCancelPenalties([{ amount: 50, currency: "EUR", from: "2026-01-01T00:00:00" }]), "Penale di 50,00 EUR dal 01/01/2026");
+  assert.equal(describeCancelPenalties([{ amount: 50, currency: "EUR", from: "2026-01-01T00:00:00" }]), "Penale di 50,00 EUR dal 01.01.2026");
 });

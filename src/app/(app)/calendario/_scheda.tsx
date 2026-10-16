@@ -8,7 +8,7 @@ import type { Booking, Structure, Unit, RoomType } from "@/lib/types";
 import BookingAmounts from "@/components/BookingAmounts";
 import MediaImg from "@/components/MediaImg";
 import { CHANNELS } from "@/lib/types";
-import { parseISO, nights } from "@/lib/dates";
+import { parseISO, nights, fmtDM } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { type JourneyStep, type StepState, type journeyOf } from "@/lib/booking-journey";
@@ -20,7 +20,7 @@ export interface Avviso { key: string; label: string; tone: "err" | "warn" | "in
 const STATE_COLOR: Record<StepState, string> = { done: "var(--ok)", todo: "var(--warn)", late: "var(--err)", na: "var(--faint)" };
 const STATE_GLYPH: Record<StepState, string> = { done: "✓", todo: "", late: "!", na: "–" };
 const TONE: Record<Avviso["tone"], string> = { err: "var(--err)", warn: "var(--warn)", info: "var(--dim)" };
-const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const dayLabel = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 // Prenotazione non più "viva" (annullata, no-show, passata): nessun percorso da mostrare.
 const NO_JOURNEY = { steps: [], chips: [], done: 0, total: 0, next: null } as unknown as Journey;

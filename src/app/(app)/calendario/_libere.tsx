@@ -2,11 +2,11 @@
 
 // Sezione "Camere libere" e "Fuori servizio / blocchi" della vista Calendario · Dettagliato.
 import type { Booking, RoomType, Structure, Unit } from "@/lib/types";
-import { parseISO } from "@/lib/dates";
+import { parseISO, fmtDM } from "@/lib/dates";
 import type { FreeUnit } from "./_modello";
 import MediaImg from "@/components/MediaImg";
 
-const dayShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const dayShort = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 function Thumb({ unit, roomType, structure }: { unit: Unit; roomType?: RoomType; structure?: Structure }) {
   const photo = unit.photos?.[0];

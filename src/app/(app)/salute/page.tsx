@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import type { HealthReport, Light } from "@/lib/health";
+import { fmtDateTime } from "@/lib/dates";
 
 const COLOR: Record<Light, string> = { ok: "var(--ok)", warn: "var(--warn)", err: "var(--err)", idle: "var(--faint)" };
 const LABEL: Record<Light, string> = { ok: "Tutto bene", warn: "Da controllare", err: "Problema", idle: "Nessun dato" };
@@ -15,7 +16,7 @@ function Dot({ light, size = 12 }: { light: Light; size?: number }) {
   return <span aria-label={LABEL[light]} title={LABEL[light]} className="inline-block shrink-0 rounded-full" style={{ width: size, height: size, background: COLOR[light] }} />;
 }
 
-const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
+const fmt = (iso?: string) => (iso ? fmtDateTime(iso) : "");
 
 export default function SalutePage() {
   const [data, setData] = useState<(HealthReport & { generatedAt?: string }) | null>(null);
@@ -61,7 +62,7 @@ export default function SalutePage() {
           <Dot light={s.light} size={20} />
           <div className="min-w-0">
             <div className="font-display text-xl font-bold text-txt">{s.headline}</div>
-            <div className="text-sm text-dim">{s.attention === 0 ? "Invii, portali e collegamenti risultano regolari." : "Guarda le voci gialle e rosse qui sotto."}{data?.generatedAt ? ` Aggiornato alle ${fmt(data.generatedAt)}.` : ""}</div>
+            <div className="text-sm text-dim">{s.attention === 0 ? "Invii, portali e collegamenti risultano regolari." : "Guarda le voci gialle e rosse qui sotto."}{data?.generatedAt ? ` Aggiornato il ${fmt(data.generatedAt)}.` : ""}</div>
           </div>
         </div>
       )}

@@ -5,7 +5,7 @@
 
 import type { Booking, ExtraKind, ExtraService, Guest, UpsellOffer } from "./types";
 import { DEFAULT_EXTRAS } from "./types";
-import { nights as nightsBetween, parseISO, toISO } from "./dates";
+import { nights as nightsBetween, parseISO, toISO, fmtDM, fmtDMY } from "./dates";
 import { eur } from "./format";
 import { guestLangOf } from "./guest-lang";
 
@@ -104,7 +104,7 @@ export interface Proposal {
   maxQty: number;
 }
 
-const fmtShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+const fmtShort = (iso: string) => fmtDM(iso);
 
 export interface ProposalCtx {
   extras: ExtraService[];     // catalogo della struttura della prenotazione
@@ -156,7 +156,7 @@ export function proposalsFor(b: Booking, ctx: ProposalCtx): Proposal[] {
     else reason = "Servizio aggiuntivo disponibile";
     if (prev.some((o) => o.status === "sent")) {
       const last = prev.filter((o) => o.status === "sent").sort((a, c) => c.at - a.at)[0];
-      reason += ` · già proposto il ${new Date(last.at).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })} (in attesa)`;
+      reason += ` · già proposto il ${fmtDM(last.at)} (in attesa)`;
       status = "warn";
     }
     ok(reason, status);
@@ -250,7 +250,7 @@ const MSG: Record<Lang, { hello: (n: string) => string; intro: (d: string) => st
 
 export function buildOfferMessage(o: { lang: Lang; firstName: string; structureName: string; checkIn: string; items: UpsellOffer["items"]; link?: string }): string {
   const m = MSG[o.lang];
-  const d = parseISO(o.checkIn).toLocaleDateString(m.loc, { day: "numeric", month: "long" });
+  const d = fmtDMY(o.checkIn);
   const list = o.items.map((i) => `• ${i.name}${i.qty > 1 ? ` ×${i.qty}` : ""} — ${eur(i.amount)}`).join("\n");
   const sum = o.items.reduce((a, i) => a + i.amount, 0);
   const total = o.items.length > 1 && sum > 0 ? `\n${m.total}: ${eur(sum)}` : "";

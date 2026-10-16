@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import type { Booking } from "@/lib/types";
-import { parseISO, toISO } from "@/lib/dates";
+import { parseISO, toISO, fmtDM } from "@/lib/dates";
 import { bookingCode } from "@/lib/bookingCode";
 import { journeyBucket, journeyOf, isLiveBooking, stepOpensModal } from "@/lib/booking-journey";
 import EmptyState from "@/components/EmptyState";
@@ -30,7 +30,7 @@ const FILTERS: { key: string; label: string }[] = [
   { key: "inhouse", label: "In casa" },
   { key: "leave", label: "Partono oggi" },
 ];
-const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const dayLabel = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 export interface DettaglioSection { key: string; title: string; color: string; ids: string[]; empty: string }
 

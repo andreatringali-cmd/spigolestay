@@ -11,6 +11,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
+import { ymdRome } from "@/lib/dates-rome";
 import { buildDocumentDraft, toCents, type FolioLine, type Regime } from "./folio";
 
 // Input normalizzato ricavato dall'evento Stripe (invoice.paid / checkout subscription).
@@ -55,7 +56,7 @@ function adminClient(): SupabaseClient | null {
 
 const dmy = (unixSec?: number | null) => {
   if (!unixSec) return "";
-  try { const d = new Date(unixSec * 1000); const p = (n: number) => String(n).padStart(2, "0"); return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`; } catch { return ""; }
+  try { const [y, m, d] = ymdRome(unixSec * 1000).split("-"); return `${d}.${m}.${y}`; } catch { return ""; }
 };
 const iso = (unixSec?: number | null) => (unixSec ? new Date(unixSec * 1000).toISOString() : null);
 

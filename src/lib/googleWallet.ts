@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { fmtDMY } from "./dates";
 
 // Integrazione Google Wallet: genera il link "Aggiungi a Google Wallet" per il pass di
 // soggiorno dell'ospite (Generic pass — https://developers.google.com/wallet/generic).
@@ -49,7 +50,7 @@ export interface WalletPassInput {
 }
 
 function fmtDateIt(iso: string): string {
-  try { return new Date(`${iso}T00:00:00`).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
+  return fmtDMY(iso);
 }
 
 // Genera il link "https://pay.google.com/gp/v/save/<JWT>" pronto per il pulsante

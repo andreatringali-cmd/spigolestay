@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDateTime } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { WhatsAppIcon, MailIcon } from "@/components/BrandIcons";
@@ -130,7 +131,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
                 return (
                   <li key={i} className="text-[11px] leading-snug">
                     <span className="font-semibold" style={{ color: e.ok ? "var(--ok)" : "var(--err)" }}>{e.ok ? "✓" : "✗"} {e.channel === "whatsapp" ? "WhatsApp" : "Email"}</span>
-                    <span className="text-faint"> · {new Date(e.at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="text-faint"> · {fmtDateTime(e.at)}</span>
                     {!e.ok && <div className="text-dim">{why || e.detail}</div>}
                   </li>
                 );

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { toISO, parseISO } from "@/lib/dates";
+import { toISO, fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
@@ -42,7 +43,7 @@ const SEGMENTS: { key: Segment; label: string; desc: string }[] = [
 const TAG_SEGMENTS: { key: Segment; label: string; desc: string }[] = GUEST_TAGS.map((tag) => ({ key: `tag:${tag}`, label: tag, desc: `Ospiti con la categoria «${tag}»` }));
 const ALL_SEGMENTS = [...SEGMENTS, ...TAG_SEGMENTS];
 const segMeta = (key: Segment) => ALL_SEGMENTS.find((s) => s.key === key);
-const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }); } catch { return iso; } };
+const fmtD = (iso: string) => fmtDate(iso);
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 
 export default function PromozioniPage() {
@@ -114,7 +115,7 @@ export default function PromozioniPage() {
   const contactsOf = (s?: { phone?: string; email?: string; website?: string }) => [s?.phone, s?.email, s?.website].filter(Boolean).join(" · ");
   // Brand/contatti dell'anteprima: la struttura attiva; solo con "Tutte" si ripiega sulla prima.
   const defaultStruct = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) ?? structures[0] : structures[0];
-  const previewBody = applyPromo(body, { nome: "Marco", sconto: discount, codice: code || "—", scadenza: validUntil ? new Date(validUntil).toLocaleDateString("it-IT") : "—", struttura: defaultStruct?.name ?? "", contatti: contactsOf(defaultStruct) });
+  const previewBody = applyPromo(body, { nome: "Marco", sconto: discount, codice: code || "—", scadenza: validUntil ? fmtDate(validUntil) : "—", struttura: defaultStruct?.name ?? "", contatti: contactsOf(defaultStruct) });
 
   // ── Invio (separato) ──
   const [sending, setSending] = useState<Promo | null>(null);
@@ -156,7 +157,7 @@ export default function PromozioniPage() {
     const st = structureId === "all" ? structures[0] : structures.find((s) => s.id === structureId);
     const contatti = contactsOf(st);
     const subject = sending.subject?.trim() || sending.name;
-    const scad = sending.validUntil ? new Date(sending.validUntil).toLocaleDateString("it-IT") : "";
+    const scad = sending.validUntil ? fmtDate(sending.validUntil) : "";
     setPromoSending(true);
     let ok = 0, fail = 0;
     for (const g of audience) {
@@ -222,9 +223,9 @@ export default function PromozioniPage() {
             <label className="col-span-2 block text-xs font-medium text-dim">Oggetto email<input value={subject} onChange={(e) => setSubject(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Sconto %<input type="number" min={0} max={90} value={discount} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Codice promo<input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className={`${inp} mt-1`} /></label>
-            <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta <span className="font-normal text-faint">· ultimo giorno per prenotare</span><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inp} mt-1`} /></label>
-            <label className="block text-xs font-medium text-dim">Valida per soggiorni dal<input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className={`${inp} mt-1`} /></label>
-            <label className="block text-xs font-medium text-dim">al<input type="date" value={validTo} min={validFrom || undefined} onChange={(e) => setValidTo(e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta <span className="font-normal text-faint">· ultimo giorno per prenotare</span><DateField value={validUntil} onChange={(v) => setValidUntil(v)} className={`${inp} mt-1 text-left`} /></label>
+            <label className="block text-xs font-medium text-dim">Valida per soggiorni dal<DateField value={validFrom} onChange={(v) => setValidFrom(v)} className={`${inp} mt-1 text-left`} /></label>
+            <label className="block text-xs font-medium text-dim">al<DateField value={validTo} min={validFrom || undefined} onChange={(v) => setValidTo(v)} className={`${inp} mt-1 text-left`} /></label>
             {structures.length > 1 && (
               <label className="col-span-2 block text-xs font-medium text-dim">Valida per<select value={promoStructure} onChange={(e) => setPromoStructure(e.target.value)} className={`${inp} mt-1`}><option value="">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             )}

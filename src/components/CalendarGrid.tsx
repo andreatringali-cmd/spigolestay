@@ -20,6 +20,9 @@ import {
   shiftISO,
   toISO,
   weekdayShort,
+  fmtDM as fmtDMlib,
+  fmtDateTime,
+  fmtDate,
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
@@ -204,7 +207,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       const conn: Record<string, { connected?: boolean; lastSync?: string }> = raw ? JSON.parse(raw) : {};
       const syncs = Object.values(conn).map((c) => c?.lastSync).filter(Boolean).map((s) => new Date(s as string).getTime());
       const ts = syncs.length ? Math.max(...syncs) : Date.now();
-      setLastRun(new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
+      setLastRun(fmtDateTime(ts));
     } catch {}
   }, []);
   // Stato REALE da Channex: unica fonte per la legenda (niente più flag locale finto).
@@ -264,7 +267,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       Object.keys(conn).forEach((k) => { if (conn[k]?.connected) conn[k].lastSync = new Date(now).toISOString(); });
       localStorage.setItem("spigolestay:canali:conn", JSON.stringify(conn));
     } catch {}
-    setLastRun(new Date(now).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
+    setLastRun(fmtDateTime(now));
     setSyncing(false);
   };
   // Insights: simulatore what-if (± prezzo).
@@ -706,9 +709,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const gapNights = gaps.reduce((a, g) => a + g.nights, 0);
   const gapValue = gaps.reduce((a, g) => { let dd = parseISO(g.from); const end = parseISO(g.to); let sum = 0; while (dd < end) { sum += rateFor(g.unit.roomTypeId, toISO(dd)); dd = addDays(dd, 1); } return a + sum; }, 0);
   // Formattatori data con mese (es. "sab 12 ago") per rendere i testi inequivocabili.
-  const monthShort = (d: Date) => d.toLocaleDateString("it-IT", { month: "short" }).replace(".", "");
-  const fmtDM = (d: Date) => `${weekdayShort(d)} ${d.getDate()} ${monthShort(d)}`;
-  const fmtRange = (aIso: string, bIso: string) => { const a = parseISO(aIso), b = parseISO(bIso); const am = monthShort(a), bm = monthShort(b); return am === bm ? `${a.getDate()}–${b.getDate()} ${bm}` : `${a.getDate()} ${am} – ${b.getDate()} ${bm}`; };
+  const fmtDM = (d: Date) => `${weekdayShort(d)} ${fmtDMlib(d)}`;
+  const fmtRange = (aIso: string, bIso: string) => { return `${fmtDMlib(aIso)} – ${fmtDMlib(bIso)}`; };
   // Applica una variazione percentuale ai prezzi di una tipologia su un intervallo di date [fromIso, toIso).
   const applyPctRange = (typeId: string, fromIso: string, toIso: string, pct: number) => { const map: Record<string, number> = {}; let dd = parseISO(fromIso); const end = parseISO(toIso); while (dd < end) { const iso = toISO(dd); if (iso >= todayISO) map[`${typeId}|${iso}`] = Math.round(rateFor(typeId, iso) * (1 + pct / 100)); dd = addDays(dd, 1); } setDayRates(map); };
   // Suggerimenti Copilota (priorità: alta occupazione → alza; buchi → riempi; bassa → apri).
@@ -942,7 +944,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div
                 key={b.id}
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
-                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
+                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
                 style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), ...(holdId === b.id ? { outline: "2px solid var(--focus)", outlineOffset: 1, transform: "scale(1.03)", zIndex: 5 } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "pan-x pan-y" }}
               >
@@ -1635,7 +1637,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       {pick && (() => {
         const u = units.find((x) => x.id === pick.unitId);
         const nn = nights(pick.from, pick.to) + 1;
-        const pretty = `${parseISO(pick.from).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} → ${parseISO(pick.to).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}`;
+        const pretty = `${fmtDMlib(pick.from)} → ${fmtDMlib(pick.to)}`;
         const noRate = rangeIsos(pick.from, pick.to).some((iso) => rateFor(pick.roomTypeId, iso) <= 0); // tariffa mancante → vendita bloccata
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
@@ -1705,8 +1707,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <input autoFocus value={evDraft.name} onChange={(e) => setEvDraft({ ...evDraft, name: e.target.value })} placeholder="Es. Festa di Santa Lucia, Ponte 25 aprile…" className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
             </label>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="block text-xs font-medium text-dim">Dal<input type="date" value={evDraft.from} onChange={(e) => setEvDraft({ ...evDraft, from: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-              <label className="block text-xs font-medium text-dim">Al (escluso)<input type="date" value={evDraft.to} onChange={(e) => setEvDraft({ ...evDraft, to: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+              <label className="block text-xs font-medium text-dim">Dal<DateField value={evDraft.from} onChange={(v) => setEvDraft({ ...evDraft, from: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+              <label className="block text-xs font-medium text-dim">Al (escluso)<DateField value={evDraft.to} onChange={(v) => setEvDraft({ ...evDraft, to: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
             </div>
             <div className="mt-3 text-xs font-medium text-dim">Colore</div>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -1737,8 +1739,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <button onClick={() => setRateEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-dim">Dal<input type="date" min={todayISO} value={rateEdit.from} onChange={(e) => setRateEdit({ ...rateEdit, from: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-                <label className="block text-xs font-medium text-dim">Al<input type="date" min={todayISO} value={rateEdit.to} onChange={(e) => setRateEdit({ ...rateEdit, to: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block text-xs font-medium text-dim">Dal<DateField min={todayISO} value={rateEdit.from} onChange={(v) => setRateEdit({ ...rateEdit, from: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+                <label className="block text-xs font-medium text-dim">Al<DateField min={todayISO} value={rateEdit.to} onChange={(v) => setRateEdit({ ...rateEdit, to: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
               </div>
 
               <div className="mt-3 flex items-center rounded-lg border border-line p-0.5">
@@ -1763,12 +1765,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
               <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-xs text-dim">
                 Applica a <b className="text-txt">{isos.length}</b> {isos.length === 1 ? "giorno" : "giorni"}.
-                {" "}Esempio {parseISO(sample).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}: <span className="font-mono">€{rateFor(rateEdit.typeId, sample)}</span> → <span className="font-mono font-bold text-[color:var(--focus)]">€{preview}</span>
+                {" "}Esempio {fmtDMlib(sample)}: <span className="font-mono">€{rateFor(rateEdit.typeId, sample)}</span> → <span className="font-mono font-bold text-[color:var(--focus)]">€{preview}</span>
                 {(() => {
                   const wknd = isos.find(isWeekendISO);
                   if (!wknd || wknd === sample || !rateEdit.weekendBoost) return null;
                   const boosted = Math.round(preview * (1 + rateEdit.weekendPct / 100));
-                  return <> · {parseISO(wknd).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })} (weekend): <span className="font-mono font-bold text-[color:var(--focus)]">€{boosted}</span></>;
+                  return <> · {fmtDMlib(wknd)} (weekend): <span className="font-mono font-bold text-[color:var(--focus)]">€{boosted}</span></>;
                 })()}
               </div>
 
@@ -1796,8 +1798,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <button onClick={() => setAvailEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-dim">Dal<input type="date" min={todayISO} value={availEdit.from} onChange={(e) => { if (e.target.value) setAvailEdit({ ...availEdit, from: e.target.value, to: e.target.value > availEdit.to ? e.target.value : availEdit.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-                <label className="block text-xs font-medium text-dim">Al<input type="date" min={availEdit.from} value={availEdit.to} onChange={(e) => { if (e.target.value) setAvailEdit({ ...availEdit, to: e.target.value < availEdit.from ? availEdit.from : e.target.value }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block text-xs font-medium text-dim">Dal<DateField min={todayISO} value={availEdit.from} onChange={(v) => { if (v) setAvailEdit({ ...availEdit, from: v, to: v > availEdit.to ? v : availEdit.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+                <label className="block text-xs font-medium text-dim">Al<DateField min={availEdit.from} value={availEdit.to} onChange={(v) => { if (v) setAvailEdit({ ...availEdit, to: v < availEdit.from ? availEdit.from : v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
               </div>
               {(() => {
                 const MAXOFF = totalRooms + 20; // consenti overbooking: si possono aprire più camere di quelle reali
@@ -1919,8 +1921,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 {presetBtn("Mese", moFrom, moTo)}
               </div>
               <div className="mt-2 grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-dim">Dal<input type="date" value={pc.from} onChange={(e) => { if (e.target.value) setPriceConfirm({ ...pc, from: e.target.value, to: e.target.value > pc.to ? e.target.value : pc.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-                <label className="block text-xs font-medium text-dim">Al<input type="date" min={pc.from} value={pc.to} onChange={(e) => { if (e.target.value) setPriceConfirm({ ...pc, to: e.target.value < pc.from ? pc.from : e.target.value }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block text-xs font-medium text-dim">Dal<DateField value={pc.from} onChange={(v) => { if (v) setPriceConfirm({ ...pc, from: v, to: v > pc.to ? v : pc.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+                <label className="block text-xs font-medium text-dim">Al<DateField min={pc.from} value={pc.to} onChange={(v) => { if (v) setPriceConfirm({ ...pc, to: v < pc.from ? pc.from : v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
               </div>
               <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-xs text-dim">Verranno aggiornati <b className="text-txt">{nDays}</b> {nDays === 1 ? "giorno" : "giorni"} × <b className="text-txt">{nTypes}</b> tipologie. La modifica è reversibile dal calendario.</div>
               <div className="mt-4 flex items-center justify-end gap-2">
@@ -1955,7 +1957,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               )}
               <div className="my-3 flex flex-col gap-1.5 rounded-xl border border-line bg-paper p-3 text-sm">
                 <div className="flex items-center justify-between gap-2"><span className="text-faint">Camera</span><span className="min-w-0 text-right text-txt">{fromU?.name ?? "Da assegnare"} <span className="text-faint">→</span> <b>{toU?.name}</b>{toS ? <span className="text-faint"> · {toS.name}</span> : null}</span></div>
-                <div className="flex items-center justify-between gap-2"><span className="text-faint">Periodo</span><span className="font-mono text-txt">{moveConfirm.checkIn.slice(5)} → {moveConfirm.checkOut.slice(5)} <span className="text-faint">({nightsN} ntt)</span></span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-faint">Periodo</span><span className="font-mono text-txt">{fmtDMlib(moveConfirm.checkIn)} → {fmtDMlib(moveConfirm.checkOut)} <span className="text-faint">({nightsN} ntt)</span></span></div>
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setMoveConfirm(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
@@ -1976,8 +1978,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <button onClick={() => setOos(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <label className="block text-xs font-medium text-dim">Dal<input type="date" value={oos.from} onChange={(e) => setOos({ ...oos, from: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-              <label className="block text-xs font-medium text-dim">Al<input type="date" value={oos.to} onChange={(e) => setOos({ ...oos, to: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+              <label className="block text-xs font-medium text-dim">Dal<DateField value={oos.from} onChange={(v) => setOos({ ...oos, from: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
+              <label className="block text-xs font-medium text-dim">Al<DateField value={oos.to} onChange={(v) => setOos({ ...oos, to: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
             </div>
             <label className="mt-3 block text-xs font-medium text-dim">Motivo<input value={oos.reason} onChange={(e) => setOos({ ...oos, reason: e.target.value })} placeholder="Es. manutenzione bagno, tinteggiatura…" className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mt-4 flex items-center justify-end gap-2">
@@ -2002,7 +2004,7 @@ function destinationLabel(view: DragView, bookings: { id: string; checkIn: strin
   if (!b || !u) return "";
   const newIn = shiftISO(b.checkIn, view.dxDays);
   const newOut = shiftISO(b.checkOut, view.dxDays);
-  return `${u.name} · ${newIn.slice(8)}→${newOut.slice(8)} (${nights(newIn, newOut)} ntt)`;
+  return `${u.name} · ${fmtDMlib(newIn)}→${fmtDMlib(newOut)} (${nights(newIn, newOut)} ntt)`;
 }
 
 function MenuToggle({ label, on, onClick, disabled, title }: { label: string; on: boolean; onClick: () => void; disabled?: boolean; title?: string }) {
@@ -2038,7 +2040,7 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
   const [notes, setNotes] = useState(unit.notes ?? "");
   const toggleDay = (d: string) => setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
   const idShort = (unit.id || "").replace(/[^0-9]/g, "").slice(-6) || unit.id.slice(-4);
-  const fmtDt = (iso?: string) => iso ? (() => { try { const d = new Date(iso); return `${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`; } catch { return "—"; } })() : "—";
+  const fmtDt = (iso?: string) => iso ? (fmtDateTime(iso) || "—") : "—";
   const lastCleanTxt = fmtDt(lastCleanIso);
   const lastLinenTxt = fmtDt(lastLinenIso);
   const save = () => {

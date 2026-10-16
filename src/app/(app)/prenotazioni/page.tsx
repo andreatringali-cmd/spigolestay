@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useData } from "@/lib/store";
 import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
-import { nights, parseISO, toISO } from "@/lib/dates";
+import { nights, parseISO, toISO, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
@@ -34,7 +34,7 @@ import { useLang } from "@/lib/i18n";
 import PrenotazioniDettaglio from "./_dettaglio";
 import { StatoProvider, StatoCell } from "./_stato";
 
-const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" });
+const fmt = (iso: string) => fmtDate(iso);
 
 export default function PrenotazioniPage() {
   const { t } = useLang();

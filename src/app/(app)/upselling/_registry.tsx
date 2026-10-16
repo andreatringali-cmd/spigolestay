@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
+import { fmtDM, fmtDate } from "@/lib/dates";
 import type { Booking, Structure, UpsellOffer } from "@/lib/types";
 import {
   offerAcceptedViaLink, offerOutcome, offerRevenue, patchAccept, patchDeleteOffer, patchSetStatus, type OfferOutcome, type UpsellStats,
@@ -23,7 +24,7 @@ const OUT: Record<OfferOutcome, { label: string; color: string }> = {
   removed: { label: "Extra rimossi", color: "var(--faint, #8a8f98)" },
 };
 type Filter = "all" | OfferOutcome;
-const fdt = (ms: number) => new Date(ms).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
+const fdt = (ms: number) => fmtDate(ms);
 
 interface Row { offer: UpsellOffer; booking: Booking; outcome: OfferOutcome; structure?: Structure }
 
@@ -106,7 +107,7 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
                         <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${out.color} 16%, transparent)`, color: out.color }}>{out.label}{viaLink ? " · dal link di check-in" : ""}</span>
                         {cancelled && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">prenotazione annullata</span>}
                       </div>
-                      <div className="mt-0.5 text-[11px] text-faint">{fdt(o.at)} · {VIA[o.via]}{multiStructure && r.structure ? ` · ${r.structure.name}` : ""} · soggiorno {r.booking.checkIn.slice(8)}/{r.booking.checkIn.slice(5, 7)}</div>
+                      <div className="mt-0.5 text-[11px] text-faint">{fdt(o.at)} · {VIA[o.via]}{multiStructure && r.structure ? ` · ${r.structure.name}` : ""} · soggiorno {fmtDM(r.booking.checkIn)}</div>
                       <div className="mt-0.5 text-xs text-dim">{o.items.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ""}`).join(", ")}</div>
                     </div>
                     <div className="text-right">

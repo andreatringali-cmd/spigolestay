@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
@@ -469,7 +470,7 @@ export default function AbbonamentoPage() {
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-display text-base font-bold text-txt">{tier.name}{isCustom ? ` ${t("personalizzato")}` : ""}{annual ? ` · ${t("annuale")}` : ` · ${t("mensile")}`}</span>
               {isCustom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
-              <span className="text-[11px] text-dim">· {t("Prossimo rinnovo")}: <b className="font-semibold text-txt">{(() => { const d = new Date(); if (annual) d.setFullYear(d.getFullYear() + 1); else d.setMonth(d.getMonth() + 1, 1); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); })()}</b></span>
+              <span className="text-[11px] text-dim">· {t("Prossimo rinnovo")}: <b className="font-semibold text-txt">{(() => { const d = new Date(); if (annual) d.setFullYear(d.getFullYear() + 1); else d.setMonth(d.getMonth() + 1, 1); return fmtDate(d); })()}</b></span>
             </div>
             {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
           </div>

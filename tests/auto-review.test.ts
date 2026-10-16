@@ -95,7 +95,7 @@ test("pre-arrivo: check-in online + guida + come entrare (nessuna reception, Wha
   const NOW = Date.UTC(2026, 9, 6, 5, 0, 0);
   const ctx: AutoCtx = { now: NOW, templates: [t], messagesLive: true };
   const b = { structureId: "s1", checkIn: "2026-10-09", checkOut: "2026-10-11" };
-  assert.equal(autoLineFor("guide", b, { email: "a@b.it" }, ctx, { today: "2026-10-06" })?.text, "Non inviato · invio previsto il 8/10 alle 10:00");
+  assert.equal(autoLineFor("guide", b, { email: "a@b.it" }, ctx, { today: "2026-10-06" })?.text, "Non inviato · invio previsto il 08.10 alle 10:00");
   assert.match(autoLineFor("checkin", b, { email: "a@b.it" }, ctx, { today: "2026-10-06" })?.text ?? "", /invio previsto/);
 });
 

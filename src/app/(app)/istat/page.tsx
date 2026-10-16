@@ -1,5 +1,7 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
@@ -101,8 +103,8 @@ export default function IstatPage() {
       const nn = nightsBetween(r.arrival, r.departure);
       const cam = b ? unitName(b.unitId) || roomName(b.roomTypeId) : "";
       const g = b ? guestById.get(b.guestId) : undefined; const pg = b?.primaryGuest ?? {};
-      out.push([r.arrival, "Principale", String(nn), cam, ageOn(g?.birthDate ?? pg.birthDate, r.arrival), (g?.sex ?? pg.sex) ?? "", g?.citizenship ?? pg.citizenship ?? r.provenance, g?.birthPlace ?? pg.birthPlace ?? "", g?.province ?? g?.country ?? ""]);
-      for (const c of b?.extraGuests ?? []) out.push([r.arrival, "Ospite", String(nn), cam, ageOn(c.birthDate, r.arrival), c.sex ?? "", c.citizenship ?? "", c.birthPlace ?? "", ""]);
+      out.push([fmtDate(r.arrival), "Principale", String(nn), cam, ageOn(g?.birthDate ?? pg.birthDate, r.arrival), (g?.sex ?? pg.sex) ?? "", g?.citizenship ?? pg.citizenship ?? r.provenance, g?.birthPlace ?? pg.birthPlace ?? "", g?.province ?? g?.country ?? ""]);
+      for (const c of b?.extraGuests ?? []) out.push([fmtDate(r.arrival), "Ospite", String(nn), cam, ageOn(c.birthDate, r.arrival), c.sex ?? "", c.citizenship ?? "", c.birthPlace ?? "", ""]);
     }
     const lines = [head.join(";"), ...out.map((row) => row.map(esc).join(";"))];
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -163,7 +165,7 @@ export default function IstatPage() {
         <span className="text-[11px] font-medium text-dim">Data corrente soggiorni:</span>
         <div className="inline-flex items-center overflow-hidden rounded-lg border border-line">
           <button onClick={() => shiftDay(-1)} className="px-2 py-1.5 text-dim hover:bg-wash" title="Giorno precedente">‹</button>
-          <input type="date" value={filterDate || todayIso} onChange={(e) => setFilterDate(e.target.value)} className="border-x border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
+          <DateField value={filterDate || todayIso} onChange={(v) => setFilterDate(v)} className="border-x border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
           <button onClick={() => shiftDay(1)} className="px-2 py-1.5 text-dim hover:bg-wash" title="Giorno successivo">›</button>
         </div>
         <button onClick={() => setFilterDate(todayIso)} className={`${fieldCls} font-semibold hover:bg-wash`}>Oggi</button>
@@ -205,7 +207,7 @@ export default function IstatPage() {
               const listShown = filterDate ? rowsAll.filter((r) => r.arrival === filterDate || r.departure === filterDate || ((r.arrival || "") < filterDate && filterDate < (r.departure || ""))) : rowsAll;
               if (!listShown.length && filterDate) return (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <p className="text-sm text-faint">Il {new Date(filterDate).toLocaleDateString("it-IT")} non ci sono ospiti in movimento (nessun arrivo, partenza o presenza).</p>
+                  <p className="text-sm text-faint">Il {fmtDate(filterDate)} non ci sono ospiti in movimento (nessun arrivo, partenza o presenza).</p>
                   <p className="text-[11px] text-faint">Cambia giorno con ‹ › in alto, oppure vedi l&apos;intero periodo.</p>
                   <button onClick={() => setFilterDate("")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">Mostra tutto il movimento</button>
                 </div>
@@ -226,7 +228,7 @@ export default function IstatPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           {role && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${role.c} 16%, transparent)`, color: role.c }}>{role.l}</span>}
-                          <span className="truncate text-sm font-medium text-txt">{r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT") : "—"} → {r.departure ? new Date(r.departure).toLocaleDateString("it-IT") : "—"}</span>
+                          <span className="truncate text-sm font-medium text-txt">{fmtDate(r.arrival) || "—"} → {fmtDate(r.departure) || "—"}</span>
                           {bk?.code && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{bk.code}</span>}
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-faint">
@@ -244,8 +246,8 @@ export default function IstatPage() {
                     {opened && (
                       <div className="pb-2 pl-1">
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                          <RF label="Arrivo" v={r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT") : ""} />
-                          <RF label="Partenza" v={r.departure ? new Date(r.departure).toLocaleDateString("it-IT") : ""} />
+                          <RF label="Arrivo" v={fmtDate(r.arrival)} />
+                          <RF label="Partenza" v={fmtDate(r.departure)} />
                           <RF label="Notti" v={nn ? String(nn) : ""} />
                           <RF label="Ospiti" v={String(r.guests)} />
                           <RF label="Provenienza" v={r.provenance ?? ""} />
@@ -278,7 +280,7 @@ export default function IstatPage() {
       {confirmClose && (
         <ConfirmDialog
           title="Chiusura giornaliera"
-          message={<>Stai per chiudere e inviare all&apos;Osservatorio il movimento di <b className="text-txt">{new Date(filterDate || todayIso).toLocaleDateString("it-IT")}</b> ({dayPending} {dayPending === 1 ? "movimento" : "movimenti"}).</>}
+          message={<>Stai per chiudere e inviare all&apos;Osservatorio il movimento di <b className="text-txt">{fmtDate(filterDate || todayIso)}</b> ({dayPending} {dayPending === 1 ? "movimento" : "movimenti"}).</>}
           warning={<>La chiusura è <b>definitiva</b>: una volta inviata non è possibile tornare indietro. Verifica arrivi, presenze e camere prima di confermare.</>}
           confirmLabel="Chiudi e invia la giornata"
           busy={busy === "close"}

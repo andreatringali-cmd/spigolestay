@@ -76,7 +76,7 @@ test("email di scarto: testo in italiano con numero, data, cliente e motivo", ()
   assert.equal(reason, "00305 Partita IVA non valida");
   const m = rejectionEmail({ numberLabel: "FT 12/2026", issueDate: "2026-10-05", customer: "Mario Rossi", reason });
   assert.equal(m.subject, "Fattura FT 12/2026 scartata dallo SdI");
-  assert.match(m.text, /La fattura n\. FT 12\/2026 del 05\/10\/2026 a Mario Rossi è stata scartata dallo SdI: 00305 Partita IVA non valida\./);
+  assert.match(m.text, /La fattura n\. FT 12\/2026 del 05\.10\.2026 a Mario Rossi è stata scartata dallo SdI: 00305 Partita IVA non valida\./);
   assert.match(m.text, /nota di credito \/ nuovo documento/);
   const bare = rejectionEmail({});
   assert.match(bare.text, /motivo non indicato/);

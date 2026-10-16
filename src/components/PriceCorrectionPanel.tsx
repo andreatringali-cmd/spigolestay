@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
-import { addDays, toISO } from "@/lib/dates";
+import { addDays, toISO, fmtDM } from "@/lib/dates";
 import { rateForDay } from "@/lib/pricing";
 import { loadWeekendPct } from "@/lib/pricing";
 import { defaultCommissionInfo } from "@/lib/booking";
@@ -37,7 +37,7 @@ const eur = (n: number) => n.toLocaleString("it-IT", { style: "currency", curren
 const eurSigned = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2 })}`;
 const pctSigned = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `b-${Date.now()}-${Math.floor(Math.random() * 1e6)}`);
-const dayLabel = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
+const dayLabel = (iso: string) => `${["dom", "lun", "mar", "mer", "gio", "ven", "sab"][new Date(iso + "T00:00:00").getDay()]} ${fmtDM(iso)}`;
 const relTime = (ts: number) => {
   const d = Math.floor((Date.now() - ts) / 1000);
   if (d < 60) return "adesso";

@@ -7,6 +7,7 @@ import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manag
 import { onlinePaymentPatch } from "@/lib/online-pay";
 import { groupRowBalances } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
           const guestName = s(g.fullName) || `${s(g.firstName)} ${s(g.lastName)}`.trim();
           await internalFetch(`${origin}/api/email`, {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ kind: "quote", to: hostEmail, subject: `Pagamento ricevuto ${code} · ${s(st.name)}`, text: `Hai ricevuto un pagamento di € ${amount.toLocaleString("it-IT")} per la prenotazione ${code}${guestName ? ` di ${guestName}` : ""} (${s(b.checkIn)} → ${s(b.checkOut)}).`, booking: { structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor) } }),
+            body: JSON.stringify({ kind: "quote", to: hostEmail, subject: `Pagamento ricevuto ${code} · ${s(st.name)}`, text: `Hai ricevuto un pagamento di € ${amount.toLocaleString("it-IT")} per la prenotazione ${code}${guestName ? ` di ${guestName}` : ""} (${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}).`, booking: { structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor) } }),
           });
         }
       } catch { /* notifica non critica */ }

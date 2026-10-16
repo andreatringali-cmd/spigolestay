@@ -7,6 +7,7 @@ import { useData, type ActivityType } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import { useLang } from "@/lib/i18n";
+import { fmtDateTime } from "@/lib/dates";
 
 const META: Record<ActivityType, { label: string; color: string }> = {
   booking: { label: "Prenotazione", color: "#2F9E6F" },
@@ -37,7 +38,7 @@ export default function RegistroPage() {
     return activities.filter((a) => (type === "all" || a.type === type) && (!ql || a.text.toLowerCase().includes(ql) || (a.by ?? "").toLowerCase().includes(ql)));
   }, [activities, type, q]);
 
-  const fmt = (ts: number) => new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmt = (ts: number) => fmtDateTime(ts);
 
   return (
     <div>

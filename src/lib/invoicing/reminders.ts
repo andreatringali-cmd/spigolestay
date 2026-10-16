@@ -16,7 +16,7 @@ const eurIt = (cents: number) => {
   const [i, d] = (Math.abs(cents) / 100).toFixed(2).split(".");
   return `€ ${i.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${d}`;
 };
-const dmy = (iso: string | null) => (iso && iso.length >= 10 ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
+const dmy = (iso: string | null) => (iso && iso.length >= 10 ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "");
 
 export function reminderSubject(r: ReminderInput): string {
   return r.daysLate > 0 ? `Promemoria di pagamento – ${r.docLabel}` : `Scadenza in arrivo – ${r.docLabel}`;

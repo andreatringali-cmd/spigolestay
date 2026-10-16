@@ -1,5 +1,6 @@
 import { cityTaxOf } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
+import { fmtDMY } from "@/lib/dates";
 import { isTranslateLang, pickGuestLang, pickTranslatedGroup, type GuestLang, type TranslationItem } from "@/lib/concierge-i18n";
 
 // Base di conoscenza del Concierge (tabella concierge_entries).
@@ -88,7 +89,7 @@ export interface AutoCtx {
   accessCode?: string; // codici della camera della prenotazione (vedi accessCodeOf)
 }
 
-const fmtDate = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return y && m && d ? `${d}/${m}/${y}` : iso; };
+const fmtDate = (iso: string) => fmtDMY(iso);
 const nightsOf = (a: string, b: string) => Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000));
 
 // Codice d'accesso dalla prenotazione: stessa regola della guida (primi 3 codici della camera, filtrati per parcheggio).

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useData } from "@/lib/store";
-import { parseISO, toISO } from "@/lib/dates";
+import { toISO, fmtDate } from "@/lib/dates";
 import { bookingGrandTotal } from "@/lib/booking";
 import { amountPaid, paymentStatus } from "@/lib/incassi";
 import { eur } from "@/lib/format";
@@ -13,7 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
 import { useLang } from "@/lib/i18n";
 
-const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
+const fmt = (iso: string) => fmtDate(iso);
 
 // Totale a carico dell'ospite: logica unica in @/lib/booking (soggiorno + pulizia + extra + tassa).
 

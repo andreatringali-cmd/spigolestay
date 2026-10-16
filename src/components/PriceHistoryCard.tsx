@@ -3,6 +3,7 @@
 // Storico delle modifiche di tariffa applicate (Autopilot / Revenue / Nèttare) con "Annulla".
 // Legge lib/revenue-history.ts (salvato su questo dispositivo). L'annullamento ripristina il
 // valore di prima solo per le tariffe che non sono state ritoccate dopo.
+import { fmtDateTime, fmtDM } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -11,7 +12,7 @@ import { eur } from "@/lib/format";
 import { Card, SectionTitle } from "@/components/ui";
 import { loadHistory, subscribeHistory, planUndo, markUndone, SOURCE_LABEL, type PriceBatch, type RevenueSource } from "@/lib/revenue-history";
 
-const fmtTs = (ts: number) => new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtTs = (ts: number) => fmtDateTime(ts);
 
 export default function PriceHistoryCard({ structureId, sources, onUndone }: { structureId: string; sources?: RevenueSource[]; onUndone?: (b: PriceBatch) => void }) {
   const { rateOverrides, setDayRates, clearDayRates, structures, addActivity } = useData();
@@ -62,7 +63,7 @@ export default function PriceHistoryCard({ structureId, sources, onUndone }: { s
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-txt">{SOURCE_LABEL[b.source]} <span className="font-normal text-faint">· {fmtTs(b.ts)}</span>{structureId === "all" && structures.length > 1 && <span className="font-normal text-faint"> · {structures.find((s) => s.id === b.structureId)?.name ?? ""}</span>}</div>
-                  <div className="text-[11px] text-dim">{b.changes.length} tariffe · variazione media {avg > 0 ? "+" : ""}{avg}%{sample ? ` · es. ${sample.typeName} ${new Date(sample.iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}: ${eur(sample.effBefore)} → ${eur(sample.after)}` : ""}</div>
+                  <div className="text-[11px] text-dim">{b.changes.length} tariffe · variazione media {avg > 0 ? "+" : ""}{avg}%{sample ? ` · es. ${sample.typeName} ${fmtDM(sample.iso)}: ${eur(sample.effBefore)} → ${eur(sample.after)}` : ""}</div>
                 </div>
                 {stillOn
                   ? <button onClick={() => void undo(b)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">Annulla</button>

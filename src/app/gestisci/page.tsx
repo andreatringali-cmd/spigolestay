@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { dateLocale } from "@/lib/guest-i18n";
+import DateField from "@/components/DateField";
+import { fmtDate } from "@/lib/dates";
 
 // Pagina PUBBLICA di gestione prenotazione per l'ospite (link nell'email di conferma).
 // Mostra riepilogo + condizioni di cancellazione e consente: annullare (con rimborso
@@ -12,7 +14,7 @@ const box = "rounded-xl border border-line bg-surface";
 const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
 const eur = (v: number, cur = "€") => `${cur} ${(v || 0).toLocaleString("it-IT")}`;
-const fmtDL = (iso: string | undefined, locale: string) => { if (!iso) return ""; try { return new Date(iso + "T00:00:00").toLocaleDateString(locale, { weekday: "short", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
+const fmtDL = (iso: string | undefined, locale: string) => { if (!iso) return ""; try { return `${new Date(iso + "T00:00:00").toLocaleDateString(locale, { weekday: "short" })} ${fmtDate(iso)}`; } catch { return iso; } };
 
 interface Info {
   booking: {
@@ -194,8 +196,8 @@ function Engine() {
                   <div className="rounded-lg border border-line bg-wash p-3">
                     <p className="mb-2 text-xs text-dim">{t("La struttura verificherà la disponibilità e ti confermerà le nuove date (e l'eventuale differenza di prezzo).")}</p>
                     <div className="grid grid-cols-2 gap-2">
-                      <label className="text-[11px] text-faint">{t("Nuovo check-in")}<input type="date" value={modCi} onChange={(e) => setModCi(e.target.value)} className={`${field} mt-1`} /></label>
-                      <label className="text-[11px] text-faint">{t("Nuovo check-out")}<input type="date" value={modCo} onChange={(e) => setModCo(e.target.value)} className={`${field} mt-1`} /></label>
+                      <label className="text-[11px] text-faint">{t("Nuovo check-in")}<DateField value={modCi} onChange={(v) => setModCi(v)} className={`${field} mt-1 w-full text-left`} /></label>
+                      <label className="text-[11px] text-faint">{t("Nuovo check-out")}<DateField value={modCo} onChange={(v) => setModCo(v)} className={`${field} mt-1 w-full text-left`} /></label>
                     </div>
                     <textarea value={modMsg} onChange={(e) => setModMsg(e.target.value)} rows={2} placeholder={t("Messaggio (facoltativo): es. arriviamo un giorno dopo…")} className={`${field} mt-2 resize-y`} />
                     <button onClick={doModify} disabled={working} className="mt-2 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{working ? t("Invio…") : t("Invia richiesta")}</button>

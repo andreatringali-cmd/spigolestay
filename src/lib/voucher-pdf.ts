@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { fmtDMY } from "./dates";
 
 // Genera il PDF del voucher/conferma prenotazione (A4, carta intestata) da allegare all'email.
 // Pure-JS (pdf-lib), gira su Vercel/Node senza dipendenze native.
@@ -20,7 +21,7 @@ function hexRgb(hex?: string) {
 }
 function fmtDate(iso?: string) {
   if (!iso) return "";
-  try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
+  try { return `${new Date(iso + "T00:00:00Z").toLocaleDateString("it-IT", { weekday: "long", timeZone: "UTC" })} ${fmtDMY(iso)}`; } catch { return fmtDMY(iso); }
 }
 
 export async function buildVoucherPdf(b: VoucherData): Promise<Uint8Array> {

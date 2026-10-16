@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
-import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
+import { nights, toISO, shiftISO, fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { depositFor } from "@/lib/deposit";
@@ -20,7 +21,7 @@ import { useAuth } from "@/lib/authsync";
 type Lang = "it" | "en" | "fr" | "de" | "es";
 const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]];
 const FLAG: Record<Lang, string> = { it: "🇮🇹", en: "🇬🇧", fr: "🇫🇷", de: "🇩🇪", es: "🇪🇸" };
-const fmt = (iso: string) => (iso ? parseISO(iso).toLocaleDateString("it-IT") : "—");
+const fmt = (iso: string) => (iso ? fmtDate(iso) : "—");
 
 // Glifi social (path SVG, fill currentColor) per il piè di pagina del preventivo.
 const SOCIAL_PATH: Record<string, string> = {
@@ -539,7 +540,7 @@ export default function PreventiviPage() {
       ? `<img src="${structure.logo}" alt="" class="logoimg">`
       : `<div class="logo" style="background:${accent}">${esc((structureName || "S").slice(0, 1).toUpperCase())}</div>`;
 
-    const dmy = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+    const dmy = (iso: string) => fmtDate(iso);
     const periodCards = ([[L.ci, dmy(checkIn)], [L.co, dmy(checkOut)], [L.durata, `${n} ${nWord}`]] as [string, string][])
       .map(([k, v]) => `<div class="pc"><div class="pk">${esc(k)}</div><div class="pv">${esc(v)}</div></div>`).join("");
     const sumRows: string[] = mergedLines.map((l) => `<tr><td>${l.qty} ${esc(rtName(l.roomTypeId) || L.room)} <span class="mut">· ${eur(l.price)} ${esc(L.aNotte)} × ${n} ${nWord}</span></td><td class="r"><b>${eur(l.qty * l.price * n)}</b></td></tr>`);
@@ -729,8 +730,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </Field>
             )}
             {structures.length > 1 && !lockedStructure && <div className="hidden sm:block" />}
-            <Field label={t("Check-in")}><input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></Field>
-            <Field label={t("Check-out")}><input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></Field>
+            <Field label={t("Check-in")}><DateField value={checkIn} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(shiftISO(v, 1)); }} className={`${inp} text-left`} /></Field>
+            <Field label={t("Check-out")}><DateField value={checkOut} min={shiftISO(checkIn, 1)} onChange={(v) => setCheckOut(v)} className={`${inp} text-left`} /></Field>
             <Field label={t("Adulti")}><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} className={inp} /></Field>
             <Field label={t("Bambini")}><input type="number" min={0} value={children} onChange={(e) => { const v = Math.max(0, Number(e.target.value)); setChildren(v); setChildAges((prev) => { const next = prev.slice(0, v); while (next.length < v) next.push(8); return next; }); }} className={inp} /></Field>
             {children > 0 && (

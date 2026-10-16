@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/authsync";
 import Icon from "@/components/Icon";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
-import { nights } from "@/lib/dates";
+import { nights, fmtDate, fmtDM } from "@/lib/dates";
 import { CHANNELS, type Booking } from "@/lib/types";
 import type { SavedQuote } from "@/lib/assistant";
 import { askAssistantAi, type AiTurn } from "@/lib/assistant-ai";
@@ -125,7 +125,7 @@ export default function AssistentePage() {
       arrivalsToday, departuresToday, noCheckin,
       ricavo: { title: "Ricavo del mese", value: eur(ricavoMese), detail: `${monthArr.length} prenotazioni con arrivo questo mese.`, go: { label: "Statistiche", href: "/statistiche" } } as Ans,
       incassato: { title: "Incassato del mese", value: eur(incassatoMese), detail: `Su ${eur(ricavoMese)} di ricavo previsto.`, go: { label: "Incassi", href: "/pagamenti" } } as Ans,
-      prossimo: { title: "Prossimo arrivo", value: nextArrival ? new Date(nextArrival.checkIn).toLocaleDateString("it-IT") : "—", detail: nextArrival ? `${getGuest(nextArrival.guestId)?.fullName || "Ospite"} · ${getStructure(nextArrival.structureId)?.name ?? ""}` : "Nessun arrivo futuro.", go: { label: "Calendario", href: "/calendario" } } as Ans,
+      prossimo: { title: "Prossimo arrivo", value: nextArrival ? fmtDate(nextArrival.checkIn) : "—", detail: nextArrival ? `${getGuest(nextArrival.guestId)?.fullName || "Ospite"} · ${getStructure(nextArrival.structureId)?.name ?? ""}` : "Nessun arrivo futuro.", go: { label: "Calendario", href: "/calendario" } } as Ans,
     };
   }, [active, t, ym, getGuest, getStructure]);
 
@@ -167,7 +167,7 @@ export default function AssistentePage() {
     const unit = getUnit(b.unitId);
     const rt = roomTypes.find((r) => r.id === b.roomTypeId);
     const nN = nights(b.checkIn, b.checkOut);
-    const dOf = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+    const dOf = (iso: string) => `${new Date(iso).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(iso)}`;
     const ch = CHANNELS[b.channel]?.label || b.channel;
     const total = b.total ?? 0, paid = b.paid ?? 0, resid = Math.max(0, total - paid);
     const people = `${b.adults} adult${b.adults === 1 ? "o" : "i"}${b.children ? ` e ${b.children} bambin${b.children === 1 ? "o" : "i"}` : ""}`;

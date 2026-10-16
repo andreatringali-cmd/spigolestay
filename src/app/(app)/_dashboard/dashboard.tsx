@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { toISO, parseISO, nights } from "@/lib/dates";
+import { toISO, parseISO, nights, fmtDM } from "@/lib/dates";
 import { num } from "@/lib/format";
 import { bookingPaidTotal, cityTaxOfBooking, nightlyRevenue } from "@/lib/booking";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
@@ -36,10 +36,9 @@ import { useDashboard2Dati } from "./_dati";
 import { loadChannelColor } from "@/lib/channelOverrides";
 
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
-const MESI_BREVI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 const OTA_CH = ["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const shortDate = (iso: string) => `${Number(iso.slice(8, 10))} ${MESI_BREVI[Number(iso.slice(5, 7)) - 1]}`;
+const shortDate = (iso: string) => fmtDM(iso);
 
 export default function Dashboard2() {
   const { bookings, guests, units, structures, openBooking, activeStructureId } = useData();
@@ -186,7 +185,7 @@ export default function Dashboard2() {
   }, [split, unitMap, structMap, guestMap, multiAll, dati.threads, dati.schedBy, remLog, today]);
 
   // --- Testi ---
-  const dateLabel = cap(parseISO(today).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }));
+  const dateLabel = cap(`${parseISO(today).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(today)}`);
   const scopeLabel = sFilter === "all" ? (structures.length > 1 ? "Tutte le strutture" : structures[0]?.name ?? "") : structMap.get(sFilter)?.name ?? "";
   const statusText = loadingAdem ? "Controllo gli adempimenti…" : statusSentence(stato.total, stato.urgent).replace(/\.$/, "");
   const statusTone = loadingAdem ? "dim" : stato.tone;

@@ -5,7 +5,8 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { nights, toISO, shiftISO } from "@/lib/dates";
+import { nights, toISO, shiftISO, fmtDateTime } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { useLang } from "@/lib/i18n";
@@ -226,7 +227,7 @@ export default function WidgetPage() {
 
   const pubInfo = pub[structureId] ?? null;
   const publishedSlug = pubInfo?.slug ?? null;
-  const publishedAtTxt = pubInfo?.updatedAt ? new Date(pubInfo.updatedAt).toLocaleString("it-IT", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  const publishedAtTxt = pubInfo?.updatedAt ? fmtDateTime(pubInfo.updatedAt) : "";
   // Modifiche alla struttura/camere successive all'ultima pubblicazione: l'embed mostra la copia pubblicata, non i dati live.
   const staleSince = useMemo(() => {
     if (!pubInfo?.updatedAt) return false;
@@ -340,6 +341,7 @@ export default function WidgetPage() {
 
   const lay = LAYOUTS.find((l) => l.key === c.layout) ?? LAYOUTS[0];
   const radius = c.theme === "rounded" ? 16 : 4;
+  const wr = { "--wr": `${radius / 2}px` } as React.CSSProperties;
   const previewScale = availW ? Math.min(1, availW / lay.w) : 1;
 
   // ── Snippet EMBED reale (motore /prenota → route pubblica /embed/<slug>) ──
@@ -606,8 +608,8 @@ export default function WidgetPage() {
                 {lay.orient === "v" ? (
                 <div className="flex flex-col gap-3 p-5">
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-xs font-medium text-dim">{t("Arrivo")}<input type="date" value={ci} onChange={(e) => setCi(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
-                    <label className="block text-xs font-medium text-dim">{t("Partenza")}<input type="date" value={co} onChange={(e) => setCo(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
+                    <label className="block text-xs font-medium text-dim" style={wr}>{t("Arrivo")}<DateField value={ci} onChange={(v) => setCi(v)} className={`mt-1 text-left ${inp} rounded-[var(--wr)]!`} /></label>
+                    <label className="block text-xs font-medium text-dim" style={wr}>{t("Partenza")}<DateField value={co} onChange={(v) => setCo(v)} className={`mt-1 text-left ${inp} rounded-[var(--wr)]!`} /></label>
                   </div>
                   <div className={`grid gap-2 ${c.askChildren ? "grid-cols-3" : "grid-cols-2"}`}>
                     <label className="block text-xs font-medium text-dim">{t("Adulti")}<input type="number" min={1} value={guests} onChange={(e) => setGuests(Math.max(1, +e.target.value))} className={`mt-1 ${inp}`} /></label>
@@ -635,8 +637,8 @@ export default function WidgetPage() {
                 </div>
                 ) : (
                 <div className={`flex flex-wrap items-end gap-2 ${c.layout === "inline" ? "p-2.5" : "p-4"}`}>
-                  <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 120 }}>{t("Arrivo")}<input type="date" value={ci} onChange={(e) => setCi(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
-                  <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 120 }}>{t("Partenza")}<input type="date" value={co} onChange={(e) => setCo(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
+                  <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 120, ...wr }}>{t("Arrivo")}<DateField value={ci} onChange={(v) => setCi(v)} className={`mt-1 text-left ${inp} rounded-[var(--wr)]!`} /></label>
+                  <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 120, ...wr }}>{t("Partenza")}<DateField value={co} onChange={(v) => setCo(v)} className={`mt-1 text-left ${inp} rounded-[var(--wr)]!`} /></label>
                   <label className="block text-[11px] font-medium text-dim" style={{ width: 68 }}>{t("Adulti")}<input type="number" min={1} value={guests} onChange={(e) => setGuests(Math.max(1, +e.target.value))} className={`mt-1 ${inp}`} /></label>
                   {c.askChildren && <label className="block text-[11px] font-medium text-dim" style={{ width: 68 }}>{t("Bambini")}<input type="number" min={0} value={children} onChange={(e) => setChildren(Math.max(0, +e.target.value))} className={`mt-1 ${inp}`} /></label>}
                   <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 130 }}>{t("Camera")}<select value={rtId} onChange={(e) => setRtId(e.target.value)} className={`mt-1 ${inp}`}>{typesOf.length === 0 && <option value="">Nessuna camera</option>}{typesOf.map((rt) => (<option key={rt.id} value={rt.id}>{rt.name}</option>))}</select></label>

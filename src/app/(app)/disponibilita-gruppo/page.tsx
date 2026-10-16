@@ -8,7 +8,7 @@ import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { POOL_DEF, POOL_KEY, parsePool, poolFamilies, poolListings, poolOccupancy, type PoolConfig } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
-import { addDays, toISO, parseISO } from "@/lib/dates";
+import { addDays, toISO, parseISO, fmtDM } from "@/lib/dates";
 import Toggle from "@/components/Toggle";
 
 const NONE = ""; // famiglia "non condivisa"
@@ -223,7 +223,7 @@ export default function GruppoPage() {
                       return (
                         <th key={d} className="px-1 py-1.5 text-center font-medium" style={{ backgroundColor: today ? tint("var(--focus)", 12) : undefined, color: today ? "var(--focus)" : wk ? "var(--err)" : "var(--faint)" }}>
                           <div className="text-[10px] uppercase">{today ? "Oggi" : dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
-                          <div className="font-mono">{dt.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}</div>
+                          <div className="font-mono">{fmtDM(dt)}</div>
                         </th>
                       );
                     })}

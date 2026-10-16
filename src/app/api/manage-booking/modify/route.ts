@@ -3,6 +3,7 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, writeBookingPatch } from "@/lib/manage-booking";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "quote", to: hostEmail, subject: `Richiesta modifica ${code} · ${s(st.name)}`,
-            text: `L'ospite ha richiesto una modifica alla prenotazione ${code}.\n\nAttuale: ${s(b.checkIn)} → ${s(b.checkOut)}\n${ci || co ? `Nuove date richieste: ${ci || s(b.checkIn)} → ${co || s(b.checkOut)}\n` : ""}${message ? `Messaggio: ${message}\n` : ""}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || s(g.email)}\n\nApri il gestionale per confermare o proporre un'alternativa.`,
+            text: `L'ospite ha richiesto una modifica alla prenotazione ${code}.\n\nAttuale: ${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}\n${ci || co ? `Nuove date richieste: ${fmtDMY(ci || s(b.checkIn))} → ${fmtDMY(co || s(b.checkOut))}\n` : ""}${message ? `Messaggio: ${message}\n` : ""}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || s(g.email)}\n\nApri il gestionale per confermare o proporre un'alternativa.`,
           }),
         });
       } catch { /* email non critica */ }

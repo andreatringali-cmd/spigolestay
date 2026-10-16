@@ -5,12 +5,13 @@ import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
 import { effBase, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
-import { shiftISO, toISO } from "@/lib/dates";
+import { shiftISO, toISO, fmtDM } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
-const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch { return iso; } };
+const fmtDay = (iso: string) => fmtDM(iso) || iso;
 
 export default function NewBookingModal() {
   const { newBooking, closeNewBooking, structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, activeStructureId } = useData();
@@ -132,11 +133,11 @@ export default function NewBookingModal() {
               <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">{t("Soggiorno")}</div>
               <div className="flex flex-wrap items-end gap-3">
                 <label className="flex-1 text-[11px] font-medium text-dim">{t("Check-in")}
-                  <input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus" />
+                  <DateField value={checkIn} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(shiftISO(v, 1)); }} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus text-left" />
                 </label>
                 <div className="grid h-11 w-9 shrink-0 place-items-center text-faint">→</div>
                 <label className="flex-1 text-[11px] font-medium text-dim">{t("Check-out")}
-                  <input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus" />
+                  <DateField value={checkOut} min={shiftISO(checkIn, 1)} onChange={(v) => setCheckOut(v)} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus text-left" />
                 </label>
                 <span className="mb-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? t("notte") : t("notti")}</span>
               </div>

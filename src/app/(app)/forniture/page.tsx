@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDate } from "@/lib/dates";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -301,7 +302,7 @@ export default function ForniturePage() {
     const when = (o.delivery_date || o.updated_at || o.created_at).slice(0, 10);
     const { error } = await supabase.from("purchase_documents").insert({
       tenant_id: uid, structure_id: o.structure_id, supplier_name: "Xenora Forniture", doc_number: docNum, doc_date: o.created_at.slice(0, 10), doc_type: "ricevuta", category: "Forniture",
-      taxable_cents: taxable, vat_cents: vat, total_cents: o.total_cents, paid: true, paid_at: when, payment_method: "Carta", source: "forniture", notes: `Ordine Forniture ${o.id.slice(0, 8)} del ${new Date(o.created_at).toLocaleDateString("it-IT")}`,
+      taxable_cents: taxable, vat_cents: vat, total_cents: o.total_cents, paid: true, paid_at: when, payment_method: "Carta", source: "forniture", notes: `Ordine Forniture ${o.id.slice(0, 8)} del ${fmtDate(new Date(o.created_at))}`,
     });
     if (error) { setMsg(error.message); return; }
     setInvoiced((p2) => ({ ...p2, [docNum]: true })); setMsg("Ordine registrato in Fatture passive (categoria Forniture).");
@@ -309,7 +310,7 @@ export default function ForniturePage() {
   const exportOrdersCsv = () => {
     const head = ["Data", "Struttura", "Tipo", "Stato", "Imponibile", "IVA", "Totale", "Consegna"];
     const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
-    const rows = shownOrders.map((o) => [new Date(o.created_at).toLocaleDateString("it-IT"), structOf(o.structure_id), o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale", STATUS_LABEL[o.status] ?? o.status, ((o.subtotal_cents ?? 0) / 100).toFixed(2), ((o.vat_cents ?? 0) / 100).toFixed(2), (o.total_cents / 100).toFixed(2), o.delivery_date ?? ""].map(q).join(","));
+    const rows = shownOrders.map((o) => [fmtDate(new Date(o.created_at)), structOf(o.structure_id), o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale", STATUS_LABEL[o.status] ?? o.status, ((o.subtotal_cents ?? 0) / 100).toFixed(2), ((o.vat_cents ?? 0) / 100).toFixed(2), (o.total_cents / 100).toFixed(2), o.delivery_date ?? ""].map(q).join(","));
     const blob = new Blob(["﻿" + [head.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "ordini-forniture.csv"; a.click(); URL.revokeObjectURL(a.href);
   };
@@ -450,7 +451,7 @@ export default function ForniturePage() {
                           <td className="px-3 py-2"><div className="font-semibold text-txt">{r.p.name}</div><div className="text-[11px] text-faint">{catName(r.p.category_id)} · conf. {r.p.pack_size} {r.p.unit || "pz"}</div></td>
                           <td className="px-3 py-2 text-right">
                             <input key={`q-${r.p.id}-${r.counted}`} type="number" min={0} step="any" defaultValue={stockRows[r.p.id] ? r.counted : ""} placeholder="—" onBlur={(e) => { const v = e.target.value.trim(); if (v === "") return; const n = Math.max(0, Number(v.replace(",", "."))); if (Number.isFinite(n) && (!stockRows[r.p.id] || n !== r.counted)) saveStock(r.p, n); }} className="w-20 rounded border border-line bg-surface px-1.5 py-1 text-right font-mono text-xs" />
-                            {r.at && <div className="mt-0.5 text-[10px] text-faint">al {new Date(r.at).toLocaleDateString("it-IT")}</div>}
+                            {r.at && <div className="mt-0.5 text-[10px] text-faint">al {fmtDate(r.at)}</div>}
                           </td>
                           <td className="px-3 py-2 text-right font-mono text-xs">{stockRows[r.p.id] ? <><span className="font-bold text-txt">{r.estimated}</span>{r.consumed > 0 && <div className="text-[10px] text-faint">−{r.consumed} dal conteggio</div>}</> : "—"}</td>
                           <td className="px-3 py-2 text-right">
@@ -545,10 +546,10 @@ export default function ForniturePage() {
                 {shownOrders.map((o) => (
                   <Fragment key={o.id}>
                     <tr onClick={() => toggleOrder(o)} className="cursor-pointer border-b border-line/60 hover:bg-wash">
-                      <td className="px-3 py-2 text-xs">{new Date(o.created_at).toLocaleDateString("it-IT")}</td>
+                      <td className="px-3 py-2 text-xs">{fmtDate(new Date(o.created_at))}</td>
                       <td className="px-3 py-2 text-xs">{structOf(o.structure_id)}</td>
                       <td className="px-3 py-2 text-xs">{o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale"}</td>
-                      <td className="px-3 py-2 text-xs"><span className="rounded-full bg-wash px-2 py-0.5 font-semibold text-dim">{STATUS_LABEL[o.status] ?? o.status}</span>{o.delivery_date && o.status === "delivered" && <span className="ml-2 text-[10px] text-faint">il {new Date(o.delivery_date).toLocaleDateString("it-IT")}</span>}</td>
+                      <td className="px-3 py-2 text-xs"><span className="rounded-full bg-wash px-2 py-0.5 font-semibold text-dim">{STATUS_LABEL[o.status] ?? o.status}</span>{o.delivery_date && o.status === "delivered" && <span className="ml-2 text-[10px] text-faint">il {fmtDate(o.delivery_date)}</span>}</td>
                       <td className="px-3 py-2 text-right font-mono font-bold text-txt">{c(o.total_cents)}</td>
                     </tr>
                     {openOrder === o.id && (

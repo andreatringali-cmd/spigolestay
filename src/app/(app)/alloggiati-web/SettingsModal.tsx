@@ -1,5 +1,6 @@
 "use client";
 
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
@@ -95,7 +96,7 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
             </div>
           </label>
           <label className="block"><span className={lbl}>Webservice Code {hasWs && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvato</span>}</span><input value={ws} onChange={(e) => setWs(e.target.value)} placeholder="Incolla il Webservice Code" className={`${inp} font-mono text-[11px]`} /></label>
-          <label className="block"><span className={lbl}>Scadenza Webservice Code</span><input type="date" value={s.ws_code_expires_at?.slice(0, 10) ?? ""} onChange={(e) => set({ ws_code_expires_at: e.target.value })} className={inp} />{wsExpSoon && <span className="mt-1 block text-[11px] font-semibold text-[color:var(--warn)]">⚠️ In scadenza: rigenera il codice sul portale Alloggiati.</span>}</label>
+          <label className="block"><span className={lbl}>Scadenza Webservice Code</span><DateField value={s.ws_code_expires_at?.slice(0, 10) ?? ""} onChange={(v) => set({ ws_code_expires_at: v })} className={inp} />{wsExpSoon && <span className="mt-1 block text-[11px] font-semibold text-[color:var(--warn)]">⚠️ In scadenza: rigenera il codice sul portale Alloggiati.</span>}</label>
           <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
           <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
           <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>

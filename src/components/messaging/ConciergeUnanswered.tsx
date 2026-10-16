@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDateTime } from "@/lib/dates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import { apiPost } from "@/lib/invoicing/client";
@@ -14,7 +15,7 @@ export interface KbPrefill { nonce: number; title: string; category: string; lan
 
 const normQ = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 const topicLabel = (c: string) => (c === "altro" ? "Altro" : CATEGORY_LABEL[c] ?? c);
-const whenOf = (ts: number) => { try { return new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+const whenOf = (ts: number) => fmtDateTime(ts);
 
 interface Row { key: string; q: string; ids: string[]; count: number; ts: number; noBooking: boolean }
 interface Group { cat: string; rows: Row[] }

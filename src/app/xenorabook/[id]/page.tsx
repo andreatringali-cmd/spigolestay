@@ -13,6 +13,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import DateField from "@/components/DateField";
 import { ListingImage, StructImg, stars, type Listing, type Room } from "@/lib/xenorabook/data";
 
 const c = (n: number) => `€${n}`;
@@ -157,8 +158,8 @@ function Engine() {
         <div>
           <Card className="sticky top-4">
             <div className="grid grid-cols-2 gap-2">
-              <label className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-in</div><input type="date" value={from} min={today} onChange={(e) => setFrom(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-txt outline-none" /></label>
-              <label className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-out</div><input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-txt outline-none" /></label>
+              <div className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-in</div><DateField value={from} min={today} onChange={(v) => setFrom(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" /></div>
+              <div className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-out</div><DateField value={to} min={from} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" /></div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
               <div className="flex items-center justify-between rounded-lg border border-line px-2.5 py-1.5"><span className="text-dim">Adulti</span><span className="flex items-center gap-2"><button onClick={() => setAdults(Math.max(1, adults - 1))} className="text-dim">−</button><b>{adults}</b><button onClick={() => setAdults(adults + 1)} className="text-dim">+</button></span></div>

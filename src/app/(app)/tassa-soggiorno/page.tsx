@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { nights } from "@/lib/dates";
+import { nights, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -148,7 +148,7 @@ export default function TassaSoggiornoPage() {
   const exportImpostaCsv = () => downloadCsv(
     `imposta-soggiorno_${label.replace(/\s+/g, "-")}.csv`,
     ["Ospite", "Provenienza", "Check-in", "Check-out", "Persone paganti", "Notti tassabili", "Imposta €"],
-    rows.map(({ b, persons, taxable, tax }) => [guestName(b.guestId), guestCountry(b.guestId), b.checkIn, b.checkOut, persons, taxable, tax.toFixed(2)]),
+    rows.map(({ b, persons, taxable, tax }) => [guestName(b.guestId), guestCountry(b.guestId), fmtDate(b.checkIn), fmtDate(b.checkOut), persons, taxable, tax.toFixed(2)]),
   );
   const exportIstatCsv = () => downloadCsv(
     `istat-movimento_${label.replace(/\s+/g, "-")}.csv`,

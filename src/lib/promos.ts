@@ -1,5 +1,6 @@
 // Libreria promo riutilizzabili, condivisa tra Promozioni, Ospiti e scheda ospite.
 import { lsGet } from "./publicdata";
+import { fmtDMY } from "./dates";
 
 export interface Promo {
   id: string;
@@ -69,7 +70,7 @@ export function applyPromo(text: string, vars: { nome?: string; sconto?: number 
 }
 // Costruisce il link mailto per inviare una promo (destinatari in ccn).
 export function promoMailto(emails: string[], promo: Promo, opts: { nome?: string; struttura?: string; contatti?: string } = {}): string {
-  const scadenza = promo.validUntil ? new Date(promo.validUntil).toLocaleDateString("it-IT") : "";
+  const scadenza = promo.validUntil ? fmtDMY(promo.validUntil) : "";
   const body = applyPromo(promo.body, { nome: opts.nome, sconto: promo.discountPct, codice: promo.code, scadenza, struttura: opts.struttura, contatti: opts.contatti });
   const single = !!opts.nome && emails.length === 1;
   const to = single ? emails[0] : "";

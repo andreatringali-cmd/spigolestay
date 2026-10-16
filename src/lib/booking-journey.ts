@@ -1,6 +1,7 @@
 // Percorso di una prenotazione: tutti i passaggi da fare/fatti (check-in, pagamento, schedina, ISTAT…)
 // calcolati dai dati che Xenora ha già. Funzione pura: nessuna scrittura, nessuna chiamata di rete.
 
+import { fmtDM } from "./dates";
 import type { Booking, Guest, Structure } from "./types";
 import { bookingPaidTotal, cityTaxOf } from "./booking";
 import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
@@ -27,7 +28,7 @@ const declaredPax = (b: Booking) => (primaryDone(b) ? 1 : 0) + (b.extraGuests?.f
 const nightsBetween = (a: string, b: string) => Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000));
 const daysTo = (iso: string, today: string) => Math.round((Date.parse(iso) - Date.parse(today)) / 86400000);
 const eurRound = (n: number) => `€ ${Math.round(n * 100) % 100 === 0 ? Math.round(n) : n.toFixed(2).replace(".", ",")}`;
-const fmtShort = (iso: string) => { const [, m, d] = iso.split("-"); return `${+d}/${+m}`; };
+const fmtShort = (iso: string) => fmtDM(iso);
 
 /** Nota interna della prenotazione, senza la dicitura "Importato da…" messa dall'importazione. Vuota se resta solo quella. Non è una nota dell'ospite: quelle sono le richieste (guestRequests). */
 export const internalNote = (note?: string) => (note ?? "").replace(/^s*Importato da (Octorate|CSV)s*·?s*/i, "").trim();

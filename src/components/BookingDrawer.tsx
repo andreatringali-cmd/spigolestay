@@ -19,7 +19,8 @@ import BookingExtrasPicker from "@/components/booking/BookingExtrasPicker";
 import { entriesTotal } from "@/lib/booking-extras";
 import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
-import { nights, parseISO, shiftISO } from "@/lib/dates";
+import { nights, parseISO, shiftISO, fmtDate as fmtDateIt, fmtDM, fmtDateTime } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { cityTaxOf, groupTaxShareOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
@@ -36,8 +37,7 @@ import MediaImg from "@/components/MediaImg";
 import MediaLink from "@/components/MediaLink";
 import QRCode from "qrcode";
 
-const fmtDate = (iso: string) =>
-  parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+const fmtDate = (iso: string) => fmtDateIt(iso);
 
 // Compleanno dell'ospite che cade durante il soggiorno [checkIn, checkOut): ritorna la data ISO o null.
 const birthdayInStay = (birthDate?: string, checkIn?: string, checkOut?: string): string | null => {
@@ -202,7 +202,7 @@ export default function BookingDrawer() {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
     const money = (x: number) => "€ " + x.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const today = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
+    const today = fmtDateIt(new Date());
     const unitV = getUnit(booking.unitId);
     const rows: [string, string][] = [
       [`Soggiorno · ${nView} ${nView === 1 ? "notte" : "notti"} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)})`, money(accV)],
@@ -384,7 +384,7 @@ export default function BookingDrawer() {
             <div className="mt-1.5 space-y-0.5">
               {Array.from({ length: nights(booking.checkIn, booking.checkOut) }, (_, i) => shiftISO(booking.checkIn, i)).map((iso) => (
                 <div key={iso} className="flex items-baseline justify-between gap-4 text-xs">
-                  <span className="text-dim">{parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}</span>
+                  <span className="text-dim">{["dom", "lun", "mar", "mer", "gio", "ven", "sab"][parseISO(iso).getDay()]} {fmtDM(iso)}</span>
                   <span className="font-mono font-medium tabular-nums text-txt">{eur(booking.nightlyRates?.[iso] ?? 0)}</span>
                 </div>
               ))}
@@ -525,7 +525,7 @@ export default function BookingDrawer() {
 
       {booking.otaCard?.present && (() => {
         const c = booking.otaCard!;
-        const fmtDate = (s?: string) => { if (!s) return null; const d = new Date(s); return isNaN(+d) ? s : d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); };
+        const fmtDate = (s?: string) => { if (!s) return null; return fmtDateIt(s) || s; };
         const eff = fmtDate(c.effectiveDate); const exp = fmtDate(c.expirationDate);
         return (
           <Section title={t("Carta virtuale OTA")}>
@@ -557,7 +557,7 @@ export default function BookingDrawer() {
           <span className="font-bold" style={{ color: "var(--warn)" }}>⇄</span>
           <div className="min-w-0 flex-1 text-txt">
             {t("Prenotazione spostata da")} <b>{booking.movedFrom.structureName || t("un'altra struttura")}</b>
-            <div className="text-[11px] text-dim">{new Date(booking.movedFrom.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+            <div className="text-[11px] text-dim">{fmtDateTime(booking.movedFrom.at)}</div>
           </div>
           <button onClick={() => updateBooking(booking.id, { movedFrom: undefined })} className="shrink-0 text-xs font-semibold text-dim hover:text-txt">{t("Nascondi")}</button>
         </div>
@@ -740,7 +740,7 @@ export default function BookingDrawer() {
         <div ref={voucherPdfRef} style={{ width: 794 }}>
           {(() => {
             const vp = voucherPayload(booking, { getStructure, getGuest, getRoomType, getUnit });
-            const fmtLong = (iso?: string) => { if (!iso) return ""; try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
+            const fmtLong = (iso?: string) => { if (!iso) return ""; return fmtDateIt(iso) || iso; };
             return (
               <VoucherDoc
                 scale={1} accent={vp.color || "#285f92"} logo={vp.logo} structureName={vp.structureName || "Xenora"}
@@ -819,8 +819,8 @@ export default function BookingDrawer() {
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label={t("Check-in")}><input type="date" className={inputCls} value={form.checkIn} onChange={(e) => set(e.target.value >= form.checkOut ? { checkIn: e.target.value, checkOut: shiftISO(e.target.value, 1) } : { checkIn: e.target.value })} /></Field>
-          <Field label={t("Check-out")}><input type="date" className={inputCls} value={form.checkOut} min={shiftISO(form.checkIn, 1)} onChange={(e) => set({ checkOut: e.target.value })} /></Field>
+          <Field label={t("Check-in")}><DateField className={inputCls + " w-full text-left"} value={form.checkIn} onChange={(v) => set(v >= form.checkOut ? { checkIn: v, checkOut: shiftISO(v, 1) } : { checkIn: v })} /></Field>
+          <Field label={t("Check-out")}><DateField className={inputCls + " w-full text-left"} value={form.checkOut} min={shiftISO(form.checkIn, 1)} onChange={(v) => set({ checkOut: v })} /></Field>
         </div>
         <div className="text-xs text-dim">{t("Durata")}: <b className="font-mono text-txt">{nEdit}</b> {nEdit === 1 ? t("notte") : t("notti")}</div>
         <div className="grid grid-cols-2 gap-2">

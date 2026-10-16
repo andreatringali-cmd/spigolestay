@@ -1,5 +1,7 @@
 "use client";
 
+import { fmtDate, fmtDateTime } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
@@ -31,8 +33,8 @@ export default function IstatArchivioPage() {
   }, [sid]);
   useEffect(() => { load(); }, [load]);
 
-  const fmt = (iso: string) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  const fmtDay = (d: string | null) => (d ? new Date(d).toLocaleDateString("it-IT") : "—");
+  const fmt = (iso: string) => fmtDateTime(iso);
+  const fmtDay = (d: string | null) => (d ? fmtDate(d) : "—");
   const okStato = (s: string) => s === "sent";
   const shown = items.filter((it) => {
     const d = (it.day || it.created_at.slice(0, 10));
@@ -50,9 +52,9 @@ export default function IstatArchivioPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {structures.length > 1 && activeStructureId === "all" && <select value={sid} onChange={(e) => setSid(e.target.value)} className={fieldCls}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
         <span className="text-[11px] font-medium text-dim">Dal</span>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} />
+        <DateField value={from} onChange={(v) => setFrom(v)} className={fieldCls} />
         <span className="text-[11px] font-medium text-dim">Al</span>
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldCls} />
+        <DateField value={to} onChange={(v) => setTo(v)} className={fieldCls} />
         {(from || to) && <button onClick={() => { setFrom(""); setTo(""); }} className={`${fieldCls} text-dim hover:bg-wash`}>Azzera filtri</button>}
         <span className="ml-auto text-[11px] text-faint">{shown.length} {shown.length === 1 ? "chiusura" : "chiusure"}</span>
       </div>

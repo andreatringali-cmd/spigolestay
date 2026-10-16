@@ -6,6 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import { handleSubscriptionPaid, type SubscriptionPaidInput } from "@/lib/invoicing/subscription-billing";
 import { planByKey } from "@/lib/stripe-plans";
 import { adminFromEnv, recordChatPayment } from "@/lib/chat-pay-server";
+import { fmtDMY } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -143,7 +145,7 @@ export async function POST(req: Request) {
           const fineUnix = (sub as unknown as { current_period_end?: number | null; cancel_at?: number | null }).cancel_at
             ?? (sub as unknown as { current_period_end?: number | null }).current_period_end
             ?? null;
-          const fine = fineUnix ? (() => { try { return new Date(fineUnix * 1000).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return ""; } })() : "";
+          const fine = fineUnix ? (() => { try { return fmtDMY(ymdRome(fineUnix * 1000)); } catch { return ""; } })() : "";
           const text = [
             isCancelNow ? "Un abbonamento Xenora è stato disdetto (cancellato)." : "Un abbonamento Xenora è stato impostato per la disdetta a fine periodo.",
             email ? `Cliente: ${email}` : "",

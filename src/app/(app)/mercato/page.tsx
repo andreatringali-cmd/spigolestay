@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
-import { toISO, shiftISO, nights } from "@/lib/dates";
+import { toISO, shiftISO, nights, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
@@ -363,7 +363,7 @@ function TrendChart({ data, cityAvg, t }: { data: { date: string; rooms_total: n
         <circle cx={last[0]} cy={last[1]} r="4" fill="var(--focus)" stroke="var(--surface)" strokeWidth="2" />
       </svg>
       <div className="mt-1 flex items-center justify-between text-[10px] text-faint">
-        <span>{new Date(data[0].date + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
+        <span>{fmtDM(data[0].date)}</span>
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1"><i className="inline-block h-2 w-3 rounded" style={{ background: "var(--focus)" }} /> {t("tu")}</span>
           {cityAvg != null && <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-3" style={{ background: "#f59e0b" }} /> {t("media città")}</span>}

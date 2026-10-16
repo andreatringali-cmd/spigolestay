@@ -8,6 +8,7 @@ import { loadUsers, PERM_TEMPLATES, initials, userHasStructure, type User } from
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
 import { supabase } from "@/lib/supabase";
+import { fmtDate } from "@/lib/dates";
 
 export default function UtentiPage() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function UtentiPage() {
     })();
     return () => { cancelled = true; };
   }, []);
-  const lastAccess = (u: User) => { const at = lastSeen[u.email.trim().toLowerCase()] || u.lastLogin?.at; return at ? new Date(at).toLocaleDateString("it-IT") : null; };
+  const lastAccess = (u: User) => { const at = lastSeen[u.email.trim().toLowerCase()] || u.lastLogin?.at; return at ? fmtDate(at) : null; };
 
   const templateLabel = (k: string) => (k === "custom" ? t("Personalizzato") : t(PERM_TEMPLATES.find((t) => t.key === k)?.label ?? "—"));
   // Con una struttura selezionata: solo gli utenti che vi hanno accesso (chi ha accesso a tutte le strutture compare ovunque).

@@ -16,7 +16,7 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import { useLang } from "@/lib/i18n";
 import { inScope } from "@/lib/scope";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
-import { shiftISO, nights, toISO } from "@/lib/dates";
+import { shiftISO, nights, toISO, fmtDM, fmtDate } from "@/lib/dates";
 import { fetchCityPulse, computeMarketSignal, revenueSuggestion, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -90,7 +90,7 @@ export default function RevenuePage() {
     for (const x of list) if (x.pct) markApplied(`${activeStructureId}|${x.iso}`); // resta spuntato anche dopo il refresh: niente doppia applicazione
     return Object.keys(map).length;
   };
-  const applyDay = (iso: string, pct: number) => { if (applyDays([{ iso, pct }], `Revenue · ${iso}`)) addActivity("rate", `Revenue: applicata variazione ${pct > 0 ? "+" : ""}${pct}% al ${iso}.`, activeStructureId === "all" ? undefined : activeStructureId); };
+  const applyDay = (iso: string, pct: number) => { if (applyDays([{ iso, pct }], `Revenue · ${fmtDate(iso)}`)) addActivity("rate", `Revenue: applicata variazione ${pct > 0 ? "+" : ""}${pct}% al ${fmtDate(iso)}.`, activeStructureId === "all" ? undefined : activeStructureId); };
   // L'annullamento ripristina le tariffe: tolgo la spunta "Applicato" dai giorni di quell'applicazione.
   const onUndone = (b: PriceBatch) => setApplied((prev) => { const n = new Set(prev); for (const c of b.changes) { n.delete(`${b.structureId}|${c.iso}`); n.delete(`all|${c.iso}`); } try { localStorage.setItem(APPLIED_KEY, JSON.stringify([...n])); } catch {} return n; });
 
@@ -245,7 +245,7 @@ export default function RevenuePage() {
                 return (
                   <tr key={r.iso} className="border-b border-line last:border-0">
                     <td className="px-2 py-2 font-medium text-txt">
-                      {new Date(r.iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}
+                      {new Date(r.iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} {fmtDM(r.iso)}
                       {r.hasEvent && <span className="ml-1.5 rounded bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-focus">{t("evento")}</span>}
                     </td>
                     <td className="px-2 py-2">
@@ -279,7 +279,7 @@ export default function RevenuePage() {
         title={`Applica ${pending.length} giorni di suggerimenti`}
         subtitle={activeStructureId !== "all" ? `Solo su ${structures.find((x) => x.id === activeStructureId)?.name ?? "questa struttura"}` : "Su tutte le strutture"}
         impact={impact}
-        examples={pending.slice(0, 5).flatMap((x) => planDay(x.iso, x.pct).slice(0, 1).map(({ rt, iso, cur, next }) => ({ label: `${rt.name} · ${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}`, from: cur, to: next })))}
+        examples={pending.slice(0, 5).flatMap((x) => planDay(x.iso, x.pct).slice(0, 1).map(({ rt, iso, cur, next }) => ({ label: `${rt.name} · ${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`, from: cur, to: next })))}
         notes={["Rispetta il prezzo minimo di ogni tipologia (se impostato in Camere)."]}
         confirmLabel={`Applica ${pending.length} giorni`}
         onConfirm={() => { const n = applyDays(pending, `Revenue · ${pending.length} giorni`); setPreview(false); if (n) addActivity("rate", `Revenue: applicati ${pending.length} giorni di suggerimenti (${n} tariffe).`, activeStructureId === "all" ? undefined : activeStructureId); }}

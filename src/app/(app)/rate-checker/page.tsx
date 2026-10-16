@@ -8,7 +8,7 @@ import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import type { Competitor, MarketRateRow } from "@/lib/ratecheck/service";
-import { toISO } from "@/lib/dates";
+import { toISO, fmtDM } from "@/lib/dates";
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const todayISO = () => toISO(new Date());
@@ -261,7 +261,7 @@ export default function RateCheckerPage() {
                   const pos = mkt && mkt.avg > 0 ? position(r.mine, mkt.avg) : null;
                   return (
                     <tr key={r.iso} className="border-b border-line last:border-0">
-                      <td className="px-2 py-2 font-medium text-txt">{new Date(r.iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}</td>
+                      <td className="px-2 py-2 font-medium text-txt">{new Date(r.iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} {fmtDM(r.iso)}</td>
                       <td className="px-2 py-2 font-mono font-semibold text-txt">{eur(r.mine)}</td>
                       <td className="px-2 py-2 font-mono text-txt">
                         {mkt && mkt.avg > 0 ? (

@@ -14,9 +14,9 @@ const guest = { email: "a@b.it", phone: "" };
 test("ora italiana: i cron UTC diventano ora locale (estate +2)", () => {
   assert.equal(whenText(instantAt("2026-10-06", 8), NOW), "previsto alle 10:00");
   assert.equal(whenText(instantAt("2026-10-07", 8), NOW), "previsto domani alle 10:00");
-  assert.equal(whenText(instantAt("2026-10-09", 8), NOW), "previsto il 9/10 alle 10:00");
+  assert.equal(whenText(instantAt("2026-10-09", 8), NOW), "previsto il 09.10 alle 10:00");
   // d'inverno (CET, +1) lo stesso cron è alle 09:00
-  assert.equal(whenText(instantAt("2026-12-10", 8), Date.UTC(2026, 11, 1, 5)), "previsto il 10/12 alle 09:00");
+  assert.equal(whenText(instantAt("2026-12-10", 8), Date.UTC(2026, 11, 1, 5)), "previsto il 10.12 alle 09:00");
 });
 
 test("minuti: entro un'ora e mezza si dice 'tra X minuti'; passato = niente", () => {
@@ -53,7 +53,7 @@ test("già sollecitato: niente 'Non inviato'", () => {
 
 test("guida: modello automatico attivo → data e ora del cron dei messaggi", () => {
   const l = autoLineFor("guide", bk("2026-10-09", "2026-10-11"), guest, ctx(), { today: TODAY });
-  assert.equal(l?.text, "Non inviato · invio previsto il 8/10 alle 10:00");
+  assert.equal(l?.text, "Non inviato · invio previsto il 08.10 alle 10:00");
 });
 
 test("invio automatico spento: non promette nulla, avvisa solo se manca poco", () => {

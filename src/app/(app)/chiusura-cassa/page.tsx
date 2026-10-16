@@ -2,6 +2,8 @@
 
 // Chiusura cassa: quadratura del contante di giornata. Il saldo teorico usa la STESSA logica
 // della Prima Nota (movimenti auto dalle prenotazioni + programmati + manuali), letta da Supabase.
+import DateField from "@/components/DateField";
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
@@ -107,7 +109,7 @@ export default function ChiusuraCassaPage() {
 
   const exportCsv = () => {
     const headers = ["Data", "Tipo", "Descrizione", "Conto", "Importo €"];
-    const body = dayMovs.map((m) => [m.date, m.kind === "in" ? "Entrata" : "Uscita", m.desc + (m.sched ? " (programmato)" : m.auto ? " (auto)" : ""), contoLabel(m.conto), m.kind === "in" ? m.amount : -m.amount]);
+    const body = dayMovs.map((m) => [fmtDate(m.date), m.kind === "in" ? "Entrata" : "Uscita", m.desc + (m.sched ? " (programmato)" : m.auto ? " (auto)" : ""), contoLabel(m.conto), m.kind === "in" ? m.amount : -m.amount]);
     body.push(["", "", "Entrate", "", entrate]);
     body.push(["", "", "Uscite", "", -uscite]);
     body.push(["", "", "Saldo teorico", "", expected]);
@@ -118,8 +120,8 @@ export default function ChiusuraCassaPage() {
   const printClose = () => {
     const w = window.open("", "_blank", "width=780,height=900"); if (!w) return;
     const rows = dayMovs.map((m) => `<tr><td>${m.kind === "in" ? "Entrata" : "Uscita"}</td><td>${esc(m.desc)}${m.auto ? " <i>(auto)</i>" : m.sched ? " <i>(prog.)</i>" : ""}</td><td style="text-align:right">${m.kind === "in" ? "" : "−"}${eur(m.amount)}</td></tr>`).join("");
-    const dd = new Date(day).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Chiusura cassa ${day}</title>
+    const dd = `${new Date(day).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDate(day)}`;
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Chiusura cassa ${fmtDate(day)}</title>
       <style>body{font-family:system-ui,Arial,sans-serif;color:#111;margin:32px;font-size:13px}h1{font-size:20px;margin:0 0 4px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5e5e5;padding:6px 8px;text-align:left}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#666}.tot{margin-top:16px;width:280px;margin-left:auto}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .big{font-weight:700;border-top:2px solid #111;padding-top:8px;font-size:15px}</style></head><body>
       <h1>Verbale di chiusura cassa</h1>
       <div class="muted">${esc(scopeName)} · Conto ${esc(contoLabel(conto))} · ${dd}</div>
@@ -151,7 +153,7 @@ export default function ChiusuraCassaPage() {
         <Card>
           <SectionTitle>Quadratura</SectionTitle>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            <label className={lbl}>Giorno<input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={inp} /></label>
+            <label className={lbl}>Giorno<DateField value={day} onChange={(v) => setDay(v)} className={inp} /></label>
             <label className={lbl}>Conto<select value={conto} onChange={(e) => setConto(e.target.value)} className={inp}>{conti.map((c) => <option key={c} value={c}>{contoLabel(c)}</option>)}</select></label>
             {/* Filtro struttura solo se in alto a destra è selezionato "Tutte" */}
             {!singleBase ? (
@@ -191,7 +193,7 @@ export default function ChiusuraCassaPage() {
         <div className="mt-2">
           {closures.map((c) => (
             <div key={c.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0 text-sm">
-              <div><div className="text-txt">{new Date(c.day).toLocaleDateString("it-IT")}</div><div className="text-[11px] text-faint">{structOf(c.structure_id)} · {contoLabel(c.conto ?? "")}</div></div>
+              <div><div className="text-txt">{fmtDate(c.day)}</div><div className="text-[11px] text-faint">{structOf(c.structure_id)} · {contoLabel(c.conto ?? "")}</div></div>
               <div className="text-right"><div className="font-mono text-txt">{eur(c.counted_cents / 100)}</div><div className="text-[11px]" style={{ color: c.diff_cents === 0 ? "var(--ok)" : "var(--err)" }}>{c.diff_cents >= 0 ? "+" : ""}{eur(c.diff_cents / 100)}</div></div>
             </div>
           ))}

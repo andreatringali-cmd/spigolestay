@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf, revenueInRange, nightlyRevenue } from "@/lib/booking";
-import { toISO, addDays, nights, parseISO } from "@/lib/dates";
+import { toISO, addDays, nights, parseISO, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, StatCard } from "@/components/ui";
 import Donut from "@/components/Donut";
@@ -23,7 +23,7 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 const monthLabelOf = (mk: string) => { const [yy, mm] = mk.split("-").map(Number); return new Date(yy, mm - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }); };
 // Importi: mai arrotondati agli euro interi (77,50 resta 77,50); si tagliano solo i decimali oltre i centesimi.
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+const fmtDay = (iso: string) => fmtDM(iso);
 
 export default function StatistichePage() {
   const { bookings, structures, units, guests, activeStructureId } = useData();
@@ -206,7 +206,7 @@ export default function StatistichePage() {
   const totStorico = repSum((r) => r.storico);
   const totPrevis = repSum((r) => !r.storico);
   const totAll = repSum(() => true);
-  const repDayLabel = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
+  const repDayLabel = (iso: string) => `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
   // Prezzo a notte (ADR) per canale → density plot
   const priceByChannel = channels.map((c) => ({

@@ -4,6 +4,7 @@
 // con camere/posti letto, membri divisi per struttura, storico pagamenti e note interne.
 // Dati da /api/admin/account (service-role lato server, gate ADMIN_EMAILS).
 
+import { fmtDate } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader, Card, StatCard } from "@/components/ui";
@@ -21,7 +22,7 @@ interface AccountD {
 }
 interface Data { ok: boolean; stripeConfigured: boolean; account: AccountD; structures: StructureD[]; membersOther: (Member & { structureName?: string })[]; invoices: Invoice[]; note: string; noteUpdatedAt: string | null }
 
-const dmy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(+d)) return "—"; return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
+const dmy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso); if (isNaN(+d)) return "—"; return fmtDate(d); };
 const eur = (n: number | null | undefined, cur = "EUR") => n == null ? "—" : `${cur === "EUR" ? "€" : cur} ${n.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`;
 const tierOf = (plan: string | null) => TIERS.find((t) => t.key === (plan || "").toLowerCase());
 const PLAN_COLOR: Record<string, string> = { basic: "#5E7C8B", pro: "#4F46E5", ultimate: "#C08A3A" };

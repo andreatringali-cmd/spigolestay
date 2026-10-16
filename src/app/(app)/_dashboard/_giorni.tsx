@@ -1,14 +1,12 @@
 "use client";
 
 // Occupazione: ultimi 30 giorni (smeraldo) e prossimi 30 (indaco) in un solo grafico ad area, con fascia weekend, linea "oggi" e tooltip.
+import { fmtDM } from "@/lib/dates";
 import { type DayCell } from "@/lib/dashboard";
 import { tint } from "../_ui";
 import { CountUp, P, Tile, TileHead, Tip, useChartHover, useEnter } from "./_kit";
 
 const WD_LONG = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
-const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
-const dayOf = (iso: string) => Number(iso.slice(8, 10));
-const monthOf = (iso: string) => MESI[Number(iso.slice(5, 7)) - 1];
 const W = 600, H = 132, PAD = 8;
 
 export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?: number }) {
@@ -62,16 +60,16 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
             {hc && <span className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2" style={{ left: `${(x(idx!) / W) * 100}%`, top: `${(y(hc.pct) / H) * 100}%`, backgroundColor: "var(--surface)", borderColor: idx! <= ti ? "var(--d2-cy)" : "var(--d2-vi)" }} />}
             {hc && (
               <Tip xPct={(x(idx!) / W) * 100}>
-                <div className="font-semibold">{WD_LONG[hc.dow]} {dayOf(hc.iso)} {monthOf(hc.iso)}{hc.isToday ? " · oggi" : ""}</div>
+                <div className="font-semibold">{WD_LONG[hc.dow]} {fmtDM(hc.iso)}{hc.isToday ? " · oggi" : ""}</div>
                 <div className="mt-0.5 font-mono"><strong>{hc.pct}%</strong> <span className="text-faint">· {hc.occupied}/{hc.total} camere</span></div>
                 <div className="mt-0.5"><span style={{ color: "var(--ok)" }}>+{hc.arrivals}</span> <span style={{ color: "var(--err)" }}>−{hc.departures}</span></div>
               </Tip>
             )}
           </div>
           <div className="relative mt-1.5 flex justify-between text-[10px] text-faint">
-            <span>{dayOf(cells[0].iso)} {monthOf(cells[0].iso)}</span>
+            <span>{fmtDM(cells[0].iso)}</span>
             <span className="font-semibold text-dim">oggi</span>
-            <span>{dayOf(cells[n - 1].iso)} {monthOf(cells[n - 1].iso)}</span>
+            <span>{fmtDM(cells[n - 1].iso)}</span>
           </div>
         </>
       )}

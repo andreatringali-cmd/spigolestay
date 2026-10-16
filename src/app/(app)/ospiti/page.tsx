@@ -9,7 +9,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
-import { nights, parseISO } from "@/lib/dates";
+import { nights, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf } from "@/lib/booking";
@@ -23,7 +23,7 @@ import { needsBulkGuard } from "@/lib/bulk-guard";
 import { useBulkGuard } from "@/components/useBulkGuard";
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
-const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" }); } catch { return iso; } };
+const fmtD = (iso: string) => fmtDate(iso);
 
 type SortKey = "name" | "stays" | "nights" | "avg" | "spent" | "comm" | "last";
 

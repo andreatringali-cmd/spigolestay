@@ -8,6 +8,8 @@ import type { Guest } from "@/lib/types";
 import { DOC_TYPES, GUEST_TAGS, CHANNELS } from "@/lib/types";
 import { USER_LANGS, AV_COLORS, initials } from "@/lib/users";
 import { eur } from "@/lib/format";
+import { fmtDate } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { contactReportCached } from "@/lib/contacts-check";
 import { guestLangOf } from "@/lib/guest-lang";
@@ -207,7 +209,7 @@ export default function OspiteSchedaPage() {
               <label className={lbl}>{t("Cognome")} *<input value={g.lastName ?? ""} onChange={(e) => set("lastName", e.target.value)} className={`${inp} mt-1`} /></label>
               <button type="button" onClick={() => setG((p) => ({ ...p, firstName: p.lastName ?? "", lastName: p.firstName ?? "" }))} className="col-span-2 -mt-1 w-fit text-[11px] font-semibold text-focus hover:underline">⇄ {t("Inverti nome e cognome")}</button>
               <label className={lbl}>{t("Sesso")}<select value={g.sex ?? ""} onChange={(e) => set("sex", e.target.value as Guest["sex"])} className={`${inp} mt-1`}><option value="">—</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select></label>
-              <label className={lbl}>{t("Data di nascita")}<input type="date" value={g.birthDate ?? ""} onChange={(e) => set("birthDate", e.target.value)} className={`${inp} mt-1`} /></label>
+              <label className={lbl}>{t("Data di nascita")}<DateField value={g.birthDate ?? ""} onChange={(v) => set("birthDate", v)} className={`${inp} mt-1 text-left`} /></label>
               <label className={lbl}>{t("Luogo di nascita")}<input value={g.birthPlace ?? ""} onChange={(e) => set("birthPlace", e.target.value)} className={`${inp} mt-1`} placeholder={t("Comune o Stato")} /></label>
               <label className={lbl}>{t("Cittadinanza")}<input value={g.citizenship ?? ""} onChange={(e) => set("citizenship", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={`${lbl} col-span-2`}>{t("Residenza")}<input value={g.address ?? ""} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} placeholder={t("Via / indirizzo")} /></label>
@@ -296,7 +298,7 @@ export default function OspiteSchedaPage() {
                       <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `var(${ch.cssVar})` }} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-txt">{st?.name ?? ""}{unit ? ` · ${unit.name}` : ""}</div>
-                        <div className="text-[11px] text-faint">{new Date(b.checkIn).toLocaleDateString("it-IT")} → {new Date(b.checkOut).toLocaleDateString("it-IT")} · {nights(b.checkIn, b.checkOut)} {t("notti")} · {ch.label}{b.status === "cancelled" ? ` · ${t("annullata")}` : ""}</div>
+                        <div className="text-[11px] text-faint">{fmtDate(b.checkIn)} → {fmtDate(b.checkOut)} · {nights(b.checkIn, b.checkOut)} {t("notti")} · {ch.label}{b.status === "cancelled" ? ` · ${t("annullata")}` : ""}</div>
                       </div>
                       <span className="shrink-0 font-mono text-sm font-semibold text-txt">{eur(b.total ?? 0)}</span>
                     </button>

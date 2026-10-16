@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
-import { toISO, shiftISO, nights } from "@/lib/dates";
+import { toISO, shiftISO, nights, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
@@ -24,7 +24,7 @@ import { scanGaps } from "@/lib/revenue-gaps";
 import ImpactPreview from "@/components/ImpactPreview";
 import PriceHistoryCard from "@/components/PriceHistoryCard";
 
-const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
+const fmtDay = (iso: string) => `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 export default function RevenueAutopilotPage() {
   const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, activeStructureId, getStructure, addActivity } = useData();

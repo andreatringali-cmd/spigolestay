@@ -11,6 +11,8 @@ import { isMediaRef } from "@/lib/media";
 import { mapPool, photoAsDataUri, uploadCheckinAttachment, type AttachmentKind } from "@/lib/checkin-upload-client";
 import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { dateLocale } from "@/lib/guest-i18n";
+import DateTextField from "@/components/DateTextField";
+import { fmtDate } from "@/lib/dates";
 import { REQUIRE_DOC_PHOTOS, checkinStatus, needsMoreGuests, stepsWithMissing, type CheckinStep, type Miss } from "@/lib/checkin-flow";
 
 // Check-in online per l'OSPITE — pagina PUBBLICA e SERVER-backed.
@@ -26,7 +28,7 @@ const box = "rounded-xl border border-line bg-surface";
 const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const fieldErr = field.replace("border-line", "border-[color:var(--err)] ring-1 ring-[color:var(--err)]");
 const lbl = "block text-xs font-medium text-dim";
-const fmtDL = (iso: string, locale: string) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(locale, { weekday: "short", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
+const fmtDL = (iso: string, locale: string) => { try { return `${new Date(iso + "T00:00:00").toLocaleDateString(locale, { weekday: "short" })} ${fmtDate(iso)}`; } catch { return iso; } };
 const errBox = { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" } as const;
 const warnBox = { backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)",  } as const;
 const okBox = { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } as const;
@@ -289,7 +291,7 @@ function Engine() {
   const balance = groupPay ? Math.round((b!.groupBalance! + upsellTotal) * 100) / 100 : Math.max(0, grand - paid);
   const canPay = !!st?.stripeChargesEnabled && !!st?.stripeAccount && balance > 0;
   // Testo mostrato nel Checkout Stripe (colonna sinistra): titolo + descrizione professionale.
-  const dLong = (iso?: string) => { try { return new Date(iso!).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }); } catch { return ""; } };
+  const dLong = (iso?: string) => fmtDate(iso);
   const payLabel = `Soggiorno · ${st?.name ?? "Struttura"}`;
   const payDesc = [
     [info?.roomType?.name, info?.unit ? `(${info.unit.name})` : ""].filter(Boolean).join(" "),
@@ -645,7 +647,7 @@ function Engine() {
                 <label className={lbl}>{t("Nome")} *<input id="f-firstName" value={doc.firstName} onChange={(e) => setD("firstName", e.target.value)} className={`${fcls("f-firstName")} mt-1`} /></label>
                 <label className={lbl}>{t("Cognome")} *<input id="f-lastName" value={doc.lastName} onChange={(e) => setD("lastName", e.target.value)} className={`${fcls("f-lastName")} mt-1`} /></label>
                 <label className={lbl}>{t("Sesso")}<select value={doc.sex} onChange={(e) => setD("sex", e.target.value)} className={`${field} mt-1`}><option value="">—</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select></label>
-                <label className={lbl}>{t("Data di nascita")} *<input id="f-birthDate" type="date" value={doc.birthDate} onChange={(e) => setD("birthDate", e.target.value)} className={`${fcls("f-birthDate")} mt-1`} /></label>
+                <label className={lbl}>{t("Data di nascita")} *<DateTextField id="f-birthDate" value={doc.birthDate} onChange={(v) => setD("birthDate", v)} className={`${fcls("f-birthDate")} mt-1`} /></label>
                 <label className={lbl}>{t("Luogo di nascita")}<input value={doc.birthPlace} onChange={(e) => setD("birthPlace", e.target.value)} className={`${field} mt-1`} placeholder={t("Comune o Stato")} /></label>
                 <label className={lbl}>{t("Cittadinanza")}<input value={doc.citizenship} onChange={(e) => setD("citizenship", e.target.value)} className={`${field} mt-1`} /></label>
                 <label className={lbl}>{t("Tipo documento")}<select value={doc.docType} onChange={(e) => setD("docType", e.target.value)} className={`${field} mt-1`}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select></label>
@@ -673,7 +675,7 @@ function Engine() {
                       <input value={e.firstName} onChange={(ev) => setExtra(i, "firstName", ev.target.value)} placeholder={t("Nome")} className={field} />
                       <input value={e.lastName} onChange={(ev) => setExtra(i, "lastName", ev.target.value)} placeholder={t("Cognome")} className={field} />
                       <select value={e.sex ?? ""} onChange={(ev) => setExtra(i, "sex", ev.target.value)} className={field}><option value="">{t("Sesso")}</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select>
-                      <input type="date" value={e.birthDate} onChange={(ev) => setExtra(i, "birthDate", ev.target.value)} className={field} aria-label={t("Data di nascita")} />
+                      <DateTextField value={e.birthDate} onChange={(v) => setExtra(i, "birthDate", v)} className={field} aria-label={t("Data di nascita")} />
                       <input value={e.birthPlace} onChange={(ev) => setExtra(i, "birthPlace", ev.target.value)} placeholder={t("Luogo di nascita")} className={field} />
                       <input value={e.citizenship} onChange={(ev) => setExtra(i, "citizenship", ev.target.value)} placeholder={t("Cittadinanza")} className={field} />
                       <select value={e.docType} onChange={(ev) => setExtra(i, "docType", ev.target.value)} className={field}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select>

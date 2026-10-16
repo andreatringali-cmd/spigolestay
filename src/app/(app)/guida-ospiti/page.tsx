@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDM } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "@/lib/supabase";
@@ -762,7 +763,7 @@ export default function GuidaOspitiPage() {
     const msg = msgFor(name, link);
     const g = getGuest(b.guestId);
     const wa = (g?.phone || "").replace(/[^\d]/g, "");
-    const dd = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7);
+    const dd = (s: string) => fmtDM(s);
     const hasCodes = !!unitCodesK(b.unitId || undefined).replace(/-/g, "");
     return (
       <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper p-3">

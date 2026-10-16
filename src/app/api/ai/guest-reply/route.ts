@@ -5,6 +5,7 @@
 // Coerente con /api/reviews/reply e /api/checkin/extract (stessa versione API + modello Claude).
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,8 +62,8 @@ export async function POST(req: NextRequest) {
     guestName ? `- Ospite: ${guestName}` : "- Ospite: (nome non disponibile)",
     `- Struttura: ${structureName}`,
     room ? `- Camera/sistemazione: ${room}` : null,
-    checkIn ? `- Check-in: ${checkIn}` : null,
-    checkOut ? `- Check-out: ${checkOut}` : null,
+    checkIn ? `- Check-in: ${fmtDMY(checkIn)}` : null,
+    checkOut ? `- Check-out: ${fmtDMY(checkOut)}` : null,
   ].filter(Boolean).join("\n");
 
   const prompt = `Sei chi gestisce "${structureName}", una struttura ricettiva. Scrivi UNA bozza di risposta al messaggio dell'ospite, che l'operatore rivedrà prima di inviarla.
@@ -73,6 +74,7 @@ Regole:
 - Sii concreto e utile, breve (2-5 frasi). Nessun preambolo, nessuna firma.
 - NON inventare fatti (prezzi, disponibilità, orari, servizi, codici) che non siano indicati qui sotto: se un'informazione manca, rispondi in modo generico o di' che verificherai/confermerai a breve.
 - NON usare segnaposto tra parentesi quadre.
+- Scrivi le date sempre nel formato gg.mm.aaaa (es. 16.10.2026).
 Dati della prenotazione:
 ${facts}
 Conversazione (dal più vecchio al più recente):

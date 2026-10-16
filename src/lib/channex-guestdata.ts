@@ -94,7 +94,7 @@ function parsePenalties(v: unknown): OtaCancelPenalty[] | undefined {
 // "gratis fino al"; la prima penale > 0 è quella che scatta. Ritorna undefined se non ci sono penali.
 export function describeCancelPenalties(p?: OtaCancelPenalty[]): string | undefined {
   if (!p || !p.length) return undefined;
-  const day = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split("-"); return y && m && d ? `${d}/${m}/${y}` : iso; };
+  const day = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split("-"); return y && m && d ? `${d}.${m}.${y}` : iso; };
   const money = (x: OtaCancelPenalty) => `${x.amount.toFixed(2).replace(".", ",")}${x.currency ? " " + x.currency : ""}`;
   const firstCharge = p.find((x) => x.amount > 0);
   if (!firstCharge) return "Cancellazione senza penale";

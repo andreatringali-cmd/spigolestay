@@ -5,6 +5,7 @@ import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { estimatedStripeFeeCents } from "@/lib/payments/fee";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
     const origin = siteOrigin(req);
     // "(caparra)" solo se è un acconto PARZIALE; se si paga l'intero importo non è una caparra.
     const isPartial = deposit > 0 && deposit < total;
-    const label = `${st?.name || "Prenotazione"} · ${ci} → ${co}${isPartial ? " (caparra)" : ""}`;
+    const label = `${st?.name || "Prenotazione"} · ${fmtDMY(ci)} → ${fmtDMY(co)}${isPartial ? " (caparra)" : ""}`;
     const success = `${origin}/prenota?site=${encodeURIComponent(slug)}&s=${encodeURIComponent(sid)}&paid=1&session_id={CHECKOUT_SESSION_ID}`;
     const cancel = `${origin}/prenota?site=${encodeURIComponent(slug)}&s=${encodeURIComponent(sid)}&canceled=1`;
     // DESTINATION CHARGE: addebito sulla piattaforma, fondi trasferiti alla struttura

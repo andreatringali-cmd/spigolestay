@@ -4,6 +4,7 @@ import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, refundEligible, writeBookingPatch } from "@/lib/manage-booking";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             kind: "quote", to: hostEmail, subject: `Annullamento ${code} · ${s(st.name)}`,
             accent: "#b4472e",
-            text: `L'ospite ha annullato la prenotazione ${code}.\n\nStruttura: ${s(st.name)}\nPeriodo: ${s(b.checkIn)} → ${s(b.checkOut)}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || gEmail}\n\nRimborso emesso: ${refunded > 0 ? `${currency} ${refunded}` : "nessuno"}${refundError ? `\n\n⚠ Errore nel rimborso automatico: ${refundError} — verifica su Stripe.` : ""}`,
+            text: `L'ospite ha annullato la prenotazione ${code}.\n\nStruttura: ${s(st.name)}\nPeriodo: ${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || gEmail}\n\nRimborso emesso: ${refunded > 0 ? `${currency} ${refunded}` : "nessuno"}${refundError ? `\n\n⚠ Errore nel rimborso automatico: ${refundError} — verifica su Stripe.` : ""}`,
           }),
         });
       }

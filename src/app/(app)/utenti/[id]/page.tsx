@@ -17,6 +17,7 @@ import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import MfaSetup from "@/components/MfaSetup";
+import { fmtDateTime } from "@/lib/dates";
 import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
 import { isValidEmail, structuresToShare, humanInviteError } from "@/lib/user-access";
@@ -319,7 +320,7 @@ export default function UserSchedaPage() {
               <SectionTitle>{t("Sicurezza & accessi")}</SectionTitle>
               {(u.sessions ?? []).length > 0 && <button onClick={() => set("sessions", (u.sessions ?? []).filter((s) => s.current))} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Disconnetti tutti")}</button>}
             </div>
-            <div className="mb-3 text-xs text-dim">{t("Ultimo accesso:")} {u.lastLogin ? <>{new Date(u.lastLogin.at).toLocaleString("it-IT")} {t("da")} <span className="font-mono">{u.lastLogin.ip}</span></> : <span className="text-faint">{t("mai")}</span>}</div>
+            <div className="mb-3 text-xs text-dim">{t("Ultimo accesso:")} {u.lastLogin ? <>{fmtDateTime(u.lastLogin.at)} {t("da")} <span className="font-mono">{u.lastLogin.ip}</span></> : <span className="text-faint">{t("mai")}</span>}</div>
             {(u.sessions ?? []).length === 0 ? (
               <div className="text-sm text-faint">{t("Nessuna sessione attiva.")}</div>
             ) : (
@@ -329,7 +330,7 @@ export default function UserSchedaPage() {
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-wash text-dim"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M11 18h2" /></svg></span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 text-sm text-txt">{s.device}{s.current && <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("questa sessione")}</span>}</div>
-                      <div className="text-[11px] text-faint"><span className="font-mono">{s.ip}</span> · {new Date(s.lastActive).toLocaleString("it-IT")}</div>
+                      <div className="text-[11px] text-faint"><span className="font-mono">{s.ip}</span> · {fmtDateTime(s.lastActive)}</div>
                     </div>
                     {!s.current && <button onClick={() => set("sessions", (u.sessions ?? []).filter((x) => x.id !== s.id))} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]" title={t("Termina sessione")}>✕</button>}
                   </div>

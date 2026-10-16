@@ -2,7 +2,7 @@
 
 // Striscia dei giorni della vista Calendario · Dettagliato: 7 giorni navigabili con i contatori di ciascuno.
 import type { ReactNode } from "react";
-import { parseISO } from "@/lib/dates";
+import { parseISO, fmtDM } from "@/lib/dates";
 import type { DayStats } from "./_modello";
 
 export type Modo = "day" | "week";
@@ -53,7 +53,7 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
           return (
             <button
               key={iso} onClick={() => onSelect(iso)} aria-pressed={isSel} aria-current={isToday ? "date" : undefined}
-              title={d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}
+              title={`${d.toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(iso)}`}
               className={`flex min-w-0 flex-col items-stretch gap-1 rounded-xl border px-1 py-1.5 text-center transition sm:px-2 sm:py-2 ${isSel ? "border-focus shadow-md ring-1 ring-[color:var(--focus)]" : "border-line shadow-sm hover:border-focus"}`}
               style={isSel ? { background: "color-mix(in srgb, var(--focus) 14%, var(--surface))" } : { background: d.getDay() === 0 || d.getDay() === 6 ? "color-mix(in srgb, var(--wash) 45%, var(--surface))" : "var(--surface)" }}
             >

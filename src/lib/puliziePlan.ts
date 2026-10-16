@@ -1,6 +1,7 @@
 // Logica pura (senza React) del planning pulizie: quali camere fare oggi, azione, carico
 // biancheria, e testo da condividere. Condivisa tra la pagina Pulizie (client) e il cron di
 // invio automatico (server) — un'unica fonte di verità, per non doverle mantenere allineate a mano.
+import { fmtDM, fmtDMY } from "@/lib/dates";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
@@ -100,8 +101,7 @@ export function computePuliziePlan(opts: {
   return { rooms, toClean, counts, linen };
 }
 
-const fmtDM = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
-export const fmtLongIT = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long" });
+export const fmtLongIT = (iso: string) => `${new Date(iso + "T00:00:00Z").toLocaleDateString("it-IT", { weekday: "long", timeZone: "UTC" })} ${fmtDMY(iso)}`;
 
 // Testo del programma da condividere (WhatsApp/email), ORDINATO PER LAVORO DA FARE: prima i cambi completi, poi gli arrivi, le partenze e i riassetti;
 // le camere senza nulla da fare stanno in una riga sola in fondo. Sempre TUTTE le camere della struttura, comprese quelle fuori servizio o con un guasto.

@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtDM } from "@/lib/dates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,7 +21,7 @@ import type { Booking, Guest, Structure } from "@/lib/types";
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
 const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
-const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
+const fmtDay = (iso?: string) => (iso ? fmtDM(iso) : "—");
 const omini = (n: number) => (n <= 5 ? "👤".repeat(Math.max(1, n)) : `👤 ${n}`); // ospiti come icone
 // Meta grafica per l'esito di ogni passo di "Elabora tutto".
 const STEP_META: Record<"fatto" | "prova" | "errore" | "niente", { icon: string; label: string; tone: string }> = {
@@ -401,7 +402,7 @@ export default function AdempimentiPage() {
   const urgent = schedToSendG.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
   const toDo = totalTasks - urgent;
   const headTone = allClear ? "var(--ok)" : urgent > 0 ? "var(--err)" : "var(--focus)";
-  const dateStr = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  const dateStr = `${new Date().toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(new Date())}`;
 
   return (
     <div>

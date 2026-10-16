@@ -204,7 +204,7 @@ test("pacchetto completo: checklist oggettiva, CSV con separatore ; e decimali c
   assert.equal(inv.filename, "commercialista-fatture-emesse-2026-T4-spigole-house");
   const lines = inv.csv.replace("﻿", "").split("\r\n");
   assert.equal(lines[0].split(";").length, 12);
-  assert.match(lines[1], /^"05\/10\/2026";"1\/2026";"Fattura"/);
+  assert.match(lines[1], /^"05\.10\.2026";"1\/2026";"Fattura"/);
   assert.match(lines[1], /"105,00"/);
   assert.match(lines[lines.length - 1], /"TOTALE"/);
 

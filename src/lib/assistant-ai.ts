@@ -6,6 +6,7 @@ import type { AssistantCtx } from "./assistant";
 import { CHANNELS } from "./types";
 import { bookingExtrasTotal } from "./booking";
 import { apiPost } from "./invoicing/client";
+import { fmtDMY } from "./dates";
 
 export interface AiTurn { role: "user" | "assistant"; text: string }
 
@@ -28,7 +29,7 @@ export function buildDigest(ctx: AssistantCtx): string {
   const complete = (id: string) => { const g = guestOf(id); return !!(g && (g.lastName || g.fullName) && g.sex && g.birthDate && g.birthPlace && g.citizenship && g.docType && g.docNumber); };
 
   const out: string[] = [];
-  out.push(`OGGI: ${today.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${todayISO})`);
+  out.push(`OGGI: ${today.toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDMY(todayISO)}`);
   out.push(`PERIMETRO: ${all ? "tutte le strutture" : structName(ctx.activeStructureId) || "struttura selezionata"}`);
   out.push(`STRUTTURE E CAMERE: ${scopedStructures.map((s) => `${s.name} (${scopedUnits.filter((u) => u.structureId === s.id && !u.outOfService).map((u) => u.name).join(", ") || "nessuna camera"})`).join("; ")}`);
 
@@ -66,9 +67,9 @@ export function buildDigest(ctx: AssistantCtx): string {
       b.cityTaxExempt ? "esente tassa" : b.cityTaxPaid ? "tassa incassata" : "",
     ].filter(Boolean).join(", ");
     const resid = Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0));
-    return `${g?.fullName ?? "Ospite"} | ${unitName(b.unitId)}${all ? ` (${structName(b.structureId)})` : ""} | ${b.checkIn}→${b.checkOut} (${nightsOf(b.checkIn, b.checkOut)} n) | ${b.adults}+${b.children} | ${CHANNELS[b.channel]?.label ?? b.channel} | totale ${Math.round(b.total ?? 0)} € pagato ${Math.round(b.paid ?? 0)} € residuo ${Math.round(resid)} € | ${flags}${g?.country ? ` | ${g.country}` : ""}`;
+    return `${g?.fullName ?? "Ospite"} | ${unitName(b.unitId)}${all ? ` (${structName(b.structureId)})` : ""} | ${fmtDMY(b.checkIn)}→${fmtDMY(b.checkOut)} (${nightsOf(b.checkIn, b.checkOut)} n) | ${b.adults}+${b.children} | ${CHANNELS[b.channel]?.label ?? b.channel} | totale ${Math.round(b.total ?? 0)} € pagato ${Math.round(b.paid ?? 0)} € residuo ${Math.round(resid)} € | ${flags}${g?.country ? ` | ${g.country}` : ""}`;
   });
-  out.push(`PRENOTAZIONI (da ${from} a ${to}${win.length > MAX_LINES ? `, mostrate ${MAX_LINES} su ${win.length}` : ""}):\n${lines.join("\n") || "nessuna"}`);
+  out.push(`PRENOTAZIONI (da ${fmtDMY(from)} a ${fmtDMY(to)}${win.length > MAX_LINES ? `, mostrate ${MAX_LINES} su ${win.length}` : ""}):\n${lines.join("\n") || "nessuna"}`);
   return out.join("\n");
 }
 

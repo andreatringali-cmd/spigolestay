@@ -28,7 +28,7 @@ const byKind = (tasks: Task[], kind: string) => tasks.filter((t) => t.kind === k
 test("date e testi", () => {
   assert.equal(addDaysISO("2026-10-31", 1), "2026-11-01");
   assert.equal(diffDays("2026-10-08", T), 2);
-  assert.equal(shortDate("2026-10-06"), "6 ott");
+  assert.equal(shortDate("2026-10-06"), "06.10");
   assert.equal(relDay("2026-10-06", T), "oggi");
   assert.equal(relDay("2026-10-07", T), "domani");
   assert.equal(relDay("2026-10-04", T), "2 giorni fa");
@@ -158,7 +158,7 @@ test("ISTAT: una voce per struttura, solo movimenti pending di prenotazioni vive
   const s1 = ist.find((t) => t.structureId === "s1")!;
   assert.equal(s1.count, 2);
   assert.equal(s1.title, "2 movimenti da comunicare");
-  assert.equal(s1.meta[0], "Arrivi dal 4 ott");
+  assert.equal(s1.meta[0], "Arrivi dal 04.10");
   assert.equal(s1.urgency, "today"); // nessuna scadenza nota: non si dichiara "in ritardo"
   assert.equal(r.done.istat, 1);
 });
