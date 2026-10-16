@@ -302,7 +302,9 @@ export default function CassaPage() {
   const openingAmounts = () => { const amounts: Record<string, string> = {}; for (const s of scopeStructs) for (const c of contiOf(s.id)) amounts[oKey(s.id, c.key)] = existingAmount(s.id, c.key); return amounts; };
   const openOpening = () => {
     setAssignOpen(null); setMoveCtx(null);
-    setOpening({ date: todayISO(), amounts: openingAmounts(), newName: "", newSids: singleSid ? [singleSid] : scopeStructs.map((x) => x.id), startOfDay: false });
+    // La data proposta è quella del saldo già impostato (i campi mostrano gli importi di QUEL giorno): con la data di oggi gli stessi importi diventerebbero il saldo di oggi e cambierebbe tutto il calcolo.
+    const existingDates = scopeStructs.flatMap((x) => contiOf(x.id).map((c) => (openingOf(manual, x.id, c.key)?.date ?? ""))).filter(Boolean).sort();
+    setOpening({ date: existingDates.length ? existingDates[existingDates.length - 1] : todayISO(), amounts: openingAmounts(), newName: "", newSids: singleSid ? [singleSid] : scopeStructs.map((x) => x.id), startOfDay: false });
   };
   const amountOf = (sid: string, key: string) => (opening && oKey(sid, key) in opening.amounts ? opening.amounts[oKey(sid, key)] : existingAmount(sid, key));
   const setAmount = (sid: string, key: string, v: string) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [oKey(sid, key)]: v } } : o));
