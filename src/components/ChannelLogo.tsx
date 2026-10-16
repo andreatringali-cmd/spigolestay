@@ -5,7 +5,12 @@ import type { Channel } from "@/lib/types";
 
 /** Portale di prenotazione riconosciuto dal NOME del canale su Channex (quando il codice OTA è generico, "Altro / OTA"). */
 export function isBedAndBreakfastIt(name?: string): boolean {
-  return /bed\s*(?:&|and|-and-|n)?\s*breakfast/i.test(name ?? "");
+  return /bed\s*(?:&|and|-and-|n)?\s*breakfast|bb\.it|bbit|\bb\s*&\s*b\b/i.test(name ?? "");
+}
+
+/** Marchio "bb.it" (bed-and-breakfast.it) disegnato qui: nessun file da caricare. */
+function BbItMark({ size }: { size: number }) {
+  return <span style={{ fontSize: size * 0.36, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.05em", color: "#0F5E4D", whiteSpace: "nowrap" }}>bb<span style={{ color: "#E4572E" }}>.it</span></span>;
 }
 
 // Marchi canale su tessere rotonde uniformi (stessa forma per tutti, colori ufficiali, glifi
@@ -18,7 +23,6 @@ const BELO =
 
 export default function ChannelLogo({ channel, size = 16, title, name }: { channel: Channel; size?: number; title?: string; name?: string }) {
   const box = { width: size, height: size } as const;
-  const [bbMissing, setBbMissing] = useState(false);
   const Tile = ({ bg, children, t }: { bg: string; children: React.ReactNode; t: string }) => (
     <span className="grid shrink-0 place-items-center overflow-hidden rounded-full" style={{ ...box, backgroundColor: bg, boxShadow: "0 0 0 1px rgba(0,0,0,.10)" }} title={title ?? t}>{children}</span>
   );
@@ -37,15 +41,7 @@ export default function ChannelLogo({ channel, size = 16, title, name }: { chann
       return <Tile bg="#E8EBF0" t="HotelBeds"><span style={{ color: "#2B3340", fontSize: size * 0.46, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.05em" }}>hb</span></Tile>;
     case "other":
       if (isBedAndBreakfastIt(name ?? title)) {
-        // Logo di bed-and-breakfast.it: il file va in public/channels/bed-and-breakfast-it.png; finché manca resta la sigla "B&B".
-        return (
-          <Tile bg="#FFFFFF" t="Bed-and-breakfast.it">
-            {bbMissing
-              ? <span style={{ color: "#0F5E4D", fontSize: size * 0.4, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.04em" }}>B&amp;B</span>
-              // eslint-disable-next-line @next/next/no-img-element
-              : <img src="/channels/bed-and-breakfast-it.png" alt="Bed-and-breakfast.it" width={size} height={size} style={{ width: size * 0.84, height: size * 0.84, objectFit: "contain" }} onError={() => setBbMissing(true)} />}
-          </Tile>
-        );
+        return <Tile bg="#FFFFFF" t="bb.it · bed-and-breakfast.it"><BbItMark size={size} /></Tile>;
       }
       return <Tile bg="#5B5F6B" t="Altro / OTA"><svg width={size * 0.62} height={size * 0.62} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4.5l3 2" /></svg></Tile>;
     case "direct":
@@ -58,7 +54,7 @@ export default function ChannelLogo({ channel, size = 16, title, name }: { chann
 
 // Logo PER INTERO del canale (marchio con il nome, non la sola icona rotonda): per Booking.com, Airbnb, Expedia, HotelBeds
 // e per le prenotazioni dirette Xenora (logo completo con la farfalla). Su fondo bianco, leggibile anche in tema scuro.
-export function ChannelWordmark({ channel, height = 20, title }: { channel: Channel; height?: number; title?: string }) {
+export function ChannelWordmark({ channel, height = 20, title, name }: { channel: Channel; height?: number; title?: string; name?: string }) {
   const fs = Math.round(height * 0.78);
   const base = { fontSize: fs, lineHeight: 1, fontWeight: 800, letterSpacing: "-0.035em", whiteSpace: "nowrap" } as const;
   const chip = (t: string, children: React.ReactNode) => (
@@ -78,6 +74,7 @@ export function ChannelWordmark({ channel, height = 20, title }: { channel: Chan
     case "hotelbeds":
       return chip("HotelBeds", <span style={{ ...base, color: "#2B3340" }}>hotelbeds</span>);
     case "other":
+      if (isBedAndBreakfastIt(name ?? title)) return chip("bb.it · bed-and-breakfast.it", <span style={{ ...base, color: "#0F5E4D" }}>bb<span style={{ color: "#E4572E" }}>.it</span></span>);
       return chip("Altro / OTA", <span style={{ ...base, fontSize: Math.round(fs * 0.85), color: "#5B5F6B" }}>OTA</span>);
     case "direct":
       /* eslint-disable-next-line @next/next/no-img-element */

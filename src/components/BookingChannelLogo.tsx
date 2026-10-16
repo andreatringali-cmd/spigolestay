@@ -6,7 +6,7 @@ import { useData } from "@/lib/store";
 import { directOriginLabel, directOriginOf, type DirectOriginInput } from "@/lib/direct-origin";
 import type { Channel, Structure } from "@/lib/types";
 
-type BookingLike = DirectOriginInput & { channel: Channel; structureId?: string };
+type BookingLike = DirectOriginInput & { channel: Channel; structureId?: string; otaName?: string };
 
 function initialsOf(name?: string): string {
   const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -44,7 +44,7 @@ export default function BookingChannelLogo({ booking, structure, size = 16, titl
   const origin = directOriginOf(booking);
   if (origin === "sito") return <SiteLogo structureId={booking.structureId} structure={structure} size={size} />;
   if (origin === "manuale") return <ChannelLogo channel="direct" size={size} title={directOriginLabel("manuale")} />;
-  return <ChannelLogo channel={booking.channel} size={size} title={title} name={name} />;
+  return <ChannelLogo channel={booking.channel} size={size} title={title} name={name ?? booking.otaName} />;
 }
 
 // Versione "per intero" (marchio + nome) per elenchi e schede: stessa regola di BookingChannelLogo.
@@ -69,5 +69,5 @@ export function BookingChannelWordmark({ booking, structure, height = 20, title 
   const origin = directOriginOf(booking);
   if (origin === "sito") return <SiteWordmark structureId={booking.structureId} structure={structure} height={height} />;
   if (origin === "manuale") return <ChannelWordmark channel="direct" height={height} title={directOriginLabel("manuale")} />;
-  return <ChannelWordmark channel={booking.channel} height={height} title={title} />;
+  return <ChannelWordmark channel={booking.channel} height={height} title={title} name={booking.otaName} />;
 }

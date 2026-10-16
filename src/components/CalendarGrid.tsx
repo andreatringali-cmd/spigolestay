@@ -31,7 +31,7 @@ import { rateForDay, loadWeekendPct, isWeekendISO } from "@/lib/pricing";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
-import ChannelLogo from "@/components/ChannelLogo";
+import ChannelLogo, { isBedAndBreakfastIt } from "@/components/ChannelLogo";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { ArrowScroller } from "@/components/ScrollStrip";
 import DateField from "@/components/DateField";
@@ -191,6 +191,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // I canali REALMENTE aggiunti su Channex (chiave = channel normalizzato Xenora, valore = attivo
   // o no) — usato per la legenda, che deve mostrare solo le OTA collegate al channel manager, non
   // l'elenco completo di CHANNELS.
+  const [realTitles, setRealTitles] = useState<Record<string, string>>({}); // nome del portale su Channex per canale (es. "Bed and Breakfast" per i canali "Altro / OTA")
   const [realChannels, setRealChannels] = useState<Record<string, boolean>>(() => {
     try {
       const by = JSON.parse(localStorage.getItem("xn-chx-status") || "null") as Record<string, { channel: string; active: boolean }[]> | null;
@@ -218,7 +219,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const toReal = (by: ByStructure) => {
       const lists = activeStructureId === "all" ? Object.values(by) : [by[activeStructureId] ?? []];
       const real: Record<string, boolean> = {};
-      lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
+      const titles: Record<string, string> = {};
+      lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; if (c.title && !titles[c.channel]) titles[c.channel] = c.title; });
+      setRealTitles(titles);
       return real;
     };
     try { const c = localStorage.getItem(CACHE_KEY); if (c) setRealChannels(toReal(JSON.parse(c) as ByStructure)); } catch {}
@@ -1198,10 +1201,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </span>
         {(Object.keys(realChannels) as (keyof typeof CHANNELS)[]).map((c) => {
           const active = realChannels[c];
-          const label = CHANNELS[c]?.label ?? c;
+          const chxTitle = realTitles[c];
+          const isBb = c === "other" && isBedAndBreakfastIt(chxTitle);
+          const label = isBb ? "bb.it" : (c === "other" && chxTitle ? chxTitle : (CHANNELS[c]?.label ?? c));
           return (
             <span key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
-              <ChannelLogo channel={c} size={22} title={label} />
+              <ChannelLogo channel={c} size={22} title={label} name={chxTitle} />
               {label}
               <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? "var(--ok)" : "var(--err)" }} />
             </span>

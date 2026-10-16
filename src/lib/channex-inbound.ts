@@ -431,6 +431,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...(otaInfo ? { otaInfo } : {}),
           ...(commShares[idx] != null ? { commissionAmount: commShares[idx] } : {}),
           ...(netPayout ? { netTotal: true } : {}),
+          ...(r.ota_name ? { otaName: String(r.ota_name).slice(0, 60) } : {}),
           ...(deductShares[idx] != null ? { otaDeductions: deductShares[idx] } : {}),
           ...(feeShares[idx] != null ? { paymentFee: feeShares[idx] } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
