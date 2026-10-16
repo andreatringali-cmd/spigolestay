@@ -85,6 +85,12 @@ export default function CassaPage() {
   const CONTI = conti;
   // Impostazioni incassi per canale: quando i soldi arrivano davvero sul conto (arrivo, check-out, bonifico settimanale o mensile).
   const [payouts, setPayouts] = useState<PayoutSettingsMap>(() => (typeof window === "undefined" ? {} : loadPayoutSettings()));
+  // Le impostazioni incassi arrivano anche dal server (sincronizzazione): quando il browser le riceve si rileggono, senza dover ricaricare la pagina.
+  useEffect(() => {
+    const h = () => { try { setPayouts(loadPayoutSettings()); } catch { /* storage non disponibile */ } };
+    window.addEventListener("spigolestay:datasync", h);
+    return () => window.removeEventListener("spigolestay:datasync", h);
+  }, []);
   const [payoutModal, setPayoutModal] = useState(false);
   const [overrides, setOverrides] = useState<OccOverrides>(() => (typeof window === "undefined" ? {} : loadOverrides())); // righe modificate per singola scadenza
   const [occCtx, setOccCtx] = useState<{ key: string; ruleId: string; orig: { amount: number; date: string; desc: string; cat: string; conto: string } } | null>(null);
