@@ -362,6 +362,28 @@ export async function sendBookingAttachment(channexBookingId: string, file: { ba
   });
 }
 
+// ── Messaggi a THREAD (Messages API: /message_threads) — pagina Messaggi 2 ──
+// Una conversazione per prenotazione/richiesta, con elenco, chiusura e "non è richiesta una risposta" (solo Booking.com). Stessa app "Messages" installata per property.
+// L'account Channex è condiviso tra tutti i clienti: la route che le usa controlla SEMPRE che la property del thread sia dell'utente (vedi channex-threads.ts / allowedChannexProperties).
+export async function listMessageThreadsFor(propertyId: string, page = 1, limit = 100) {
+  return channex<{ data?: unknown[]; meta?: { total?: number } }>(`/message_threads?filter[property_id]=${encodeURIComponent(propertyId)}&pagination[page]=${page}&pagination[limit]=${Math.max(1, Math.min(100, limit))}`);
+}
+export async function getMessageThread(threadId: string) {
+  return channex<{ data?: unknown }>(`/message_threads/${encodeURIComponent(threadId)}`);
+}
+export async function listThreadMessages(threadId: string, limit = 100) {
+  return channex<{ data?: unknown[] }>(`/message_threads/${encodeURIComponent(threadId)}/messages?pagination[limit]=${Math.max(1, Math.min(100, limit))}`);
+}
+export async function sendThreadMessage(threadId: string, text: string) {
+  return channex<{ data?: unknown }>(`/message_threads/${encodeURIComponent(threadId)}/messages`, { method: "POST", body: JSON.stringify({ message: { message: text } }) });
+}
+export async function closeMessageThread(threadId: string) {
+  return channex<{ data?: unknown }>(`/message_threads/${encodeURIComponent(threadId)}/close`, { method: "POST" });
+}
+export async function markThreadNoReplyNeeded(threadId: string) {
+  return channex<{ data?: unknown }>(`/message_threads/${encodeURIComponent(threadId)}/no_reply_needed`, { method: "POST" });
+}
+
 // ── Recensioni (Reviews Collection API: Booking.com/Airbnb/Expedia unificate) ──
 // Richiede la STESSA app "Messages & Reviews" installata per property in Channex (dashboard →
 // Applications) già richiesta sopra dai Messaggi: "Add the Messages & Reviews app to the
