@@ -118,6 +118,20 @@ export function monthlyCommissionInfo(bk: Booking, payouts: PayoutSettingsMap): 
   return { amount, pct: commissionShareOf(b), date: commissionDateFor(commissionMonthOf(b), rule.day) };
 }
 
+/**
+ * Prenotazione OTA prolungata a mano nel gestionale (es. 3 notti in più pagate all'ospite in contanti): l'OTA conosce solo le notti di nightlyRates, quindi il suo bonifico
+ * copre solo quelle; il di più (totale − notti dell'OTA) l'ospite lo paga direttamente, dal giorno in cui finisce la prenotazione originale. null se non c'è nulla da separare.
+ */
+export function otaExtensionOf(b: Booking): { ota: number; extra: number; from: string } | null {
+  if (b.channel === "direct" || b.channel === "blocked" || !b.nightlyRates) return null;
+  const keys = Object.keys(b.nightlyRates).sort();
+  if (!keys.length) return null;
+  const ota = roundCents(keys.reduce((a, k) => a + (Number(b.nightlyRates![k]) || 0), 0));
+  const extra = roundCents(lordoOf(b) - ota);
+  if (!(ota > 0) || extra < 0.5 || extra >= lordoOf(b)) return null;
+  return { ota, extra, from: shiftISO(keys[keys.length - 1], 1) };
+}
+
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
 // Commissioni: di norma un movimento per prenotazione, alla data dell'incasso. Se la struttura ha impostato per quel portale "commissioni tutte insieme il giorno N
 // del mese dopo" (PayoutRule.commission), NON c'è più il movimento per prenotazione: c'è UN movimento per (struttura, canale, mese del CHECK-OUT) datato il giorno N
@@ -142,11 +156,17 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     const incassato = roundCents(b.paid ?? 0);
     // Diretta pagata online (Stripe): la parte online è incassata il giorno del pagamento, non all'arrivo; il resto (es. saldo in contanti all'arrivo) alla data del canale.
     // Diretta senza pagamento online: l'acconto (50% o la % della struttura) si versa alla data della prenotazione, il resto all'arrivo.
+    const ext = otaExtensionOf(b);
     const online = onlineIncasso(b) ?? directDepositIncasso(b, lordoOf(b), st?.depositPct);
     if (online) {
       const label = `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`;
       if (online.amount > 0) out.push({ id: `auto-in-${b.id}`, date: online.date, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.amount, conto: cassaContoFor(b, principal, route.validConti, route.accounts), auto: true, ref: b.id });
       if (online.rest > 0) out.push({ id: `${REST_IN_PREFIX}${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.rest, conto: restContoFor(b, route), auto: true, ref: b.id });
+    } else if (incassato > 0 && ext && incassato > ext.ota + 0.005) {
+      // OTA prolungata: il bonifico del portale copre le notti dell'OTA, le notti in più sono incassate dall'ospite alla fine della prenotazione originale
+      const label = `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`;
+      out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: ext.ota, conto: cassaContoFor(b, principal, route.validConti, route.accounts), auto: true, ref: b.id });
+      out.push({ id: `${REST_IN_PREFIX}${b.id}`, date: ext.from, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${label} · prolungamento`, amount: roundCents(incassato - ext.ota), conto: cassaContoFor({ channel: "direct", paymentMethod: "contanti" }, principal, route.validConti, route.accounts), auto: true, ref: b.id });
     } else if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, route.validConti, route.accounts), auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
     const mrule = commissionRuleFor(payouts, b.channel, b.structureId);
