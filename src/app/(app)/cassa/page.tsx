@@ -891,7 +891,23 @@ export default function CassaPage() {
                     const pd = rowDate(listRows[i - 1]);
                     // «Oggi»: il punto in cui il registro passa dal passato al futuro, con il saldo di adesso (sopra/sotto, il saldo progressivo è quello PREVISTO a quella data)
                     const crossesToday = futureView ? (pd <= today && d > today) : (pd > today && d <= today);
-                    if (crossesToday) parts.push(<div key={"oggi-" + i} className="flex items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt"><span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">{t("Oggi")}</span><span>{fmtDMY(today)}</span>{hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}</div>);
+                    if (crossesToday) {
+                      const oggiOpen = openPayouts.has("oggi");
+                      parts.push(
+                        <div key={"oggi-" + i}>
+                          <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
+                            <span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">{t("Oggi")}</span><span>{fmtDMY(today)}</span><span className="text-faint">{oggiOpen ? "▾" : "▸"}</span>
+                            {hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}
+                          </div>
+                          {oggiOpen && balParts.filter((b) => b.own || b.start !== undefined || Math.abs(b.saldo) > 0.004).map((b) => (
+                            <div key={"og-" + b.sid + "|" + b.conto} className="flex items-center gap-2 bg-wash/40 px-3 py-1 text-xs text-dim">
+                              <span className="truncate pl-9">{scopeStructs.length > 1 && b.sid ? `${getStructure(b.sid)?.name ?? "—"} · ` : ""}{(CONTI.find((c) => c.key === b.conto)?.label) ?? b.conto}</span>
+                              <span className="ml-auto font-mono" style={{ color: b.saldo < 0 ? "var(--err)" : undefined }}>{eur(b.saldo)}</span>
+                            </div>
+                          ))}
+                        </div>,
+                      );
+                    }
                     if (y !== pd.slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
                   }
                   parts.push(el);
