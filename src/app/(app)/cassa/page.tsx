@@ -525,12 +525,22 @@ export default function CassaPage() {
   useEffect(() => { setForm((f) => ({ ...f, struttura: singleSid })); setRf((f) => ({ ...f, struttura: singleSid })); }, [singleSid]);
   // Il menu «Conto» mostra solo i conti della struttura scelta (più il conto attuale del movimento, se non è suo, segnalato: non lo si cambia di nascosto).
   const nameOfStruct = (id: string) => getStructure(id)?.name ?? "—";
+  // Con più strutture selezionate (o tutte) il nome del conto dice a quale struttura appartiene: «Revolut - Spigolehouse», «Revolut - Central Perk».
+  const contoLabel = (key: string, sid?: string) => {
+    const c = conti.find((x) => x.key === key);
+    if (!c) return key;
+    const base = t(c.label);
+    if (!multiScope) return base;
+    const mine = c.structureIds ?? [];
+    const ids = sid && mine.includes(sid) ? [sid] : mine.filter((id) => scopeStructs.some((x) => x.id === id));
+    return ids.length ? `${base} - ${ids.map(nameOfStruct).join(", ")}` : base;
+  };
   const contoOptions = (sid: string, current: string) => {
     const list = contiOfStructure(conti, sid);
     const extra = current && !list.some((c) => c.key === current) ? conti.find((c) => c.key === current) : undefined;
     return extra ? [...list, extra] : list;
   };
-  const contoOptLabel = (c: ContoDef, sid: string) => `${contoVisible(c, sid && sid !== "all" ? sid : "all") ? "" : "⚠ "}${t(contoDisplayLabel(c, conti, nameOfStruct))}`;
+  const contoOptLabel = (c: ContoDef, sid: string) => `${contoVisible(c, sid && sid !== "all" ? sid : "all") ? "" : "⚠ "}${multiScope ? contoLabel(c.key, sid && sid !== "all" ? sid : undefined) : t(contoDisplayLabel(c, conti, nameOfStruct))}`;
   const defaultContoFor = (sid: string) => { const r = routeFor(conti, prefs, sid); return r.accounts?.cash ?? r.principal; };
   // Un NUOVO movimento / pagamento programmato deve cadere su un conto della struttura scelta: se quello attuale non lo è, si passa ai suoi contanti (o al suo principale).
   useEffect(() => { if (editingMov === NEW_MOV && form.struttura && !contiOfStructure(conti, form.struttura).some((c) => c.key === form.conto)) setForm((f) => ({ ...f, conto: defaultContoFor(form.struttura) })); }, [editingMov, form.struttura, form.conto, conti, prefs]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -857,7 +867,7 @@ export default function CassaPage() {
                         {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
                         {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
                         {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
-                        <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), multiScope && movSid(m) ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
+                        <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", contoLabel(m.conto, movSid(m) || undefined), multiScope && movSid(m) && !contoLabel(m.conto, movSid(m) || undefined).includes(" - ") ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
                         {contoUnassigned(m, conti) && <span className="shrink-0 text-[10px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a questa struttura: correggi il conto dalla modifica del movimento, oppure sposta in blocco i movimenti da «Saldo di partenza» → «Sposta movimenti tra conti».")}>⚠ {t("conto non assegnato")}</span>}
                       </div>
                       {isBooking ? (
@@ -893,7 +903,7 @@ export default function CassaPage() {
                           </div>
                           {oggiOpen && balParts.filter((b) => b.own || b.start !== undefined || Math.abs(b.saldo) > 0.004).map((b) => (
                             <div key={"og-" + b.sid + "|" + b.conto} className="flex items-center gap-2 bg-wash/40 px-3 py-1 text-xs text-dim">
-                              <span className="truncate pl-9">{scopeStructs.length > 1 && b.sid ? `${getStructure(b.sid)?.name ?? "—"} · ` : ""}{(CONTI.find((c) => c.key === b.conto)?.label) ?? b.conto}</span>
+                              <span className="truncate pl-9">{contoLabel(b.conto, b.sid || undefined)}</span>
                               <span className="ml-auto font-mono" style={{ color: b.saldo < 0 ? "var(--err)" : undefined }}>{eur(b.saldo)}</span>
                             </div>
                           ))}
