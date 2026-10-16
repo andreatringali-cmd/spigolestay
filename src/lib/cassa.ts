@@ -266,7 +266,9 @@ export type CassaListRow =
   | { type: "mov"; mov: Mov }
   | { type: "booking"; id: string; income: Mov; commission?: Mov; gross: number; comm: number; net: number }
   // un bonifico/pagamento dell'OTA che riunisce più prenotazioni (stessa struttura, stesso canale, stessa data di incasso)
-  | { type: "payout"; id: string; channel: string; structureId?: string; date: string; items: CassaListRow[]; gross: number; comm: number; net: number; count: number; movIds: string[]; forecast: boolean };
+  | { type: "payout"; id: string; channel: string; structureId?: string; date: string; items: CassaListRow[]; gross: number; comm: number; net: number; count: number; movIds: string[]; forecast: boolean }
+  // i saldi di partenza dei conti di una struttura, nella stessa data: una riga chiusa che si apre sul dettaglio dei conti
+  | { type: "opening"; id: string; date: string; structureId?: string; items: Mov[]; total: number; movIds: string[] };
 
 const BOOKING_MOV = /^(auto-in|auto-comm|fc-in)-/;
 /** `groupPayout(canale, strutturaId)`: il canale di quella struttura è pagato con un bonifico unico (settimanale/mensile)? Senza, nessun raggruppamento. */
@@ -291,7 +293,7 @@ export function groupBookingRows(rows: Mov[], groupPayout?: (channel: string, st
   const groups = new Map<string, Extract<CassaListRow, { type: "payout" }>>();
   const refs = new Map<string, Set<string>>();
   for (const r of out) {
-    if (r.type === "payout") { res.push(r); continue; }
+    if (r.type === "payout" || r.type === "opening") { res.push(r); continue; }
     const m = r.type === "booking" ? r.income : r.mov;
     if (!(m.channel && BOOKING_MOV.test(m.id) && groupPayout(m.channel, m.bookingStructureId))) { res.push(r); continue; }
     const key = `${m.bookingStructureId ?? ""}|${m.channel}|${m.date}`;
@@ -312,6 +314,23 @@ export function groupBookingRows(rows: Mov[], groupPayout?: (channel: string, st
 // Senza lo storico delle uscite passate, l'host scrive quanto ha oggi su un conto: da quella data il saldo parte da quell'importo e si aggiorna
 // con le entrate e le uscite dei giorni SUCCESSIVI (fino a oggi). Il movimento di partenza è un normale movimento con categoria "apertura".
 export const OPENING_CAT = "apertura";
+/** Riunisce in UNA riga i saldi di partenza (uno per conto) della stessa struttura e della stessa data: nel registro è una riga chiusa con il totale, e si apre sul dettaglio dei conti. */
+export function groupOpeningRows(rows: CassaListRow[]): CassaListRow[] {
+  const out: CassaListRow[] = [];
+  const idx = new Map<string, number>();
+  for (const r of rows) {
+    if (r.type !== "mov" || r.mov.cat !== OPENING_CAT) { out.push(r); continue; }
+    const m = r.mov;
+    const key = `${m.structureId ?? ""}|${m.date}`;
+    const at = idx.get(key);
+    const amt = m.kind === "in" ? m.amount : -m.amount;
+    if (at === undefined) { idx.set(key, out.length); out.push({ type: "opening", id: `op-${key}`, date: m.date, structureId: m.structureId, items: [m], total: roundCents(amt), movIds: [m.id] }); continue; }
+    const g = out[at] as Extract<CassaListRow, { type: "opening" }>;
+    g.items.push(m); g.movIds.push(m.id); g.total = roundCents(g.total + amt);
+  }
+  // un solo saldo di partenza (un solo conto) resta una riga normale
+  return out.map((r) => (r.type === "opening" && r.items.length === 1 ? { type: "mov" as const, mov: r.items[0] } : r));
+}
 const signed = (m: Mov) => (m.kind === "in" ? m.amount : -m.amount);
 export interface Balance { saldo: number; since?: string; start?: number }
 

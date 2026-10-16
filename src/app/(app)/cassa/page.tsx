@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, groupOpeningRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -255,7 +255,7 @@ export default function CassaPage() {
   const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
   const infoText = (i: { amount: number; pct: number; date: string }) => `${t("commissione")} − ${eur(i.amount)} (${String(i.pct).replace(".", ",")}%) · ${t("trattenuta il")} ${fmtDMY(i.date)}`;
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
-  const listRows = groupBookingRows(rowsOrdered, groupPayout);
+  const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout));
   // cella "saldo conti" (riusata dalle voci bonifico)
   const balCell = (bal: number | null, inc: boolean) => (
     <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
@@ -706,8 +706,39 @@ export default function CassaPage() {
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {(() => {
-                const rowDate = (x: (typeof listRows)[number]) => (x.type === "payout" ? x.date : x.type === "booking" ? x.income.date : x.mov.date);
+                const rowDate = (x: (typeof listRows)[number]) => (x.type === "payout" || x.type === "opening" ? x.date : x.type === "booking" ? x.income.date : x.mov.date);
                 const els = listRows.map((r) => {
+                  if (r.type === "opening") {
+                    const open = openPayouts.has(r.id);
+                    const lastId = r.movIds.reduce((best, id) => ((ledger.order.get(id) ?? 0) > (ledger.order.get(best) ?? 0) ? id : best), r.movIds[0]);
+                    const stName = r.structureId ? structNameOf(r.structureId) : "";
+                    return (
+                      <div key={r.id}>
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra i conti")} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap py-2.5 hover:bg-wash/60">
+                          <span className="font-mono text-xs text-dim">{fmtDMY(r.date)}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-wash text-dim"><Icon name="coins" size={13} /></span>
+                            <span className="truncate text-sm font-medium text-txt">{t("Saldo di partenza")}{stName ? ` · ${stName}` : ""} · {r.items.length} {t("conti")}</span>
+                            <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
+                          </div>
+                          <span className="max-md:hidden" />
+                          <span className="max-md:hidden" />
+                          <span className="text-right font-mono text-sm font-bold" style={{ color: r.total >= 0 ? "var(--ok)" : "var(--err)" }}>{r.total >= 0 ? "+ " : "− "}{eur(Math.abs(r.total))}</span>
+                          {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
+                        </div>
+                        {open && r.items.map((m) => (
+                          <div key={"o-" + m.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                            <span />
+                            <span className="truncate pl-9">{(CONTI.find((c) => c.key === m.conto)?.label) ?? m.conto}</span>
+                            <span className="max-md:hidden" />
+                            <span className="max-md:hidden" />
+                            <span className="text-right font-mono">{m.kind === "in" ? "+ " : "− "}{eur(m.amount)}</span>
+                            <div className="-my-1 self-stretch border-l border-line" />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
                   if (r.type === "payout") {
                     const open = openPayouts.has(r.id);
                     const infoSum = sumCents(r.items.map((it) => (it.type === "mov" ? infoOf(it.mov)?.amount : it.type === "booking" ? infoOf(it.income)?.amount : 0)));
@@ -729,7 +760,7 @@ export default function CassaPage() {
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
                         {open && r.items.map((it) => {
-                          if (it.type === "payout") return null;
+                          if (it.type === "payout" || it.type === "opening") return null;
                           const im = it.type === "booking" ? it.income : it.mov;
                           const ib = bkOf(im);
                           const gn = ib ? (guests.find((g) => g.id === ib.guestId)?.fullName || "Ospite") : im.desc;

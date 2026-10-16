@@ -35,3 +35,18 @@ test("senza spostamento tutto resta come prima", () => {
   assert.equal(m.length, 1);
   assert.equal(m[0].date, "2026-10-16"); // arrivo: regola di s2
 });
+
+test("saldi di partenza: i conti della stessa struttura e data diventano UNA riga che si apre sul dettaglio", async () => {
+  const { groupOpeningRows, OPENING_CAT } = await import("../src/lib/cassa.ts");
+  const op = (id: string, conto: string, amount: number, structureId = "s1", date = "2026-10-16") => ({ type: "mov" as const, mov: { id, date, kind: "in" as const, cat: OPENING_CAT, desc: "x", amount, conto, structureId } });
+  const other = { type: "mov" as const, mov: { id: "m1", date: "2026-10-17", kind: "out" as const, cat: "tasse", desc: "t", amount: 10, conto: "banca" } };
+  const rows = groupOpeningRows([op("a", "contanti", 1000), op("b", "revolut", 3339.01), op("c", "banca", 155.6), other] as never);
+  assert.equal(rows.length, 2);
+  const g = rows[0] as { type: string; items: unknown[]; total: number };
+  assert.equal(g.type, "opening");
+  assert.equal(g.items.length, 3);
+  assert.equal(g.total, 4494.61);
+  // un solo conto: resta una riga normale; strutture o date diverse: gruppi separati
+  assert.equal((groupOpeningRows([op("a", "contanti", 5)] as never)[0] as { type: string }).type, "mov");
+  assert.equal(groupOpeningRows([op("a", "contanti", 5), op("b", "banca", 6, "s2")] as never).length, 2);
+});
