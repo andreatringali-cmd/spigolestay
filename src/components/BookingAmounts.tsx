@@ -1,5 +1,5 @@
 import type { Booking, Structure } from "@/lib/types";
-import { bookingPaidTotal, cityTaxOfBooking, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
+import { commissionIsEstimate, COMMISSION_ESTIMATE_HINT, bookingPaidTotal, cityTaxOfBooking, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
 
@@ -42,7 +42,7 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
           : <Row k={`Da incassare${pmTxt}`} v={eur(resid)} color="var(--err)" strong />}
       {b.depositPaid && resid > 0.005 && <Row k="Caparra" v="ricevuta ✓" color="var(--ok)" />}
       {tax > 0 && <Row k="Tassa (a parte)" v={`${eur(tax)} · ${b.cityTaxPaid ? "incassata ✓" : "da incassare"}`} color={b.cityTaxPaid ? "var(--ok)" : "var(--warn)"} title="Non rientra nel totale: si riscuote in struttura" />}
-      {comm > 0 && <Row k={`Comm. ${commissionShareOf(b)}%`} v={`− ${eur(comm)} · netto ${eur(nettoOf(b))}`} color="var(--dim)" title={payFee > 0 ? `Commissione ${eur(commissionBaseOf(b))} + costo d'incasso ${eur(payFee)} (Payment charge), e quanto resta a te` : "Commissione dell'OTA e quanto resta a te"} />}
+      {comm > 0 && <Row k={`Comm. ${commissionShareOf(b)}%${commissionIsEstimate(b) ? " · stima" : ""}`} v={`− ${eur(comm)}${commissionIsEstimate(b) ? " (stima)" : ""} · netto ${eur(nettoOf(b))}`} color="var(--dim)" title={commissionIsEstimate(b) ? COMMISSION_ESTIMATE_HINT : payFee > 0 ? `Commissione ${eur(commissionBaseOf(b))} + costo d'incasso ${eur(payFee)} (Payment charge), e quanto resta a te` : "Commissione dell'OTA e quanto resta a te"} />}
     </div>
   );
 }

@@ -21,7 +21,7 @@ import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL,
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO, fmtDate as fmtDateIt, fmtDM, fmtDateTime } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { cityTaxOfBooking, cityTaxOfBookingRaw, nightlyRevenue, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
+import { commissionIsEstimate, COMMISSION_ESTIMATE_HINT, cityTaxOfBooking, cityTaxOfBookingRaw, nightlyRevenue, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -865,6 +865,7 @@ export default function BookingDrawer() {
             <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm font-mono font-semibold text-[color:var(--ok)]">{eur(form.total - (form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)))}</div>
           </div>
         </div>
+        {commissionIsEstimate(booking) && form.commissionAmount == null && <p className="rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>⚠ {COMMISSION_ESTIMATE_HINT}</p>}
         <p className="text-[11px] text-faint">{t("Se conosci la cifra esatta (es. da Booking.com) inseriscila in €: avrà sempre la priorità sulla %. Modificando la % l'importo esatto viene rimosso.")}</p>
         <Field label={t("Numero prenotazione (OTA)")}><input className={inputCls} value={form.code} onChange={(e) => set({ code: e.target.value })} placeholder={t("es. 6400788454")} /></Field>
         <div className="rounded-lg border border-line bg-paper p-3">

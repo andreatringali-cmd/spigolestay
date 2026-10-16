@@ -201,6 +201,16 @@ export function commissionPctOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null && b.total) return Math.round(((b.commissionAmount + paymentFeeOf(b)) / b.total) * 1000) / 10;
   return b.commissionPct ?? defaultCommissionInfo(b.channel, b.structureId).pct;
 }
+/**
+ * La commissione mostrata è una STIMA? Vero quando il portale non ha mandato la cifra esatta (commissionAmount) e nessuno ha scritto una percentuale a mano:
+ * allora si usa la media reale delle altre prenotazioni dello stesso canale e struttura (vedi defaultCommissionInfo). Da dire sempre all'utente.
+ */
+export function commissionIsEstimate(b: CommissionBookingLike): boolean {
+  if (isNetPayout(b) || b.channel === "direct" || b.channel === "blocked") return false;
+  if (b.commissionAmount != null || b.commissionPct != null) return false;
+  return commissionBaseOf(b) > 0;
+}
+export const COMMISSION_ESTIMATE_HINT = "Stima: il portale non ha mandato la commissione esatta di questa prenotazione, quindi si usa la media reale delle altre dello stesso canale. Scrivi la cifra vera per correggerla.";
 /** Solo la commissione di intermediazione dell'OTA (senza il costo d'incasso). */
 export function commissionBaseOf(b: CommissionBookingLike): number {
   if (isNetPayout(b)) return 0; // il totale è già netto: la commissione non si sottrae due volte

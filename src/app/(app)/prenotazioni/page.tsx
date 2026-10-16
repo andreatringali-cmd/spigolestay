@@ -8,7 +8,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
+import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionIsEstimate, COMMISSION_ESTIMATE_HINT, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel, exportPdf } from "@/lib/export";
@@ -248,7 +248,7 @@ export default function PrenotazioniPage() {
           {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
         </span>
       </td>
-      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint" title="Commissioni ÷ lordo">({commissionShareOf(b)}%)</span></> : "—"}</td>
+      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint" title={commissionIsEstimate(b) ? COMMISSION_ESTIMATE_HINT : "Commissioni ÷ lordo"}>({commissionShareOf(b)}%{commissionIsEstimate(b) ? " · stima" : ""})</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
       <td className="px-3 py-2.5"><StatoCell b={b} /></td>
     </>);
