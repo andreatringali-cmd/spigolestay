@@ -60,7 +60,7 @@ export default function ActivityLog() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 max-h-[70dvh] w-80 overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+        <div className="absolute right-0 top-full z-40 mt-1 max-h-[70dvh] w-80 overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Registro attività")}</div>
           {activities.length === 0 ? (
             <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>

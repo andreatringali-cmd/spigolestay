@@ -72,7 +72,7 @@ function RowMenu({ items, onPick }: { items: TaskAction[]; onPick: (a: TaskActio
     <div ref={ref} className="relative shrink-0">
       <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Altre azioni" onClick={() => setOpen((o) => !o)} className="grid h-8 w-8 place-items-center rounded-lg text-base font-bold leading-none text-faint transition hover:bg-line hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">⋯</button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+        <div role="menu" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           {items.map((a, i) => (
             <button key={i} type="button" role="menuitem" onClick={() => { setOpen(false); onPick(a); }} className="block w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-xs font-semibold text-txt transition hover:bg-wash">{a.label}</button>
           ))}

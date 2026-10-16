@@ -18,7 +18,7 @@ export default function LanguageSwitcher() {
         <Flag code={cur.code} className="h-4 w-6" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+        <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Lingua</div>
           {LANGS.map((l) => (
             <button key={l.code} onClick={() => { setLang(l.code); setOpen(false); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-wash ${l.code === lang ? "bg-wash" : ""}`}>

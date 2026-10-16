@@ -682,7 +682,7 @@ function StructureFilter({ value, onChange, structures, units, roomTypes, single
         <Icon name="chevron" size={14} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-64 overflow-auto rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+        <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-64 overflow-auto rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           <Opt active={value === "all"} onClick={() => pick("all")}>{allLabel}</Opt>
           {single ? (
             // Una sola struttura selezionata: solo camere, divise per tipologia.

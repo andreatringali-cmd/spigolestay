@@ -174,7 +174,7 @@ export default function TipologiaSchedaPage() {
               <div className="relative mt-1">
                 <input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} onFocus={() => setNameOpen(true)} onBlur={() => setTimeout(() => setNameOpen(false), 120)} autoComplete="off" className={inp} placeholder={t("Es. Camera Matrimoniale Deluxe")} />
                 {nameOpen && nameSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+                  <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
                     {nameSuggestions.map((o) => <button key={o} type="button" onMouseDown={(e) => { e.preventDefault(); set("name", o); setNameOpen(false); }} className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm text-txt hover:bg-wash">{o}</button>)}
                   </div>
                 )}

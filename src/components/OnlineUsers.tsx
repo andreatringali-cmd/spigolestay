@@ -106,7 +106,7 @@ export default function OnlineUsers() {
         </span>
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+        <div className="absolute right-0 top-full z-40 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Online adesso")} · {online.length}</div>
           {online.map((u, i) => (
             <div key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">

@@ -156,7 +156,7 @@ export default function XenoraBookPublicPage() {
                   <div className="text-sm font-semibold text-txt">{adults + children} ospiti · {rooms} {rooms > 1 ? "camere" : "camera"}</div>
                 </button>
                 {guestsOpen && (
-                  <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+                  <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
                     {([["Adulti", adults, setAdults, 1], ["Bambini", children, setChildren, 0], ["Camere", rooms, setRooms, 1]] as const).map(([lbl, val, set, min]) => (
                       <div key={lbl} className="flex items-center justify-between py-1.5">
                         <span className="text-sm text-txt">{lbl}</span>
