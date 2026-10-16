@@ -41,3 +41,11 @@ test("link di pagamento della tassa: usa la quota del gruppo, in centesimi", () 
   const ctxB = chatPayContext(bks[1] as never, CP, false, bks as never);
   assert.equal(ctxA.cityTaxCents + ctxB.cityTaxCents, 693);
 });
+
+test("residuo di un gruppo: ogni camera con la sua quota di tassa, la somma è il saldo del gruppo", async () => {
+  const { groupRowBalances } = await import("../src/lib/booking.ts");
+  const rows = [{ ...room("a"), cleaningFee: 0, paid: 86.63 }, { ...room("b"), cleaningFee: 0, paid: 86.63 }];
+  const bals = groupRowBalances(CP, rows as never);
+  assert.equal(Math.round(bals.reduce((a, r) => a + r.balance * 100, 0)), 693); // camere già pagate: resta solo la tassa del gruppo
+  assert.deepEqual(bals.map((r) => r.balance).sort(), [3.46, 3.47]);
+});

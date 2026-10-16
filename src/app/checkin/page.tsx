@@ -73,7 +73,7 @@ interface Info {
   aiEnabled?: boolean;
   returning?: boolean;
   group?: { b: string; code: string; roomType: string; unit: string; adults: number; children: number; webCheckin: boolean }[];
-  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxGroup?: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
+  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxGroup?: number; groupBalance?: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null; lang?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
@@ -284,7 +284,9 @@ function Engine() {
   const cityTax = b?.cityTax ?? 0;
   const grand = accommodation ? accommodation + cleaning + baseExtras + upsellTotal + cityTax : 0;
   const paid = b?.paid ?? 0;
-  const balance = Math.max(0, grand - paid);
+  // Gruppo di più camere: si paga UNA volta per tutte (residuo di ogni camera con la sua quota di tassa), non solo per questa camera.
+  const groupPay = (info?.group?.length ?? 0) > 1 && typeof b?.groupBalance === "number";
+  const balance = groupPay ? Math.round((b!.groupBalance! + upsellTotal) * 100) / 100 : Math.max(0, grand - paid);
   const canPay = !!st?.stripeChargesEnabled && !!st?.stripeAccount && balance > 0;
   // Testo mostrato nel Checkout Stripe (colonna sinistra): titolo + descrizione professionale.
   const dLong = (iso?: string) => { try { return new Date(iso!).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }); } catch { return ""; } };
@@ -427,7 +429,7 @@ function Engine() {
       const back = `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}&lang=${lang}`;
       const r = await fetch("/api/stripe/quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: balance, label: payLabel, desc: payDesc, email: info.guest.email, acct: st.stripeAccount || "", locale: lang, metadata: { bookingId: params.b }, successUrl: back, cancelUrl: back }),
+        body: JSON.stringify({ amount: balance, label: payLabel, desc: payDesc, email: info.guest.email, acct: st.stripeAccount || "", locale: lang, metadata: { bookingId: params.b, ...(groupPay ? { group: "1" } : {}) }, successUrl: back, cancelUrl: back }),
       });
       const j = await r.json().catch(() => ({}));
       if (j.url) { window.location.href = j.url; return; }
@@ -513,7 +515,7 @@ function Engine() {
       {cityTax > 0 && isGroup && b?.cityTaxGroup ? <div className="text-right text-[11px] text-faint">{t("Tassa del gruppo (tutte le camere)")}: {eur(b.cityTaxGroup)}</div> : null}
       <div className="mt-1 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(grand)}</span></div>
       {paid > 0 && <div className="flex justify-between"><span className="text-dim">{t("Già versato")}</span><span className="font-mono" style={{ color: "var(--ok)" }}>−{eur(paid)}</span></div>}
-      <div className="flex justify-between"><span className="font-semibold text-txt">{t("Saldo")}</span><span className="font-mono text-lg font-extrabold" style={{ color: balance > 0 ? "var(--err)" : "var(--ok)" }}>{eur(balance)}</span></div>
+      <div className="flex justify-between"><span className="font-semibold text-txt">{groupPay ? t("Saldo del gruppo (tutte le camere)") : t("Saldo")}</span><span className="font-mono text-lg font-extrabold" style={{ color: balance > 0 ? "var(--err)" : "var(--ok)" }}>{eur(balance)}</span></div>
     </div>
   );
 

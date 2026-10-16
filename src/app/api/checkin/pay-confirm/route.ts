@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
 import { onlinePaymentPatch } from "@/lib/online-pay";
+import { groupRowBalances } from "@/lib/booking";
+import type { Structure } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +50,28 @@ export async function POST(req: Request) {
       const bk = bookings[idx] as Json;
       const sessions = arr(bk.paidSessions).map(String);
       if (sessions.includes(session.id)) return false; // già registrata
+      // Pagamento di GRUPPO (più camere prenotate insieme): l'importo si ripartisce sui residui di ogni camera (con la sua quota di tassa del gruppo), questa camera per prima; l'eventuale eccedenza resta su questa.
+      const gid = s(bk.groupId);
+      if (session.metadata?.group === "1" && gid) {
+        const st = arr(data.structures).find((x) => s(x.id) === s(bk.structureId)) as unknown as Structure | undefined;
+        const idxs = bookings.map((x, i) => ({ x: x as Json, i })).filter(({ x }) => s(x.groupId) === gid && s(x.status) !== "cancelled" && s(x.status) !== "no_show" && s(x.channel) !== "blocked");
+        const bals = groupRowBalances(st, idxs.map(({ x }) => ({ id: s(x.id), adults: n(x.adults), children: n(x.children), childAges: (Array.isArray(x.childAges) ? (x.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(x.checkIn), checkOut: s(x.checkOut), total: n(x.total), cityTaxExempt: x.cityTaxExempt === true, cleaningFee: n(x.cleaningFee), extras: arr(x.extras) as { price?: number }[], paid: n(x.paid) })));
+        const order = idxs.slice().sort((a, b) => (s(a.x.id) === s(bk.id) ? -1 : s(b.x.id) === s(bk.id) ? 1 : 0));
+        let left = Math.round(amount * 100);
+        const give = new Map<string, number>();
+        for (const { x } of order) { const bal = Math.round((bals.find((r) => r.id === s(x.id))?.balance ?? 0) * 100); const g = Math.min(left, bal); if (g > 0) { give.set(s(x.id), g); left -= g; } }
+        if (left > 0) give.set(s(bk.id), (give.get(s(bk.id)) ?? 0) + left);
+        for (const { x, i } of order) {
+          const g = give.get(s(x.id)); if (!g) { if (s(x.id) === s(bk.id)) bookings[i] = { ...x, paidSessions: [...arr(x.paidSessions).map(String), session.id], updatedAt: Date.now() }; continue; } // la sessione resta segnata anche su questa camera (idempotenza)
+          const part = g / 100;
+          const rowSessions = arr(x.paidSessions).map(String);
+          const bal = bals.find((r) => r.id === s(x.id));
+          const settled = !!bal && g >= Math.round(bal.balance * 100) && bal.tax > 0;
+          bookings[i] = { ...x, paid: Math.round((n(x.paid) + part) * 100) / 100, paidSessions: [...rowSessions, session.id], updatedAt: Date.now(), ...(settled ? { cityTaxPaid: true } : {}), ...onlinePaymentPatch(x as never, part, Date.now()) };
+        }
+        data.bookings = bookings;
+        return true;
+      }
       bookings[idx] = { ...bk, paid: Math.round((n(bk.paid) + amount) * 100) / 100, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()) };
       data.bookings = bookings;
       return true;

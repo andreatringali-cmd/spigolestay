@@ -3,7 +3,7 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
-import { cityTaxOf, cityTaxOfGroup, cityTaxShareOf, type GroupTaxRow } from "@/lib/booking";
+import { cityTaxOf, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, type GroupTaxRow } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
 import { guestLangOrNull } from "@/lib/guest-lang";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
@@ -62,6 +62,7 @@ export async function GET(req: Request) {
     const nightsTot = (() => { try { return Math.max(1, Math.round((Date.parse(s(b.checkOut)) - Date.parse(s(b.checkIn))) / 86400000)); } catch { return 1; } })();
     let cityTax = cityTaxOf(st as unknown as Structure, n(b.adults) || 1, nightsTot, n(b.total), b.cityTaxExempt === true, (n(b.adults) || 1) + n(b.children));
     let cityTaxGroup: number | undefined;
+    let groupBalance: number | undefined;
 
     // Prenotazione di GRUPPO: se questa prenotazione ha un groupId, restituisci tutte le camere
     // del gruppo (stessa struttura/store) per un check-in unico che compila tutti gli ospiti.
@@ -76,9 +77,9 @@ export async function GET(req: Request) {
 
     // Gruppo di più camere: la tassa si calcola UNA volta sull'insieme delle camere (come il Comune) e ogni camera ne porta la sua quota, così le quote sommano esattamente il totale.
     if (group.length > 1) {
-      const rows: GroupTaxRow[] = arr(store.data.bookings).filter((x) => s((x as Json).groupId) === groupId && s((x as Json).status) !== "cancelled" && s((x as Json).status) !== "no_show" && s((x as Json).channel) !== "blocked")
-        .map((x) => { const xb = x as Json; return { id: s(xb.id), adults: n(xb.adults), children: n(xb.children), childAges: (Array.isArray(xb.childAges) ? (xb.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(xb.checkIn), checkOut: s(xb.checkOut), total: n(xb.total), cityTaxExempt: xb.cityTaxExempt === true }; });
-      if (rows.some((r) => r.id === s(b.id))) { cityTaxGroup = cityTaxOfGroup(st as unknown as Structure, rows); cityTax = cityTaxShareOf(st as unknown as Structure, rows, s(b.id)); }
+      const rows = arr(store.data.bookings).filter((x) => s((x as Json).groupId) === groupId && s((x as Json).status) !== "cancelled" && s((x as Json).status) !== "no_show" && s((x as Json).channel) !== "blocked")
+        .map((x) => { const xb = x as Json; return { id: s(xb.id), adults: n(xb.adults), children: n(xb.children), childAges: (Array.isArray(xb.childAges) ? (xb.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(xb.checkIn), checkOut: s(xb.checkOut), total: n(xb.total), cityTaxExempt: xb.cityTaxExempt === true, cleaningFee: n(xb.cleaningFee), extras: arr(xb.extras) as { price?: number }[], paid: n(xb.paid) }; });
+      if (rows.some((r) => r.id === s(b.id))) { cityTaxGroup = cityTaxOfGroup(st as unknown as Structure, rows); cityTax = cityTaxShareOf(st as unknown as Structure, rows, s(b.id)); groupBalance = Math.round(groupRowBalances(st as unknown as Structure, rows).reduce((a, r) => a + r.balance * 100, 0)) / 100; }
     }
 
     // Verifica LIVE che l'account collegato possa incassare, se il flag salvato non è ancora true:
@@ -96,7 +97,7 @@ export async function GET(req: Request) {
       booking: {
         id: s(b.id), code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), status: s(b.status),
         checkIn: s(b.checkIn), checkOut: s(b.checkOut), adults: n(b.adults) || 1, children: n(b.children),
-        total: n(b.total), paid: n(b.paid), cleaningFee: n(b.cleaningFee), cityTax, cityTaxGroup,
+        total: n(b.total), paid: n(b.paid), cleaningFee: n(b.cleaningFee), cityTax, cityTaxGroup, groupBalance,
         cityTaxExempt: b.cityTaxExempt === true,
         webCheckin: b.webCheckin === true, arrivalTime: s(b.arrivalTime), guestRequests: s(b.guestRequests),
         extras: arr(b.extras), extraGuests: seeDocs ? arr(b.extraGuests) : arr(b.extraGuests).map(withoutDocPhotos),

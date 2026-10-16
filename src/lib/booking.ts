@@ -78,6 +78,15 @@ export function cityTaxShareOf(structure: Structure | undefined, rows: GroupTaxR
   return (idx < 0 ? 0 : base[idx]) / 100;
 }
 
+/** Residuo di ogni camera di un gruppo (soggiorno + pulizia + extra + QUOTA di tassa del gruppo − incassato), ai centesimi. */
+export function groupRowBalances(structure: Structure | undefined, rows: (GroupTaxRow & { cleaningFee?: number; extras?: { price?: number }[]; paid?: number })[]): { id: string; balance: number; tax: number }[] {
+  return rows.map((r, i) => {
+    const tax = cityTaxShareOf(structure, rows, r.id ?? String(i));
+    const grand = cents(r.total ?? 0) + cents(r.cleaningFee ?? 0) + cents(bookingExtrasTotal(r)) + cents(tax);
+    return { id: r.id ?? String(i), tax, balance: Math.max(0, grand - cents(r.paid ?? 0)) / 100 };
+  });
+}
+
 export function cityTaxPayers(structure: Structure | undefined, b: { adults?: number; childAges?: number[] }): number {
   const adults = b.adults ?? 0;
   const freeUnder = structure?.cityTaxChildFreeUnder ?? 18; // default: tutti i minorenni esenti
