@@ -104,7 +104,7 @@ export default function CassaPage() {
   const [openPayouts, setOpenPayouts] = useState<Set<string>>(() => new Set()); // bonifici aperti nell'elenco
   // Le impostazioni incassi sono PER STRUTTURA: nella finestra si sceglie la struttura (di partenza la attiva, se è una sola; altrimenti la prima).
   const [payoutStruct, setPayoutStruct] = useState("");
-  const payoutSid = structures.some((x) => x.id === payoutStruct) ? payoutStruct : (structures.some((x) => x.id === singleSid) ? singleSid : (structures[0]?.id ?? ""));
+  const payoutSid = scopeStructs.some((x) => x.id === payoutStruct) ? payoutStruct : (scopeStructs[0]?.id ?? structures[0]?.id ?? "");
   const payoutKey = payoutSid || DEFAULT_PAYOUTS_ID;
   const payoutsOfModal = payoutSettingsFor(payouts, payoutSid);
   const openPayoutModal = () => { setPayoutStruct(""); setPayoutModal(true); };
@@ -1056,14 +1056,14 @@ export default function CassaPage() {
           <button aria-label={t("Chiudi")} onClick={() => setPayoutModal(false)} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
-            <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento. Valgono per la struttura scelta.")}</p>
-            {structures.length > 0 && (
-              <div className="mb-2 flex items-end gap-2">
-                <label className="min-w-0 flex-1"><span className="text-xs text-dim">{t("Struttura")}</span><select value={payoutSid} onChange={(e) => setPayoutStruct(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-                {structures.length > 1 && <button onClick={copyPayoutsToAll} className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">{t("Copia su tutte le strutture")}</button>}
+            <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento.")}</p>
+            {scopeStructs.length > 1 && (
+              <div className="mb-2 flex flex-wrap gap-1">
+                {scopeStructs.map((x) => <button key={x.id} type="button" onClick={() => setPayoutStruct(x.id)} aria-pressed={payoutSid === x.id} className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${payoutSid === x.id ? "border-transparent bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>{x.name}</button>)}
               </div>
             )}
-            <div className="flex flex-col divide-y divide-[color:var(--line)] rounded-xl border border-line px-3">
+            <div className="overflow-hidden rounded-xl border border-line">
+              <div className="hidden grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint md:grid"><span>{t("Portale")}</span><span>{t("Quando arriva il pagamento")}</span><span>{t("Commissioni")}</span></div>
               {PAYOUT_CHANNELS.map((ch) => {
                 const rule = payoutsOfModal[ch] ?? { mode: "arrival" as PayoutMode };
                 const wd = rule.weekday ?? 4, md = rule.monthDay ?? 1, dd = rule.days ?? 0;
@@ -1073,9 +1073,10 @@ export default function CassaPage() {
                   : `${t("Un unico bonifico il")} ${md} ${t("del mese successivo: copre tutti i check-out del mese, dal 1 all'ultimo giorno.")}`;
                 const tipFull = rule.commission ? `${tip} ${t("Le commissioni sono trattenute tutte insieme il")} ${rule.commission.day} ${t("del mese dopo, per le prenotazioni con check-out del mese precedente.")}` : tip;
                 return (
-                  <div key={ch} title={tipFull} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
-                    <div className="flex w-[128px] shrink-0 items-center gap-2"><ChannelLogo channel={ch} size={20} title={CHANNELS[ch].label} /><span className="truncate text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
-                    <select aria-label={t("Quando arriva il pagamento")} value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className="w-[210px] rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
+                  <div key={ch} title={tipFull} className="grid grid-cols-1 gap-x-3 gap-y-1.5 border-b border-line px-3 py-2.5 last:border-b-0 md:grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] md:items-center">
+                    <div className="flex shrink-0 items-center gap-2"><ChannelLogo channel={ch} size={20} title={CHANNELS[ch].label} /><span className="truncate text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                    <select aria-label={t("Quando arriva il pagamento")} value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className="w-full max-w-[210px] rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
                       <option value="arrival">{t("Alla data di arrivo")}</option>
                       <option value="checkout">{t("Dopo il check-out (carta virtuale)")}</option>
                       <option value="weekly">{t("Bonifico settimanale")}</option>
@@ -1084,8 +1085,9 @@ export default function CassaPage() {
                     {rule.mode === "checkout" && <span className="flex items-center gap-1.5 text-xs text-dim"><input type="number" min={0} max={60} aria-label={t("Giorni dopo il check-out")} value={dd} onChange={(e) => setPayoutRule(ch, { days: Number(e.target.value) || 0 })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("giorni dopo")}</span>}
                     {rule.mode === "weekly" && <select aria-label={t("Giorno del bonifico")} value={wd} onChange={(e) => setPayoutRule(ch, { weekday: Number(e.target.value) })} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">{WEEKDAY_LABELS.map((w, i) => <option key={w} value={i}>{t(w)}</option>)}</select>}
                     {rule.mode === "monthly" && <span className="flex items-center gap-1.5 text-xs text-dim">{t("il")}<input type="number" min={1} max={31} aria-label={t("Giorno del mese successivo")} value={md} onChange={(e) => setPayoutRule(ch, { monthDay: Number(e.target.value) || 1 })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("del mese dopo")}</span>}
-                    <div className="flex basis-full flex-wrap items-center gap-x-1.5 gap-y-1 pl-[136px] text-xs text-dim max-md:pl-0">
-                      <span>{t("Commissioni")}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-dim">
+                      <span className="md:hidden">{t("Commissioni")}</span>
                       <select aria-label={t("Quando il portale trattiene le commissioni")} value={rule.commission ? "monthly" : "together"} onChange={(e) => setPayoutRule(ch, { commission: e.target.value === "monthly" ? { mode: "monthly", day: rule.commission?.day ?? COMMISSION_DEFAULT_DAY } : undefined })} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus">
                         <option value="together">{t("Insieme all'incasso")}</option>
                         <option value="monthly">{t("Tutte insieme, il mese dopo")}</option>
