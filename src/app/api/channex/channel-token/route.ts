@@ -33,7 +33,9 @@ export async function POST(req: Request) {
   const { data: who } = await auth.admin.auth.admin.getUserById(auth.tenantId);
   const username = who?.user?.email || "utente";
 
-  const res = await createChannelOneTimeToken(String(map.channex_property_id), username);
+  const propertyId = String(map.channex_property_id || "").trim();
+  if (!propertyId) return NextResponse.json({ ok: false, error: "Struttura non collegata a un canale manager." }, { status: 200 }); // mai un token senza property
+  const res = await createChannelOneTimeToken(propertyId, username);
   if (!res.ok || !res.data?.data?.token) return NextResponse.json({ ok: false, error: res.error || "Impossibile generare il token" }, { status: 200 });
 
   return NextResponse.json({ ok: true, token: res.data.data.token, propertyId: map.channex_property_id, base: channexBase().replace(/\/api\/v1$/, "") });

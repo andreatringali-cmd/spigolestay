@@ -453,7 +453,8 @@ export async function replyToReview(reviewId: string, text: string) {
 export async function createChannelOneTimeToken(propertyId: string, username: string) {
   return channex<{ data: { token: string } }>("/auth/one_time_token", {
     method: "POST",
-    body: JSON.stringify({ property_id: propertyId, username }),
+    // Formato della documentazione ufficiale (chiave one_time_token). Il token deve SEMPRE essere limitato a UNA property (Channex blocca dal 19/10/2026 i token senza property); i campi in chiaro restano per compatibilità.
+    body: JSON.stringify({ one_time_token: { property_id: propertyId, username }, property_id: propertyId, username }),
   });
 }
 
