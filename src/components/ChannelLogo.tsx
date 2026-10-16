@@ -8,8 +8,11 @@ export function isBedAndBreakfastIt(name?: string): boolean {
   return /bed\s*(?:&|and|-and-|n)?\s*breakfast|bb\.it|bbit|\bb\s*&\s*b\b/i.test(name ?? "");
 }
 
-/** Marchio "bb.it" (bed-and-breakfast.it) disegnato qui: nessun file da caricare. */
+/** Logo ufficiale di bed-and-breakfast.it (public/channels/bed-and-breakfast-it.png, tazza su fondo verde); se il file non si carica resta la scritta "bb.it". */
 function BbItMark({ size }: { size: number }) {
+  const [missing, setMissing] = useState(false);
+  // eslint-disable-next-line @next/next/no-img-element
+  if (!missing) return <img src="/channels/bed-and-breakfast-it.png" alt="bb.it" width={size} height={size} style={{ width: size, height: size, objectFit: "cover" }} onError={() => setMissing(true)} />;
   return <span style={{ fontSize: size * 0.36, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.05em", color: "#0F5E4D", whiteSpace: "nowrap" }}>bb<span style={{ color: "#E4572E" }}>.it</span></span>;
 }
 
@@ -74,7 +77,8 @@ export function ChannelWordmark({ channel, height = 20, title, name }: { channel
     case "hotelbeds":
       return chip("HotelBeds", <span style={{ ...base, color: "#2B3340" }}>hotelbeds</span>);
     case "other":
-      if (isBedAndBreakfastIt(name ?? title)) return chip("bb.it · bed-and-breakfast.it", <span style={{ ...base, color: "#0F5E4D" }}>bb<span style={{ color: "#E4572E" }}>.it</span></span>);
+      // eslint-disable-next-line @next/next/no-img-element
+      if (isBedAndBreakfastIt(name ?? title)) return chip("bb.it · bed-and-breakfast.it", <><img src="/channels/bed-and-breakfast-it.png" alt="" width={height} height={height} style={{ width: height, height, borderRadius: "50%" }} /><span style={{ ...base, color: "#2E7D32" }}>bb.it</span></>);
       return chip("Altro / OTA", <span style={{ ...base, fontSize: Math.round(fs * 0.85), color: "#5B5F6B" }}>OTA</span>);
     case "direct":
       /* eslint-disable-next-line @next/next/no-img-element */
