@@ -773,6 +773,8 @@ function Splash({ label, forceLabel = false }: { label: string; forceLabel?: boo
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+  const sessionRef = useRef<Session | null>(null);
+  useEffect(() => { sessionRef.current = session; }, [session]);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [storageFull, setStorageFull] = useState(false); // il browser non ha più spazio: i dati non si salvano in locale
@@ -861,7 +863,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       finally { if (!cancelled) setMfaChecked(true); }
     })();
     return () => { cancelled = true; };
-  }, [session]);
+  }, [sessionUid]); // solo al cambio di utente: un nuovo oggetto sessione (refresh del token, iframe/altra scheda) non deve rimandare in "Verifica sicurezza…" smontando la pagina aperta
 
   // 2c) Cancello di accesso "SU INVITO": Xenora non è a registrazione aperta. Dopo il login
   // chiediamo al server se l'utente è abilitato (owner, utente esistente, membro, invitato o in
@@ -876,7 +878,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 10000);
-        const res = await fetch("/api/access/status", { headers: { Authorization: `Bearer ${session.access_token}` }, signal: ctl.signal }).finally(() => clearTimeout(to));
+        const res = await fetch("/api/access/status", { headers: { Authorization: `Bearer ${sessionRef.current?.access_token ?? ""}` }, signal: ctl.signal }).finally(() => clearTimeout(to));
         const j = await res.json().catch(() => null) as { allowed?: boolean } | null;
         if (cancelled) return;
         if (j && j.allowed === false) {
@@ -892,7 +894,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [session, mfaChecked, mfaNeeded]);
+  }, [sessionUid, mfaChecked, mfaNeeded]);
 
   // 3) Al login: scarica lo stato dal server e reidrata una sola volta per questo utente/tab.
   useEffect(() => {
