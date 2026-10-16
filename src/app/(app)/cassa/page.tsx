@@ -284,12 +284,11 @@ export default function CassaPage() {
   const addConto = () => {
     if (!opening) return;
     const label = opening.newName.trim();
-    if (!label) return;
-    // con una sola struttura nell'account il conto è suo; altrimenti si scelgono le strutture (almeno una)
-    const sids = allStructures.length > 1 ? opening.newSids.filter((id) => allStructures.some((x) => x.id === id)) : allStructures.map((x) => x.id);
-    if (allStructures.length > 0 && sids.length === 0) { toast(t("Scegli almeno una struttura per il conto."), "error"); return; }
-    const key = contoKeyFromLabel(label, conti, sids.length === 1 ? sids[0] : undefined); // stesso nome di un altro conto = conto NUOVO con chiave distinta
-    persistConti([...conti, { key, label, ...(sids.length ? { structureIds: sids } : {}) }]);
+    // I conti si creano dalla singola struttura selezionata e sono SUOI.
+    const sid = scopeStructs.length === 1 ? scopeStructs[0].id : "";
+    if (!label || !sid) return;
+    const key = contoKeyFromLabel(label, conti, sid); // stesso nome di un altro conto = conto NUOVO con chiave distinta
+    persistConti([...conti, { key, label, structureIds: [sid] }]);
     setOpening((o) => (o ? { ...o, newName: "" } : o));
   };
   const moveConto = (sid: string, key: string, dir: -1 | 1) => { const next = moveWithin(conti, key, dir, contiOf(sid).map((c) => c.key)); if (next !== conti) persistConti(next); };
@@ -373,6 +372,8 @@ export default function CassaPage() {
       savedPairs.push({ sid: s.id, conto: c.key });
     }
     if (!newMovs.length) { setOpening(null); return; }
+    // un conto vecchio, non ancora assegnato, diventa della struttura che ne scrive il saldo (le altre strutture non lo vedono più)
+    { const claim = new Map<string, string>(); for (const { sid, conto } of savedPairs) { const c = conti.find((x) => x.key === conto); if (c && !isContoAssigned(c) && !claim.has(conto)) claim.set(conto, sid); } if (claim.size) persistConti(conti.map((x) => (claim.has(x.key) ? { ...x, structureIds: [claim.get(x.key) as string] } : x))); }
     // i vecchi saldi COMUNI (senza struttura) degli stessi conti si sostituiscono da soli, così non si contano due volte
     const oldList = openingsReplacedBy(manual, savedPairs); // il nuovo sostituisce quello di prima SOLO di questa struttura e conto, più i comuni degli stessi conti
     const oldIds = new Set(oldList.map((o) => o.id));
@@ -998,18 +999,9 @@ export default function CassaPage() {
                             <span className="text-xs text-faint">€</span>
                             <button type="button" onClick={() => moveConto(s.id, c.key, -1)} disabled={list[0]?.key === c.key} title={t("Sposta su")} aria-label={`${t("Sposta su")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↑</button>
                             <button type="button" onClick={() => moveConto(s.id, c.key, 1)} disabled={list[list.length - 1]?.key === c.key} title={t("Sposta giù")} aria-label={`${t("Sposta giù")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↓</button>
-                            {multi && <button type="button" onClick={() => setAssignOpen(assignOpen === c.key ? null : c.key)} title={t("Strutture a cui appartiene il conto")} aria-label={`${t("Strutture a cui appartiene il conto")} ${c.label}`} className={`shrink-0 rounded p-1 text-xs leading-none hover:bg-wash ${unassigned ? "text-[color:var(--warn)]" : "text-faint hover:text-txt"}`}>⇄</button>}
                             <button type="button" onClick={() => setRenaming({ key: c.key, label: c.label })} title={t("Rinomina il conto")} aria-label={`${t("Rinomina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
                             <button type="button" onClick={() => void deleteConto(c)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
                           </div>
-                          {multi && (unassigned || assignOpen === c.key) && (
-                            <div className="ml-5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                              {unassigned && <span className="text-[10px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a nessuna struttura: compare ovunque")}>{t("Non assegnato")}</span>}
-                              {allStructures.map((x) => (
-                                <label key={x.id} className="flex items-center gap-1 text-[11px] text-dim"><input type="checkbox" checked={c.structureIds?.includes(x.id) ?? false} onChange={() => toggleSid(c.key, x.id)} className="h-3.5 w-3.5 accent-[color:var(--focus)]" />{x.name}</label>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -1017,19 +1009,12 @@ export default function CassaPage() {
                 </div>
               );
             })}
-            <div className="mt-3 border-t border-line pt-3">
+            {scopeStructs.length === 1 && <div className="mt-3 border-t border-line pt-3">
               <div className="flex items-center gap-2">
                 <input value={opening.newName} onChange={(e) => setOpening((o) => (o ? { ...o, newName: e.target.value } : o))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addConto(); } }} placeholder={t("Nuovo conto (es. Revolut, Intesa…)")} maxLength={30} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-                <button onClick={addConto} disabled={!opening.newName.trim() || (allStructures.length > 1 && opening.newSids.length === 0)} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">{t("+ Aggiungi conto")}</button>
+                <button onClick={addConto} disabled={!opening.newName.trim()} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">{t("+ Aggiungi conto")}</button>
               </div>
-              {allStructures.length > 1 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                  {allStructures.map((x) => (
-                    <label key={x.id} className="flex items-center gap-1 text-[11px] text-dim"><input type="checkbox" checked={opening.newSids.includes(x.id)} onChange={() => setOpening((o) => (o ? { ...o, newSids: o.newSids.includes(x.id) ? o.newSids.filter((id) => id !== x.id) : [...o.newSids, x.id] } : o))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" />{x.name}</label>
-                  ))}
-                </div>
-              )}
-            </div>
+            </div>}
             <label className="mt-3 block"><span className="text-xs text-dim">{t("Valido dal giorno")}</span>
               <input type="date" value={opening.date} onChange={(e) => setOpening((o) => (o ? { ...o, date: e.target.value } : o))} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
             </label>
