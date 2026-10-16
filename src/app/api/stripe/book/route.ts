@@ -49,8 +49,8 @@ export async function POST(req: Request) {
     const ci = String(b?.ci || "").trim(), co = String(b?.co || "").trim();
     const adults = Math.max(1, parseInt(String(b?.adults ?? "1"), 10) || 1);
     const children = Math.max(0, parseInt(String(b?.children ?? "0"), 10) || 0);
-    const total = Math.round(Number(b?.total) || 0);
-    const deposit = Math.round(Number(b?.deposit) || 0);
+    const total = Math.round((Number(b?.total) || 0) * 100) / 100; // ai centesimi, non all'euro intero
+    const deposit = Math.round((Number(b?.deposit) || 0) * 100) / 100;
     const note = String(b?.note || "").slice(0, 480);
     const code = String(b?.code || "").slice(0, 40);
     const planName = String(b?.planName || "").slice(0, 60);
@@ -99,10 +99,10 @@ export async function POST(req: Request) {
     // (i direct charges non sono più supportati per piattaforme nuove con account Express).
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(amount * 100), product_data: { name: label } }, quantity: 1 }],
       customer_email: g.email || undefined,
       metadata: meta,
-      payment_intent_data: { metadata: meta, transfer_data: { destination: acct, amount: Math.max(0, amount * 100 - estimatedStripeFeeCents(amount * 100)) }, on_behalf_of: acct },
+      payment_intent_data: { metadata: meta, transfer_data: { destination: acct, amount: Math.max(0, Math.round(amount * 100) - estimatedStripeFeeCents(Math.round(amount * 100))) }, on_behalf_of: acct },
       success_url: success, cancel_url: cancel,
     });
     return NextResponse.json({ ok: true, payment: true, url: session.url, token });

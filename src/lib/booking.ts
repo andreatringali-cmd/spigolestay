@@ -44,6 +44,40 @@ export function cityTaxOfBooking(structure: Structure | undefined, b: { adults?:
   const n = Math.max(0, Math.round((Date.parse(b.checkOut + "T00:00:00Z") - Date.parse(b.checkIn + "T00:00:00Z")) / 86400000));
   return cityTaxOf(structure, cityTaxPayers(structure, b), n, b.total ?? 0, b.cityTaxExempt, (b.adults ?? 0) + (b.children ?? 0));
 }
+/** Riga di una prenotazione per il calcolo della tassa di GRUPPO (più camere prenotate insieme, stesso groupId). */
+export type GroupTaxRow = { id?: string; adults?: number; children?: number; childAges?: number[]; checkIn: string; checkOut: string; total?: number; cityTaxExempt?: boolean };
+const cents = (n: number) => Math.round(n * 100);
+/**
+ * Tassa di soggiorno di un GRUPPO di camere: si calcola UNA volta sull'insieme (adulti, minori e soggiorno di tutte le camere), non camera per camera: così il totale è quello
+ * del Comune (arrotondato una volta sola) e il tetto a persona/notte tiene conto di tutti gli ospiti. Camere con date diverse: somma delle singole (nessuna unione possibile).
+ */
+export function cityTaxOfGroup(structure: Structure | undefined, rows: GroupTaxRow[]): number {
+  if (rows.length === 0) return 0;
+  if (rows.length === 1) return cityTaxOfBooking(structure, rows[0]);
+  const same = rows.every((r) => r.checkIn === rows[0].checkIn && r.checkOut === rows[0].checkOut);
+  if (!same) return Math.round(rows.reduce((a, r) => a + cents(cityTaxOfBooking(structure, r)), 0)) / 100;
+  return cityTaxOfBooking(structure, {
+    adults: rows.reduce((a, r) => a + (r.adults ?? 0), 0), children: rows.reduce((a, r) => a + (r.children ?? 0), 0),
+    childAges: rows.flatMap((r) => r.childAges ?? []), checkIn: rows[0].checkIn, checkOut: rows[0].checkOut,
+    total: rows.reduce((a, r) => a + (r.total ?? 0), 0), cityTaxExempt: rows.every((r) => r.cityTaxExempt),
+  });
+}
+/** Quota di UNA camera nella tassa del gruppo, in proporzione ai paganti, ai centesimi e in modo che le quote sommino ESATTAMENTE il totale del gruppo. */
+export function cityTaxShareOf(structure: Structure | undefined, rows: GroupTaxRow[], id: string): number {
+  if (rows.length <= 1) return cityTaxOfGroup(structure, rows);
+  const total = cents(cityTaxOfGroup(structure, rows));
+  const ordered = rows.map((r, i) => ({ r, i, w: r.cityTaxExempt ? 0 : cityTaxPayers(structure, r) })).sort((a, b) => String(a.r.id ?? a.i).localeCompare(String(b.r.id ?? b.i)));
+  const sumW = ordered.reduce((a, x) => a + x.w, 0);
+  const weights = sumW > 0 ? ordered.map((x) => x.w) : ordered.map(() => 1);
+  const wTot = weights.reduce((a, w) => a + w, 0);
+  const base = weights.map((w) => Math.floor((total * w) / wTot));
+  let left = total - base.reduce((a, v) => a + v, 0);
+  const order = weights.map((w, k) => ({ k, frac: (total * w) / wTot - base[k] })).sort((a, b) => b.frac - a.frac || a.k - b.k);
+  for (const o of order) { if (left <= 0) break; base[o.k] += 1; left--; }
+  const idx = ordered.findIndex((x) => x.r.id === id);
+  return (idx < 0 ? 0 : base[idx]) / 100;
+}
+
 export function cityTaxPayers(structure: Structure | undefined, b: { adults?: number; childAges?: number[] }): number {
   const adults = b.adults ?? 0;
   const freeUnder = structure?.cityTaxChildFreeUnder ?? 18; // default: tutti i minorenni esenti

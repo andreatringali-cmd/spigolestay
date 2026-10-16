@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const store = await findBookingStoreForTenant(auth.admin, auth.tenantId, bookingId);
     if (!store) return NextResponse.json({ error: "booking_not_found", message: "Prenotazione non trovata sul server: se l'hai appena creata, riprova tra qualche secondo." }, { status: 404 });
 
-    const ctx = await withLiveStripe(chatPayContext(store.booking as unknown as Booking, (store.structure ?? undefined) as unknown as Structure | undefined));
+    const ctx = await withLiveStripe(chatPayContext(store.booking as unknown as Booking, (store.structure ?? undefined) as unknown as Structure | undefined, false, (Array.isArray(store.data.bookings) ? store.data.bookings : []) as unknown as Booking[]));
     const plan = planChatPayment(ctx, kind, requested);
     if (!plan.ok) return NextResponse.json({ error: plan.error, message: plan.message, maxAmount: plan.maxCents != null ? plan.maxCents / 100 : undefined }, { status: 400 });
 

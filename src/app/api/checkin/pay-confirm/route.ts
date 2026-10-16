@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // Destination charge: la sessione è sull'account PIATTAFORMA (niente stripeAccount header).
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid" }, { status: 402 });
-    const amount = Math.round((session.amount_total ?? 0) / 100);
+    const amount = Math.round(session.amount_total ?? 0) / 100; // ai centesimi (prima era arrotondato all'euro: 3,37 € risultavano 3 €)
     // Idempotenza: non risommare se questa sessione è già stata registrata.
     const already = arr((store.booking as Json).paidSessions).some((x) => s(x) === session.id);
     if (already) return NextResponse.json({ ok: true, already: true });
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       const bk = bookings[idx] as Json;
       const sessions = arr(bk.paidSessions).map(String);
       if (sessions.includes(session.id)) return false; // già registrata
-      bookings[idx] = { ...bk, paid: n(bk.paid) + amount, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()) };
+      bookings[idx] = { ...bk, paid: Math.round((n(bk.paid) + amount) * 100) / 100, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()) };
       data.bookings = bookings;
       return true;
     });

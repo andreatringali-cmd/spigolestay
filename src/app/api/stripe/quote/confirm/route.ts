@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     if (session.payment_status !== "paid") return NextResponse.json({ error: "not_paid", status: session.payment_status }, { status: 402 });
 
     const m = (session.metadata ?? {}) as Record<string, string>;
-    const amountPaid = Math.round((session.amount_total ?? 0) / 100); // in euro
+    const amountPaid = Math.round(session.amount_total ?? 0) / 100; // in euro, ai centesimi
     const uid = (m.uid || "").trim();
     const ownerEmail = (m.oe || "").trim().toLowerCase();
     const sid = (m.sid || "").trim();      // structureId
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     const co = (m.co || "").trim();
     const adults = Math.max(1, parseInt(m.ad || "1", 10) || 1);
     const children = Math.max(0, parseInt(m.ch || "0", 10) || 0);
-    const total = Math.round(Number(m.tot) || 0) || undefined;
+    const total = Math.round((Number(m.tot) || 0) * 100) / 100 || undefined;
     const gn = (m.gn || "").trim();        // nome ospite
     const ge = (m.ge || "").trim();        // email ospite
     const ref = (m.ref || "").trim();      // codice preventivo "n/anno"
@@ -170,7 +170,7 @@ export async function POST(req: Request) {
         const pi = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
         await admin.from("platform_fees").upsert({
           tenant_id: ownerId, org_id: null, structure_id: sid, booking_id: booking.id, source: "direct",
-          currency: "EUR", gross_amount_cents: (session.amount_total ?? amountPaid * 100),
+          currency: "EUR", gross_amount_cents: (session.amount_total ?? Math.round(amountPaid * 100)),
           fee_base_cents: parseInt((m.fee_base || "0"), 10) || 0,
           fee_vat_cents: parseInt((m.fee_vat || "0"), 10) || 0,
           fee_total_cents: feeTotal,

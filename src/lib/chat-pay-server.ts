@@ -46,7 +46,7 @@ export async function recordChatPayment(admin: SupabaseClient, session: Stripe.C
     if (idx < 0 || idx >= bookings.length) return false;
     const bk = bookings[idx];
     const st = arr(data.structures).find((s) => s.id === bk.structureId);
-    const ctx = chatPayContext(bk as unknown as Booking, st as unknown as Structure | undefined);
+    const ctx = chatPayContext(bk as unknown as Booking, st as unknown as Structure | undefined, false, bookings as unknown as Booking[]);
     const r = applyChatPayment(bk, { sessionId: session.id, cents, kind, balanceBeforeCents: ctx.balanceCents, cityTaxCents: ctx.cityTaxCents, cityTaxExempt: ctx.cityTaxExempt, now: Date.now() });
     outcome = r;
     if (!r.applied) return false;

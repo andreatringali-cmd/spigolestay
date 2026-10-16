@@ -73,7 +73,7 @@ interface Info {
   aiEnabled?: boolean;
   returning?: boolean;
   group?: { b: string; code: string; roomType: string; unit: string; adults: number; children: number; webCheckin: boolean }[];
-  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
+  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxGroup?: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null; lang?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
@@ -509,7 +509,8 @@ function Engine() {
       {cleaning > 0 && <div className="flex justify-between"><span className="text-dim">{t("Pulizia")}</span><span className="font-mono text-txt">{eur(cleaning)}</span></div>}
       {baseExtras > 0 && <div className="flex justify-between"><span className="text-dim">{t("Extra")}</span><span className="font-mono text-txt">{eur(baseExtras)}</span></div>}
       {upsellItems.map((x) => <div key={x.name} className="flex justify-between"><span className="text-dim">+ {x.name}</span><span className="font-mono text-txt">{eur(x.price)}</span></div>)}
-      {cityTax > 0 && <div className="flex justify-between"><span className="text-dim">{t("Tassa di soggiorno")}</span><span className="font-mono text-txt">{eur(cityTax)}</span></div>}
+      {cityTax > 0 && <div className="flex justify-between"><span className="text-dim">{t("Tassa di soggiorno")}{isGroup && b?.cityTaxGroup ? ` · ${t("quota di questa camera")}` : ""}</span><span className="font-mono text-txt">{eur(cityTax)}</span></div>}
+      {cityTax > 0 && isGroup && b?.cityTaxGroup ? <div className="text-right text-[11px] text-faint">{t("Tassa del gruppo (tutte le camere)")}: {eur(b.cityTaxGroup)}</div> : null}
       <div className="mt-1 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(grand)}</span></div>
       {paid > 0 && <div className="flex justify-between"><span className="text-dim">{t("Già versato")}</span><span className="font-mono" style={{ color: "var(--ok)" }}>−{eur(paid)}</span></div>}
       <div className="flex justify-between"><span className="font-semibold text-txt">{t("Saldo")}</span><span className="font-mono text-lg font-extrabold" style={{ color: balance > 0 ? "var(--err)" : "var(--ok)" }}>{eur(balance)}</span></div>

@@ -13,8 +13,9 @@ export async function POST(req: Request) {
   if (!key) return NextResponse.json({ error: "stripe_not_configured" }, { status: 503 });
   try {
     const body = await req.json().catch(() => ({}));
-    const amount = Math.round(Number(body?.amount) || 0); // in euro
-    if (amount <= 0) return NextResponse.json({ error: "invalid_amount" }, { status: 400 });
+    // Importo ai CENTESIMI (prima era arrotondato all'euro intero: una tassa di 3,37 € diventava 3 €).
+    const amountCents = Math.round((Number(body?.amount) || 0) * 100);
+    if (amountCents <= 0) return NextResponse.json({ error: "invalid_amount" }, { status: 400 });
     const label = String(body?.label || "Prenotazione").slice(0, 250);
     const desc = typeof body?.desc === "string" && body.desc.trim() ? body.desc.trim().slice(0, 300) : "";
     const email = typeof body?.email === "string" ? body.email : undefined;
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     // dirette e solo se il tenant ha attivato la fee ed ha P.IVA. La paga la struttura,
     // mai l'ospite → nessuna voce nel checkout, si passa application_fee_amount.
     const source: PaymentSource = body?.source === "ota" || body?.source === "manual" ? body.source : "direct";
-    const fee = computePlatformFee(amount * 100, source, {
+    const fee = computePlatformFee(amountCents, source, {
       bps: Number.isFinite(Number(body?.feeBps)) ? Number(body.feeBps) : undefined,
       vatRate: Number.isFinite(Number(body?.feeVatRate)) ? Number(body.feeVatRate) : undefined,
       enabled: body?.feeEnabled !== false,
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
 
     const params: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
-      line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label, ...(desc ? { description: desc } : {}) } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: "eur", unit_amount: amountCents, product_data: { name: label, ...(desc ? { description: desc } : {}) } }, quantity: 1 }],
       metadata: { kind: "quote", source, ...meta },
       payment_intent_data: { metadata: { kind: "quote", source, ...meta } },
       customer_email: email,
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     if (acct) {
       // La struttura sostiene la commissione Stripe: le trasferiamo il NETTO (lordo − stima Stripe
       // − eventuale fee Xenora). La piattaforma trattiene il resto (copre Stripe + fee).
-      const gross = amount * 100;
+      const gross = amountCents;
       const platformFee = fee.applies ? fee.totalCents : 0;
       const transferAmount = Math.max(0, gross - estimatedStripeFeeCents(gross) - platformFee);
       params.payment_intent_data = {
