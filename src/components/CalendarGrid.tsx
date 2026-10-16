@@ -488,7 +488,14 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const goToHit = (b: { id: string; checkIn: string }) => { setStart(addDays(parseISO(b.checkIn), -2)); setCalQuery(""); openBooking(b.id); };
 
   // ─── Refs per i listener di drag (leggono sempre i dati aggiornati) ───
-  const dragRef = useRef<{ id: string; startX: number; startY: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{ id: string; startX: number; startY: number; moved: boolean; touch?: boolean; armed?: boolean; timer?: number } | null>(null);
+  // Telefono/tablet: il trascinamento parte dopo una pressione lunga sulla barra (prima il gesto verticale era preso dallo scorrimento della pagina e non succedeva niente).
+  const [holdId, setHoldId] = useState<string | null>(null);
+  useEffect(() => {
+    const block = (ev: TouchEvent) => { if (dragRef.current?.armed && ev.cancelable) ev.preventDefault(); };
+    window.addEventListener("touchmove", block, { passive: false });
+    return () => window.removeEventListener("touchmove", block);
+  }, []);
   const dragViewRef = useRef<DragView | null>(null);
   const bookingsRef = useRef(bookings);
   const unitsRef = useRef(units);
@@ -528,6 +535,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     if (!s) return;
     const dx = e.clientX - s.startX;
     const dy = e.clientY - s.startY;
+    if (s.touch && !s.armed) { if (Math.hypot(dx, dy) > 8) onPointerCancel(); return; }
     if (!s.moved && Math.hypot(dx, dy) < 5) return;
     s.moved = true;
     const dxDays = 0; // spostamento solo verticale: le date non cambiano mai
@@ -543,6 +551,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Il browser può annullare il tocco (scroll del calendario partito da una barra, gesto di sistema): senza questo il trascinamento restava "appeso"
   // e il tocco successivo, ovunque, apriva una prenotazione a caso.
   function onPointerCancel() {
+    if (dragRef.current?.timer) window.clearTimeout(dragRef.current.timer);
+    setHoldId(null);
     dragRef.current = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
@@ -551,6 +561,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   }
   function onPointerUp() {
     const s = dragRef.current;
+    if (s?.timer) window.clearTimeout(s.timer);
+    setHoldId(null);
     dragRef.current = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
@@ -558,7 +570,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const view = dragViewRef.current;
     setDragView(null);
     if (!s) return;
-    if (!s.moved) { const b = bookingsRef.current.find((x) => x.id === s.id); if (b && b.channel === "blocked") openOosEdit(b); else openBooking(s.id); return; }
+    if (!s.moved) { if (s.touch && s.armed) return; /* pressione lunga senza spostare: niente */ const b = bookingsRef.current.find((x) => x.id === s.id); if (b && b.channel === "blocked") openOosEdit(b); else openBooking(s.id); return; }
     // Rilasciata su una camera non valida: prima non succedeva niente e non si capiva perché; ora si dice il motivo.
     if (view && !view.valid && view.reason && view.reason !== "—") toast(`Non posso spostarla qui: ${view.reason}`, "error"); // click semplice → scheda (o editor fuori servizio)
     if (view && view.valid && view.targetUnitId?.startsWith(UNASSIGNED_PREFIX)) {
@@ -583,9 +595,15 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   };
 
   function onBarPointerDown(e: React.PointerEvent, bId: string) {
-    e.preventDefault();
-    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch {}
-    dragRef.current = { id: bId, startX: e.clientX, startY: e.clientY, moved: false };
+    const touch = e.pointerType === "touch";
+    if (!touch) { e.preventDefault(); try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch {} } // mouse come prima; sul tocco non si blocca lo scorrimento
+    dragRef.current = { id: bId, startX: e.clientX, startY: e.clientY, moved: false, touch, armed: !touch };
+    if (touch) {
+      dragRef.current.timer = window.setTimeout(() => {
+        const d = dragRef.current;
+        if (d && d.touch && !d.moved) { d.armed = true; setHoldId(d.id); try { navigator.vibrate?.(15); } catch { /* niente */ } }
+      }, 380);
+    }
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerCancel);
@@ -925,7 +943,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
                 title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "pan-x pan-y" }}
+                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), ...(holdId === b.id ? { outline: "2px solid var(--focus)", outlineOffset: 1, transform: "scale(1.03)", zIndex: 5 } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "pan-x pan-y" }}
               >
                 {sotto ? (
                   <>
