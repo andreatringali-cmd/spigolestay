@@ -398,7 +398,7 @@ export default function PrenotazioniPage() {
         <StatCard label={t("Prenotazioni")} value={String(filtered.length)} />
         <StatCard label={t("Notti totali")} value={String(nightsTot)} />
         <StatCard label={t("ADR (prezzo medio/notte)")} value={<>{eur(avgPrice)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoPerNight)})</span></>} />
-        <StatCard label={t("Ricavi")} value={eur(revenue)} />
+        <StatCard label={t("Ricavi")} value={<>{eur(revenue)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoTot)})</span></>} />
       </div>
 
       {/* Grafici: una riga scorrevole con frecce ‹ › · torte larghe 2 card, barre 1 card */}
