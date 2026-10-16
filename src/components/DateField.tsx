@@ -65,7 +65,7 @@ export default function DateField({
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto shrink-0 text-dim"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl">
+        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           <div className="mb-1 flex items-center justify-between px-1">
             <button type="button" onClick={() => setView(new Date(y, m - 1, 1))} aria-label="Mese precedente" className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">‹</button>
             <span className="text-sm font-semibold capitalize text-txt">{MONTHS[m]} {y}</span>

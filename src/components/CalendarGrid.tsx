@@ -1090,7 +1090,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <div className="relative min-w-0 flex-1 sm:order-first sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:flex-none sm:shrink-0">
             <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
             {calQuery.trim() && (
-              <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+              <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
                 {calHits.length === 0
                   ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
                   : calHits.map((b) => (
@@ -1110,7 +1110,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <span className="hidden sm:inline-flex"><Icon name="calendar" size={15} /></span> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
             </button>
             {monthOpen && (
-              <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl">
+              <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
                 {monthList.map((mm) => {
                   const active = start.getFullYear() === mm.y && start.getMonth() === mm.m;
                   return (
@@ -1135,7 +1135,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
             </button>
             {vizOpen && (
-              <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+              <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Vista</div>
                 <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
                   {([["type", "Compatta"], ["struct", "Esplosa"]] as ["type" | "struct", string][]).map(([v, lab]) => (

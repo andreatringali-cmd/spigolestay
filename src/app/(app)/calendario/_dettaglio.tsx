@@ -235,7 +235,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
             <Icon name="calendar" size={15} /> <span className="capitalize">{selDate.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</span> <span className="text-xs">▾</span>
           </button>
           {monthOpen && (
-            <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl">
+            <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
               {monthList.map((mm) => {
                 const active = selDate.getFullYear() === mm.y && selDate.getMonth() === mm.m;
                 return <button key={mm.iso} onClick={() => { pick(mm.iso); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>;

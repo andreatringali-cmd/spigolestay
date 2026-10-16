@@ -49,7 +49,7 @@ export default function StructureSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+        <div className="absolute right-0 z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           {!allowedStructureIds && <Item checked={allOn} onClick={() => apply(structures.map((x) => x.id))} name={t("Tutte le strutture")} />}
           {!allowedStructureIds && <div className="my-1 border-t border-line" />}
           {structures.map((x) => (

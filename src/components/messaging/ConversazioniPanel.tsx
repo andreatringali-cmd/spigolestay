@@ -820,7 +820,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   <div ref={queueRef} className="relative shrink-0">
                     <button onClick={() => setQueueOpen((o) => !o)} aria-expanded={queueOpen} title={t("Invii automatici in arrivo")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${queueOpen ? "border-focus text-focus" : "border-line text-dim"}`}>⏱ {guestQueue.length} {t("in arrivo")}</button>
                     {queueOpen && (
-                      <div className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[85vw] rounded-xl border border-line bg-surface p-2 shadow-xl">
+                      <div className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[85vw] rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[60] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
                         <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Invii automatici in arrivo")}</div>
                         <div className="flex flex-col gap-1.5">
                           {guestQueue.slice(0, 5).map((x) => (
