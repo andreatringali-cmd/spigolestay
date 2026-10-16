@@ -159,6 +159,7 @@ export async function POST(req: Request) {
       cityTaxPaid: false,
       updatedAt: Date.now(),
       extId,
+      source: "sito", // origine: sito ufficiale → in gestionale si mostra il logo della struttura (lib/direct-origin.ts)
       code: String((body as { code?: string })?.code || "").trim().slice(0, 40) || undefined,
       note: (note || "Prenotazione dal sito") + (overbooked ? " · ⚠ nessuna camera libera in quelle date: da assegnare a mano" : ""),
       ratePlanName: planName || undefined,

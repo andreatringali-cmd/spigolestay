@@ -285,7 +285,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
         return; // niente schermata di conferma: la prenotazione non è stata registrata
       }
     } else {
-      addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
+      addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note, source: "sito" });
       addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
     }
     setCode(bkCode);

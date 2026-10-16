@@ -27,7 +27,7 @@ import DateField from "@/components/DateField";
 import { flagColor, flagGradient } from "@/lib/flags";
 import Icon from "@/components/Icon";
 import ExportMenu, { type ExportField } from "@/components/ExportMenu";
-import ChannelLogo, { ChannelWordmark } from "@/components/ChannelLogo";
+import BookingChannelLogo, { BookingChannelWordmark } from "@/components/BookingChannelLogo";
 import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
@@ -234,7 +234,7 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
       {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
       <td className={`whitespace-nowrap px-3 py-2.5 text-dim ${indent ? "pl-8" : ""}`}>{indent && <span className="text-faint">↳ </span>}{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>
-      <td className="px-3 py-2.5"><ChannelWordmark channel={b.channel} height={16} title={b.channel === "direct" ? "xenora.it" : ch.label} /></td>
+      <td className="px-3 py-2.5"><BookingChannelWordmark booking={b} height={16} title={ch.label} /></td>
       <td className="px-3 py-2.5 font-medium text-txt"><span className="block max-w-[200px] truncate" title={guestName(b)}>{guestName(b)}</span></td>
       <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
@@ -481,7 +481,7 @@ export default function PrenotazioniPage() {
                 <button onClick={() => toggleGroup(gid)} className="block w-full p-3 text-left active:bg-wash">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 font-semibold text-txt"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><span className="truncate">{guestName(b) || "—"}</span></span>
-                    <ChannelLogo channel={b.channel} size={18} title={b.channel === "direct" ? "xenora.it" : ch.label} />
+                    <BookingChannelLogo booking={b} size={18} title={ch.label} />
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-dim"><span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span><span className="text-faint">·</span><span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span></div>
                   <div className="mt-1 flex items-center justify-between gap-2">
@@ -509,7 +509,7 @@ export default function PrenotazioniPage() {
             <button key={b.id} onClick={() => openBooking(b.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>
-                <ChannelLogo channel={b.channel} size={18} title={b.channel === "direct" ? "xenora.it" : ch.label} />
+                <BookingChannelLogo booking={b} size={18} title={ch.label} />
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs text-dim">
                 <span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span>
@@ -571,7 +571,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                     <td className="whitespace-nowrap px-3 py-2.5"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span></td>
-                    <td className="px-3 py-2.5"><ChannelWordmark channel={b.channel} height={16} title={b.channel === "direct" ? "xenora.it" : ch.label} /></td>
+                    <td className="px-3 py-2.5"><BookingChannelWordmark booking={b} height={16} title={ch.label} /></td>
                     <td className="px-3 py-2.5 font-medium text-txt"><span className="block max-w-[200px] truncate" title={guestName(b)}>{guestName(b)}</span></td>
                     <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => x.adults + x.children)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>

@@ -9,7 +9,7 @@ import { otaLabel, isOtaVia } from "@/lib/ota-label";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import { bookingExtrasTotal } from "@/lib/booking";
-import ChannelLogo from "@/components/ChannelLogo";
+import BookingChannelLogo from "@/components/BookingChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
 import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
@@ -722,7 +722,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   <button onClick={() => setSel(p.id)} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3.5 text-left">
                     <span className="relative shrink-0">
                       <span className="grid h-11 w-11 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(p.name) }}>{initials(p.name)}</span>
-                      {p.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><ChannelLogo channel={p.b.channel} size={12} /></span>}
+                      {p.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><BookingChannelLogo booking={p.b} size={12} /></span>}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
@@ -806,7 +806,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 <button onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-dim hover:bg-wash lg:hidden">←</button>
                 <span className="relative shrink-0">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(current.name) }}>{initials(current.name)}</span>
-                  {current.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><ChannelLogo channel={current.b.channel} size={12} /></span>}
+                  {current.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><BookingChannelLogo booking={current.b} size={12} /></span>}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-semibold text-txt">{current.name}</span>
@@ -856,7 +856,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 const warn = { backgroundColor: "color-mix(in srgb, var(--warn) 15%, transparent)", color: "var(--warn)", borderColor: "transparent" } as const;
                 return (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className={chipBase} title={t("Come hanno prenotato")}><ChannelLogo channel={b.channel} size={13} /> {CHANNELS[b.channel]?.label ?? b.channel}</span>
+                    <span className={chipBase} title={t("Come hanno prenotato")}><BookingChannelLogo booking={b} size={13} /> {CHANNELS[b.channel]?.label ?? b.channel}</span>
                     <span className={chipBase} title={t("Check-in → Check-out")}>📅 {fmtD(b.checkIn)} → {fmtD(b.checkOut)}</span>
                     <span className={chipBase} title={t("Camera")}>🛏 {room}{showStruct && st?.name ? ` · ${st.name}` : ""}</span>
                     <span className={chipBase} style={hasParking ? ok : undefined} title={t("Parcheggio")}>🅿 {hasParking ? t("Parcheggio") : t("No parcheggio")}</span>

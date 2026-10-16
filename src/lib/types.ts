@@ -343,6 +343,7 @@ export interface Booking {
   note?: string;
   color?: string; // colore personalizzato della barra nel calendario (esadecimale); assente = colore del canale
   extId?: string; // id esterno (es. UID iCal/Octorate) per import idempotente
+  source?: "sito" | "manuale"; // origine di una prenotazione DIRETTA: dal sito ufficiale (logo struttura) o inserita a mano dal gestionale (logo Xenora). Vedi lib/direct-origin.ts (per i dati vecchi senza campo si deduce)
   cleaningFee?: number; // € pulizia finale
   cityTaxExempt?: boolean; // esente tassa di soggiorno
   cityTaxPaid?: boolean; // tassa di soggiorno incassata

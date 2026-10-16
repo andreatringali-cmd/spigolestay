@@ -13,6 +13,8 @@ import { guestLangOf } from "@/lib/guest-lang";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Booking, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import NumInput from "@/components/NumInput";
+import BookingChannelLogo from "@/components/BookingChannelLogo";
+import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import BookingExtrasPicker from "@/components/booking/BookingExtrasPicker";
 import { entriesTotal } from "@/lib/booking-extras";
 import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
@@ -474,7 +476,7 @@ export default function BookingDrawer() {
 
       <Section title={t("Soggiorno")}>
         <Row label={t("Codice")} value={bookingCode(booking)} mono />
-        <Row label={t("Canale")} value={ch.label} />
+        <Row label={t("Canale")} value={directOriginOf(booking) ? directOriginLabel(directOriginOf(booking)!, structure?.name) : ch.label} icon={<BookingChannelLogo booking={booking} structure={structure} size={18} title={ch.label} />} />
         <Row label={t("Struttura")} value={structure?.name ?? "—"} />
         <Row label={t("Tipologia")} value={roomType?.name ?? "—"} />
         <Row label={t("Unità")} value={unitV?.name ?? t("Da assegnare")} />
@@ -1030,11 +1032,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Row({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
+function Row({ label, value, mono, strong, icon }: { label: string; value: string; mono?: boolean; strong?: boolean; icon?: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="text-sm text-dim">{label}</span>
-      <span className={`text-right text-sm ${mono ? "font-mono tabular-nums" : ""} ${strong ? "font-bold text-txt" : "text-txt"}`}>{value}</span>
+      <span className={`${icon ? "flex items-center justify-end gap-1.5" : ""} text-right text-sm ${mono ? "font-mono tabular-nums" : ""} ${strong ? "font-bold text-txt" : "text-txt"}`}>{icon}{value}</span>
     </div>
   );
 }

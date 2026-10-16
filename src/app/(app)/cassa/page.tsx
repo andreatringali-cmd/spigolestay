@@ -19,7 +19,9 @@ import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
 import { fmtDMY } from "@/lib/dates";
+import Link from "next/link";
 import ChannelLogo from "@/components/ChannelLogo";
+import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { type PayoutMode, type PayoutSettingsMap, PAYOUT_CHANNELS, WEEKDAY_LABELS, DEFAULT_PAYOUTS_ID, COMMISSION_DEFAULT_DAY, COMMISSION_MAX_DAY, cleanRule, isGroupedPayout, loadPayoutSettings, payoutSettingsFor, savePayoutSettings } from "@/lib/payouts";
 import { formatDecimalIT, parseDecimalIT } from "@/lib/num-it";
@@ -296,8 +298,11 @@ export default function CassaPage() {
     setOpening((o) => { if (!o) return o; const { [c.key]: _gone, ...rest } = o.amounts; void _gone; return { ...o, amounts: rest }; });
   };
   const openingTotal = opening ? sumCents(CONTI.map((c) => { const v = parseFloat((opening.amounts[c.key] ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(v) ? v : 0; })) : 0;
-  const saveOpening = () => {
+  const saveOpening = async () => {
     if (!opening) return;
+    // Protezione: i conti sono gli STESSI per tutte le strutture. Se si sta per portare a zero un saldo che oggi ha un importo, si chiede conferma (è così che si perde il saldo per errore).
+    const azzerati = CONTI.filter((c) => { const txt = (opening.amounts[c.key] ?? "").trim(); const v = txt ? parseDecimalIT(txt) : null; const cur = balances[c.key]?.start ?? 0; return v === 0 && Math.abs(cur) > 0.005; });
+    if (azzerati.length && !(await ask({ title: "Azzerare il saldo di partenza?", message: `Stai per portare a zero: ${azzerati.map((c) => `${c.label} (ora ${eur(balances[c.key]?.start ?? 0)})`).join(", ")}. I conti valgono per tutte le strutture, non solo per quella selezionata.`, danger: true, confirmLabel: "Azzera" }))) return;
     const date0 = opening.date || todayISO();
     const date = opening.startOfDay ? shiftISO(date0, -1) : date0; // saldo di inizio giornata: valido dalla sera prima, così contano anche i movimenti di quel giorno
     const newMovs: Mov[] = []; const olds: Mov[] = [];
@@ -616,6 +621,7 @@ export default function CassaPage() {
         </select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+          <Link href="/riconciliazione-booking" title={t("Confronta le prenotazioni con l'elenco dell'extranet di Booking.com")} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt">{t("Riconcilia con Booking")}</Link>
           <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
           <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
@@ -744,7 +750,7 @@ export default function CassaPage() {
                     <div onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2">
-                        {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
+                        {bk ? <BookingChannelLogo booking={bk} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
                         <span className="truncate text-sm font-medium text-txt">{title}</span>
                         {!isBooking && receiptOf.get(m.id) && <button type="button" onClick={(e) => { e.stopPropagation(); void openRcpt(receiptOf.get(m.id)!.path); }} aria-label={t("Apri scontrino")} title={t("Apri scontrino")} className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt"><Icon name="receipt" size={13} /></button>}
                         {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
@@ -778,9 +784,18 @@ export default function CassaPage() {
                 });
                 // Cambio d'anno: una riga più spessa con il titolo dell'anno che comincia (si vede subito dove finisce un anno e inizia l'altro)
                 return els.flatMap((el, i) => {
-                  const y = rowDate(listRows[i]).slice(0, 4);
-                  if (i === 0 || y === rowDate(listRows[i - 1]).slice(0, 4)) return [el];
-                  return [<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>, el];
+                  const parts: React.ReactNode[] = [];
+                  const d = rowDate(listRows[i]);
+                  const y = d.slice(0, 4);
+                  if (i > 0) {
+                    const pd = rowDate(listRows[i - 1]);
+                    // «Oggi»: il punto in cui il registro passa dal passato al futuro, con il saldo di adesso (sopra/sotto, il saldo progressivo è quello PREVISTO a quella data)
+                    const crossesToday = futureView ? (pd <= today && d > today) : (pd > today && d <= today);
+                    if (crossesToday) parts.push(<div key={"oggi-" + i} className="flex items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt"><span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">{t("Oggi")}</span><span>{fmtDMY(today)}</span>{hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}</div>);
+                    if (y !== pd.slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
+                  }
+                  parts.push(el);
+                  return parts;
                 });
                 })()}
               </div>
@@ -840,6 +855,7 @@ export default function CassaPage() {
           <button aria-label={t("Chiudi")} onClick={() => setOpening(null)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
           <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="text-base font-bold text-txt">{t("Saldo di partenza")}</div>
+            {activeStructureId !== "all" && <p className="mt-1 rounded-lg bg-wash px-2.5 py-1.5 text-[11px] font-medium text-[color:var(--warn)]">{t("Attenzione: i conti (Revolut, Banca, Contanti) sono gli stessi per tutte le strutture. Questi importi valgono per tutte, non solo per la struttura selezionata.")}</p>}
             <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai oggi su ogni conto. Da qui ogni saldo parte dal suo importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve. I conti lasciati vuoti non vengono toccati.")}</p>
             <p className="mt-1 text-[11px] text-faint">{t("★ = conto principale: qui arrivano i soldi delle prenotazioni dai portali. ↑ ↓ cambiano l'ordine dei conti.")}</p>
             <div className="mt-3 flex flex-col gap-2">

@@ -52,6 +52,16 @@ export function occurrences(r: Rule, fromISO: string, toISO: string): string[] {
 // Una regola/movimento è visibile nello scope della struttura selezionata?
 // Con "Tutte" si vede tutto; con UNA struttura selezionata solo ciò che appartiene a quella
 // struttura (i movimenti "comuni", senza struttura, restano visibili solo con "Tutte").
+/**
+ * A quale struttura appartengono gli INCASSI di una prenotazione: a quella che l'ha RICEVUTA dall'OTA (e con le sue regole di incasso e commissioni).
+ * Spostarla di camera in un'altra struttura cambia solo la disponibilità nel calendario: `movedFrom` ricorda la struttura di origine.
+ */
+export const cashStructureOf = (b: { structureId: string; movedFrom?: { structureId?: string } | null }): string => b.movedFrom?.structureId || b.structureId;
+/** La prenotazione vista dalla Cassa: stessa prenotazione, ma con la struttura che incassa (vedi cashStructureOf). */
+export function cashView<T extends { structureId: string; movedFrom?: { structureId?: string } | null }>(b: T): T {
+  const sid = cashStructureOf(b);
+  return sid === b.structureId ? b : { ...b, structureId: sid };
+}
 export const scopeVisible = (structureId: string | undefined | null, active: string) =>
   active === "all" || structureId === active;
 
@@ -69,7 +79,8 @@ export const monthNameIT = (ym: string) => `${MONTHS_IT[Number(ym.slice(5, 7)) -
  * Commissione di una prenotazione che il portale trattiene "tutte insieme" (modalità mensile): importo, % reale e data della trattenuta.
  * Serve al registro per mostrarla in forma INFORMATIVA accanto all'incasso; undefined se la struttura/portale non usa la modalità mensile o non c'è commissione.
  */
-export function monthlyCommissionInfo(b: Booking, payouts: PayoutSettingsMap): { amount: number; pct: number; date: string } | undefined {
+export function monthlyCommissionInfo(bk: Booking, payouts: PayoutSettingsMap): { amount: number; pct: number; date: string } | undefined {
+  const b = cashView(bk);
   if (b.status === "cancelled" || b.channel === "blocked") return undefined;
   const rule = commissionRuleFor(payouts, b.channel, b.structureId);
   if (!rule) return undefined;
@@ -87,7 +98,7 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
   const out: Mov[] = [];
   const batches = new Map<string, { structureId: string; channel: Booking["channel"]; ym: string; day: number; items: { id: string; checkOut: string; comm: number }[] }>();
   const structIds = new Set<string>(); // strutture delle prenotazioni visibili: se più di una, il nome struttura entra nella descrizione delle commissioni mensili
-  for (const b of bookings) {
+  for (const b of bookings.map(cashView)) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (active !== "all" && b.structureId !== active) continue;
     structIds.add(b.structureId);
@@ -394,7 +405,7 @@ export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
 // programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
 export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
-  for (const b of bookings) {
+  for (const b of bookings.map(cashView)) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (active !== "all" && b.structureId !== active) continue;
     const when = payoutDate(b, payouts); // impostazioni della struttura della prenotazione
