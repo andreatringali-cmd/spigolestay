@@ -24,6 +24,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled } from "./supabase";
 import MfaChallenge from "@/components/MfaChallenge";
 import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
+import { mergeKeyedList } from "./list-merge";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -482,6 +483,12 @@ function mergeSnapshots(
     if (!isMediaFlatKey(key)) continue;
     const adopted = adoptMigratedMedia(local[key], server?.[key]);
     if (adopted !== null) merged[key] = adopted;
+  }
+  // Categorie e conti della Cassa sono liste salvate per intero: si fondono voce per voce (chi crea una voce su un dispositivo non la perde se un altro ha la lista vecchia).
+  for (const key of ["spigolestay:cassa:cats", "spigolestay:cassa:conti"]) {
+    if (local[key] === undefined || server?.[key] === undefined) continue;
+    const m = mergeKeyedList(local[key], server[key], base?.[key]);
+    if (m !== null) merged[key] = m;
   }
   return merged;
 }
