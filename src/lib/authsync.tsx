@@ -25,6 +25,7 @@ import { supabase, supabaseEnabled } from "./supabase";
 import MfaChallenge from "@/components/MfaChallenge";
 import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 import { mergeKeyedList } from "./list-merge";
+import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig } from "./org-cassa-config";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -659,6 +660,7 @@ async function syncOnce(
 
   const orgIds = await fetchOrgIds(client, uid);
   const { personal, orgs } = splitByOrg(fullData);
+  const orgSids = orgStructureSets(fullData); // strutture di ogni org: conti e regole di incasso di quelle strutture viaggiano nell'org (stessi per tutti i soci)
 
   // 1) + 2) salva il personale (le chiavi non-dati, es. impostazioni, viaggiano col personale) e ogni org di cui sono membro: IN PARALLELO
   // (righe diverse del database, nessuna dipendenza tra loro: prima erano una dopo l'altra e all'avvio sommavano i tempi di 3-4 trasferimenti da qualche MB).
@@ -669,12 +671,14 @@ async function syncOnce(
     saveOne(client, "app_state", "user_id", uid, personalSnap, personalRef),
     ...orgIds.map((orgId) => {
       const localOrg = orgs.get(orgId) ?? EMPTY_ORG_DATA();
-      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg) };
+      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg), ...extractOrgCassaConfig(snap, orgSids.get(orgId) ?? new Set<string>()) };
       return saveOne(client, "org_state", "org_id", orgId, orgSnap, orgRefs.current[orgId]);
     }),
   ]);
   revRef.current = personalRef.rev; lastSynced.current = personalRef.last;
   const orgMergedDatas: DataObj[] = [];
+  const orgCassa: { sids: Set<string>; merged: Record<string, string> }[] = [];
+  orgIds.forEach((orgId, i) => { const r = orgResults[i]; if (r) orgCassa.push({ sids: orgSids.get(orgId) ?? new Set<string>(), merged: r.merged }); });
   for (const r of orgResults) { try { orgMergedDatas.push(JSON.parse(r.merged["spigolestay:data:v1"] || "{}") as DataObj); } catch { /* salta */ } }
   for (const k of Object.keys(orgRefs.current)) if (!orgIds.includes(k)) delete orgRefs.current[k]; // pulizia org non più membro
 
@@ -683,6 +687,8 @@ async function syncOnce(
   try { mergedPersonal = JSON.parse(pRes.merged["spigolestay:data:v1"] || "{}") as DataObj; } catch { mergedPersonal = personal; }
   const combined = combineData(mergedPersonal, orgMergedDatas);
   const newBlob: Record<string, string> = { ...pRes.merged, "spigolestay:data:v1": JSON.stringify(combined) };
+  // Conti, regole di incasso e conto principale delle strutture condivise: si adotta la versione fusa dell'org (tutti i soci vedono gli stessi).
+  for (const oc of orgCassa) { if (oc.sids.size) Object.assign(newBlob, applyOrgCassaConfig(newBlob, oc.merged, oc.sids)); }
 
   // ANTI-RACE: la sincronizzazione fotografa il localStorage all'inizio, poi fa round-trip di
   // rete, poi restore() riscrive. Se l'utente SALVA durante il round-trip, restore lo cancellerebbe.

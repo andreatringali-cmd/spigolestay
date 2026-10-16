@@ -209,8 +209,22 @@ export function computeScheduled(rules: Rule[], paid: Set<string>, active: CashS
 
 // ---- Persistenza Supabase --------------------------------------------------
 type Row = Record<string, unknown>;
+// Org con la cassa CONDIVISA tra i soci (organizations.cash_shared, es. Central Perk): i loro movimenti, pagamenti programmati e pagamenti segnati portano org_id e li vedono/modificano tutti i membri.
+let sharedCashOrgs = new Set<string>();
+export async function loadSharedCashOrgs(): Promise<Set<string>> {
+  if (!supabase) return sharedCashOrgs;
+  try {
+    const { data, error } = await supabase.from("organizations").select("id").eq("cash_shared", true);
+    if (!error && data) sharedCashOrgs = new Set((data as { id: string }[]).map((r) => String(r.id)));
+  } catch { /* si tiene l'elenco precedente */ }
+  return sharedCashOrgs;
+}
+/** org_id da scrivere sulle righe di cassa di una struttura: l'org della struttura se la sua cassa è condivisa, altrimenti null (riga personale). */
+export const cashOrgOf = (structureOrgId?: string | null): string | null => (structureOrgId && sharedCashOrgs.has(structureOrgId) ? structureOrgId : null);
+
 export async function loadCash(): Promise<{ movements: Mov[]; rules: Rule[]; paid: string[] }> {
   if (!supabase) return { movements: [], rules: [], paid: [] };
+  await loadSharedCashOrgs();
   const [mv, rl, pd] = await Promise.all([
     supabase.from("cash_movements").select("*").order("date", { ascending: false }),
     supabase.from("cash_rules").select("*"),
@@ -228,14 +242,14 @@ export type WriteResult = string | null;
 const errMsg = (e: { message?: string } | null | undefined): WriteResult => (e ? (e.message || "errore sconosciuto") : null);
 const NO_CONN: WriteResult = "Non sei connesso al server: la modifica non è stata salvata.";
 
-export async function insertMovement(tenantId: string, m: Mov): Promise<WriteResult> {
+export async function insertMovement(tenantId: string, m: Mov, orgId: string | null = null): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
+  const { error } = await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, org_id: orgId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
   return errMsg(error);
 }
-export async function updateMovement(id: string, m: Mov): Promise<WriteResult> {
+export async function updateMovement(id: string, m: Mov, orgId: string | null = null): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_movements").update({ structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto }).eq("id", id);
+  const { error } = await supabase.from("cash_movements").update({ org_id: orgId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto }).eq("id", id);
   return errMsg(error);
 }
 export async function deleteMovement(id: string): Promise<WriteResult> {
@@ -243,14 +257,14 @@ export async function deleteMovement(id: string): Promise<WriteResult> {
   const { error } = await supabase.from("cash_movements").delete().eq("id", id);
   return errMsg(error);
 }
-export async function insertRule(tenantId: string, r: Rule): Promise<WriteResult> {
+export async function insertRule(tenantId: string, r: Rule, orgId: string | null = null): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable });
+  const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, org_id: orgId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable });
   return errMsg(error);
 }
-export async function updateRule(id: string, r: Rule): Promise<WriteResult> {
+export async function updateRule(id: string, r: Rule, orgId: string | null = null): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_rules").update({ structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable }).eq("id", id);
+  const { error } = await supabase.from("cash_rules").update({ org_id: orgId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable }).eq("id", id);
   return errMsg(error);
 }
 export async function deleteRule(id: string): Promise<WriteResult> {
@@ -258,10 +272,10 @@ export async function deleteRule(id: string): Promise<WriteResult> {
   const { error } = await supabase.from("cash_rules").delete().eq("id", id);
   return errMsg(error);
 }
-export async function addPaid(tenantId: string, keys: string[]): Promise<WriteResult> {
+export async function addPaid(tenantId: string, keys: string[], orgOf: (key: string) => string | null = () => null): Promise<WriteResult> {
   if (!keys.length) return null;
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_paid").upsert(keys.map((k) => ({ tenant_id: tenantId, k })), { onConflict: "tenant_id,k" });
+  const { error } = await supabase.from("cash_paid").upsert(keys.map((k) => ({ tenant_id: tenantId, org_id: orgOf(k), k })), { onConflict: "tenant_id,k" });
   return errMsg(error);
 }
 

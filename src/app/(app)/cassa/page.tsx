@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, groupOpeningRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, cashOrgOf, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, groupOpeningRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -80,6 +80,7 @@ export default function CassaPage() {
   const toast = useToast();
   const { t } = useLang();
   const { user } = useAuth();
+  const orgForStruct = (sid?: string) => cashOrgOf(allStructures.find((s) => s.id === sid)?.orgId); // org della cassa condivisa (soci) della struttura, se c'è
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   // Acquisti di materiale (modulo Pulizie): il movimento ha lo stesso id dell'acquisto, quindi da qui si risale allo scontrino allegato.
   const [pOrders] = useSyncedList<PulizieOrder>(KEY_ORDERS);
@@ -165,7 +166,7 @@ export default function CassaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rules, scopeKey, today, paidSet]);
   const dropPaid = (keys: string[]) => setPaid((p) => p.filter((x) => !keys.includes(x)));
-  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(tenantId ?? user.id, [k]), "Il pagamento", () => dropPaid([k])); };
+  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(tenantId ?? user.id, [k], () => orgForStruct(r.structureId)), "Il pagamento", () => dropPaid([k])); };
   const [pendAmt, setPendAmt] = useState<Record<string, string>>({}); // importo reale digitato per le scadenze a importo variabile
   const confirmVariable = (r: Rule, iso: string) => {
     const key = `${r.id}|${iso}`;
@@ -173,11 +174,11 @@ export default function CassaPage() {
     if (amt <= 0) { toast(t("Inserisci l'importo reale."), "error"); return; }
     const mov: Mov = { id: uid(), date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: amt, conto: r.conto, structureId: r.structureId };
     setManual((prev) => [mov, ...prev]);
-    if (tenantId) checkWrite(insertMovement(tenantId, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    if (tenantId) checkWrite(insertMovement(tenantId, mov, orgForStruct(mov.structureId)), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     markPaid(r, iso);
     toast(`${t("Registrato")} · ${r.desc} · ${eur(amt)}`, "success");
   };
-  const markAllPaid = () => { const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(tenantId ?? user.id, keys), "I pagamenti", () => dropPaid(keys)); };
+  const markAllPaid = () => { const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(tenantId ?? user.id, keys, (key) => orgForStruct(rules.find((r) => key.startsWith(r.id + "|"))?.structureId)), "I pagamenti", () => dropPaid(keys)); };
 
   // Prossime scadenze (dopo oggi).
   const upcoming = useMemo(() => {
@@ -381,7 +382,7 @@ export default function CassaPage() {
     setManual((prev) => [...newMovs, ...prev.filter((x) => !oldIds.has(x.id))]);
     if (user) {
       for (const o of oldList) checkWrite(deleteMovement(o.id), "Il saldo di partenza precedente", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
-      for (const mv of newMovs) checkWrite(insertMovement(tenantId ?? user.id, mv), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
+      for (const mv of newMovs) checkWrite(insertMovement(tenantId ?? user.id, mv, orgForStruct(mv.structureId)), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
     }
     setOpening(null);
   };
@@ -475,7 +476,7 @@ export default function CassaPage() {
       if (!prev) { resetForm(); return; }
       const next: Mov = { ...prev, date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
       setManual((all) => all.map((m) => (m.id === prev.id ? next : m)));
-      if (user) checkWrite(updateMovement(prev.id, next), "La modifica", () => setManual((all) => all.map((m) => (m.id === prev.id ? prev : m))));
+      if (user) checkWrite(updateMovement(prev.id, next, orgForStruct(next.structureId)), "La modifica", () => setManual((all) => all.map((m) => (m.id === prev.id ? prev : m))));
       showDate(form.date);
       toast(`${t("Movimento modificato")} · ${summary}`, "success");
       resetForm();
@@ -483,7 +484,7 @@ export default function CassaPage() {
     }
     const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
     setManual((prev) => [mov, ...prev]);
-    if (tenantId) checkWrite(insertMovement(tenantId, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    if (tenantId) checkWrite(insertMovement(tenantId, mov, orgForStruct(mov.structureId)), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     showDate(form.date);
     toast(`${t("Movimento registrato")} · ${summary}`, "success");
     // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
@@ -495,7 +496,7 @@ export default function CassaPage() {
       const nextStart = fmt(d.getFullYear(), d.getMonth(), d.getDate());
       const rule: Rule = { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true };
       setRules((prev) => [...prev, rule]);
-      if (tenantId) checkWrite(insertRule(tenantId, rule), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
+      if (tenantId) checkWrite(insertRule(tenantId, rule, orgForStruct(rule.structureId)), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     }
     resetForm();
   };
@@ -561,13 +562,13 @@ export default function CassaPage() {
       if (!prev) return closeRuleModal();
       const next: Rule = { ...prev, kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.variable ? false : rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined, variable: rf.variable };
       setRules((all) => all.map((r) => (r.id === prev.id ? next : r)));
-      if (user) checkWrite(updateRule(prev.id, next), "La modifica", () => setRules((all) => all.map((r) => (r.id === prev.id ? prev : r))));
+      if (user) checkWrite(updateRule(prev.id, next, orgForStruct(next.structureId)), "La modifica", () => setRules((all) => all.map((r) => (r.id === prev.id ? prev : r))));
       closeRuleModal();
       return;
     }
     const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.variable ? false : rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined, variable: rf.variable };
     setRules((prev) => [...prev, rule]);
-    if (tenantId) checkWrite(insertRule(tenantId, rule), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
+    if (tenantId) checkWrite(insertRule(tenantId, rule, orgForStruct(rule.structureId)), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     closeRuleModal();
     setRf((f) => ({ ...f, desc: "", amount: "" }));
   };
@@ -909,18 +910,16 @@ export default function CassaPage() {
                           ))}
                         </div>
                 );
-                // «Oggi»: dove il registro passa dal passato al futuro (anche in cima o in fondo se tutte le righe sono dallo stesso lato), con il dettaglio dei saldi dei conti
-                const oggiPos = (() => { for (let k = 0; k < listRows.length; k++) { const dd = rowDate(listRows[k]); if (futureView ? dd > today : dd <= today) return k; } return listRows.length; })();
+                // «Oggi»: sempre la PRIMA riga del registro (poi tutto il resto), con il dettaglio dei saldi dei conti
                 const withDividers = els.flatMap((el, i) => {
                   const parts: React.ReactNode[] = [];
                   const d = rowDate(listRows[i]);
                   const y = d.slice(0, 4);
-                  if (i === oggiPos) parts.push(oggiNode("oggi-" + i));
                   if (i > 0 && y !== rowDate(listRows[i - 1]).slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
                   parts.push(el);
                   return parts;
                 });
-                if (listRows.length > 0 && oggiPos >= listRows.length) withDividers.push(oggiNode("oggi-fine"));
+                if (listRows.length > 0) withDividers.unshift(oggiNode("oggi"));
                 return withDividers;
                 })()}
               </div>
