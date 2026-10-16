@@ -88,7 +88,16 @@ export const movSid = (m: { structureId?: string; bookingStructureId?: string })
 /** Id del secondo movimento di incasso di una prenotazione diretta pagata online: la parte NON pagata online (es. saldo in contanti all'arrivo). Comincia per `auto-in-`, così i filtri e i raggruppamenti per prenotazione lo riconoscono. */
 export const REST_IN_PREFIX = "auto-in-resto-";
 /** Conto della parte NON pagata online: segue la scelta del gestore; senza scelta è quello storico (diretta → contanti), non la carta dedotta dal pagamento online. */
-const restContoFor = (b: Booking, principal: string, validConti: string[]) => cassaContoFor({ ...b, stripePaymentIntent: undefined }, principal, validConti);
+const restContoFor = (b: Booking, r: ContiRoute) => cassaContoFor({ ...b, stripePaymentIntent: undefined }, r.principal, r.validConti, r.accounts);
+/** Instradamento dei conti PER STRUTTURA: `principal` stringa = vecchio comportamento (stessi conti per tutte le strutture); funzione = conti propri di ogni struttura (vedi routeFor). */
+function routeResolver(principal: string | ContiRouter, validConti: string[] | undefined): ContiRouter {
+  if (typeof principal === "function") {
+    const cache = new Map<string, ContiRoute>();
+    return (sid) => { let r = cache.get(sid); if (!r) { r = principal(sid); cache.set(sid, r); } return r; };
+  }
+  const r: ContiRoute = { principal, validConti: validConti ?? loadConti().map((c) => c.key) };
+  return () => r;
+}
 
 /** Id dei movimenti "commissioni mensili tutte insieme": auto-commm-<struttura>-<canale>-<aaaa-mm>. NB: diverso da `auto-comm-` (commissione della singola prenotazione), che non deve combaciare. */
 export const COMM_MONTH_PREFIX = "auto-commm-";
@@ -114,14 +123,17 @@ export function monthlyCommissionInfo(bk: Booking, payouts: PayoutSettingsMap): 
 // del mese dopo" (PayoutRule.commission), NON c'è più il movimento per prenotazione: c'è UN movimento per (struttura, canale, mese del CHECK-OUT) datato il giorno N
 // del mese successivo, con la somma delle commissioni (ai centesimi) delle prenotazioni non annullate di quel mese. L'incasso resta lordo e invariato.
 // Diretta pagata online (Stripe): la parte pagata online è datata al giorno del pagamento (booking.paidAt), non all'arrivo.
-export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: CashScope, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
+export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: CashScope, principal: string | ContiRouter = defaultContiRouter(), payouts: PayoutSettingsMap = loadPayoutSettings(), validConti?: string[]): Mov[] {
   const out: Mov[] = [];
-  const batches = new Map<string, { structureId: string; channel: Booking["channel"]; ym: string; day: number; items: { id: string; checkOut: string; comm: number }[] }>();
+  const routeOf = routeResolver(principal, validConti); // conti della struttura che incassa (principale, contanti, carta)
+  const batches = new Map<string, { structureId: string; channel: Booking["channel"]; ym: string; day: number; principal: string; items: { id: string; checkOut: string; comm: number }[] }>();
   const structIds = new Set<string>(); // strutture delle prenotazioni visibili: se più di una, il nome struttura entra nella descrizione delle commissioni mensili
   for (const b of bookings.map(cashView)) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (!scopeVisible(b.structureId, active)) continue;
     structIds.add(b.structureId);
+    const route = routeOf(b.structureId);
+    const principal = route.principal; // conto principale DELLA STRUTTURA che incassa
     const when = payoutDate(b, payouts); // data in cui i soldi arrivano davvero (impostazioni del canale, della struttura della prenotazione)
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
@@ -132,9 +144,9 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     const online = onlineIncasso(b);
     if (online) {
       const label = `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`;
-      if (online.amount > 0) out.push({ id: `auto-in-${b.id}`, date: online.date, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.amount, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
-      if (online.rest > 0) out.push({ id: `${REST_IN_PREFIX}${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.rest, conto: restContoFor(b, principal, validConti), auto: true, ref: b.id });
-    } else if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
+      if (online.amount > 0) out.push({ id: `auto-in-${b.id}`, date: online.date, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.amount, conto: cassaContoFor(b, principal, route.validConti, route.accounts), auto: true, ref: b.id });
+      if (online.rest > 0) out.push({ id: `${REST_IN_PREFIX}${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.rest, conto: restContoFor(b, route), auto: true, ref: b.id });
+    } else if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, route.validConti, route.accounts), auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
     const mrule = commissionRuleFor(payouts, b.channel, b.structureId);
     if (mrule) {
@@ -143,7 +155,7 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
         const ym = commissionMonthOf(b);
         const key = `${b.structureId}|${b.channel}|${ym}`;
         let bt = batches.get(key);
-        if (!bt) { bt = { structureId: b.structureId, channel: b.channel, ym, day: mrule.day, items: [] }; batches.set(key, bt); }
+        if (!bt) { bt = { structureId: b.structureId, channel: b.channel, ym, day: mrule.day, principal, items: [] }; batches.set(key, bt); }
         bt.items.push({ id: b.id, checkOut: b.checkOut || b.checkIn, comm });
       }
     } else if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
@@ -154,7 +166,7 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     const items = bt.items.slice().sort((a, b) => (a.checkOut < b.checkOut ? -1 : a.checkOut > b.checkOut ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const stName = structIds.size > 1 ? getStructure(bt.structureId)?.name : undefined;
     const n = items.length;
-    out.push({ id: `${COMM_MONTH_PREFIX}${bt.structureId}-${bt.channel}-${bt.ym}`, date: commissionDateFor(bt.ym, bt.day), channel: bt.channel, bookingStructureId: bt.structureId, kind: "out", cat: "commissioni", desc: `Commissioni ${CHANNELS[bt.channel].label}${stName ? ` · ${stName}` : ""} · ${monthNameIT(bt.ym)} · ${n} ${n === 1 ? "prenotazione" : "prenotazioni"}`, amount, conto: principal, auto: true, commRefs: items.map((i) => i.id) });
+    out.push({ id: `${COMM_MONTH_PREFIX}${bt.structureId}-${bt.channel}-${bt.ym}`, date: commissionDateFor(bt.ym, bt.day), channel: bt.channel, bookingStructureId: bt.structureId, kind: "out", cat: "commissioni", desc: `Commissioni ${CHANNELS[bt.channel].label}${stName ? ` · ${stName}` : ""} · ${monthNameIT(bt.ym)} · ${n} ${n === 1 ? "prenotazione" : "prenotazioni"}`, amount, conto: bt.principal, auto: true, commRefs: items.map((i) => i.id) });
   }
   return out;
 }
@@ -341,6 +353,14 @@ export function balanceParts(movs: Mov[], today: string, conti: string[], scope:
   return parts;
 }
 
+/**
+ * Saldi di partenza che un nuovo salvataggio SOSTITUISCE: quelli della stessa struttura sullo stesso conto e, per i conti che si stanno salvando, i vecchi saldi COMUNI
+ * (senza struttura, vecchio sistema): così non si contano due volte. Gli altri conti e le altre strutture non si toccano.
+ */
+export function openingsReplacedBy(movs: Mov[], saved: { sid: string; conto: string }[]): Mov[] {
+  const contos = new Set(saved.map((s) => s.conto));
+  return movs.filter((m) => m.cat === OPENING_CAT && (saved.some((s) => s.conto === m.conto && movSid(m) === s.sid) || (contos.has(m.conto) && movSid(m) === "")));
+}
 /** Il saldo di partenza in vigore (il più recente) di una struttura su un conto; sid "" = comune (vecchio sistema, senza struttura). */
 export const openingOf = (movs: Mov[], sid: string, conto: string): Mov | undefined => latestOf(movs.filter((m) => m.cat === OPENING_CAT && m.conto === conto && movSid(m) === sid));
 /** Importo con segno di un movimento (entrata +, uscita −). */
@@ -394,7 +414,7 @@ export function niceAxis(maxValue: number): { max: number; step: number } {
 // I conti di base (contanti, banca, PayPal, carta) si possono rinominare; PayPal e carta anche eliminare. Si possono aggiungere altri conti (più banche: Revolut, Intesa…).
 // I movimenti salvano la chiave del conto (testo libero nel database); l'elenco dei conti aggiunti vive nel browser e si sincronizza con l'account
 // (come tutte le chiavi "spigolestay:").
-export interface ContoDef { key: string; label: string }
+export interface ContoDef { key: string; label: string; structureIds?: string[] /* strutture a cui appartiene il conto; assente/vuoto = vecchio conto NON assegnato: compare in ogni ambito finché non lo si assegna */ }
 export const DEFAULT_CONTI: ContoDef[] = [
   { key: "contanti", label: "Contanti" },
   { key: "banca", label: "Banca" },
@@ -406,11 +426,14 @@ const isDefault = (k: string) => DEFAULT_CONTI.some((d) => d.key === k);
 
 // Preferenze dei conti: ORDINE di visualizzazione e CONTO PRINCIPALE (dove arrivano i soldi delle prenotazioni OTA). Chiave sincronizzata con l'account.
 const CONTI_PREFS_KEY = "spigolestay:cassa:conti-prefs";
-export interface ContiPrefs { order: string[]; principal: string }
+/** `principal` = conto principale di ripiego (vecchia preferenza globale); `principalBy` = conto principale PER STRUTTURA ({ idStruttura: chiaveConto }). */
+export interface ContiPrefs { order: string[]; principal: string; principalBy?: Record<string, string> }
 export function loadContiPrefs(): ContiPrefs {
   try {
     const p = JSON.parse(localStorage.getItem(CONTI_PREFS_KEY) || "{}") as Partial<ContiPrefs>;
-    return { order: Array.isArray(p.order) ? p.order.filter((k) => typeof k === "string") : [], principal: typeof p.principal === "string" && p.principal ? p.principal : "banca" };
+    const by: Record<string, string> = {};
+    if (p.principalBy && typeof p.principalBy === "object") for (const [sid, k] of Object.entries(p.principalBy)) if (sid && typeof k === "string" && k) by[sid] = k;
+    return { order: Array.isArray(p.order) ? p.order.filter((k) => typeof k === "string") : [], principal: typeof p.principal === "string" && p.principal ? p.principal : "banca", ...(Object.keys(by).length ? { principalBy: by } : {}) };
   } catch { return { order: [], principal: "banca" }; }
 }
 export function saveContiPrefs(p: ContiPrefs) { try { localStorage.setItem(CONTI_PREFS_KEY, JSON.stringify(p)); } catch { /* storage non disponibile */ } }
@@ -427,8 +450,15 @@ export function sortConti(list: ContoDef[], order: string[]): ContoDef[] {
   return list.map((c, i) => ({ c, i })).sort((a, b) => idx(a.c.key) - idx(b.c.key) || a.i - b.i).map((x) => x.c);
 }
 
-// Salvataggio: per i conti di base solo ciò che cambia (nome nuovo o conto eliminato), per quelli aggiunti nome e chiave.
-type SavedConto = { key: string; label: string; removed?: boolean };
+// Salvataggio: per i conti di base solo ciò che cambia (nome nuovo, strutture assegnate o conto eliminato), per quelli aggiunti nome, chiave e strutture.
+// I vecchi dati (senza `structureIds`) restano validi: quel conto è "non assegnato" e compare in ogni ambito finché non lo si assegna.
+type SavedConto = { key: string; label: string; removed?: boolean; structureIds?: string[] };
+const cleanSids = (v: unknown): string[] | undefined => {
+  if (!Array.isArray(v)) return undefined;
+  const ids = [...new Set(v.filter((x): x is string => typeof x === "string" && x !== "" && x !== "all"))];
+  return ids.length ? ids : undefined;
+};
+const withSids = (c: { structureIds?: string[] }): { structureIds?: string[] } => { const s = cleanSids(c.structureIds); return s ? { structureIds: s } : {}; };
 export function loadConti(): ContoDef[] {
   try {
     const saved = (JSON.parse(localStorage.getItem(CONTI_KEY) || "[]") as SavedConto[]).filter((c) => c && typeof c.key === "string" && typeof c.label === "string" && c.key && c.label);
@@ -436,9 +466,9 @@ export function loadConti(): ContoDef[] {
     for (const d of DEFAULT_CONTI) {
       const o = saved.find((c) => c.key === d.key);
       if (o?.removed) continue;
-      out.push({ key: d.key, label: o ? o.label : d.label });
+      out.push({ key: d.key, label: o ? o.label : d.label, ...(o ? withSids(o) : {}) });
     }
-    for (const c of saved) if (!isDefault(c.key) && !c.removed) out.push({ key: c.key, label: c.label });
+    for (const c of saved) if (!isDefault(c.key) && !c.removed) out.push({ key: c.key, label: c.label, ...withSids(c) });
     return sortConti(out, loadContiPrefs().order);
   } catch { return [...DEFAULT_CONTI]; }
 }
@@ -448,9 +478,9 @@ export function saveConti(list: ContoDef[]) {
     for (const d of DEFAULT_CONTI) {
       const cur = list.find((c) => c.key === d.key);
       if (!cur) entries.push({ key: d.key, label: d.label, removed: true });
-      else if (cur.label !== d.label) entries.push({ key: d.key, label: cur.label });
+      else if (cur.label !== d.label || cleanSids(cur.structureIds)) entries.push({ key: d.key, label: cur.label, ...withSids(cur) });
     }
-    for (const c of list) if (!isDefault(c.key)) entries.push({ key: c.key, label: c.label });
+    for (const c of list) if (!isDefault(c.key)) entries.push({ key: c.key, label: c.label, ...withSids(c) });
     localStorage.setItem(CONTI_KEY, JSON.stringify(entries));
     saveContiPrefs({ ...loadContiPrefs(), order: list.map((c) => c.key) }); // anche l'ordine
   } catch { /* storage non disponibile */ }
@@ -465,18 +495,117 @@ export function canDeleteConto(key: string, movs: Mov[], rules: { conto: string 
   return { ok: true };
 }
 /** Chiave stabile per un nuovo conto a partire dal nome ("Revolut" → "conto-revolut"); se esiste già si aggiunge un numero. */
-export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
+export function contoKeyFromLabel(label: string, existing: ContoDef[], structureId?: string): string {
   const slug = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "conto";
-  let key = `conto-${slug}`; let n = 2;
-  while (existing.some((c) => c.key === key)) key = `conto-${slug}-${n++}`;
+  let base = `conto-${slug}`;
+  // Il nome uguale NON significa conto condiviso: se la chiave esiste già (conto di un'altra struttura) e si conosce la struttura del nuovo conto, la chiave prende il suo suffisso.
+  if (structureId && existing.some((c) => c.key === base)) base = `${base}@${structureId}`;
+  let key = base; let n = 2;
+  while (existing.some((c) => c.key === key)) key = `${base}-${n++}`;
   return key;
+}
+
+// ── Conti PER STRUTTURA ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Ogni conto può appartenere a una o più strutture (`structureIds`). Un conto è disponibile in un ambito se contiene almeno una struttura dell'ambito; con l'ambito
+// "tutte" si vedono tutti i conti. I vecchi conti senza `structureIds` (non assegnati) restano visibili ovunque finché non vengono assegnati.
+export const isContoAssigned = (c: { structureIds?: string[] }): boolean => !!c.structureIds && c.structureIds.length > 0;
+export function contoVisible(c: { structureIds?: string[] }, scope: CashScope): boolean {
+  const ids = c.structureIds;
+  if (!ids || ids.length === 0) return true;
+  if (typeof scope === "string") return scope === "all" || ids.includes(scope);
+  return scope.some((s) => ids.includes(s));
+}
+export const contiForScope = <T extends { structureIds?: string[] }>(conti: T[], scope: CashScope): T[] => conti.filter((c) => contoVisible(c, scope));
+/** I conti di UNA struttura ("" o "all" = nessuna restrizione: tutti). */
+export const contiOfStructure = <T extends { structureIds?: string[] }>(conti: T[], sid: string): T[] => (sid && sid !== "all" ? contiForScope(conti, sid) : [...conti]);
+/** Il movimento punta a un conto che esiste ma NON è assegnato alla sua struttura? (le voci comuni, senza struttura, non hanno mai l'avviso) */
+export function contoUnassigned(m: { conto: string; structureId?: string; bookingStructureId?: string }, conti: ContoDef[]): boolean {
+  const sid = movSid(m);
+  if (!sid) return false;
+  const c = conti.find((x) => x.key === m.conto);
+  return !!c && !contoVisible(c, sid);
+}
+/** Chiavi dei conti da mostrare/sommare in un ambito: quelli disponibili + quelli NON assegnati su cui però ci sono movimenti dell'ambito (non spariscono né si perdono dal saldo). */
+export function contiKeysInScope(conti: ContoDef[], movs: Mov[], scope: CashScope): string[] {
+  const vis = contiForScope(conti, scope).map((c) => c.key);
+  const extra = conti.filter((c) => !vis.includes(c.key) && movs.some((m) => m.conto === c.key && scopeVisible(movSid(m) || undefined, scope))).map((c) => c.key);
+  return [...vis, ...extra];
+}
+/** Nome del conto per i menu: se un altro conto ha lo stesso nome (conti diversi di strutture diverse) si aggiungono le strutture per distinguerli. */
+export function contoDisplayLabel(c: ContoDef, all: ContoDef[], nameOf: (sid: string) => string): string {
+  const norm = (s: string) => s.trim().toLowerCase();
+  if (!all.some((x) => x.key !== c.key && norm(x.label) === norm(c.label))) return c.label;
+  return isContoAssigned(c) ? `${c.label} (${(c.structureIds ?? []).map(nameOf).join(", ")})` : c.label;
+}
+/** Sposta in su/giù un conto tra quelli mostrati (`shown`), scambiandolo con il vicino VISIBILE e non con uno nascosto. */
+export function moveWithin<T extends { key: string }>(list: T[], key: string, dir: -1 | 1, shown: string[]): T[] {
+  const i = shown.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= shown.length) return list;
+  const a = list.findIndex((c) => c.key === key), b = list.findIndex((c) => c.key === shown[j]);
+  if (a < 0 || b < 0) return list;
+  const next = list.slice(); [next[a], next[b]] = [next[b], next[a]];
+  return next;
+}
+
+// Instradamento dei movimenti automatici: i conti di una struttura. Principale = preferenza della struttura → vecchia preferenza globale → "banca" (se è un suo conto),
+// altrimenti il primo conto che non sia contanti/carta. Contanti e carta: i conti di quel tipo DELLA STRUTTURA; se non ne ha, l'incasso va sul suo principale.
+export interface ContiRoute { principal: string; validConti: string[]; accounts?: { cash?: string; card?: string } }
+export type ContiRouter = (structureId: string) => ContiRoute;
+const labelKey = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, " ").trim();
+/** Conto "contanti": la chiave storica, quelle per struttura, oppure (solo se assegnato a delle strutture) un conto che si chiama Contanti/Cassa. */
+export const isCashConto = (c: ContoDef): boolean => c.key === "contanti" || c.key.startsWith("contanti@") || (isContoAssigned(c) && /^(contanti|cassa)( |$)/.test(labelKey(c.label)));
+export const isCardConto = (c: ContoDef): boolean => c.key === "carta" || c.key.startsWith("carta@") || (isContoAssigned(c) && /^(carta|pos)( |$)/.test(labelKey(c.label)));
+export function routeFor(conti: ContoDef[], prefs: ContiPrefs, sid: string): ContiRoute {
+  const mine = contiOfStructure(conti, sid);
+  const pool = mine.length ? mine : conti; // una struttura senza alcun conto non perde i movimenti: ripiego sull'elenco completo
+  const keys = pool.map((c) => c.key);
+  // una preferenza vale se il conto è della struttura, o se non è un conto conosciuto (dati vecchi: nessun cambio di significato); NON se è conto di altre strutture
+  const usable = (k: string | undefined): k is string => !!k && (keys.includes(k) || !conti.some((c) => c.key === k));
+  const principal = [prefs.principalBy?.[sid], prefs.principal].find(usable)
+    ?? (keys.includes("banca") ? "banca" : undefined)
+    ?? (pool.find((c) => !isCashConto(c) && !isCardConto(c)) ?? pool[0])?.key ?? prefs.principal;
+  const cash = (pool.find((c) => c.key === "contanti") ?? pool.find(isCashConto))?.key;
+  const card = (pool.find((c) => c.key === "carta") ?? pool.find(isCardConto))?.key;
+  return { principal, validConti: keys, accounts: { cash, card } };
+}
+/** Instradamento di default: legge conti e preferenze salvati (usato quando il chiamante non ne passa uno). */
+export function defaultContiRouter(): ContiRouter {
+  const conti = loadConti(), prefs = loadContiPrefs();
+  return (sid) => routeFor(conti, prefs, sid);
+}
+/** Conto principale in vigore per una struttura (per mostrare la ★). */
+export const principalOf = (conti: ContoDef[], prefs: ContiPrefs, sid: string): string => routeFor(conti, prefs, sid).principal;
+
+// Spostamento in blocco: i movimenti (e i pagamenti programmati) di UNA struttura su un conto passano a un altro conto. Non tocca nient'altro.
+export function moveContoOfStructure<T extends { id: string; conto: string; structureId?: string }>(list: T[], sid: string, from: string, to: string): { list: T[]; ids: string[] } {
+  if (!sid || sid === "all" || !from || !to || from === to) return { list, ids: [] };
+  const ids: string[] = [];
+  const next = list.map((x) => { if (x.conto === from && normSid(x.structureId) === sid) { ids.push(x.id); return { ...x, conto: to }; } return x; });
+  return { list: ids.length ? next : list, ids };
+}
+export const countOnConto = (list: { conto: string; structureId?: string }[], sid: string, conto: string): number => (sid ? list.filter((x) => x.conto === conto && normSid(x.structureId) === sid).length : 0);
+
+// Scrittura server dello spostamento (a blocchi, per non superare la lunghezza dell'URL).
+const chunk = <T,>(a: T[], n: number): T[][] => { const out: T[][] = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; };
+export async function updateContoOfMovements(ids: string[], conto: string): Promise<WriteResult> {
+  if (!ids.length) return null;
+  if (!supabase) return NO_CONN;
+  for (const part of chunk(ids, 100)) { const { error } = await supabase.from("cash_movements").update({ conto }).in("id", part); if (error) return errMsg(error); }
+  return null;
+}
+export async function updateContoOfRules(ids: string[], conto: string): Promise<WriteResult> {
+  if (!ids.length) return null;
+  if (!supabase) return NO_CONN;
+  for (const part of chunk(ids, 100)) { const { error } = await supabase.from("cash_rules").update({ conto }).in("id", part); if (error) return errMsg(error); }
+  return null;
 }
 
 // ── Flusso di cassa: oggi e futuro ──────────────────────────────────────────────────────────────────────────────────────
 // Movimenti PREVISTI da oggi in poi: il saldo ancora da incassare delle prenotazioni in arrivo (alla data di arrivo) e le occorrenze future dei pagamenti
 // programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
-export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: CashScope, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
+export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: CashScope, today: string, horizon: string, principal: string | ContiRouter = defaultContiRouter(), payouts: PayoutSettingsMap = loadPayoutSettings(), validConti?: string[]): Mov[] {
   const out: Mov[] = [];
+  const routeOf = routeResolver(principal, validConti);
   for (const b of bookings.map(cashView)) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (!scopeVisible(b.structureId, active)) continue;
@@ -486,7 +615,7 @@ export function computeForecast(bookings: Booking[], guests: Guest[], getStructu
     if (remaining <= 0) continue;
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
-    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: restContoFor(b, principal, validConti), auto: true, forecast: true, ref: b.id });
+    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: restContoFor(b, routeOf(b.structureId)), auto: true, forecast: true, ref: b.id });
   }
   const from = shiftISO(today, 1);
   if (from <= horizon) {

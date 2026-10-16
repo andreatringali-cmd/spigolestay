@@ -93,6 +93,8 @@ interface DataContextValue {
   mergeGuests: (keepId: string, dropIds: string[]) => void; // accorpa doppioni: sposta le prenotazioni e rimuove le voci duplicate
   addBooking: (b: Omit<Booking, "id">) => Booking;
   updateBooking: (id: string, patch: Partial<Booking>) => void;
+  /** Correzioni automatiche in background (BookingHealer): applica le modifiche con updatedAt nuovo (così la sincronizzazione le adotta) SENZA voci nel registro attività, email di avviso né Google Calendar. */
+  patchBookingsSilently: (patches: { id: string; patch: Partial<Booking> }[]) => void;
   moveBooking: (id: string, to: { unitId: string; checkIn: string; checkOut: string }) => void;
   deleteBooking: (id: string) => void;
   deleteBookingGroup: (groupId: string) => void; // elimina tutte le camere di una prenotazione di gruppo
@@ -617,6 +619,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
             }
           }
         }
+      },
+      patchBookingsSilently: (patches) => {
+        if (!patches.length) return;
+        const byId = new Map(patches.map((p) => [p.id, p.patch]));
+        const now = Date.now();
+        setBookings((prev) => prev.map((x) => { const pt = byId.get(x.id); return pt ? { ...x, ...pt, updatedAt: now } : x; }));
       },
       moveBooking: (id, to) => {
         const target = units.find((u) => u.id === to.unitId);

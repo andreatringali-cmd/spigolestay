@@ -70,7 +70,9 @@ export const PAY_OPTIONS = [
 export const DEFAULT_PAY_CONTO = "contanti";
 export const PURCHASE_CASH_CAT = "forniture"; // categoria della Cassa: "Forniture" (materiale di consumo)
 const ALLOWED_CONTI: ReadonlySet<string> = new Set(PAY_OPTIONS.map((o) => o.key));
-export const normalizePayConto = (c: unknown): string => (typeof c === "string" && ALLOWED_CONTI.has(c) ? c : DEFAULT_PAY_CONTO);
+// Conti PER STRUTTURA: oltre ai tre di base valgono i conti creati in Cassa (chiavi "conto-...", "contanti@...", "carta@...", "banca@..."); qualunque altra cosa → contanti.
+const STRUCT_CONTO = /^(conto-|contanti@|carta@|banca@)[a-z0-9@_-]{1,100}$/;
+export const normalizePayConto = (c: unknown): string => (typeof c === "string" && (ALLOWED_CONTI.has(c) || STRUCT_CONTO.test(c)) ? c : DEFAULT_PAY_CONTO);
 
 // ---- acquisto → movimento di Prima nota ---------------------------------------------------------------------------------------
 export const purchaseDescription = (name: string, qty: number): string => `Materiale: ${name.trim().replace(/\s+/g, " ")} × ${String(qty).replace(".", ",")}`;

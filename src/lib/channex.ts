@@ -247,6 +247,21 @@ export async function getBookingRevision(id: string): Promise<{ ok: boolean; sta
   return { ok: true, status: res.status, revision: flattenRevision(res.data?.data) };
 }
 
+// Ultima revision (= stato attuale) di UNA prenotazione, dato il suo booking_id (quello che teniamo in extId "channex:<id>"), in SOLA LETTURA (nessun ack).
+// Usa lo stesso endpoint filtrato per booking già usato da listBookingRevisions (revisions più recente per prima, 1 sola riga). Se la riga dell'elenco non porta i
+// dettagli (camere/importo), li rilegge con GET /booking_revisions/:id. Serve a ricavare commissione e totale esatti di prenotazioni importate prima che il codice li leggesse.
+export async function getLatestRevisionOfBooking(bookingId: string): Promise<{ ok: boolean; status: number; error?: string; revision?: ChxRevision }> {
+  const q = `?filter[booking_id]=${encodeURIComponent(bookingId)}&order[inserted_at]=desc&pagination[limit]=1`;
+  const res = await channex<{ data?: unknown[] }>(`/booking_revisions${q}`);
+  if (!res.ok) return { ok: false, status: res.status, error: res.error };
+  const list = Array.isArray(res.data?.data) ? res.data!.data! : [];
+  if (!list.length) return { ok: false, status: 404, error: "nessuna revision per questa prenotazione" };
+  const rev = flattenRevision(list[0]);
+  if (Array.isArray(rev.rooms) || rev.amount != null) return { ok: true, status: res.status, revision: rev };
+  if (!rev.id) return { ok: false, status: res.status, error: "revision senza id" };
+  return getBookingRevision(rev.id);
+}
+
 // Elenco COMPLETO delle revision (ackate e non), opzionalmente filtrato per property o
 // per booking. A differenza del feed (solo non-ackate), qui restiamo di sola lettura e NON
 // facciamo ack: serve a raccogliere gli ID (booking + revision) per la certificazione (Test #11),

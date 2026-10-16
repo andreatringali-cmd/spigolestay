@@ -61,7 +61,6 @@ export const NAV: NavItem[] = [
   { label: "Scadenzario incassi", href: "/scadenzario-incassi", group: "Amministrazione", icon: "card", perm: "pagamenti", module: "pms" },
   { label: "Cassa · Prima Nota", href: "/cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
   { label: "Chiusura cassa", href: "/chiusura-cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
-  { label: "Riconciliazione Booking", href: "/riconciliazione-booking", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
   { label: "Clienti / Agenzie", href: "/anagrafica-clienti", group: "Amministrazione", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Forniture", href: "/forniture", group: "Amministrazione", icon: "box", perm: "cassa", module: "pms" },
 

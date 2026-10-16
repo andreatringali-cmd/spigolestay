@@ -17,7 +17,7 @@ test("movimento di Prima nota da un acquisto: uscita, Forniture, importo in cent
 });
 
 test("movimento: quantità con virgola, spazi normalizzati, conto sconosciuto → contanti, senza struttura → null", () => {
-  const r = P.buildPurchaseMovement({ ...base, name: "  Detersivo   vetri ", qty: 1.5, conto: "conto-strano", structureId: undefined }, TENANT);
+  const r = P.buildPurchaseMovement({ ...base, name: "  Detersivo   vetri ", qty: 1.5, conto: "conto strano", structureId: undefined }, TENANT);
   assert.equal(r.ok, true);
   if (!r.ok) return;
   assert.equal(r.row.descr, "Materiale: Detersivo vetri × 1,5");

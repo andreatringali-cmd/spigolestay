@@ -11,15 +11,9 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents, sumCents } from "@/lib/money";
 import { exportExcel } from "@/lib/export";
-import { type Mov, type Rule, type CashScope, computeAuto, computeScheduled, scopeVisible, cashScopeOf, scopeIds, loadCash, loadConti } from "@/lib/cassa";
+import { type Mov, type Rule, type CashScope, computeAuto, computeScheduled, scopeVisible, cashScopeOf, scopeIds, loadCash, loadConti, contiKeysInScope, contoDisplayLabel, isCashConto, type ContoDef } from "@/lib/cassa";
 import { useTenantId } from "@/lib/tenant";
 
-const CONTI = [
-  { key: "contanti", label: "Contanti" },
-  { key: "banca", label: "Banca" },
-  { key: "paypal", label: "PayPal" },
-  { key: "carta", label: "Carta / POS" },
-];
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const numv = (v: string) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -38,6 +32,14 @@ export default function ChiusuraCassaPage() {
   const paidSet = useMemo(() => new Set(paid), [paid]);
   useEffect(() => { if (!user) return; (async () => { const c = await loadCash(); setManual(c.movements); setRules(c.rules); setPaid(c.paid); })(); }, [user]);
 
+  // Conti della Cassa (PER STRUTTURA): si rileggono quando arrivano dal server.
+  const [allConti, setAllConti] = useState<ContoDef[]>(() => (typeof window === "undefined" ? [] : loadConti()));
+  useEffect(() => {
+    const h = () => { try { setAllConti(loadConti()); } catch { /* storage non disponibile */ } };
+    h();
+    window.addEventListener("spigolestay:datasync", h);
+    return () => window.removeEventListener("spigolestay:datasync", h);
+  }, []);
   const [day, setDay] = useState(todayISO());
   const [conto, setConto] = useState("contanti");
   const [counted, setCounted] = useState("");
@@ -75,9 +77,16 @@ export default function ChiusuraCassaPage() {
     const s = computeScheduled(rules, paidSet, scope, day);
     const m = manual.filter((mv) => scopeVisible(mv.structureId, scope));
     return [...a, ...s, ...m];
-  }, [bookings, guests, getStructure, scopeKey, rules, paidSet, day, manual]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bookings, guests, getStructure, scopeKey, rules, paidSet, day, manual, allConti]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const conti = useMemo(() => { const s = new Set(all.map((m) => m.conto).filter(Boolean)); CONTI.forEach((c) => s.add(c.key)); return Array.from(s); }, [all]);
+  // Conti dell'ambito scelto (ognuna struttura ha i suoi), più quelli su cui ci sono movimenti (anche non assegnati).
+  const conti = useMemo(() => { const s = new Set<string>(contiKeysInScope(allConti, all, scope)); all.forEach((m) => { if (m.conto) s.add(m.conto); }); return Array.from(s); }, [all, allConti, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Il conto scelto deve esistere nell'ambito: altrimenti si passa ai contanti (o al primo conto).
+  useEffect(() => {
+    if (conti.includes(conto)) return;
+    const cash = conti.find((k) => { const c = allConti.find((x) => x.key === k); return !!c && isCashConto(c); });
+    setConto(cash ?? conti[0] ?? "contanti");
+  }, [conti, conto, allConti]);
 
   const dayMovs = useMemo(() => all.filter((m) => m.conto === conto && m.date === day).sort((a, b) => b.amount - a.amount), [all, conto, day]);
   const entrate = sumCents(dayMovs.filter((m) => m.kind === "in").map((m) => m.amount));
@@ -86,7 +95,7 @@ export default function ChiusuraCassaPage() {
   const expected = useMemo(() => sumCents(all.filter((m) => m.conto === conto && m.date <= day).map((m) => (m.kind === "in" ? m.amount : -m.amount))), [all, conto, day]);
   const diff = roundCents(numv(counted) - expected);
 
-  const contoLabel = (k: string) => CONTI.find((c) => c.key === k)?.label ?? loadConti().find((c) => c.key === k)?.label ?? k;
+  const contoLabel = (k: string) => { const c = allConti.find((x) => x.key === k); return c ? contoDisplayLabel(c, allConti, (id) => getStructure(id)?.name ?? "—") : k; };
   const structOf = (id: string | null) => (!id || id === "all" ? "Tutte" : getStructure(id)?.name ?? "—");
 
   const save = async () => {

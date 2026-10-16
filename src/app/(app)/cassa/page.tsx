@@ -14,12 +14,11 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
 import { fmtDMY } from "@/lib/dates";
-import Link from "next/link";
 import ChannelLogo from "@/components/ChannelLogo";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
@@ -95,7 +94,7 @@ export default function CassaPage() {
   const [payouts, setPayouts] = useState<PayoutSettingsMap>(() => (typeof window === "undefined" ? {} : loadPayoutSettings()));
   // Le impostazioni incassi arrivano anche dal server (sincronizzazione): quando il browser le riceve si rileggono, senza dover ricaricare la pagina.
   useEffect(() => {
-    const h = () => { try { setPayouts(loadPayoutSettings()); } catch { /* storage non disponibile */ } };
+    const h = () => { try { setPayouts(loadPayoutSettings()); setConti(loadConti()); setPrefsState(loadContiPrefs()); } catch { /* storage non disponibile */ } }; // anche conti e conti principali per struttura (li vedono i collaboratori)
     window.addEventListener("spigolestay:datasync", h);
     return () => window.removeEventListener("spigolestay:datasync", h);
   }, []);
@@ -121,7 +120,8 @@ export default function CassaPage() {
   };
   // Il bonifico unico riunisce solo prenotazioni della stessa struttura: quali canali raggruppare dipende dalla struttura della riga.
   const groupPayout = useMemo(() => (channel: string, structureId: string | undefined) => isGroupedPayout(payouts, channel, structureId), [payouts]);
-  const [principal, setPrincipalState] = useState<string>(() => (typeof window === "undefined" ? "banca" : loadContiPrefs().principal)); // dove arrivano i soldi delle prenotazioni OTA
+  const [prefs, setPrefsState] = useState<ContiPrefs>(() => (typeof window === "undefined" ? { order: [], principal: "banca" } : loadContiPrefs())); // conto principale PER STRUTTURA (dove arrivano i soldi delle prenotazioni OTA)
+  const router = useMemo<ContiRouter>(() => (sid) => routeFor(conti, prefs, sid), [conti, prefs]); // conti della struttura che incassa: principale, contanti, carta
   useEffect(() => { try { const r = localStorage.getItem(CATS_KEY); if (r) { const saved = JSON.parse(r); const customs = saved.filter((c: Cat) => c.custom); setCats([...DEFAULT_CATS, ...customs]); } } catch {} }, []);
   const saveCats = (list: Cat[]) => { setCats(list); try { localStorage.setItem(CATS_KEY, JSON.stringify(list.filter((c) => c.custom))); } catch {} };
   const catOf = (k: string) => cats.find((c) => c.key === k);
@@ -149,7 +149,7 @@ export default function CassaPage() {
   const today = todayISO();
 
   // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
-  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, scope, principal, payouts), [bookings, guests, scopeKey, getStructure, principal, payouts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, scope, router, payouts), [bookings, guests, scopeKey, getStructure, router, payouts]); // eslint-disable-line react-hooks/exhaustive-deps
   const ruleVisible = (structureId?: string) => scopeVisible(structureId, scope);
   const scheduled = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, scope, today), overrides), [rules, scopeKey, today, paidSet, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -218,7 +218,7 @@ export default function CassaPage() {
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(bookings, guests, getStructure, rules, scope, today, fcEnd, principal, payouts), overrides), [bookings, guests, getStructure, rules, scopeKey, today, fcEnd, principal, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
+  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(bookings, guests, getStructure, rules, scope, today, fcEnd, router, payouts), overrides), [bookings, guests, getStructure, rules, scopeKey, today, fcEnd, router, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -230,15 +230,16 @@ export default function CassaPage() {
   const saldo = roundCents(entrate - uscite);
 
   // SALDI PER STRUTTURA: ogni struttura ha il proprio saldo di partenza su ogni conto e conta solo i propri movimenti; il saldo dell'ambito è la somma (con "Tutte" valgono anche i vecchi saldi comuni).
-  const contiKeys = useMemo(() => CONTI.map((c) => c.key), [CONTI]);
   const balMovs = useMemo<Mov[]>(() => [...auto, ...scheduled, ...visibleManual], [auto, scheduled, visibleManual]);
+  // conti dell'ambito (più quelli non assegnati su cui ci sono movimenti dell'ambito: non spariscono dal saldo)
+  const contiKeys = useMemo(() => contiKeysInScope(conti, balMovs, scope), [conti, balMovs, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const balances = useMemo(() => computeBalances(balMovs, today, contiKeys, scope), [balMovs, today, contiKeys, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const balParts = useMemo(() => balanceParts(balMovs, today, contiKeys, scope), [balMovs, today, contiKeys, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const saldoPerStruttura = useMemo(() => balanceTotalsBySid(balParts).map((x) => ({ ...x, name: x.sid ? (getStructure(x.sid)?.name ?? "—") : t("Comuni (vecchio saldo)") })), [balParts, getStructure, t]);
-  const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
+  const saldoConti: Record<string, number> = Object.fromEntries(contiKeys.filter((k) => balances[k]?.since).map((k) => [k, balances[k].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
 
-  const hasOpening = CONTI.some((c) => balances[c.key]?.since);
+  const hasOpening = contiKeys.some((k) => balances[k]?.since);
   // Ultima card in vista "oggi e future": saldo previsto = saldo attuale dei conti + entrate − uscite dei giorni dopo oggi (quelli di oggi sono già nel saldo attuale).
   const prevCard = futureView && hasOpening;
   // Con il saldo attuale come base, le card contano solo i movimenti dopo oggi (quelli di oggi e prima sono già nel saldo attuale): così saldo attuale + entrate − uscite = saldo previsto.
@@ -265,85 +266,119 @@ export default function CassaPage() {
   );
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
-  // I saldi di partenza sono PER STRUTTURA: la finestra lavora su una struttura alla volta (scelta in cima), con i suoi importi e basta.
-  const [opening, setOpening] = useState<{ sid: string; date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
-  const openingAmounts = (sid: string) => { const amounts: Record<string, string> = {}; for (const c of CONTI) { const op = sid ? openingOf(manual, sid, c.key) : undefined; amounts[c.key] = op ? formatDecimalIT(signedAmount(op)) : ""; } return amounts; };
-  const openOpening = (sid?: string) => {
-    const pick = sid && scopeStructs.some((x) => x.id === sid) ? sid : (singleSid || scopeStructs[0]?.id || "");
-    setOpening({ sid: pick, date: todayISO(), amounts: openingAmounts(pick), newName: "", startOfDay: false });
+  // I saldi sono PER STRUTTURA e per conto. La finestra edita le strutture selezionate in alto a destra: una sezione per struttura, con i SUOI conti.
+  const oKey = (sid: string, key: string) => `${sid}|${key}`;
+  const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; newSids: string[]; startOfDay: boolean } | null>(null);
+  const [assignOpen, setAssignOpen] = useState<string | null>(null); // conto di cui si stanno scegliendo le strutture
+  const [moveCtx, setMoveCtx] = useState<{ sid: string; from: string; to: string } | null>(null); // spostamento in blocco dei movimenti di una struttura da un conto a un altro
+  const contiOf = (sid: string) => contiOfStructure(conti, sid);
+  const existingAmount = (sid: string, key: string) => { const op = sid ? openingOf(manual, sid, key) : undefined; return op ? formatDecimalIT(signedAmount(op)) : ""; };
+  const openingAmounts = () => { const amounts: Record<string, string> = {}; for (const s of scopeStructs) for (const c of contiOf(s.id)) amounts[oKey(s.id, c.key)] = existingAmount(s.id, c.key); return amounts; };
+  const openOpening = () => {
+    setAssignOpen(null); setMoveCtx(null);
+    setOpening({ date: todayISO(), amounts: openingAmounts(), newName: "", newSids: singleSid ? [singleSid] : scopeStructs.map((x) => x.id), startOfDay: false });
   };
-  const pickOpeningStruct = (sid: string) => setOpening((o) => (o ? { ...o, sid, amounts: openingAmounts(sid) } : o));
-  // Vecchi saldi di partenza SENZA struttura (comuni): valgono solo con "Tutte" e coprono le strutture che non hanno ancora il proprio.
-  const commonOpenings = useMemo(() => manual.filter((m) => m.cat === OPENING_CAT && normSid(m.structureId) === ""), [manual]);
+  const amountOf = (sid: string, key: string) => (opening && oKey(sid, key) in opening.amounts ? opening.amounts[oKey(sid, key)] : existingAmount(sid, key));
+  const setAmount = (sid: string, key: string, v: string) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [oKey(sid, key)]: v } } : o));
+  const persistConti = (next: ContoDef[]) => { setConti(next); saveConti(next); };
   const addConto = () => {
     if (!opening) return;
     const label = opening.newName.trim();
     if (!label) return;
-    const key = contoKeyFromLabel(label, conti);
-    const next = [...conti, { key, label }];
-    setConti(next); saveConti(next);
-    setOpening((o) => (o ? { ...o, newName: "", amounts: { ...o.amounts, [key]: "" } } : o));
+    // con una sola struttura nell'account il conto è suo; altrimenti si scelgono le strutture (almeno una)
+    const sids = allStructures.length > 1 ? opening.newSids.filter((id) => allStructures.some((x) => x.id === id)) : allStructures.map((x) => x.id);
+    if (allStructures.length > 0 && sids.length === 0) { toast(t("Scegli almeno una struttura per il conto."), "error"); return; }
+    const key = contoKeyFromLabel(label, conti, sids.length === 1 ? sids[0] : undefined); // stesso nome di un altro conto = conto NUOVO con chiave distinta
+    persistConti([...conti, { key, label, ...(sids.length ? { structureIds: sids } : {}) }]);
+    setOpening((o) => (o ? { ...o, newName: "" } : o));
   };
-  const moveConto = (key: string, dir: -1 | 1) => { const next = moveItem(conti, conti.findIndex((c) => c.key === key), dir); if (next !== conti) { setConti(next); saveConti(next); } };
-  const makePrincipal = (key: string) => {
-    setPrincipalState(key); saveContiPrefs({ ...loadContiPrefs(), principal: key });
-    const first = [...conti].sort((a, b) => (a.key === key ? -1 : b.key === key ? 1 : 0)); setConti(first); saveConti(first); // il principale va in cima
+  const moveConto = (sid: string, key: string, dir: -1 | 1) => { const next = moveWithin(conti, key, dir, contiOf(sid).map((c) => c.key)); if (next !== conti) persistConti(next); };
+  const makePrincipal = (sid: string, key: string) => {
+    const cur = loadContiPrefs();
+    const next: ContiPrefs = { ...cur, principalBy: { ...(cur.principalBy ?? {}), [sid]: key } };
+    setPrefsState(next); saveContiPrefs(next);
+  };
+  const toggleSid = (key: string, sid: string) => {
+    const c = conti.find((x) => x.key === key);
+    if (!c) return;
+    const cur = c.structureIds ?? [];
+    const next = cur.includes(sid) ? cur.filter((x) => x !== sid) : [...cur, sid];
+    if (!next.length) { toast(t("Un conto deve appartenere ad almeno una struttura."), "error"); return; }
+    persistConti(conti.map((x) => (x.key === key ? { ...x, structureIds: next } : x)));
+    if (cur.includes(sid) && countOnConto(manual, sid, key) + countOnConto(rules, sid, key) > 0) toast(t("I movimenti di questa struttura su questo conto restano dove sono: puoi spostarli con «Sposta movimenti tra conti»."), "success");
   };
   const [renaming, setRenaming] = useState<{ key: string; label: string } | null>(null);
   const renameConto = () => {
     if (!renaming) return;
     const label = renaming.label.trim();
-    if (label) { const next = conti.map((c) => (c.key === renaming.key ? { ...c, label } : c)); setConti(next); saveConti(next); }
+    if (label) persistConti(conti.map((c) => (c.key === renaming.key ? { ...c, label } : c)));
     setRenaming(null);
   };
   const deleteConto = async (c: ContoDef) => {
-    const chk = canDeleteConto(c.key, [...computeAuto(raw.bookings, guests, getStructure, "all", principal, payouts), ...computeScheduled(rules, paidSet, "all", today), ...manual], rules, [principal, "contanti"]);
+    // i conti su cui arrivano in automatico le prenotazioni (principale e contanti di ogni struttura) non si eliminano
+    const fixed = [...new Set(allStructures.flatMap((x) => { const r = router(x.id); return [r.principal, r.accounts?.cash].filter((k): k is string => !!k); }))];
+    const chk = canDeleteConto(c.key, [...computeAuto(raw.bookings, guests, getStructure, "all", router, payouts), ...computeScheduled(rules, paidSet, "all", today), ...manual], rules, fixed);
     if (!chk.ok) { await ask({ title: t("Conto non eliminabile"), message: t(chk.reason ?? ""), confirmLabel: t("Ho capito") }); return; }
     if (!(await ask({ title: t("Elimina conto"), message: `${t("Eliminare il conto")} «${c.label}»? ${t("Il suo saldo di partenza verrà tolto.")}`, danger: true, confirmLabel: t("Elimina") }))) return;
-    const next = conti.filter((x) => x.key !== c.key);
-    setConti(next); saveConti(next);
+    persistConti(conti.filter((x) => x.key !== c.key));
     const olds = manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key);
     if (olds.length) {
       const ids = new Set(olds.map((o) => o.id));
       setManual((prev) => prev.filter((x) => !ids.has(x.id)));
       if (user) for (const o of olds) checkWrite(deleteMovement(o.id), "Il saldo di partenza", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
     }
-    setOpening((o) => { if (!o) return o; const { [c.key]: _gone, ...rest } = o.amounts; void _gone; return { ...o, amounts: rest }; });
   };
-  const removeCommonOpenings = async () => {
-    if (!commonOpenings.length) return;
-    if (!(await ask({ title: t("Togliere i saldi comuni?"), message: `${commonOpenings.map((m) => `${CONTI.find((c) => c.key === m.conto)?.label ?? m.conto} ${eur(signedAmount(m))}`).join(", ")}. ${t("I saldi di partenza delle singole strutture non cambiano.")}`, danger: true, confirmLabel: t("Togli") }))) return;
-    const olds = commonOpenings;
-    const ids = new Set(olds.map((o) => o.id));
-    setManual((prev) => prev.filter((x) => !ids.has(x.id)));
-    if (user) for (const o of olds) checkWrite(deleteMovement(o.id), "Il saldo di partenza comune", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
+  // Sposta in blocco i movimenti (e i pagamenti programmati) di UNA struttura da un conto a un altro. Non tocca le altre strutture.
+  const moveStored = async () => {
+    if (!moveCtx) return;
+    const { sid, from, to } = moveCtx;
+    if (!sid || !from || !to || from === to) return;
+    const mv = moveContoOfStructure(manual, sid, from, to);
+    const rl = moveContoOfStructure(rules, sid, from, to);
+    if (mv.ids.length + rl.ids.length === 0) { toast(t("Nessun movimento da spostare."), "error"); return; }
+    const lab = (k: string) => conti.find((c) => c.key === k)?.label ?? k;
+    const sname = getStructure(sid)?.name ?? "—";
+    const what = `${mv.ids.length} ${t("movimenti")}${rl.ids.length ? ` ${t("e")} ${rl.ids.length} ${t("pagamenti programmati")}` : ""}`;
+    if (!(await ask({ title: t("Sposta i movimenti"), message: `${t("Sposto")} ${what} ${t("di")} «${sname}» ${t("dal conto")} «${lab(from)}» ${t("al conto")} «${lab(to)}». ${t("I movimenti delle altre strutture non cambiano.")}`, confirmLabel: t("Sposta") }))) return;
+    const mvSet = new Set(mv.ids), rlSet = new Set(rl.ids);
+    setManual(mv.list); setRules(rl.list);
+    // anche le scadenze modificate a mano di quelle regole
+    const ovNext: OccOverrides = {}; let ovChanged = false;
+    for (const [k, v] of Object.entries(overrides)) { if (v.conto === from && rlSet.has(k.split("|")[0])) { ovNext[k] = { ...v, conto: to }; ovChanged = true; } else ovNext[k] = v; }
+    if (ovChanged) { setOverrides(ovNext); saveOverrides(ovNext); }
+    if (user) {
+      checkWrite(updateContoOfMovements(mv.ids, to), "Lo spostamento dei movimenti", () => setManual((all) => all.map((m) => (mvSet.has(m.id) ? { ...m, conto: from } : m))));
+      checkWrite(updateContoOfRules(rl.ids, to), "Lo spostamento dei pagamenti programmati", () => setRules((all) => all.map((r) => (rlSet.has(r.id) ? { ...r, conto: from } : r))));
+    }
+    setMoveCtx(null);
+    toast(`${mv.ids.length + rl.ids.length} ${t("spostati")} · ${sname}: ${lab(from)} → ${lab(to)}`, "success");
   };
-  const openingTotal = opening ? sumCents(CONTI.map((c) => { const v = parseFloat((opening.amounts[c.key] ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(v) ? v : 0; })) : 0;
+  const openingTotal = opening ? sumCents(scopeStructs.flatMap((s) => contiOf(s.id).map((c) => parseDecimalIT(amountOf(s.id, c.key)) ?? 0))) : 0;
   const saveOpening = async () => {
     if (!opening) return;
-    const sid = opening.sid;
-    if (!sid) { toast(t("Scegli la struttura."), "error"); return; }
-    const sname = getStructure(sid)?.name ?? "—";
-    const curOf = (key: string) => { const op = openingOf(manual, sid, key); return op ? signedAmount(op) : 0; };
-    // Protezione: se si sta per portare a zero un saldo che oggi ha un importo, si chiede conferma (è così che si perde il saldo per errore). Vale solo per questa struttura.
-    const azzerati = CONTI.filter((c) => { const txt = (opening.amounts[c.key] ?? "").trim(); const v = txt ? parseDecimalIT(txt) : null; return v === 0 && Math.abs(curOf(c.key)) > 0.005; });
-    if (azzerati.length && !(await ask({ title: "Azzerare il saldo di partenza?", message: `Stai per portare a zero, per «${sname}»: ${azzerati.map((c) => `${c.label} (ora ${eur(curOf(c.key))})`).join(", ")}. Gli altri saldi delle altre strutture non cambiano.`, danger: true, confirmLabel: "Azzera" }))) return;
+    const pairs = scopeStructs.flatMap((s) => contiOf(s.id).map((c) => ({ s, c })));
+    const curOf = (sid: string, key: string) => { const op = openingOf(manual, sid, key); return op ? signedAmount(op) : 0; };
+    // Protezione: se si sta per portare a zero un saldo che oggi ha un importo, si chiede conferma (è così che si perde il saldo per errore).
+    const azzerati = pairs.filter(({ s, c }) => { const txt = amountOf(s.id, c.key).trim(); const v = txt ? parseDecimalIT(txt) : null; return v === 0 && Math.abs(curOf(s.id, c.key)) > 0.005; });
+    if (azzerati.length && !(await ask({ title: "Azzerare il saldo di partenza?", message: `Stai per portare a zero: ${azzerati.map(({ s, c }) => `${s.name} · ${c.label} (ora ${eur(curOf(s.id, c.key))})`).join(", ")}. Gli altri saldi non cambiano.`, danger: true, confirmLabel: "Azzera" }))) return;
     const date0 = opening.date || todayISO();
     const date = opening.startOfDay ? shiftISO(date0, -1) : date0; // saldo di inizio giornata: valido dalla sera prima, così contano anche i movimenti di quel giorno
-    const newMovs: Mov[] = []; const olds: Mov[] = [];
-    for (const c of CONTI) {
-      const txt = (opening.amounts[c.key] ?? "").trim();
+    const newMovs: Mov[] = []; const savedPairs: { sid: string; conto: string }[] = [];
+    for (const { s, c } of pairs) {
+      const txt = amountOf(s.id, c.key).trim();
       if (!txt) continue;
-      const raw = parseDecimalIT(txt);
-      if (raw === null) continue;
-      newMovs.push({ id: uid(), date, kind: raw >= 0 ? "in" : "out", cat: OPENING_CAT, desc: `${t("Saldo di partenza")} · ${sname} · ${c.label}`, amount: roundCents(Math.abs(raw)), conto: c.key, structureId: sid });
-      olds.push(...manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key && normSid(x.structureId) === sid)); // il nuovo sostituisce quello di prima, SOLO di questa struttura
+      const val = parseDecimalIT(txt);
+      if (val === null) continue;
+      newMovs.push({ id: uid(), date, kind: val >= 0 ? "in" : "out", cat: OPENING_CAT, desc: `${t("Saldo di partenza")} · ${s.name} · ${c.label}`, amount: roundCents(Math.abs(val)), conto: c.key, structureId: s.id });
+      savedPairs.push({ sid: s.id, conto: c.key });
     }
     if (!newMovs.length) { setOpening(null); return; }
-    const oldIds = new Set(olds.map((o) => o.id));
+    // i vecchi saldi COMUNI (senza struttura) degli stessi conti si sostituiscono da soli, così non si contano due volte
+    const oldList = openingsReplacedBy(manual, savedPairs); // il nuovo sostituisce quello di prima SOLO di questa struttura e conto, più i comuni degli stessi conti
+    const oldIds = new Set(oldList.map((o) => o.id));
     setManual((prev) => [...newMovs, ...prev.filter((x) => !oldIds.has(x.id))]);
     if (user) {
-      for (const o of olds) checkWrite(deleteMovement(o.id), "Il saldo di partenza precedente", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
+      for (const o of oldList) checkWrite(deleteMovement(o.id), "Il saldo di partenza precedente", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
       for (const mv of newMovs) checkWrite(insertMovement(tenantId ?? user.id, mv), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
     }
     setOpening(null);
@@ -486,6 +521,18 @@ export default function CassaPage() {
   const [rf, setRf] = useState<{ kind: Kind; cat: string; desc: string; amount: string; conto: string; struttura: string; freq: Rule["freq"]; day: string; start: string; auto: boolean; end: string; note?: string; variable: boolean }>(() => ({ kind: "out", cat: "affitto", desc: "", amount: "", conto: "banca", struttura: singleSid, freq: "monthly", day: "1", start: todayISO(), auto: true, end: "", note: "", variable: false }));
   // La struttura del nuovo movimento/regola segue la struttura selezionata in alto a destra.
   useEffect(() => { setForm((f) => ({ ...f, struttura: singleSid })); setRf((f) => ({ ...f, struttura: singleSid })); }, [singleSid]);
+  // Il menu «Conto» mostra solo i conti della struttura scelta (più il conto attuale del movimento, se non è suo, segnalato: non lo si cambia di nascosto).
+  const nameOfStruct = (id: string) => getStructure(id)?.name ?? "—";
+  const contoOptions = (sid: string, current: string) => {
+    const list = contiOfStructure(conti, sid);
+    const extra = current && !list.some((c) => c.key === current) ? conti.find((c) => c.key === current) : undefined;
+    return extra ? [...list, extra] : list;
+  };
+  const contoOptLabel = (c: ContoDef, sid: string) => `${contoVisible(c, sid && sid !== "all" ? sid : "all") ? "" : "⚠ "}${t(contoDisplayLabel(c, conti, nameOfStruct))}`;
+  const defaultContoFor = (sid: string) => { const r = routeFor(conti, prefs, sid); return r.accounts?.cash ?? r.principal; };
+  // Un NUOVO movimento / pagamento programmato deve cadere su un conto della struttura scelta: se quello attuale non lo è, si passa ai suoi contanti (o al suo principale).
+  useEffect(() => { if (editingMov === NEW_MOV && form.struttura && !contiOfStructure(conti, form.struttura).some((c) => c.key === form.conto)) setForm((f) => ({ ...f, conto: defaultContoFor(form.struttura) })); }, [editingMov, form.struttura, form.conto, conti, prefs]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ruleModal && !editingRule && rf.struttura && !contiOfStructure(conti, rf.struttura).some((c) => c.key === rf.conto)) setRf((f) => ({ ...f, conto: defaultContoFor(rf.struttura) })); }, [ruleModal, editingRule, rf.struttura, rf.conto, conti, prefs]); // eslint-disable-line react-hooks/exhaustive-deps
   const openNewRule = () => { setEditingRule(null); setRuleModal(true); };
   const openEditRule = (r: Rule) => {
     setEditingRule(r.id);
@@ -642,7 +689,6 @@ export default function CassaPage() {
         </select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
-          <Link href="/riconciliazione-booking" title={t("Confronta le prenotazioni con l'elenco dell'extranet di Booking.com")} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt">{t("Riconcilia con Booking")}</Link>
           <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
           <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
@@ -764,7 +810,7 @@ export default function CassaPage() {
                   const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
                   const bal = ledger.balanceAfter.get(lastId) ?? null;
                   // riga modificabile: movimento inserito a mano (si apre la finestra di modifica) o saldo di partenza (si apre la finestra del saldo)
-                  const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening(normSid(m.structureId)) : () => startEditMov(m);
+                  const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
                     <div key={isBooking ? "b-" + r.id : m.id}>
@@ -779,6 +825,7 @@ export default function CassaPage() {
                         {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
                         {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
                         <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), multiScope && movSid(m) ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
+                        {contoUnassigned(m, conti) && <span className="shrink-0 text-[10px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a questa struttura: correggi il conto dalla modifica del movimento, oppure sposta in blocco i movimenti da «Saldo di partenza» → «Sposta movimenti tra conti».")}>⚠ {t("conto non assegnato")}</span>}
                       </div>
                       {isBooking ? (
                         <>
@@ -876,32 +923,81 @@ export default function CassaPage() {
           <button aria-label={t("Chiudi")} onClick={() => setOpening(null)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
           <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="text-base font-bold text-txt">{t("Saldo di partenza")}</div>
-            <label className="mt-2 block"><span className="text-xs font-semibold text-dim">{t("Struttura")}</span>
-              <select aria-label={t("Struttura")} value={opening.sid} onChange={(e) => pickOpeningStruct(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm font-semibold text-txt outline-none focus:border-focus">{scopeStructs.length === 0 && <option value="">{t("Scegli la struttura…")}</option>}{scopeStructs.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-            </label>
-            <p className="mt-1.5 rounded-lg bg-wash px-2.5 py-1.5 text-[11px] font-medium text-dim">{t("I saldi sono PER STRUTTURA: gli importi qui sotto valgono solo per la struttura scelta qui sopra. Il saldo attuale di più strutture è la somma dei loro saldi. I conti (Revolut, Banca, Contanti) hanno un saldo separato in ogni struttura.")}</p>
-            {commonOpenings.length > 0 && <div className="mt-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[color:var(--warn)]" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)" }}>{t("Hai ancora dei saldi di partenza COMUNI (vecchio sistema, senza struttura)")}: {commonOpenings.map((m) => `${CONTI.find((c) => c.key === m.conto)?.label ?? m.conto} ${eur(signedAmount(m))}`).join(" · ")}. {t("Valgono solo con «Tutte le strutture» e coprono le strutture che non hanno ancora il proprio saldo: quando li hai riscritti per struttura, toglili per non contarli due volte.")} <button type="button" onClick={() => void removeCommonOpenings()} className="font-semibold underline">{t("Togli i saldi comuni")}</button></div>}
             <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai oggi su ogni conto. Da qui ogni saldo parte dal suo importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve. I conti lasciati vuoti non vengono toccati.")}</p>
-            <p className="mt-1 text-[11px] text-faint">{t("★ = conto principale: qui arrivano i soldi delle prenotazioni dai portali. ↑ ↓ cambiano l'ordine dei conti.")}</p>
-            <div className="mt-3 flex flex-col gap-2">
-              {CONTI.map((c) => (
-                <div key={c.key} className="flex items-center gap-1.5">
-                  <button type="button" onClick={() => makePrincipal(c.key)} title={c.key === principal ? t("Conto principale: qui arrivano i soldi delle prenotazioni") : t("Imposta come conto principale (dove arrivano i soldi delle prenotazioni)")} aria-label={`${t("Conto principale")} ${c.label}`} className={`shrink-0 rounded p-0.5 text-sm leading-none ${c.key === principal ? "text-[color:var(--warn)]" : "text-faint hover:text-[color:var(--warn)]"}`}>{c.key === principal ? "★" : "☆"}</button>
-                  {renaming?.key === c.key
-                    ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-32 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
-                    : <span className="w-32 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
-                  <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={opening.amounts[c.key] ?? ""} onBlur={(e) => { const v = parseDecimalIT(e.target.value); if (v !== null) setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: formatDecimalIT(v) } } : o)); }} onChange={(e) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: e.target.value } } : o))} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
-                  <span className="text-xs text-faint">€</span>
-                  <button type="button" onClick={() => moveConto(c.key, -1)} disabled={conti[0]?.key === c.key} title={t("Sposta su")} aria-label={`${t("Sposta su")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↑</button>
-                  <button type="button" onClick={() => moveConto(c.key, 1)} disabled={conti[conti.length - 1]?.key === c.key} title={t("Sposta giù")} aria-label={`${t("Sposta giù")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↓</button>
-                  <button type="button" onClick={() => setRenaming({ key: c.key, label: c.label })} title={t("Rinomina il conto")} aria-label={`${t("Rinomina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
-                  <button type="button" onClick={() => void deleteConto(c)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+            <p className="mt-1 text-[11px] text-faint">{t("★ = conto principale della struttura: qui arrivano i soldi delle prenotazioni dai portali. ↑ ↓ cambiano l'ordine dei conti.")}</p>
+            {scopeStructs.map((s) => {
+              const list = contiOf(s.id);
+              const pr = principalOf(conti, prefs, s.id);
+              const mv = moveCtx?.sid === s.id ? moveCtx : null;
+              return (
+                <div key={s.id} className="mt-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs font-semibold text-dim">{scopeStructs.length > 1 ? s.name : ""}</span>
+                    <button type="button" onClick={() => setMoveCtx(mv ? null : { sid: s.id, from: "", to: "" })} className="shrink-0 text-[11px] font-medium text-focus hover:underline">{t("Sposta movimenti tra conti")}</button>
+                  </div>
+                  {mv && (() => {
+                    const withItems = conti.filter((c) => countOnConto(manual, s.id, c.key) + countOnConto(rules, s.id, c.key) > 0);
+                    return (
+                      <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-line p-2 text-xs">
+                        <select aria-label={t("Dal conto")} value={mv.from} onChange={(e) => setMoveCtx({ ...mv, from: e.target.value, to: mv.to === e.target.value ? "" : mv.to })} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-2 py-1.5 text-xs text-txt outline-none focus:border-focus">
+                          <option value="">{withItems.length ? t("Dal conto…") : t("Nessun movimento da spostare.")}</option>
+                          {withItems.map((c) => <option key={c.key} value={c.key}>{contoDisplayLabel(c, conti, (id) => getStructure(id)?.name ?? "—")} ({countOnConto(manual, s.id, c.key) + countOnConto(rules, s.id, c.key)}){contoVisible(c, s.id) ? "" : " ⚠"}</option>)}
+                        </select>
+                        <span className="text-faint">→</span>
+                        <select aria-label={t("Al conto")} value={mv.to} onChange={(e) => setMoveCtx({ ...mv, to: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-2 py-1.5 text-xs text-txt outline-none focus:border-focus">
+                          <option value="">{t("Al conto…")}</option>
+                          {list.filter((c) => c.key !== mv.from).map((c) => <option key={c.key} value={c.key}>{contoDisplayLabel(c, conti, (id) => getStructure(id)?.name ?? "—")}</option>)}
+                        </select>
+                        <button type="button" onClick={() => void moveStored()} disabled={!mv.from || !mv.to} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Sposta")}</button>
+                      </div>
+                    );
+                  })()}
+                  <div className="flex flex-col gap-2">
+                    {list.map((c) => {
+                      const unassigned = !isContoAssigned(c);
+                      const multi = allStructures.length > 1;
+                      return (
+                        <div key={c.key} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={() => makePrincipal(s.id, c.key)} title={c.key === pr ? t("Conto principale: qui arrivano i soldi delle prenotazioni") : t("Imposta come conto principale (dove arrivano i soldi delle prenotazioni)")} aria-label={`${t("Conto principale")} ${c.label}`} className={`shrink-0 rounded p-0.5 text-sm leading-none ${c.key === pr ? "text-[color:var(--warn)]" : "text-faint hover:text-[color:var(--warn)]"}`}>{c.key === pr ? "★" : "☆"}</button>
+                            {renaming?.key === c.key
+                              ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-32 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
+                              : <span className="w-32 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
+                            <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={amountOf(s.id, c.key)} onBlur={(e) => { const v = parseDecimalIT(e.target.value); if (v !== null) setAmount(s.id, c.key, formatDecimalIT(v)); }} onChange={(e) => setAmount(s.id, c.key, e.target.value)} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
+                            <span className="text-xs text-faint">€</span>
+                            <button type="button" onClick={() => moveConto(s.id, c.key, -1)} disabled={list[0]?.key === c.key} title={t("Sposta su")} aria-label={`${t("Sposta su")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↑</button>
+                            <button type="button" onClick={() => moveConto(s.id, c.key, 1)} disabled={list[list.length - 1]?.key === c.key} title={t("Sposta giù")} aria-label={`${t("Sposta giù")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↓</button>
+                            {multi && <button type="button" onClick={() => setAssignOpen(assignOpen === c.key ? null : c.key)} title={t("Strutture a cui appartiene il conto")} aria-label={`${t("Strutture a cui appartiene il conto")} ${c.label}`} className={`shrink-0 rounded p-1 text-xs leading-none hover:bg-wash ${unassigned ? "text-[color:var(--warn)]" : "text-faint hover:text-txt"}`}>⇄</button>}
+                            <button type="button" onClick={() => setRenaming({ key: c.key, label: c.label })} title={t("Rinomina il conto")} aria-label={`${t("Rinomina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
+                            <button type="button" onClick={() => void deleteConto(c)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                          </div>
+                          {multi && (unassigned || assignOpen === c.key) && (
+                            <div className="ml-5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                              {unassigned && <span className="text-[10px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a nessuna struttura: compare ovunque")}>{t("Non assegnato")}</span>}
+                              {allStructures.map((x) => (
+                                <label key={x.id} className="flex items-center gap-1 text-[11px] text-dim"><input type="checkbox" checked={c.structureIds?.includes(x.id) ?? false} onChange={() => toggleSid(c.key, x.id)} className="h-3.5 w-3.5 accent-[color:var(--focus)]" />{x.name}</label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
-              <input value={opening.newName} onChange={(e) => setOpening((o) => (o ? { ...o, newName: e.target.value } : o))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addConto(); } }} placeholder={t("Nuovo conto (es. Revolut, Intesa…)")} maxLength={30} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-              <button onClick={addConto} disabled={!opening.newName.trim()} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">{t("+ Aggiungi conto")}</button>
+              );
+            })}
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="flex items-center gap-2">
+                <input value={opening.newName} onChange={(e) => setOpening((o) => (o ? { ...o, newName: e.target.value } : o))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addConto(); } }} placeholder={t("Nuovo conto (es. Revolut, Intesa…)")} maxLength={30} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+                <button onClick={addConto} disabled={!opening.newName.trim() || (allStructures.length > 1 && opening.newSids.length === 0)} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">{t("+ Aggiungi conto")}</button>
+              </div>
+              {allStructures.length > 1 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  {allStructures.map((x) => (
+                    <label key={x.id} className="flex items-center gap-1 text-[11px] text-dim"><input type="checkbox" checked={opening.newSids.includes(x.id)} onChange={() => setOpening((o) => (o ? { ...o, newSids: o.newSids.includes(x.id) ? o.newSids.filter((id) => id !== x.id) : [...o.newSids, x.id] } : o))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" />{x.name}</label>
+                  ))}
+                </div>
+              )}
             </div>
             <label className="mt-3 block"><span className="text-xs text-dim">{t("Valido dal giorno")}</span>
               <input type="date" value={opening.date} onChange={(e) => setOpening((o) => (o ? { ...o, date: e.target.value } : o))} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
@@ -1038,7 +1134,7 @@ export default function CassaPage() {
               </button>
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
-              <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={form.conto} onChange={(e) => setForm((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
+              <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={form.conto} onChange={(e) => setForm((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{contoOptions(form.struttura, form.conto).map((c) => <option key={c.key} value={c.key}>{contoOptLabel(c, form.struttura)}</option>)}</select></label>
               <label className="block"><span className="text-xs text-dim">{t("Data")}</span><input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             </div>
             {!singleSid && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")} *</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className={"mt-0.5 w-full rounded-lg border bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus " + (form.struttura ? "border-line" : "border-[color:var(--warn)]")}><option value="">{t("Scegli la struttura…")}</option>{form.struttura === "all" && <option value="all">{t("Comune (tutte)")}</option>}{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
@@ -1127,7 +1223,7 @@ export default function CassaPage() {
               )}
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
-              <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={rf.conto} onChange={(e) => setRf((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
+              <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={rf.conto} onChange={(e) => setRf((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{contoOptions(rf.struttura, rf.conto).map((c) => <option key={c.key} value={c.key}>{contoOptLabel(c, rf.struttura)}</option>)}</select></label>
               {!singleSid && <label className="block"><span className="text-xs text-dim">{t("Struttura")} *</span><select value={rf.struttura} onChange={(e) => setRf((f) => ({ ...f, struttura: e.target.value }))} className={"mt-0.5 w-full rounded-lg border bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus " + (rf.struttura ? "border-line" : "border-[color:var(--warn)]")}><option value="">{t("Scegli la struttura…")}</option>{rf.struttura === "all" && <option value="all">{t("Comune (tutte)")}</option>}{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
             </div>
             {rf.freq === "monthly" && <label className="mb-2 block"><span className="text-xs text-dim">{t("A partire da")}</span><input type="date" value={rf.start} onChange={(e) => setRf((f) => ({ ...f, start: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>}

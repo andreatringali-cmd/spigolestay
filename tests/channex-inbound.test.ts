@@ -646,3 +646,52 @@ test("avvisi disattivati nelle preferenze: nessuna email al titolare; senza emai
   assert.equal(calls("internalFetch").length, 0);
   assert.equal(calls("gcalUpsert").length, 0); // senza gcalId nessuna sincronizzazione calendario
 });
+
+// ───────────────────────── doppioni Octorate/Channex nei NUOVI import ─────────────────────────
+test("doppione: riga Channex E riga Octorate (stessa prenotazione) → la Channex è l'unica viva, l'Octorate annullata come duplicato e i suoi dati passano alla Channex", async () => {
+  const chx = seedBooking({ id: "old-1", extId: "channex:bk-1", unitId: "u1", paid: 0, updatedAt: 1000 });
+  const octo = seedBooking({ id: "oct-1", groupId: "g-oct", extId: "octorate:99", unitId: "u2", paid: 100, commissionAmount: 50, note: "Importato da Octorate · arrivo tardi" });
+  const sc = scenario(baseData({ bookings: [chx, octo] }));
+  await withChannex({}, async () => { await importSingleRevision(sc.client, rev({ status: "modified" }) as never); });
+  const s = sc.state();
+  const liveRows = live(s);
+  assert.equal(liveRows.length, 1);
+  assert.equal(liveRows[0].extId, "channex:bk-1");
+  assert.equal(liveRows[0].paid, 100);
+  assert.equal(liveRows[0].commissionAmount, 50);
+  assert.match(liveRows[0].note, /arrivo tardi/);
+  const dup = s.bookings.find((b: any) => b.id === "oct-1");
+  assert.ok(dup, "la riga Octorate NON viene cancellata");
+  assert.equal(dup.status, "cancelled");
+  assert.match(dup.note, /^Duplicato \(Octorate\) di 4812345678: unito alla prenotazione Channex/);
+  assert.ok(dup.updatedAt > 1000);
+  assert.deepEqual(lapidi(s), ["old-1"]); // solo la vecchia riga Channex sostituita; l'Octorate resta recuperabile
+});
+
+test("doppione: l'Octorate con date diverse (non è la stessa prenotazione) non viene toccata", async () => {
+  const chx = seedBooking({ id: "old-1", extId: "channex:bk-1" });
+  const octo = seedBooking({ id: "oct-1", extId: "octorate:99", checkIn: "2099-07-01", checkOut: "2099-07-04", unitId: "u2", paid: 100 });
+  const sc = scenario(baseData({ bookings: [chx, octo] }));
+  await withChannex({}, async () => { await importSingleRevision(sc.client, rev({ status: "modified" }) as never); });
+  const o = sc.state().bookings.find((b: any) => b.id === "oct-1");
+  assert.equal(o.status, "confirmed");
+  assert.equal(live(sc.state()).length, 2);
+});
+
+test("doppione: cancellazione Channex annulla anche la riga Octorate gemella", async () => {
+  const chx = seedBooking({ id: "old-1", extId: "channex:bk-1" });
+  const octo = seedBooking({ id: "oct-1", extId: "octorate:99", unitId: "u2" });
+  const sc = scenario(baseData({ bookings: [chx, octo] }));
+  await withChannex({}, async () => { await importSingleRevision(sc.client, rev({ status: "cancelled" }) as never); });
+  assert.equal(live(sc.state()).length, 0);
+  assert.match(sc.state().bookings.find((b: any) => b.id === "oct-1").note, /^Duplicato \(Octorate\)/);
+});
+
+test("doppione: se la revision non ha camere mappate non si tocca nulla (l'Octorate resta attiva)", async () => {
+  const chx = seedBooking({ id: "old-1", extId: "channex:bk-1" });
+  const octo = seedBooking({ id: "oct-1", extId: "octorate:99", unitId: "u2" });
+  const sc = scenario(baseData({ bookings: [chx, octo] }));
+  await withChannex({}, async () => { await importSingleRevision(sc.client, rev({ status: "modified", rooms: [room({ room_type_id: "chx-sconosciuta" })] }) as never); });
+  assert.equal(live(sc.state()).length, 2);
+  assert.equal(sc.state().bookings.find((b: any) => b.id === "oct-1").status, "confirmed");
+});

@@ -14,6 +14,8 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/channex-guestdata";
 import { splitCommission } from "@/lib/commission-split";
+import { channelFromOta } from "@/lib/channex-channel";
+import { findOctorateTwins, twinFillPatch, duplicatePatch, usefulOctorateNote } from "@/lib/booking-heal";
 import { parsePaymentCharge } from "@/lib/payment-fee";
 import { fmtDMY } from "./dates";
 import { notifyBookingLines } from "./booking-notify";
@@ -61,19 +63,8 @@ export async function saveChannexMap(admin: SupabaseClient, tenantId: string, st
   return { ok: !error, error: error?.message };
 }
 
-// OTA → canale Xenora.
-export function channelFromOta(ota?: string): string {
-  const s = (ota || "").toLowerCase();
-  if (!s) return "direct";
-  if (s.includes("book")) return "booking";
-  if (s.includes("airbnb")) return "airbnb";
-  if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
-  if (s.includes("hotelbed") || s.includes("hotel bed") || s.includes("hbeds")) return "hotelbeds";
-  if (s.includes("agoda")) return "agoda";
-  if (s.includes("google")) return "google"; // Google Hotel Search (link gratuiti di prenotazione) via Channex
-  if (s.includes("direct") || s.includes("crs") || s.includes("website")) return "direct";
-  return "other";
-}
+// OTA → canale Xenora (la funzione sta in channex-channel.ts, senza dipendenze, così la usa anche la riconciliazione).
+export { channelFromOta };
 
 const num = (v: unknown, d = 0) => { const n = Number(v); return isNaN(n) ? d : n; };
 
@@ -310,10 +301,19 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       if (r.booking_id) candidates.add(`channex:${r.booking_id}`);
       if (r.id) candidates.add(`channex:${r.id}`);
       const prevIdx = bookings.map((b, i) => (b.extId && candidates.has(b.extId) ? i : -1)).filter((i) => i >= 0);
+      const hadChannexPrev = prevIdx.length > 0;
       // Prenotazione già presente perché importata PRIMA del collegamento (es. da Octorate, con extId diverso): si riconosce dal numero di prenotazione
       // dell'OTA (stesso codice, stessa struttura). Così una modifica o cancellazione la aggiorna invece di creare un doppione.
       const otaCode = String(r.ota_reservation_code || "").trim();
       if (!prevIdx.length && otaCode) bookings.forEach((b, i) => { if (b.structureId === map.structure_id && String(b.code || "").trim() === otaCode && !String(b.extId || "").startsWith("channex:")) prevIdx.push(i); });
+      // Doppione Octorate: la prenotazione può esistere GIÀ come riga Channex E come riga importata da Octorate (stessa struttura, canale, numero e date).
+      // La riga Channex è quella viva; quella Octorate non si cancella: si segna annullata come duplicato (sparisce da calendario, totali e Cassa, resta recuperabile)
+      // e i suoi dati (incassato, commissione, note, camera) passano sulla riga Channex. Se invece la riga Channex non c'era, l'Octorate è già la "versione precedente" (sopra).
+      const twinRows: Booking[] = hadChannexPrev && otaCode
+        ? findOctorateTwins(bookings, { structureId: map.structure_id, code: otaCode, channel: channelFromOta(r.ota_name), ranges: [{ ci: r.arrival_date || "", co: r.departure_date || "" }, ...(r.rooms ?? []).map((rm) => ({ ci: rm.checkin_date || "", co: rm.checkout_date || "" }))] }).map((i) => bookings[i])
+        : [];
+      const twinSet = new Set<Booking>(twinRows);
+      const markTwinsDuplicate = () => twinRows.forEach((t) => { touchAvail(t); Object.assign(t, duplicatePatch(t as { note?: string }, otaCode), { updatedAt: Date.now() }); syncGcalServer(t, "delete"); });
       const bidLog = r.booking_id || r.id;
       if (r.status === "cancelled") {
         const cancelledGuestName = prevIdx.length ? guests.find((g) => g.id === bookings[prevIdx[0]].guestId)?.fullName : undefined;
@@ -321,6 +321,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
         // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
         prevIdx.forEach((i) => { touchAvail(bookings[i]); bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); notifyOwnerServer("cancel", bookings[i]); });
+        markTwinsDuplicate();
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
         console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
@@ -378,6 +379,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // Righe sostituite (modifica, o prenotazione già importata da Octorate): i dati che Channex non conosce — incassi, check-in online, documenti, note, extra,
       // camera assegnata — si RIPORTANO sulla nuova riga, altrimenti una prenotazione già pagata tornerebbe "da incassare".
       const oldPool = [...removed];
+      const twinPool = [...twinRows];
       const CARRY = ["paid", "cleaningFee", "cityTaxExempt", "cityTaxPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature", "invoiceNo",
         "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt", "reviewRequestChannel", "bookedOn", "childAges", "cribs", "paymentMethod",
         // Commissione già nota (es. dal file Octorate): se Channex non la manda per questa prenotazione NON va persa. Se la manda, quella di Channex vince (più sotto).
@@ -389,7 +391,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         const co = room.checkout_date || r.departure_date || "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(ci) || !/^\d{4}-\d{2}-\d{2}$/.test(co) || co <= ci) return;
         const ofType = units.filter((u) => u.roomTypeId === roomTypeId && !u.outOfService);
-        const isFree = (uid2: string) => !bookings.some((b) => b.unitId === uid2 && b.status !== "cancelled" && overlaps(b, ci, co));
+        const isFree = (uid2: string) => !bookings.some((b) => !twinSet.has(b) && b.unitId === uid2 && b.status !== "cancelled" && overlaps(b, ci, co));
         const free = ofType.find((u) => isFree(u.id));
         // Riga sostituita corrispondente: stessa tipologia (e se possibile stesse date), altrimenti la prima della stessa tipologia.
         let oi = oldPool.findIndex((o) => o.roomTypeId === roomTypeId && o.checkIn === ci && o.checkOut === co);
@@ -398,9 +400,17 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         const oldNote = String(old?.note ?? "");
         const keep: Record<string, unknown> = {};
         if (old) for (const k of CARRY) { const v = (old as unknown as Record<string, unknown>)[k]; if (v !== undefined && v !== null && v !== "") keep[k] = v; }
+        // Riga Octorate gemella di questa camera: porta incassato, commissione esatta e campi che la riga Channex non ha.
+        let ti = twinPool.findIndex((t) => t.roomTypeId === roomTypeId && t.checkIn === ci && t.checkOut === co);
+        if (ti < 0) ti = twinPool.findIndex((t) => t.roomTypeId === roomTypeId);
+        if (ti < 0 && twinPool.length === 1 && roomsArr.length === 1) ti = 0;
+        const twin = ti >= 0 ? twinPool.splice(ti, 1)[0] : undefined;
+        if (twin) Object.assign(keep, twinFillPatch(keep, twin));
         if (netPayout) { delete keep.commissionAmount; delete keep.commissionPct; } // totale già netto: nessuna commissione (anche vecchia) da sottrarre
         // Camera: si tiene quella già assegnata se è ancora libera; altrimenti la prima libera. MAI una occupata se ce n'è una libera.
-        const prevUnit = old?.unitId && ofType.some((u) => u.id === old.unitId) && isFree(old.unitId) ? old.unitId : undefined;
+        const twinUnit = typeof twin?.unitId === "string" ? twin.unitId : undefined;
+        const prevUnit = old?.unitId && ofType.some((u) => u.id === old.unitId) && isFree(old.unitId) ? old.unitId
+          : twinUnit && ofType.some((u) => u.id === twinUnit) && isFree(twinUnit) ? twinUnit : undefined;
         // Dati ospite dalla revision (note, orario di arrivo, età bambini, tipo di pagamento, penali) e totale CON i
         // centesimi (somma notti → room.amount → amount della prenotazione). Logica pura in channex-guestdata.ts.
         // Non mappati perché assenti dallo schema Channex: culle/lettini (restano quelle riportate da CARRY),
@@ -426,7 +436,11 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",
-          note: oldNote && !/via Channex/.test(oldNote) ? oldNote : `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
+          note: (() => {
+            const base = oldNote && !/via Channex/.test(oldNote) ? oldNote : `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`;
+            const extra = twin ? usefulOctorateNote(twin.note) : undefined;
+            return extra && !base.includes(extra) ? `${base} · ${extra}` : base;
+          })(),
           updatedAt: Date.now(), // senza, qualunque modifica successiva (es. una cancellazione) rischia di sparire al sync (vedi sopra)
         } as Booking);
         touchAvail(bookings[bookings.length - 1]);
@@ -439,6 +453,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // vecchia/e riga/e (id diverso) va tolto esplicitamente, altrimenti resta un doppione
         // "fantasma" sul calendario reale dell'utente.
         if (isUpdate) removed.forEach((old) => syncGcalServer(old, "delete"));
+        markTwinsDuplicate();
         // Le righe sostituite vanno LAPIDATE: senza, un browser rimasto aperto con la copia vecchia la rimette dentro alla sincronizzazione e la prenotazione risulta doppia
         // (successo con le prenotazioni importate da Octorate e poi ricevute da Channex). La fusione del client tratta le lapidi del server come autorevoli.
         if (removed.length) {

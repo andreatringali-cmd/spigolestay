@@ -8,7 +8,7 @@ import type { Structure } from "@/lib/types";
 import { KEY_ORDERS, KEY_STOCK, matchStock, parseMoney, type PulizieOrder, type ReceiptRef, type StockLite } from "@/lib/pulizie-addetta";
 import { DEFAULT_PAY_CONTO, PAY_OPTIONS, RECEIPT_ACCEPT, createPurchaseOrder, markCash, newUuid, planCashSync } from "@/lib/pulizie-purchase";
 import { discardReceipt, recordPurchase, unrecordPurchase, uploadReceipt } from "@/lib/pulizie-purchase-client";
-import { loadConti } from "@/lib/cassa";
+import { loadConti, loadContiPrefs, routeFor, type ContoDef } from "@/lib/cassa";
 import DateField from "@/components/DateField";
 import Icon from "@/components/Icon";
 import { useSyncedList } from "./useSyncedList";
@@ -32,7 +32,7 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
   const [err, setErr] = useState("");
   const [cashMsg, setCashMsg] = useState("");
   const [tick, setTick] = useState(0);
-  const [contiKeys, setContiKeys] = useState<string[]>(PAY_OPTIONS.map((o) => o.key));
+  const [contiAll, setContiAll] = useState<ContoDef[]>([]);
   const busy = useRef(new Set<string>());
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -40,13 +40,21 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
   const structId = sid || structures[0]?.id || "";
   const match = matchStock(stock, name, structId);
   const suggestions = useMemo(() => [...new Set(stock.filter((p) => !p._deleted && p.structureId === structId).map((p) => p.name))].sort((a, b) => a.localeCompare(b, "it")), [stock, structId]);
-  const payOptions = useMemo(() => PAY_OPTIONS.filter((o) => contiKeys.includes(o.key)), [contiKeys]); // un conto tolto dalla Cassa non si offre più
+  // Conti della Cassa PER STRUTTURA: Contanti / Carta / Bonifico cadono sui conti della struttura dell'acquisto (contanti e carta suoi, bonifico = banca o suo principale).
+  const route = useMemo(() => (contiAll.length ? routeFor(contiAll, loadContiPrefs(), structId) : null), [contiAll, structId]);
+  const realConto = (opt: string): string | undefined => {
+    if (!route) return opt; // conti non ancora letti: chiavi di base
+    if (opt === "contanti") return route.accounts?.cash ?? route.principal;
+    if (opt === "carta") return route.accounts?.card;
+    return route.validConti.includes("banca") ? "banca" : route.principal;
+  };
+  const payOptions = useMemo(() => PAY_OPTIONS.filter((o) => !!realConto(o.key)), [route]); // eslint-disable-line react-hooks/exhaustive-deps
   const effConto = payOptions.some((o) => o.key === payConto) ? payConto : DEFAULT_PAY_CONTO; // il conto scelto non esiste più nella Cassa → contanti
   const hasCost = (parseMoney(cost) ?? 0) > 0;
 
   // Conti esistenti nella Cassa (quelli di base si possono eliminare: carta).
   useEffect(() => {
-    const read = () => { try { setContiKeys(loadConti().map((c) => c.key)); } catch { /* resta l'elenco di base */ } };
+    const read = () => { try { setContiAll(loadConti()); } catch { /* resta l'elenco di base */ } };
     read();
     window.addEventListener("spigolestay:datasync", read);
     return () => window.removeEventListener("spigolestay:datasync", read);
@@ -112,7 +120,7 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
     setErr("");
     const n = stamp();
     const when = `${date || n.today}${n.iso.slice(10)}`;
-    const order = createPurchaseOrder({ id: newUuid(), productId: match?.id, productName: match?.name ?? name.trim(), structureId: structId, date: when, qty: q, cost: parseMoney(cost), conto: effConto, receipt: att?.ref, nowMs: n.ms });
+    const order = createPurchaseOrder({ id: newUuid(), productId: match?.id, productName: match?.name ?? name.trim(), structureId: structId, date: when, qty: q, cost: parseMoney(cost), conto: realConto(effConto) ?? effConto, receipt: att?.ref, nowMs: n.ms });
     setOrders((prev) => [order, ...prev]);
     if (match && addStock) setStock((prev) => prev.map((p) => (p.id === match.id ? { ...p, qty: (p.qty || 0) + q, updatedAt: n.ms } : p)));
     if (att?.preview) URL.revokeObjectURL(att.preview);

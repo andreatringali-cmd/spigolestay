@@ -106,15 +106,19 @@ export function invoicePayMethodLabel(b: PayBookingLike): string | undefined {
  * Conto di Cassa su cui finisce l'incasso automatico di una prenotazione. Senza metodo indicato resta il comportamento storico:
  * diretta → contanti, OTA → conto principale. `validConti`: chiavi dei conti esistenti (un conto eliminato non riceve movimenti).
  */
-export function cassaContoFor(b: PayBookingLike, principal: string, validConti?: string[]): string {
+export function cassaContoFor(b: PayBookingLike, principal: string, validConti?: string[], accounts?: { cash?: string; card?: string }): string {
   const { method } = effectivePayMethod(b);
   const ok = (k: string) => !validConti || validConti.includes(k);
+  // Con `accounts` (conti PER STRUTTURA) contanti e carta cadono sul conto di quel tipo della struttura; se la struttura non ne ha uno adatto, sul suo principale.
+  // Senza (vecchio comportamento, stessi conti per tutti): chiave storica "contanti" / "carta".
+  const cash = () => (accounts ? (accounts.cash ?? principal) : "contanti"); // storico: conto fisso, non si può eliminare (CONTI_FISSI)
+  const card = () => (accounts ? (accounts.card ?? principal) : ok("carta") ? "carta" : principal);
   switch (method) {
-    case "contanti": return "contanti"; // conto fisso: non si può eliminare (CONTI_FISSI)
-    case "carta": return ok("carta") ? "carta" : principal;
+    case "contanti": return cash();
+    case "carta": return card();
     case "bonifico":
     case "altro":
     case "ota": return principal;
-    default: return b.channel === "direct" ? "contanti" : principal;
+    default: return b.channel === "direct" ? cash() : principal;
   }
 }
