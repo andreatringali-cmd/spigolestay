@@ -287,11 +287,17 @@ export default function PrenotazioniPage() {
   const STAY_GREENS = ["#2F9E6F", "#57B98A", "#8DD3B0", "#C3E8D6"];
   const stayDist = Object.entries(stayBuckets).map(([k, v], i) => ({ label: k, value: v, color: STAY_GREENS[i % STAY_GREENS.length] }));
   const MONTHS = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
-  const monthAgg: Record<number, number> = {};
-  const revMonthAgg: Record<number, number> = {};
-  filtered.forEach((b) => { const mo = parseISO(b.checkIn).getMonth(); monthAgg[mo] = (monthAgg[mo] || 0) + 1; revMonthAgg[mo] = (revMonthAgg[mo] || 0) + (b.total ?? 0); });
-  const byMonth = Object.keys(monthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], value: monthAgg[mo], color: "#C2683C" }));
-  const revByMonth = Object.keys(revMonthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], value: Math.round(revMonthAgg[mo]), color: "var(--ok)", fmt: eur }));
+  // Mesi in ordine CRONOLOGICO e con l'anno (prima erano ordinati solo per numero di mese: con "In corso e future" gennaio 2027 compariva PRIMA di ottobre 2026). Una prenotazione già iniziata prima dell'inizio del periodo
+  // filtrato conta nel primo mese del periodo (altrimenti con "In corso e future" comparirebbero mesi passati).
+  const monthKeyOf = (b: { checkIn: string }) => (from && b.checkIn < from ? from : b.checkIn).slice(0, 7);
+  const monthAgg: Record<string, number> = {};
+  const revMonthAgg: Record<string, number> = {};
+  filtered.forEach((b) => { const k = monthKeyOf(b); monthAgg[k] = (monthAgg[k] || 0) + 1; revMonthAgg[k] = (revMonthAgg[k] || 0) + (b.total ?? 0); });
+  const monthKeys = Object.keys(monthAgg).sort();
+  const multiYear = new Set(monthKeys.map((k) => k.slice(0, 4))).size > 1;
+  const monthLabelOf = (k: string) => `${MONTHS[Number(k.slice(5, 7)) - 1]}${multiYear ? ` ${k.slice(2, 4)}` : ""}`;
+  const byMonth = monthKeys.map((k) => ({ label: monthLabelOf(k), value: monthAgg[k], color: "#C2683C" }));
+  const revByMonth = monthKeys.map((k) => ({ label: monthLabelOf(k), value: Math.round(revMonthAgg[k]), color: "var(--ok)", fmt: eur }));
   // Per tipologia (somma le camere con lo stesso nome tipologia) e per paese di provenienza.
   const rtAgg: Record<string, { n: number; rev: number }> = {};
   filtered.forEach((b) => { const u = b.unitId ? unitMap.get(b.unitId) : undefined; const name = u ? rtMap.get(u.roomTypeId) : null; if (!name) return; if (!rtAgg[name]) rtAgg[name] = { n: 0, rev: 0 }; rtAgg[name].n++; rtAgg[name].rev += b.total ?? 0; });
@@ -311,14 +317,14 @@ export default function PrenotazioniPage() {
       const rev = b.total ?? 0;
       const sn = stName.get(b.structureId); if (sn) addPart(stParts, sn, b.channel, rev);
       const u = b.unitId ? unitMap.get(b.unitId) : undefined; const tn = u ? rtMap.get(u.roomTypeId) : null; if (tn) addPart(rtParts, tn, b.channel, rev);
-      addPart(moParts, String(parseISO(b.checkIn).getMonth()), b.channel, rev);
+      addPart(moParts, monthKeyOf(b), b.channel, rev);
     });
     const partsOf = (m: Parts, key: string) => Array.from(m.get(key) ?? []).map(([channel, v]) => ({ channel, count: v.count, revenue: Math.round(v.revenue) }));
     const structureRowsCh = structureRows.map((r) => ({ ...r, parts: partsOf(stParts, r.label) }));
     const roomTypeRowsCh = roomTypeRows.map((r) => ({ ...r, parts: partsOf(rtParts, r.label) }));
-    const monthStack = Object.keys(monthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], segs: partsOf(moParts, String(mo)).map((p) => ({ channel: p.channel, value: p.count })) }));
+    const monthStack = monthKeys.map((k) => ({ label: monthLabelOf(k), segs: partsOf(moParts, k).map((p) => ({ channel: p.channel, value: p.count })) }));
     return { byChannel, channelRows, structureRows: structureRowsCh, stayDist, byMonth, revByMonth, roomTypeRows: roomTypeRowsCh, byCountry, monthStack };
-  }, [filtered, guests, units, roomTypes, structures]);
+  }, [filtered, guests, units, roomTypes, structures, from]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Con una sola struttura selezionata i grafici "per struttura" non hanno senso: si nascondono.
