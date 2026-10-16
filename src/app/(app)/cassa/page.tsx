@@ -259,14 +259,22 @@ export default function CassaPage() {
   // Ultima card in vista "oggi e future": saldo previsto = saldo attuale dei conti + entrate − uscite dei giorni dopo oggi (quelli di oggi sono già nel saldo attuale).
   const prevCard = futureView && hasOpening;
   // Con il saldo attuale come base, le card contano solo i movimenti dopo oggi (quelli di oggi e prima sono già nel saldo attuale): così saldo attuale + entrate − uscite = saldo previsto.
-  // Le righe PREVISTE con data di oggi o passata (es. il saldo da incassare di chi arriva oggi) non sono nel saldo attuale (non ancora incassate) ma sono nell'estratto conto: devono contare anche qui, altrimenti card e saldo dell'ultima riga differiscono di quell'importo.
-  const cardRows = (prevCard ? rowsStat.filter((m) => m.date > today || (m.forecast && m.date <= today)) : rowsStat).filter((m) => !futureView || m.date <= listHorizon); // l'etichetta «al {listHorizon}» deve valere anche per i movimenti manuali/auto oltre l'orizzonte
+  const cardRows = (prevCard ? rowsStat.filter((m) => m.date > today) : rowsStat).filter((m) => !futureView || m.date <= listHorizon); // l'etichetta «al {listHorizon}» deve valere anche per i movimenti manuali/auto oltre l'orizzonte
   const entrateCard = sumCents(cardRows.filter((m) => m.kind === "in").map((m) => m.amount));
   const usciteCard = sumCents(cardRows.filter((m) => m.kind === "out").map((m) => m.amount));
-  const saldoPrevisto = roundCents(saldoTot + entrateCard - usciteCard);
+  const saldoPrevistoCalc = roundCents(saldoTot + entrateCard - usciteCard);
   // Estratto conto: saldo dopo ogni movimento, solo per le strutture selezionate in alto a destra (somma dei saldi di ciascuna, dalla propria data di partenza).
   const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...visibleManual, ...forecastView], scope), [auto, scheduled, visibleManual, forecastView, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
+  // La card del saldo previsto deve dare ESATTAMENTE il saldo dell'ultima riga dell'estratto conto entro l'orizzonte: si legge dall'estratto conto stesso (stesse regole di saldo di partenza,
+  // movimenti del giorno del saldo già compresi, previsti), invece di rifare il calcolo con regole leggermente diverse.
+  const saldoPrevisto = (() => {
+    if (!prevCard) return saldoPrevistoCalc;
+    let lastId: string | undefined; let best = -1;
+    for (const m of [...auto, ...scheduled, ...visibleManual, ...forecastView]) { if (m.date > listHorizon) continue; const o = ledger.order.get(m.id); if (o !== undefined && o > best) { best = o; lastId = m.id; } }
+    const v = lastId ? ledger.balanceAfter.get(lastId) : null;
+    return v == null ? saldoPrevistoCalc : v;
+  })();
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? raw.bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   // Commissioni trattenute dal portale TUTTE INSIEME (modalità mensile): sulla riga dell'incasso restano solo come nota informativa, il movimento vero è l'aggregato mensile.
   const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? raw.bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
