@@ -67,3 +67,20 @@ export function onlinePaymentPatch(b: OnlineLike, amount: number, nowMs: number)
   const before = typeof b.paidOnline === "number" && Number.isFinite(b.paidOnline) ? b.paidOnline : b.stripePaymentIntent ? Math.max(0, b.paid ?? 0) : 0;
   return { paidOnline: roundCents(before + Math.max(0, amount)), paidAt: ymdRome(nowMs) };
 }
+
+/**
+ * Prenotazione DIRETTA senza pagamento online (inserita a mano, da telefono, ecc.): l'acconto (la % di acconto della struttura, 50% se non è impostata)
+ * si versa alla DATA DELLA PRENOTAZIONE, non all'arrivo. Se la prenotazione NON è ancora saldata, quanto incassato è proprio l'acconto: tutto alla data della
+ * prenotazione. Se è già saldata, alla data della prenotazione va la quota di acconto e il resto resta alla data prevista (arrivo).
+ * `lordo` = quanto paga l'ospite (soggiorno + pulizia + extra). Serve `bookedOn` precedente all'arrivo; altrimenti null (come prima).
+ */
+export function directDepositIncasso(b: OnlineLike, lordo: number, depositPct?: number | null): OnlineIncasso | null {
+  if (b.channel !== "direct" || isOnlineDirect(b)) return null;
+  const paid = roundCents(Math.max(0, b.paid ?? 0));
+  if (paid <= 0 || !(lordo > 0)) return null;
+  if (!isISO(b.bookedOn) || !isISO(b.checkIn) || b.bookedOn >= b.checkIn) return null;
+  const pct = depositPct && depositPct > 0 && depositPct <= 100 ? depositPct : 50;
+  const deposit = roundCents(lordo * pct / 100);
+  const amount = paid < lordo - 0.005 ? paid : Math.min(paid, deposit);
+  return { date: b.bookedOn, amount, rest: roundCents(paid - amount), approx: false };
+}

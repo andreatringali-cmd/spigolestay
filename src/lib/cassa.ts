@@ -4,12 +4,12 @@
 import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
-import { commissionOf, commissionShareOf, bookingExtrasTotal } from "./booking";
+import { commissionOf, commissionShareOf, bookingExtrasTotal, lordoOf } from "./booking";
 import { cassaContoFor } from "./pay-method";
 import { shiftISO } from "./dates";
 import { payoutDate, loadPayoutSettings, commissionRuleFor, commissionMonthOf, commissionDateFor, type PayoutSettingsMap } from "./payouts";
 import { roundCents, sumCents } from "./money";
-import { onlineIncasso } from "./online-pay";
+import { onlineIncasso, directDepositIncasso } from "./online-pay";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; bookingStructureId?: string /* struttura della prenotazione da cui nasce (movimenti automatici): serve a non mescolare strutture nei bonifici unici */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */; variable?: boolean /* scadenza a importo variabile: l'importo è una stima */; commRefs?: string[] /* commissioni mensili tutte insieme: id delle prenotazioni incluse */ }
@@ -141,7 +141,8 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
     const incassato = roundCents(b.paid ?? 0);
     // Diretta pagata online (Stripe): la parte online è incassata il giorno del pagamento, non all'arrivo; il resto (es. saldo in contanti all'arrivo) alla data del canale.
-    const online = onlineIncasso(b);
+    // Diretta senza pagamento online: l'acconto (50% o la % della struttura) si versa alla data della prenotazione, il resto all'arrivo.
+    const online = onlineIncasso(b) ?? directDepositIncasso(b, lordoOf(b), st?.depositPct);
     if (online) {
       const label = `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`;
       if (online.amount > 0) out.push({ id: `auto-in-${b.id}`, date: online.date, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.amount, conto: cassaContoFor(b, principal, route.validConti, route.accounts), auto: true, ref: b.id });

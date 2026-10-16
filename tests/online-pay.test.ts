@@ -63,9 +63,15 @@ test("OTA e dirette senza pagamento online: nessun cambio (data del canale, un s
   const ota = run({ ...base, channel: "booking", paid: 139, bookedOn: "2026-10-01", paidAt: "2026-10-01", paidOnline: 139, stripePaymentIntent: "pi_x" }).filter((m) => m.kind === "in");
   assert.equal(ota.length, 1);
   assert.equal(ota[0].date, "2026-10-21");
+  // diretta inserita a mano e già saldata: la quota di acconto (50%) alla data della prenotazione, il resto all'arrivo
   const cash = run({ ...base, paid: 139, bookedOn: "2026-10-01" }).filter((m) => m.kind === "in");
-  assert.equal(cash.length, 1);
-  assert.deepEqual([cash[0].id, cash[0].date, cash[0].conto], ["auto-in-b1", "2026-10-21", "contanti"]);
+  assert.equal(cash.length, 2);
+  assert.deepEqual([cash[0].id, cash[0].date, cash[0].amount], ["auto-in-b1", "2026-10-01", 69.5]);
+  assert.deepEqual([cash[1].date, cash[1].amount], ["2026-10-21", 69.5]);
+  // senza data di prenotazione: tutto all'arrivo, come prima
+  const noDate = run({ ...base, paid: 139 }).filter((m) => m.kind === "in");
+  assert.equal(noDate.length, 1);
+  assert.deepEqual([noDate[0].id, noDate[0].date, noDate[0].conto], ["auto-in-b1", "2026-10-21", "contanti"]);
   assert.equal(isOnlineDirect({ channel: "direct", paid: 10 }), false);
   assert.equal(isOnlineDirect({ channel: "booking", stripePaymentIntent: "pi" }), false);
 });
@@ -120,4 +126,20 @@ test("pagamento online successivo (saldo): paidOnline si somma, paidAt = giorno 
   assert.deepEqual(onlinePaymentPatch({ stripePaymentIntent: "pi", paid: 50 }, 89, now), { paidOnline: 139, paidAt: "2026-10-20" });
   // diretta senza Stripe che paga col link: parte da zero
   assert.deepEqual(onlinePaymentPatch({ channel: "direct", paid: 50 }, 89, now), { paidOnline: 89, paidAt: "2026-10-20" });
+});
+
+test("diretta inserita a mano: l'acconto va alla data della prenotazione, non all'arrivo (caso Nunzia De Toma: 42 € su 80, prenotata l'11, arrivo il 17)", async () => {
+  const { directDepositIncasso } = await import("../src/lib/online-pay.ts");
+  const nunzia = { channel: "direct", checkIn: "2026-10-17", bookedOn: "2026-10-11", paid: 42 };
+  assert.deepEqual(directDepositIncasso(nunzia, 80, undefined), { date: "2026-10-11", amount: 42, rest: 0, approx: false });
+  // già saldata: alla prenotazione solo la quota di acconto (50% o quella della struttura), il resto all'arrivo
+  assert.deepEqual(directDepositIncasso({ ...nunzia, paid: 80 }, 80, undefined), { date: "2026-10-11", amount: 40, rest: 40, approx: false });
+  assert.deepEqual(directDepositIncasso({ ...nunzia, paid: 80 }, 80, 30), { date: "2026-10-11", amount: 24, rest: 56, approx: false });
+  // niente da incassare, senza data di prenotazione, o prenotata il giorno dell'arrivo: comportamento di prima
+  assert.equal(directDepositIncasso({ ...nunzia, paid: 0 }, 80), null);
+  assert.equal(directDepositIncasso({ ...nunzia, bookedOn: undefined }, 80), null);
+  assert.equal(directDepositIncasso({ ...nunzia, bookedOn: "2026-10-17" }, 80), null);
+  // OTA e pagamenti online restano com'erano
+  assert.equal(directDepositIncasso({ ...nunzia, channel: "booking" }, 80), null);
+  assert.equal(directDepositIncasso({ ...nunzia, stripePaymentIntent: "pi_1" }, 80), null);
 });
