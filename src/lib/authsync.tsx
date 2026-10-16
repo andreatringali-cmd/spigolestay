@@ -18,7 +18,7 @@
 //     letto; altrimenti si rilegge e si rifonde al ciclo successivo (niente sovrascritture cieche).
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { initBigStore, kvGet, kvSet, kvRemove, kvKeys, kvFlush, kvVersion } from "./bigstore";
+import { initBigStore, kvGet, kvSet, kvRemove, kvKeys, kvFlush, kvVersion, lastIdbError } from "./bigstore";
 import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled } from "./supabase";
@@ -1196,7 +1196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={value}>
       {storageFull && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, padding: "10px 16px", background: "#b42318", color: "#fff", fontSize: 14, textAlign: "center" }}>
-          Spazio del browser esaurito: le ultime modifiche potrebbero non essere salvate su questo dispositivo. Svuota i dati del sito xenora.it dalle impostazioni del browser e riaccedi (i dati restano sul server), oppure scrivici.
+          Spazio del browser esaurito: le ultime modifiche potrebbero non essere salvate su questo dispositivo. Svuota i dati del sito xenora.it dalle impostazioni del browser e riaccedi (i dati restano sul server), oppure scrivici.{(() => { const d = lastIdbError(); return d ? ` [${d}]` : ""; })()}
         </div>
       )}
       {children}

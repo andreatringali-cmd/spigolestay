@@ -54,6 +54,17 @@ function idbWrite(entries: [string, string | null][]): Promise<void> {
   });
 }
 
+// Motivo dell'ultimo problema con IndexedDB, per capire da remoto perché un dispositivo non salva (resta solo su questo dispositivo, mostrato nell'avviso).
+const IDB_ERROR_KEY = "xn-idb-error";
+function noteIdbError(where: string, e: unknown) { try { const er = e as { name?: string; message?: string } | null; localStorage.setItem(IDB_ERROR_KEY, `${where}: ${er?.name ?? "errore"} ${String(er?.message ?? "").slice(0, 120)}`); } catch { /* ignora */ } }
+/** Ultimo errore IndexedDB registrato su questo dispositivo ("" se nessuno). */
+export function lastIdbError(): string { try { return localStorage.getItem(IDB_ERROR_KEY) || ""; } catch { return ""; } }
+// IndexedDB inutilizzabile/instabile (es. alcuni iPhone): il blocco grande vive SOLO in memoria per questa sessione e viaggia comunque sul server; mai riscritto in localStorage (5 MB, esaurirebbe lo spazio).
+let memoryOnly = false;
+/** true = su questo dispositivo il blocco grande vive solo in memoria (IndexedDB non funziona). */
+export function bigStoreMemoryOnly(): boolean { return memoryOnly; }
+function toMemoryOnly(where: string, e: unknown) { noteIdbError(where, e); memoryOnly = true; db = null; enabled = true; }
+
 function reportFull() { try { window.dispatchEvent(new Event("xenora:storage-full")); } catch { /* ambiente senza window */ } }
 
 function runFlush(): Promise<void> {
@@ -62,7 +73,11 @@ function runFlush(): Promise<void> {
     if (!pending.size || !db) return;
     const batch = [...pending.entries()];
     batch.forEach(([k, v]) => { if (pending.get(k) === v) pending.delete(k); }); // se nel frattempo cambia, resta in coda
-    try { await idbWrite(batch); } catch { batch.forEach(([k, v]) => { if (!pending.has(k)) pending.set(k, v); }); reportFull(); }
+    try { await idbWrite(batch); } catch (e) {
+      batch.forEach(([k, v]) => { if (!pending.has(k)) pending.set(k, v); });
+      // Un secondo tentativo (a volte il browser chiude la transazione per un attimo); se fallisce ancora si passa alla sola memoria, senza allarmare: i dati sono al sicuro sul server.
+      try { await idbWrite([...pending.entries()]); pending.clear(); } catch (e2) { toMemoryOnly("scrittura", e2 ?? e); }
+    }
   });
   return flushing;
 }
@@ -77,7 +92,11 @@ export function initBigStore(): Promise<void> {
   initPromise = (async () => {
     if (typeof window === "undefined" || typeof indexedDB === "undefined") return;
     try {
-      db = await openDb();
+      // iOS a volte apre IndexedDB al secondo tentativo: ne facciamo fino a 3, poi si lavora in sola memoria.
+      let opened: IDBDatabase | null = null, lastErr: unknown = null;
+      for (let i = 0; i < 3 && !opened; i++) { try { opened = await openDb(); } catch (e) { lastErr = e; await new Promise((res) => setTimeout(res, 250 * (i + 1))); } }
+      if (!opened) throw lastErr ?? new Error("indexeddb non disponibile");
+      db = opened;
       let migrated = false;
       try { migrated = localStorage.getItem(MIGRATED_FLAG) === "1"; } catch { /* storage non disponibile */ }
       for (const key of BIG_KEYS) {
@@ -101,8 +120,10 @@ export function initBigStore(): Promise<void> {
       const onHide = () => { void runFlush(); };
       window.addEventListener("pagehide", onHide);
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") onHide(); });
-    } catch {
-      enabled = false; mem.clear(); db = null; // IndexedDB inutilizzabile: si resta su localStorage
+    } catch (e) {
+      // IndexedDB inutilizzabile: il blocco grande resta in memoria (mai in localStorage, che non basta). L'eventuale copia vecchia in localStorage si legge ma non si riscrive.
+      toMemoryOnly("apertura", e);
+      for (const key of BIG_KEYS) { try { const v = localStorage.getItem(key); if (v != null && !mem.has(key)) mem.set(key, v); } catch { /* ignora */ } }
     }
   })();
   return initPromise;
@@ -135,4 +156,4 @@ export function kvKeys(): string[] {
 }
 
 /** Solo per i test. */
-export function __resetBigStoreForTests() { enabled = false; mem.clear(); pending.clear(); db = null; initPromise = null; timer = null; }
+export function __resetBigStoreForTests() { memoryOnly = false; enabled = false; mem.clear(); pending.clear(); db = null; initPromise = null; timer = null; }
