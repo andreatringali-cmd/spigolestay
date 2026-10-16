@@ -6,6 +6,7 @@
     { "path": "/api/channex/cron", "schedule": "30 6 * * *" },
     { "path": "/api/cron/pulizie-plan", "schedule": "0 6 * * *" },
     { "path": "/api/cron/pulizie-plan", "schedule": "20 19 * * *" },
-    { "path": "/api/cron/sdi-status", "schedule": "30 7 * * *" }
+    { "path": "/api/cron/sdi-status", "schedule": "30 7 * * *" },
+    { "path": "/api/cron/entities-verify", "schedule": "15 3 * * *" }
   ]
 }
