@@ -259,7 +259,8 @@ export default function CassaPage() {
   // Ultima card in vista "oggi e future": saldo previsto = saldo attuale dei conti + entrate − uscite dei giorni dopo oggi (quelli di oggi sono già nel saldo attuale).
   const prevCard = futureView && hasOpening;
   // Con il saldo attuale come base, le card contano solo i movimenti dopo oggi (quelli di oggi e prima sono già nel saldo attuale): così saldo attuale + entrate − uscite = saldo previsto.
-  const cardRows = (prevCard ? rowsStat.filter((m) => m.date > today) : rowsStat).filter((m) => !futureView || m.date <= listHorizon); // l'etichetta «al {listHorizon}» deve valere anche per i movimenti manuali/auto oltre l'orizzonte
+  // Le righe PREVISTE con data di oggi o passata (es. il saldo da incassare di chi arriva oggi) non sono nel saldo attuale (non ancora incassate) ma sono nell'estratto conto: devono contare anche qui, altrimenti card e saldo dell'ultima riga differiscono di quell'importo.
+  const cardRows = (prevCard ? rowsStat.filter((m) => m.date > today || (m.forecast && m.date <= today)) : rowsStat).filter((m) => !futureView || m.date <= listHorizon); // l'etichetta «al {listHorizon}» deve valere anche per i movimenti manuali/auto oltre l'orizzonte
   const entrateCard = sumCents(cardRows.filter((m) => m.kind === "in").map((m) => m.amount));
   const usciteCard = sumCents(cardRows.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldoPrevisto = roundCents(saldoTot + entrateCard - usciteCard);
