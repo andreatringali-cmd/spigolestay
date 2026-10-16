@@ -11,7 +11,7 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents, sumCents } from "@/lib/money";
 import { exportExcel } from "@/lib/export";
-import { type Mov, type Rule, computeAuto, computeScheduled, scopeVisible, loadCash, loadConti } from "@/lib/cassa";
+import { type Mov, type Rule, type CashScope, computeAuto, computeScheduled, scopeVisible, cashScopeOf, scopeIds, loadCash, loadConti } from "@/lib/cassa";
 import { useTenantId } from "@/lib/tenant";
 
 const CONTI = [
@@ -29,7 +29,7 @@ interface Closure { id: string; day: string; conto: string | null; structure_id:
 export default function ChiusuraCassaPage() {
   const { user } = useAuth();
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
-  const { bookings, guests, structures, getStructure, activeStructureId } = useData();
+  const { bookings, guests, getStructure, allStructures, selectedStructureIds } = useData();
 
   // Dati Cassa dal server (movimenti manuali + regole + occorrenze saldate).
   const [manual, setManual] = useState<Mov[]>([]);
@@ -45,22 +45,29 @@ export default function ChiusuraCassaPage() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [msg, setMsg] = useState("");
 
-  // Struttura: se ne è già selezionata una in alto a destra, uso quella (niente filtro).
-  const [struct, setStruct] = useState<string>(activeStructureId);
-  useEffect(() => { setStruct(activeStructureId); }, [activeStructureId]);
-  const scope = activeStructureId !== "all" ? activeStructureId : struct;
-  const scopeName = scope === "all" ? "Tutte le strutture" : getStructure(scope)?.name ?? "—";
+  // Ambito: le strutture selezionate in alto a destra (una, più d'una o tutte). Con più strutture si può restringere a una sola; "all" qui = tutte quelle selezionate.
+  const allIds = useMemo(() => allStructures.map((x) => x.id), [allStructures]);
+  const baseScope = useMemo<CashScope>(() => cashScopeOf(selectedStructureIds, allIds), [selectedStructureIds, allIds]);
+  const singleBase = typeof baseScope === "string" && baseScope !== "all";
+  const baseKey = typeof baseScope === "string" ? baseScope : baseScope.join(",");
+  const structures = useMemo(() => { const ids = scopeIds(baseScope, allIds); return allStructures.filter((x) => ids.includes(x.id)); }, [baseScope, allStructures, allIds]); // strutture tra cui scegliere
+  const [struct, setStruct] = useState<string>("all");
+  useEffect(() => { setStruct("all"); }, [baseKey]);
+  const scope: CashScope = singleBase ? baseScope : struct !== "all" && structures.some((x) => x.id === struct) ? struct : baseScope;
+  const scopeKey = typeof scope === "string" ? scope : scope.join(",");
+  const scopeName = typeof scope === "string" ? (scope === "all" ? "Tutte le strutture" : getStructure(scope)?.name ?? "—") : scope.map((id) => getStructure(id)?.name ?? "—").join(" + ");
 
   // Chiusure recenti: con una struttura nello scope si vedono solo le sue (con "Tutte" tutte).
   const loadClosures = async () => {
     if (!supabase) return;
     let q = supabase.from("cash_closures").select("id, day, conto, structure_id, expected_cents, counted_cents, diff_cents, note");
-    if (scope !== "all") q = q.eq("structure_id", scope);
+    if (typeof scope !== "string") q = q.or(`structure_id.is.null,structure_id.in.(${scope.join(",")})`);
+    else if (scope !== "all") q = q.eq("structure_id", scope);
     const { data } = await q.order("day", { ascending: false }).limit(40);
     setClosures((data ?? []) as Closure[]);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadClosures(); }, [scope]);
+  useEffect(() => { loadClosures(); }, [scopeKey]);
 
   // Composizione movimenti (come Prima Nota) nello scope struttura scelto.
   const all = useMemo<Mov[]>(() => {
@@ -68,7 +75,7 @@ export default function ChiusuraCassaPage() {
     const s = computeScheduled(rules, paidSet, scope, day);
     const m = manual.filter((mv) => scopeVisible(mv.structureId, scope));
     return [...a, ...s, ...m];
-  }, [bookings, guests, getStructure, scope, rules, paidSet, day, manual]);
+  }, [bookings, guests, getStructure, scopeKey, rules, paidSet, day, manual]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const conti = useMemo(() => { const s = new Set(all.map((m) => m.conto).filter(Boolean)); CONTI.forEach((c) => s.add(c.key)); return Array.from(s); }, [all]);
 
@@ -84,7 +91,7 @@ export default function ChiusuraCassaPage() {
 
   const save = async () => {
     if (!supabase || !user) { setMsg("Devi essere connesso."); return; }
-    const { error } = await supabase.from("cash_closures").insert({ tenant_id: tenantId ?? user.id, day, conto: conto || null, structure_id: scope === "all" ? null : scope, expected_cents: Math.round(expected * 100), counted_cents: Math.round(numv(counted) * 100), diff_cents: Math.round(diff * 100), note: note || null });
+    const { error } = await supabase.from("cash_closures").insert({ tenant_id: tenantId ?? user.id, day, conto: conto || null, structure_id: typeof scope === "string" && scope !== "all" ? scope : null, expected_cents: Math.round(expected * 100), counted_cents: Math.round(numv(counted) * 100), diff_cents: Math.round(diff * 100), note: note || null });
     setMsg(error ? "Errore: " + error.message : "Chiusura salvata ✓");
     if (!error) { setCounted(""); setNote(""); loadClosures(); }
   };
@@ -96,7 +103,7 @@ export default function ChiusuraCassaPage() {
     body.push(["", "", "Uscite", "", -uscite]);
     body.push(["", "", "Saldo teorico", "", expected]);
     if (counted !== "") { body.push(["", "", "Contato", "", numv(counted)]); body.push(["", "", "Differenza", "", diff]); }
-    exportExcel(`chiusura-cassa-${day}-${scope === "all" ? "tutte" : scopeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`, headers, body);
+    exportExcel(`chiusura-cassa-${day}-${scope === "all" || typeof scope !== "string" ? "tutte" : scopeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`, headers, body);
   };
 
   const printClose = () => {
@@ -138,8 +145,8 @@ export default function ChiusuraCassaPage() {
             <label className={lbl}>Giorno<input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={inp} /></label>
             <label className={lbl}>Conto<select value={conto} onChange={(e) => setConto(e.target.value)} className={inp}>{conti.map((c) => <option key={c} value={c}>{contoLabel(c)}</option>)}</select></label>
             {/* Filtro struttura solo se in alto a destra è selezionato "Tutte" */}
-            {activeStructureId === "all" ? (
-              <label className={`${lbl} sm:col-span-2`}>Struttura<select value={struct} onChange={(e) => setStruct(e.target.value)} className={inp}><option value="all">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+            {!singleBase ? (
+              <label className={`${lbl} sm:col-span-2`}>Struttura<select value={struct} onChange={(e) => setStruct(e.target.value)} className={inp}><option value="all">{typeof baseScope === "string" ? "Tutte le strutture" : "Tutte le selezionate"}</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             ) : (
               <div className="sm:col-span-2 text-xs text-dim">Struttura: <b className="text-txt">{scopeName}</b></div>
             )}

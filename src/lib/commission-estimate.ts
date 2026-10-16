@@ -26,21 +26,34 @@ function isoMinusDays(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - days); return d.toISOString().slice(0, 10);
 }
 
-/** Percentuale stimata per ogni "canale@struttura", un decimale. Canali senza commissione (diretta, blocchi) esclusi. */
+/** Finestre della stima, dalla più recente: le percentuali cambiano con promo e Genius, quindi contano di più le prenotazioni ultime. */
+export const ESTIMATE_WINDOWS_DAYS = [90, 365] as const;
+
+/**
+ * Percentuale stimata per ogni "canale@struttura", un decimale. Canali senza commissione (diretta, blocchi) esclusi.
+ * Si usa la finestra più recente che ha abbastanza prenotazioni con cifra reale (ultimi 90 giorni, poi l'ultimo anno).
+ * In più, per ogni canale, "canale@*" = stessa stima su TUTTE le strutture: serve come ripiego per una struttura con pochi dati.
+ */
 export function computeCommissionEstimates(bookings: B[], todayIso: string): Record<string, number> {
-  const from = isoMinusDays(todayIso, 365);
-  const acc = new Map<string, { amt: number; tot: number; n: number }>();
-  for (const b of bookings) {
-    if (b.status === "cancelled" || !b.channel || b.channel === "direct" || b.channel === "blocked") continue;
-    if (isNetPayout(b)) continue; // totale già netto: non è una commissione
-    if (b.commissionAmount == null || !(b.total && b.total > 0) || !(b.commissionAmount >= 0)) continue;
-    if (b.checkIn < from) continue;
-    const k = key(b.channel, b.structureId);
-    const a = acc.get(k) ?? { amt: 0, tot: 0, n: 0 };
-    a.amt += b.commissionAmount; a.tot += b.total; a.n += 1; acc.set(k, a);
-  }
   const out: Record<string, number> = {};
-  acc.forEach((a, k) => { if (a.n >= MIN_ESTIMATE_SAMPLES && a.tot > 0) out[k] = Math.round((a.amt / a.tot) * 1000) / 10; });
+  const pick = (keyOf: (b: B) => string): void => {
+    for (const days of ESTIMATE_WINDOWS_DAYS) {
+      const from = isoMinusDays(todayIso, days);
+      const acc = new Map<string, { amt: number; tot: number; n: number }>();
+      for (const b of bookings) {
+        if (b.status === "cancelled" || !b.channel || b.channel === "direct" || b.channel === "blocked") continue;
+        if (isNetPayout(b)) continue; // totale già netto: non è una commissione
+        if (b.commissionAmount == null || !(b.total && b.total > 0) || !(b.commissionAmount >= 0)) continue;
+        if (b.checkIn < from) continue;
+        const k = keyOf(b);
+        const a = acc.get(k) ?? { amt: 0, tot: 0, n: 0 };
+        a.amt += b.commissionAmount; a.tot += b.total; a.n += 1; acc.set(k, a);
+      }
+      acc.forEach((a, k) => { if (!(k in out) && a.n >= MIN_ESTIMATE_SAMPLES && a.tot > 0) out[k] = Math.round((a.amt / a.tot) * 1000) / 10; });
+    }
+  };
+  pick((b) => key(b.channel as string, b.structureId));
+  pick((b) => key(b.channel as string, "*"));
   return out;
 }
 
@@ -48,5 +61,5 @@ let ESTIMATES: Record<string, number> = {};
 export function setCommissionEstimates(m: Record<string, number>) { ESTIMATES = m; }
 /** Stima per canale e struttura, se ce ne sono abbastanza dati; altrimenti undefined. */
 export function commissionEstimateFor(channel: string, structureId?: string): number | undefined {
-  return ESTIMATES[key(channel, structureId)];
+  return ESTIMATES[key(channel, structureId)] ?? ESTIMATES[key(channel, "*")];
 }

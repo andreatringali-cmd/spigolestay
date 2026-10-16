@@ -21,3 +21,16 @@ test("strutture e canali separati", () => {
   const r = computeCommissionEstimates([...bk(5), ...bk(5, { structureId: "T", commissionAmount: 10 }), ...bk(5, { channel: "expedia", commissionAmount: 30 })], "2026-10-11");
   assert.equal(r["booking@S"], 20); assert.equal(r["booking@T"], 10); assert.equal(r["expedia@S"], 30);
 });
+
+test("conta di più il periodo recente: se negli ultimi 90 giorni ci sono abbastanza dati, la vecchia media non pesa", () => {
+  const vecchie = bk(6, { commissionAmount: 12, checkIn: "2026-02-01" }); // 12%
+  const recenti = bk(5, { commissionAmount: 24.5, checkIn: "2026-09-20" }); // 24,5%
+  const r = computeCommissionEstimates([...vecchie, ...recenti], "2026-10-11");
+  assert.equal(r["booking@S"], 24.5);
+});
+
+test("struttura con pochi dati: ripiego sulla stima dello stesso canale su tutte le strutture", () => {
+  const r = computeCommissionEstimates([...bk(6, { commissionAmount: 24.5, checkIn: "2026-09-20" }), ...bk(2, { structureId: "R", commissionAmount: 17, checkIn: "2026-09-20" })], "2026-10-11");
+  assert.equal(r["booking@R"], undefined); // solo 2 dati propri
+  assert.ok(typeof r["booking@*"] === "number" && r["booking@*"] > 20 && r["booking@*"] < 25);
+});

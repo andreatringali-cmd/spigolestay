@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -70,7 +70,13 @@ const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}
 const CATS_KEY = "spigolestay:cassa:cats";
 
 export default function CassaPage() {
-  const { bookings, guests, structures, activeStructureId, getStructure } = useData();
+  const { bookings, guests, structures, getStructure, allStructures, selectedStructureIds, raw } = useData();
+  // AMBITO della Cassa: le strutture selezionate in alto a destra (una, più d'una, o tutte). Ogni struttura ha i propri registri, saldi, entrate e uscite; con più strutture si sommano.
+  const scope = useMemo<CashScope>(() => cashScopeOf(selectedStructureIds, allStructures.map((x) => x.id)), [selectedStructureIds, allStructures]);
+  const scopeKey = typeof scope === "string" ? scope : scope.join(",");
+  const singleSid = typeof scope === "string" && scope !== "all" ? scope : ""; // struttura di destinazione predefinita: solo se ne è selezionata UNA
+  const multiScope = !singleSid; // più strutture (o tutte): nel registro serve il nome della struttura
+  const scopeStructs = useMemo(() => { const ids = scopeIds(scope, allStructures.map((x) => x.id)); return allStructures.filter((x) => ids.includes(x.id)); }, [scope, allStructures]);
   const ask = useConfirm();
   const toast = useToast();
   const { t } = useLang();
@@ -99,7 +105,7 @@ export default function CassaPage() {
   const [openPayouts, setOpenPayouts] = useState<Set<string>>(() => new Set()); // bonifici aperti nell'elenco
   // Le impostazioni incassi sono PER STRUTTURA: nella finestra si sceglie la struttura (di partenza la attiva, se è una sola; altrimenti la prima).
   const [payoutStruct, setPayoutStruct] = useState("");
-  const payoutSid = structures.some((x) => x.id === payoutStruct) ? payoutStruct : (structures.some((x) => x.id === activeStructureId) ? activeStructureId : (structures[0]?.id ?? ""));
+  const payoutSid = structures.some((x) => x.id === payoutStruct) ? payoutStruct : (structures.some((x) => x.id === singleSid) ? singleSid : (structures[0]?.id ?? ""));
   const payoutKey = payoutSid || DEFAULT_PAYOUTS_ID;
   const payoutsOfModal = payoutSettingsFor(payouts, payoutSid);
   const openPayoutModal = () => { setPayoutStruct(""); setPayoutModal(true); };
@@ -143,9 +149,9 @@ export default function CassaPage() {
   const today = todayISO();
 
   // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
-  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId, principal, payouts), [bookings, guests, activeStructureId, getStructure, principal, payouts]);
-  const ruleVisible = (structureId?: string) => scopeVisible(structureId, activeStructureId);
-  const scheduled = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, activeStructureId, today), overrides), [rules, activeStructureId, today, paidSet, overrides]);
+  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, scope, principal, payouts), [bookings, guests, scopeKey, getStructure, principal, payouts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ruleVisible = (structureId?: string) => scopeVisible(structureId, scope);
+  const scheduled = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, scope, today), overrides), [rules, scopeKey, today, paidSet, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scadenze da registrare: occorrenze passate di regole NON automatiche, non ancora saldate (stato SCADUTA).
   const pending = useMemo(() => {
@@ -157,7 +163,7 @@ export default function CassaPage() {
     }
     return out.sort((a, b) => (a.iso < b.iso ? 1 : -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rules, activeStructureId, today, paidSet]);
+  }, [rules, scopeKey, today, paidSet]);
   const dropPaid = (keys: string[]) => setPaid((p) => p.filter((x) => !keys.includes(x)));
   const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(tenantId ?? user.id, [k]), "Il pagamento", () => dropPaid([k])); };
   const [pendAmt, setPendAmt] = useState<Record<string, string>>({}); // importo reale digitato per le scadenze a importo variabile
@@ -181,9 +187,9 @@ export default function CassaPage() {
     for (const r of rules) { if (!ruleVisible(r.structureId)) continue; for (const iso of occurrences(r, from, horizon)) list.push({ rule: r, date: iso }); }
     return list.sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 8);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rules, activeStructureId]);
+  }, [rules, scopeKey]);
 
-  const visibleManual = useMemo(() => manual.filter((m) => ruleVisible(m.structureId)), [manual, activeStructureId]);
+  const visibleManual = useMemo(() => manual.filter((m) => ruleVisible(m.structureId)), [manual, scopeKey]);
   const all = useMemo(() => [...auto, ...scheduled, ...visibleManual].sort((a, b) => (a.date < b.date ? 1 : -1)), [auto, scheduled, visibleManual]);
 
   // Selettore mese.
@@ -212,7 +218,7 @@ export default function CassaPage() {
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts), overrides), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts, overrides]);
+  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(bookings, guests, getStructure, rules, scope, today, fcEnd, principal, payouts), overrides), [bookings, guests, getStructure, rules, scopeKey, today, fcEnd, principal, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -223,11 +229,15 @@ export default function CassaPage() {
   const uscite = sumCents(rowsStat.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldo = roundCents(entrate - uscite);
 
-  const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all", principal, payouts), [bookings, guests, getStructure, principal, payouts]);
-  const programmateTutte = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, "all", today), overrides), [rules, paidSet, today, overrides]);
-  const balances = useMemo(() => computeBalances([...autoTutte, ...programmateTutte, ...manual], today, CONTI.map((c) => c.key)), [autoTutte, programmateTutte, manual, today, CONTI]);
+  // SALDI PER STRUTTURA: ogni struttura ha il proprio saldo di partenza su ogni conto e conta solo i propri movimenti; il saldo dell'ambito è la somma (con "Tutte" valgono anche i vecchi saldi comuni).
+  const contiKeys = useMemo(() => CONTI.map((c) => c.key), [CONTI]);
+  const balMovs = useMemo<Mov[]>(() => [...auto, ...scheduled, ...visibleManual], [auto, scheduled, visibleManual]);
+  const balances = useMemo(() => computeBalances(balMovs, today, contiKeys, scope), [balMovs, today, contiKeys, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const balParts = useMemo(() => balanceParts(balMovs, today, contiKeys, scope), [balMovs, today, contiKeys, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const saldoPerStruttura = useMemo(() => balanceTotalsBySid(balParts).map((x) => ({ ...x, name: x.sid ? (getStructure(x.sid)?.name ?? "—") : t("Comuni (vecchio saldo)") })), [balParts, getStructure, t]);
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
+
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
   // Ultima card in vista "oggi e future": saldo previsto = saldo attuale dei conti + entrate − uscite dei giorni dopo oggi (quelli di oggi sono già nel saldo attuale).
   const prevCard = futureView && hasOpening;
@@ -236,9 +246,8 @@ export default function CassaPage() {
   const entrateCard = sumCents(cardRows.filter((m) => m.kind === "in").map((m) => m.amount));
   const usciteCard = sumCents(cardRows.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldoPrevisto = roundCents(saldoTot + entrateCard - usciteCard);
-  // Estratto conto: saldo dopo ogni movimento, solo per la struttura selezionata in alto a destra (con "tutte" sono tutte). I saldi di partenza dei conti valgono sempre.
-  const ledgerManual = useMemo(() => manual.filter((m) => m.cat === OPENING_CAT || ruleVisible(m.structureId)), [manual, activeStructureId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...ledgerManual, ...forecastView]), [auto, scheduled, ledgerManual, forecastView]);
+  // Estratto conto: saldo dopo ogni movimento, solo per le strutture selezionate in alto a destra (somma dei saldi di ciascuna, dalla propria data di partenza).
+  const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...visibleManual, ...forecastView], scope), [auto, scheduled, visibleManual, forecastView, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   // Commissioni trattenute dal portale TUTTE INSIEME (modalità mensile): sulla riga dell'incasso restano solo come nota informativa, il movimento vero è l'aggregato mensile.
@@ -256,12 +265,16 @@ export default function CassaPage() {
   );
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
-  const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
-  const openOpening = () => {
-    const amounts: Record<string, string> = {};
-    for (const c of CONTI) amounts[c.key] = balances[c.key]?.since ? formatDecimalIT(balances[c.key].start ?? null) : "";
-    setOpening({ date: todayISO(), amounts, newName: "", startOfDay: false });
+  // I saldi di partenza sono PER STRUTTURA: la finestra lavora su una struttura alla volta (scelta in cima), con i suoi importi e basta.
+  const [opening, setOpening] = useState<{ sid: string; date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
+  const openingAmounts = (sid: string) => { const amounts: Record<string, string> = {}; for (const c of CONTI) { const op = sid ? openingOf(manual, sid, c.key) : undefined; amounts[c.key] = op ? formatDecimalIT(signedAmount(op)) : ""; } return amounts; };
+  const openOpening = (sid?: string) => {
+    const pick = sid && scopeStructs.some((x) => x.id === sid) ? sid : (singleSid || scopeStructs[0]?.id || "");
+    setOpening({ sid: pick, date: todayISO(), amounts: openingAmounts(pick), newName: "", startOfDay: false });
   };
+  const pickOpeningStruct = (sid: string) => setOpening((o) => (o ? { ...o, sid, amounts: openingAmounts(sid) } : o));
+  // Vecchi saldi di partenza SENZA struttura (comuni): valgono solo con "Tutte" e coprono le strutture che non hanno ancora il proprio.
+  const commonOpenings = useMemo(() => manual.filter((m) => m.cat === OPENING_CAT && normSid(m.structureId) === ""), [manual]);
   const addConto = () => {
     if (!opening) return;
     const label = opening.newName.trim();
@@ -284,7 +297,7 @@ export default function CassaPage() {
     setRenaming(null);
   };
   const deleteConto = async (c: ContoDef) => {
-    const chk = canDeleteConto(c.key, [...autoTutte, ...programmateTutte, ...manual], rules, [principal, "contanti"]);
+    const chk = canDeleteConto(c.key, [...computeAuto(raw.bookings, guests, getStructure, "all", principal, payouts), ...computeScheduled(rules, paidSet, "all", today), ...manual], rules, [principal, "contanti"]);
     if (!chk.ok) { await ask({ title: t("Conto non eliminabile"), message: t(chk.reason ?? ""), confirmLabel: t("Ho capito") }); return; }
     if (!(await ask({ title: t("Elimina conto"), message: `${t("Eliminare il conto")} «${c.label}»? ${t("Il suo saldo di partenza verrà tolto.")}`, danger: true, confirmLabel: t("Elimina") }))) return;
     const next = conti.filter((x) => x.key !== c.key);
@@ -297,12 +310,24 @@ export default function CassaPage() {
     }
     setOpening((o) => { if (!o) return o; const { [c.key]: _gone, ...rest } = o.amounts; void _gone; return { ...o, amounts: rest }; });
   };
+  const removeCommonOpenings = async () => {
+    if (!commonOpenings.length) return;
+    if (!(await ask({ title: t("Togliere i saldi comuni?"), message: `${commonOpenings.map((m) => `${CONTI.find((c) => c.key === m.conto)?.label ?? m.conto} ${eur(signedAmount(m))}`).join(", ")}. ${t("I saldi di partenza delle singole strutture non cambiano.")}`, danger: true, confirmLabel: t("Togli") }))) return;
+    const olds = commonOpenings;
+    const ids = new Set(olds.map((o) => o.id));
+    setManual((prev) => prev.filter((x) => !ids.has(x.id)));
+    if (user) for (const o of olds) checkWrite(deleteMovement(o.id), "Il saldo di partenza comune", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
+  };
   const openingTotal = opening ? sumCents(CONTI.map((c) => { const v = parseFloat((opening.amounts[c.key] ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(v) ? v : 0; })) : 0;
   const saveOpening = async () => {
     if (!opening) return;
-    // Protezione: i conti sono gli STESSI per tutte le strutture. Se si sta per portare a zero un saldo che oggi ha un importo, si chiede conferma (è così che si perde il saldo per errore).
-    const azzerati = CONTI.filter((c) => { const txt = (opening.amounts[c.key] ?? "").trim(); const v = txt ? parseDecimalIT(txt) : null; const cur = balances[c.key]?.start ?? 0; return v === 0 && Math.abs(cur) > 0.005; });
-    if (azzerati.length && !(await ask({ title: "Azzerare il saldo di partenza?", message: `Stai per portare a zero: ${azzerati.map((c) => `${c.label} (ora ${eur(balances[c.key]?.start ?? 0)})`).join(", ")}. I conti valgono per tutte le strutture, non solo per quella selezionata.`, danger: true, confirmLabel: "Azzera" }))) return;
+    const sid = opening.sid;
+    if (!sid) { toast(t("Scegli la struttura."), "error"); return; }
+    const sname = getStructure(sid)?.name ?? "—";
+    const curOf = (key: string) => { const op = openingOf(manual, sid, key); return op ? signedAmount(op) : 0; };
+    // Protezione: se si sta per portare a zero un saldo che oggi ha un importo, si chiede conferma (è così che si perde il saldo per errore). Vale solo per questa struttura.
+    const azzerati = CONTI.filter((c) => { const txt = (opening.amounts[c.key] ?? "").trim(); const v = txt ? parseDecimalIT(txt) : null; return v === 0 && Math.abs(curOf(c.key)) > 0.005; });
+    if (azzerati.length && !(await ask({ title: "Azzerare il saldo di partenza?", message: `Stai per portare a zero, per «${sname}»: ${azzerati.map((c) => `${c.label} (ora ${eur(curOf(c.key))})`).join(", ")}. Gli altri saldi delle altre strutture non cambiano.`, danger: true, confirmLabel: "Azzera" }))) return;
     const date0 = opening.date || todayISO();
     const date = opening.startOfDay ? shiftISO(date0, -1) : date0; // saldo di inizio giornata: valido dalla sera prima, così contano anche i movimenti di quel giorno
     const newMovs: Mov[] = []; const olds: Mov[] = [];
@@ -311,8 +336,8 @@ export default function CassaPage() {
       if (!txt) continue;
       const raw = parseDecimalIT(txt);
       if (raw === null) continue;
-      newMovs.push({ id: uid(), date, kind: raw >= 0 ? "in" : "out", cat: OPENING_CAT, desc: `${t("Saldo di partenza")} · ${c.label}`, amount: roundCents(Math.abs(raw)), conto: c.key });
-      olds.push(...manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key)); // il nuovo sostituisce quello di prima
+      newMovs.push({ id: uid(), date, kind: raw >= 0 ? "in" : "out", cat: OPENING_CAT, desc: `${t("Saldo di partenza")} · ${sname} · ${c.label}`, amount: roundCents(Math.abs(raw)), conto: c.key, structureId: sid });
+      olds.push(...manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key && normSid(x.structureId) === sid)); // il nuovo sostituisce quello di prima, SOLO di questa struttura
     }
     if (!newMovs.length) { setOpening(null); return; }
     const oldIds = new Set(olds.map((o) => o.id));
@@ -359,13 +384,13 @@ export default function CassaPage() {
   const axisTicks = [0, 1, 2, 3, 4].map((i) => i * axis.step);
 
   // ---- Form nuovo movimento -------------------------------------------------
-  const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
+  const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: singleSid, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
   const NEW_MOV = "__nuovo__";
   const [movTab, setMovTab] = useState<"mov" | "prog">("mov"); // scheda della finestra Nuovo movimento
   const OCC_MOV = "__scadenza__"; // la finestra movimento modifica UNA scadenza di un pagamento programmato
   const [editingMov, setEditingMov] = useState<string | null>(null); // finestra movimento: id del movimento in modifica, NEW_MOV per uno nuovo, null = chiusa
-  const openNewMov = () => { setForm((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key, desc: "", amount: "", repeat: "once", date: todayISO(), struttura: activeStructureId })); setMovTab("mov"); setEditingMov(NEW_MOV); };
+  const openNewMov = () => { setForm((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key, desc: "", amount: "", repeat: "once", date: todayISO(), struttura: singleSid })); setMovTab("mov"); setEditingMov(NEW_MOV); };
   const resetForm = () => { setEditingMov(null); setOccCtx(null); setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once", date: todayISO() })); };
   const openOcc = (m: Mov) => {
     const r = rules.find((x) => x.id === m.ref);
@@ -373,7 +398,7 @@ export default function CassaPage() {
     const key = occurrenceKey(m);
     const origDate = key.split("|")[1] ?? m.date;
     setOccCtx({ key, ruleId: r.id, orig: { amount: r.amount, date: origDate, desc: r.desc, cat: r.cat, conto: r.conto } });
-    setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? activeStructureId, repeat: "once" });
+    setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? (singleSid || "all"), repeat: "once" });
     setEditingMov(OCC_MOV);
   };
   const saveOcc = () => {
@@ -393,7 +418,7 @@ export default function CassaPage() {
   const resetOcc = () => { if (!occCtx) return; const next = { ...overrides }; delete next[occCtx.key]; setOverrides(next); saveOverrides(next); resetForm(); };
   const startEditMov = (m: Mov) => {
     setEditingMov(m.id);
-    setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? activeStructureId, repeat: "once" });
+    setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? (singleSid || "all"), repeat: "once" });
   };
   // Se la data del movimento cade fuori dal periodo mostrato, allarga il periodo: la riga appena registrata deve vedersi nell'elenco.
   const showDate = (d: string) => {
@@ -402,6 +427,7 @@ export default function CassaPage() {
   };
   const add = () => {
     if (editingMov === OCC_MOV) { saveOcc(); return; }
+    if (!form.struttura) { toast(t("Scegli la struttura."), "error"); return; } // con più strutture (o tutte) la struttura va scelta: niente voci «comuni» per sbaglio
     const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0); // al centesimo (prima era arrotondato all'euro)
     if (amt <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return; }
     if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
@@ -457,19 +483,20 @@ export default function CassaPage() {
   // ---- Modale pagamento programmato -----------------------------------------
   const [ruleModal, setRuleModal] = useState(false);
   const [editingRule, setEditingRule] = useState<string | null>(null); // id della regola in modifica (null = nuova)
-  const [rf, setRf] = useState<{ kind: Kind; cat: string; desc: string; amount: string; conto: string; struttura: string; freq: Rule["freq"]; day: string; start: string; auto: boolean; end: string; note?: string; variable: boolean }>(() => ({ kind: "out", cat: "affitto", desc: "", amount: "", conto: "banca", struttura: activeStructureId, freq: "monthly", day: "1", start: todayISO(), auto: true, end: "", note: "", variable: false }));
+  const [rf, setRf] = useState<{ kind: Kind; cat: string; desc: string; amount: string; conto: string; struttura: string; freq: Rule["freq"]; day: string; start: string; auto: boolean; end: string; note?: string; variable: boolean }>(() => ({ kind: "out", cat: "affitto", desc: "", amount: "", conto: "banca", struttura: singleSid, freq: "monthly", day: "1", start: todayISO(), auto: true, end: "", note: "", variable: false }));
   // La struttura del nuovo movimento/regola segue la struttura selezionata in alto a destra.
-  useEffect(() => { setForm((f) => ({ ...f, struttura: activeStructureId })); setRf((f) => ({ ...f, struttura: activeStructureId })); }, [activeStructureId]);
+  useEffect(() => { setForm((f) => ({ ...f, struttura: singleSid })); setRf((f) => ({ ...f, struttura: singleSid })); }, [singleSid]);
   const openNewRule = () => { setEditingRule(null); setRuleModal(true); };
   const openEditRule = (r: Rule) => {
     setEditingRule(r.id);
-    setRf({ kind: r.kind, cat: r.cat, desc: r.desc, amount: String(r.amount).replace(".", ","), conto: r.conto, struttura: r.structureId ?? activeStructureId, freq: r.freq, day: String(r.day), start: r.start, auto: r.auto, end: r.end ?? "", note: r.note ?? "", variable: !!r.variable });
+    setRf({ kind: r.kind, cat: r.cat, desc: r.desc, amount: String(r.amount).replace(".", ","), conto: r.conto, struttura: r.structureId ?? (singleSid || "all"), freq: r.freq, day: String(r.day), start: r.start, auto: r.auto, end: r.end ?? "", note: r.note ?? "", variable: !!r.variable });
     setRuleModal(true);
   };
   const closeRuleModal = () => { setRuleModal(false); setEditingRule(null); };
   const addRule = () => {
     const amt = roundCents(parseFloat(rf.amount.replace(",", ".")) || 0);
     if (amt <= 0) return;
+    if (!rf.struttura) { toast(t("Scegli la struttura."), "error"); return; }
     if (editingRule) {
       const prev = rules.find((r) => r.id === editingRule);
       if (!prev) return closeRuleModal();
@@ -495,7 +522,7 @@ export default function CassaPage() {
   const periodLabel = from || to ? `${from || "inizio"}_${to || "in-poi"}` : "storico";
   const doExcel = () => {
     const headers = [t("Data"), t("Tipo"), t("Categoria"), t("Descrizione"), t("Conto"), t("Struttura"), `${t("Entrata")} €`, `${t("Uscita")} €`];
-    const body = rows.map((m) => [m.date, m.kind === "in" ? t("Entrata") : t("Uscita"), catOf(m.cat)?.label ? t(catOf(m.cat)!.label) : m.cat, m.desc + (m.sched ? ` (${t("programmato")})` : m.auto ? ` (${t("auto")})` : ""), CONTI.find((x) => x.key === m.conto)?.label ? t(CONTI.find((x) => x.key === m.conto)!.label) : m.conto, structNameOf(m.structureId), m.kind === "in" ? m.amount : "", m.kind === "out" ? m.amount : ""]);
+    const body = rows.map((m) => [m.date, m.kind === "in" ? t("Entrata") : t("Uscita"), catOf(m.cat)?.label ? t(catOf(m.cat)!.label) : m.cat, m.desc + (m.sched ? ` (${t("programmato")})` : m.auto ? ` (${t("auto")})` : ""), CONTI.find((x) => x.key === m.conto)?.label ? t(CONTI.find((x) => x.key === m.conto)!.label) : m.conto, structNameOf(movSid(m)), m.kind === "in" ? m.amount : "", m.kind === "out" ? m.amount : ""]);
     body.push(["", "", "", "", "", t("TOTALI"), entrate, uscite]);
     body.push(["", "", "", "", "", t("SALDO"), saldo, ""]);
     exportExcel(`cassa-${periodLabel}`, headers, body);
@@ -519,7 +546,7 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}</> : t("Imposta il saldo di partenza →")} />
+        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}{saldoPerStruttura.length > 1 && <span className="mt-0.5 block space-y-px text-[10px] leading-tight">{saldoPerStruttura.map((x) => <span key={x.sid || "comuni"} className="flex items-baseline justify-between gap-2"><span className="truncate">{x.name}</span><span className="shrink-0 font-mono">{eur(x.saldo)}</span></span>)}</span>}</> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrateCard)} color="var(--ok)" hint={`${cardRows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(usciteCard)} color="var(--err)" hint={`${cardRows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? <>{t("con saldo attuale")} · {t("al")} {fmtDMY(listHorizon)}</> : t("entrate − uscite")} />
@@ -600,12 +627,6 @@ export default function CassaPage() {
           <DateField value={from} onChange={(v) => { setFrom(v); setPreset("custom"); }} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
           <span className="text-xs text-faint">→</span>
           <DateField value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
-        </div>
-        {/* Entrate / Uscite: sempre a vista (le altre viste per tipo restano nel menu qui accanto) */}
-        <div role="group" aria-label={t("Entrate e uscite")} className="flex items-center rounded-lg border border-line p-0.5">
-          {([["all", "Tutti", "var(--txt)"], ["in", "Entrate", "var(--ok)"], ["out", "Uscite", "var(--err)"]] as const).map(([k, lab, col]) => (
-            <button key={k} type="button" onClick={() => setTipo(k)} aria-pressed={tipo === k} className={`rounded-md px-2.5 py-1 text-sm font-semibold transition ${tipo === k ? "bg-focus text-white" : "hover:bg-wash"}`} style={tipo === k ? undefined : { color: col }}>{t(lab)}</button>
-          ))}
         </div>
         <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
           <option value="all">{t("Tutti i movimenti")}</option>
@@ -743,7 +764,7 @@ export default function CassaPage() {
                   const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
                   const bal = ledger.balanceAfter.get(lastId) ?? null;
                   // riga modificabile: movimento inserito a mano (si apre la finestra di modifica) o saldo di partenza (si apre la finestra del saldo)
-                  const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
+                  const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening(normSid(m.structureId)) : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
                     <div key={isBooking ? "b-" + r.id : m.id}>
@@ -757,7 +778,7 @@ export default function CassaPage() {
                         {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
                         {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
                         {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
-                        <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), activeStructureId === "all" && m.structureId && m.structureId !== "all" ? structNameOf(m.structureId) : ""].filter(Boolean).join(" · ")}</span>
+                        <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), multiScope && movSid(m) ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
                       </div>
                       {isBooking ? (
                         <>
@@ -855,7 +876,11 @@ export default function CassaPage() {
           <button aria-label={t("Chiudi")} onClick={() => setOpening(null)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
           <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="text-base font-bold text-txt">{t("Saldo di partenza")}</div>
-            {activeStructureId !== "all" && <p className="mt-1 rounded-lg bg-wash px-2.5 py-1.5 text-[11px] font-medium text-[color:var(--warn)]">{t("Attenzione: i conti (Revolut, Banca, Contanti) sono gli stessi per tutte le strutture. Questi importi valgono per tutte, non solo per la struttura selezionata.")}</p>}
+            <label className="mt-2 block"><span className="text-xs font-semibold text-dim">{t("Struttura")}</span>
+              <select aria-label={t("Struttura")} value={opening.sid} onChange={(e) => pickOpeningStruct(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm font-semibold text-txt outline-none focus:border-focus">{scopeStructs.length === 0 && <option value="">{t("Scegli la struttura…")}</option>}{scopeStructs.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+            </label>
+            <p className="mt-1.5 rounded-lg bg-wash px-2.5 py-1.5 text-[11px] font-medium text-dim">{t("I saldi sono PER STRUTTURA: gli importi qui sotto valgono solo per la struttura scelta qui sopra. Il saldo attuale di più strutture è la somma dei loro saldi. I conti (Revolut, Banca, Contanti) hanno un saldo separato in ogni struttura.")}</p>
+            {commonOpenings.length > 0 && <div className="mt-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[color:var(--warn)]" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)" }}>{t("Hai ancora dei saldi di partenza COMUNI (vecchio sistema, senza struttura)")}: {commonOpenings.map((m) => `${CONTI.find((c) => c.key === m.conto)?.label ?? m.conto} ${eur(signedAmount(m))}`).join(" · ")}. {t("Valgono solo con «Tutte le strutture» e coprono le strutture che non hanno ancora il proprio saldo: quando li hai riscritti per struttura, toglili per non contarli due volte.")} <button type="button" onClick={() => void removeCommonOpenings()} className="font-semibold underline">{t("Togli i saldi comuni")}</button></div>}
             <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai oggi su ogni conto. Da qui ogni saldo parte dal suo importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve. I conti lasciati vuoti non vengono toccati.")}</p>
             <p className="mt-1 text-[11px] text-faint">{t("★ = conto principale: qui arrivano i soldi delle prenotazioni dai portali. ↑ ↓ cambiano l'ordine dei conti.")}</p>
             <div className="mt-3 flex flex-col gap-2">
@@ -1016,7 +1041,7 @@ export default function CassaPage() {
               <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={form.conto} onChange={(e) => setForm((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
               <label className="block"><span className="text-xs text-dim">{t("Data")}</span><input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             </div>
-            {activeStructureId === "all" && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+            {!singleSid && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")} *</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className={"mt-0.5 w-full rounded-lg border bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus " + (form.struttura ? "border-line" : "border-[color:var(--warn)]")}><option value="">{t("Scegli la struttura…")}</option>{form.struttura === "all" && <option value="all">{t("Comune (tutte)")}</option>}{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             {editingMov === NEW_MOV && (
             <div className="mb-3">
@@ -1103,7 +1128,7 @@ export default function CassaPage() {
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
               <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={rf.conto} onChange={(e) => setRf((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
-              {activeStructureId === "all" && <label className="block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={rf.struttura} onChange={(e) => setRf((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{activeStructureId === "all" && <option value="all">{t("Tutte")}</option>}{structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+              {!singleSid && <label className="block"><span className="text-xs text-dim">{t("Struttura")} *</span><select value={rf.struttura} onChange={(e) => setRf((f) => ({ ...f, struttura: e.target.value }))} className={"mt-0.5 w-full rounded-lg border bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus " + (rf.struttura ? "border-line" : "border-[color:var(--warn)]")}><option value="">{t("Scegli la struttura…")}</option>{rf.struttura === "all" && <option value="all">{t("Comune (tutte)")}</option>}{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
             </div>
             {rf.freq === "monthly" && <label className="mb-2 block"><span className="text-xs text-dim">{t("A partire da")}</span><input type="date" value={rf.start} onChange={(e) => setRf((f) => ({ ...f, start: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>}
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Termina ripetizione")}</span><input type="date" value={rf.end} onChange={(e) => setRf((f) => ({ ...f, end: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><span className="mt-0.5 block text-[11px] text-faint">{t("Lascia vuoto per «Mai».")}</span></label>

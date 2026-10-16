@@ -62,8 +62,28 @@ export function cashView<T extends { structureId: string; movedFrom?: { structur
   const sid = cashStructureOf(b);
   return sid === b.structureId ? b : { ...b, structureId: sid };
 }
-export const scopeVisible = (structureId: string | undefined | null, active: string) =>
-  active === "all" || structureId === active;
+/**
+ * AMBITO della Cassa (quali strutture si stanno guardando): "all" = tutte le strutture dell'account (somma di tutto, comprese le voci "comuni" senza struttura);
+ * una stringa = UNA struttura; un array = un SOTTOINSIEME di strutture (le voci senza struttura non si vedono). Una selezione che copre tutte le strutture vale "all" (vedi cashScopeOf).
+ */
+export type CashScope = "all" | string | readonly string[];
+/** Struttura di una voce: le voci "comuni" (nessuna struttura, oppure il vecchio valore "all") danno "". */
+export const normSid = (s: string | undefined | null): string => (s && s !== "all" ? s : "");
+export function scopeVisible(structureId: string | undefined | null, scope: CashScope): boolean {
+  if (typeof scope === "string") return scope === "all" || structureId === scope;
+  const sid = normSid(structureId);
+  return sid !== "" && scope.includes(sid);
+}
+/** Ambito dalla selezione delle strutture in alto a destra: tutte (o nessuna) → "all"; una sola → il suo id; più d'una → l'elenco. */
+export function cashScopeOf(selectedIds: readonly string[], allIds: readonly string[]): CashScope {
+  const sel = selectedIds.filter((id) => allIds.includes(id));
+  if (sel.length === 0 || allIds.every((id) => sel.includes(id))) return "all";
+  return sel.length === 1 ? sel[0] : sel;
+}
+/** Le strutture dell'ambito (per "all": tutte quelle dell'account). */
+export const scopeIds = (scope: CashScope, allIds: readonly string[]): string[] => (typeof scope === "string" ? (scope === "all" ? [...allIds] : [scope]) : allIds.filter((id) => scope.includes(id)));
+/** Struttura a cui appartiene un movimento (quella della prenotazione per i movimenti automatici; "" = comune). */
+export const movSid = (m: { structureId?: string; bookingStructureId?: string }): string => normSid(m.bookingStructureId || m.structureId);
 
 /** Id del secondo movimento di incasso di una prenotazione diretta pagata online: la parte NON pagata online (es. saldo in contanti all'arrivo). Comincia per `auto-in-`, così i filtri e i raggruppamenti per prenotazione lo riconoscono. */
 export const REST_IN_PREFIX = "auto-in-resto-";
@@ -94,13 +114,13 @@ export function monthlyCommissionInfo(bk: Booking, payouts: PayoutSettingsMap): 
 // del mese dopo" (PayoutRule.commission), NON c'è più il movimento per prenotazione: c'è UN movimento per (struttura, canale, mese del CHECK-OUT) datato il giorno N
 // del mese successivo, con la somma delle commissioni (ai centesimi) delle prenotazioni non annullate di quel mese. L'incasso resta lordo e invariato.
 // Diretta pagata online (Stripe): la parte pagata online è datata al giorno del pagamento (booking.paidAt), non all'arrivo.
-export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
+export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: CashScope, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
   const batches = new Map<string, { structureId: string; channel: Booking["channel"]; ym: string; day: number; items: { id: string; checkOut: string; comm: number }[] }>();
   const structIds = new Set<string>(); // strutture delle prenotazioni visibili: se più di una, il nome struttura entra nella descrizione delle commissioni mensili
   for (const b of bookings.map(cashView)) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
-    if (active !== "all" && b.structureId !== active) continue;
+    if (!scopeVisible(b.structureId, active)) continue;
     structIds.add(b.structureId);
     const when = payoutDate(b, payouts); // data in cui i soldi arrivano davvero (impostazioni del canale, della struttura della prenotazione)
     const g = guests.find((x) => x.id === b.guestId);
@@ -140,7 +160,7 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
 }
 
 // Occorrenze passate (fino a uptoISO) che contano nel saldo: regole automatiche o occorrenze già saldate.
-export function computeScheduled(rules: Rule[], paid: Set<string>, active: string, uptoISO: string): Mov[] {
+export function computeScheduled(rules: Rule[], paid: Set<string>, active: CashScope, uptoISO: string): Mov[] {
   const out: Mov[] = [];
   const from = fmt(new Date().getFullYear() - 2, new Date().getMonth(), 1);
   for (const r of rules) {
@@ -283,15 +303,67 @@ export const OPENING_CAT = "apertura";
 const signed = (m: Mov) => (m.kind === "in" ? m.amount : -m.amount);
 export interface Balance { saldo: number; since?: string; start?: number }
 
-/** Saldo attuale per conto. Con un saldo di partenza: importo di partenza + movimenti dei giorni dopo la data di partenza, fino a oggi.
- *  Senza saldo di partenza resta la somma di tutti i movimenti, come prima. Il saldo di partenza più recente vince. */
-export function computeBalances(movs: Mov[], today: string, conti: string[]): Record<string, Balance> {
+/** Un pezzo del saldo: una STRUTTURA (sid; "" = comune) su un conto.
+ *  own = ha il PROPRIO saldo di partenza; senza, può essere "coperto" dal vecchio saldo comune (since valorizzato, solo con l'ambito "all"). */
+export interface BalancePart { sid: string; conto: string; saldo: number; since?: string; start?: number; own: boolean }
+
+const latestOf = (list: Mov[]): Mov | undefined => list.reduce<Mov | undefined>((best, m) => (!best || m.date >= best.date ? m : best), undefined);
+
+/**
+ * Saldi PER STRUTTURA e per conto nell'ambito dato. Per ogni coppia (struttura, conto) c'è il suo saldo di partenza (il più recente) e contano SOLO i movimenti di quella
+ * struttura dei giorni dopo la data di partenza, fino a oggi. Il totale è la somma dei pezzi.
+ * Compatibilità: un vecchio saldo di partenza SENZA struttura (comune) vale solo con l'ambito "all": copre i movimenti di tutte le strutture che su quel conto non hanno
+ * ancora il proprio saldo (come prima che i saldi fossero per struttura); appena una struttura scrive il proprio, i suoi movimenti passano a quello.
+ * Un conto senza alcun saldo di partenza resta la somma di tutti i movimenti, senza "since".
+ */
+export function balanceParts(movs: Mov[], today: string, conti: string[], scope: CashScope = "all"): BalancePart[] {
+  const inScope = movs.filter((m) => scopeVisible(movSid(m) || undefined, scope));
+  const sids = [...new Set(inScope.map(movSid))];
+  const parts: BalancePart[] = [];
+  for (const conto of conti) {
+    const cm = inScope.filter((m) => m.conto === conto);
+    const opens = cm.filter((m) => m.cat === OPENING_CAT);
+    const real = cm.filter((m) => m.cat !== OPENING_CAT);
+    const own = new Map<string, Mov>();
+    for (const sid of sids) { const op = latestOf(opens.filter((m) => movSid(m) === sid)); if (op) own.set(sid, op); }
+    if (own.size === 0) {
+      for (const sid of sids) { const r = real.filter((m) => movSid(m) === sid); if (r.length) parts.push({ sid, conto, saldo: sumCents(r.map(signed)), own: false }); }
+      continue;
+    }
+    const common = scope === "all" ? own.get("") : undefined;
+    for (const sid of sids) {
+      const gm = real.filter((m) => movSid(m) === sid);
+      const op = own.get(sid);
+      if (op) parts.push({ sid, conto, saldo: roundCents(signed(op) + sumCents(gm.filter((m) => m.date > op.date && m.date <= today).map(signed))), since: op.date, start: signed(op), own: true });
+      else if (common) parts.push({ sid, conto, saldo: sumCents(gm.filter((m) => m.date > common.date && m.date <= today).map(signed)), since: common.date, own: false });
+    }
+  }
+  return parts;
+}
+
+/** Il saldo di partenza in vigore (il più recente) di una struttura su un conto; sid "" = comune (vecchio sistema, senza struttura). */
+export const openingOf = (movs: Mov[], sid: string, conto: string): Mov | undefined => latestOf(movs.filter((m) => m.cat === OPENING_CAT && m.conto === conto && movSid(m) === sid));
+/** Importo con segno di un movimento (entrata +, uscita −). */
+export const signedAmount = (m: { kind: Kind; amount: number }): number => (m.kind === "in" ? m.amount : -m.amount);
+
+/** Totale per struttura dei conti con saldo di partenza (stessa regola del saldo attuale: i conti senza saldo di partenza non hanno uno storico completo e non contano). */
+export function balanceTotalsBySid(parts: BalancePart[]): { sid: string; saldo: number }[] {
+  const map = new Map<string, number>();
+  for (const p of parts) if (p.since) map.set(p.sid, sumCents([map.get(p.sid) ?? 0, p.saldo]));
+  return [...map.entries()].map(([sid, saldo]) => ({ sid, saldo }));
+}
+
+/** Saldo attuale per conto nell'ambito dato: somma dei saldi delle strutture (vedi balanceParts). Con un saldo di partenza: importo + movimenti dei giorni dopo la data,
+ *  fino a oggi. Senza saldo di partenza resta la somma di tutti i movimenti, come prima. Per ogni struttura il saldo di partenza più recente vince. */
+export function computeBalances(movs: Mov[], today: string, conti: string[], scope: CashScope = "all"): Record<string, Balance> {
+  const parts = balanceParts(movs, today, conti, scope);
   const out: Record<string, Balance> = {};
   for (const conto of conti) {
-    const op = movs.filter((m) => m.cat === OPENING_CAT && m.conto === conto).reduce<Mov | undefined>((best, m) => (!best || m.date >= best.date ? m : best), undefined);
-    if (!op) { out[conto] = { saldo: sumCents(movs.filter((m) => m.conto === conto && m.cat !== OPENING_CAT).map(signed)) }; continue; }
-    const after = movs.filter((m) => m.conto === conto && m.cat !== OPENING_CAT && m.date > op.date && m.date <= today);
-    out[conto] = { saldo: roundCents(signed(op) + sumCents(after.map(signed))), since: op.date, start: signed(op) };
+    const ps = parts.filter((p) => p.conto === conto);
+    const o: Balance = { saldo: sumCents(ps.map((p) => p.saldo)) };
+    const dated = ps.filter((p) => p.since);
+    if (dated.length) { o.since = dated.reduce((best, p) => (p.since! > best ? p.since! : best), ""); o.start = sumCents(dated.filter((p) => p.own).map((p) => p.start ?? 0)); }
+    out[conto] = o;
   }
   return out;
 }
@@ -403,11 +475,11 @@ export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
 // ── Flusso di cassa: oggi e futuro ──────────────────────────────────────────────────────────────────────────────────────
 // Movimenti PREVISTI da oggi in poi: il saldo ancora da incassare delle prenotazioni in arrivo (alla data di arrivo) e le occorrenze future dei pagamenti
 // programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
-export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
+export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: CashScope, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings.map(cashView)) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
-    if (active !== "all" && b.structureId !== active) continue;
+    if (!scopeVisible(b.structureId, active)) continue;
     const when = payoutDate(b, payouts); // impostazioni della struttura della prenotazione
     if (when < today || when > horizon) continue;
     const remaining = roundCents(Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0)));
@@ -426,11 +498,14 @@ export function computeForecast(bookings: Booking[], guests: Guest[], getStructu
   return out;
 }
 
-/** Saldo previsto a una data: il saldo attuale dei conti con saldo di partenza + i movimenti dei giorni dopo oggi, fino a quella data. */
-export function projectBalance(movs: Mov[], balances: Record<string, Balance>, today: string, until: string): number {
+/** Saldo previsto a una data: il saldo attuale dei conti con saldo di partenza + i movimenti dei giorni dopo oggi, fino a quella data.
+ *  Segue lo stesso principio dei saldi: contano solo i movimenti delle strutture che su quel conto hanno il loro saldo di partenza (o il vecchio comune che le copre, con "all"). */
+export function projectBalance(movs: Mov[], balances: Record<string, Balance>, today: string, until: string, scope: CashScope = "all"): number {
   const withOpening = new Set(Object.keys(balances).filter((k) => balances[k].since));
   const base = sumCents([...withOpening].map((k) => balances[k].saldo));
-  const future = movs.filter((m) => withOpening.has(m.conto) && m.cat !== OPENING_CAT && m.date > today && m.date <= until);
+  const counted = new Set(balanceParts(movs, today, [...withOpening], scope).filter((p) => p.since).map((p) => `${p.sid}|${p.conto}`));
+  const hasOpeningMov = (conto: string) => movs.some((m) => m.cat === OPENING_CAT && m.conto === conto);
+  const future = movs.filter((m) => withOpening.has(m.conto) && m.cat !== OPENING_CAT && m.date > today && m.date <= until && scopeVisible(movSid(m) || undefined, scope) && (!hasOpeningMov(m.conto) || counted.has(`${movSid(m)}|${m.conto}`)));
   return roundCents(base + sumCents(future.map(signed)));
 }
 
@@ -458,18 +533,26 @@ export function matchesQuery(m: Mov, q: string, labels: { cat?: string; conto?: 
 }
 
 // ── Estratto conto: saldo in quella data ────────────────────────────────────────────────────────────────────────────────
-// Per ogni movimento il saldo totale dei conti con un saldo di partenza, DOPO quel movimento. Ogni conto parte dal suo saldo di partenza
-// e si muove solo con i movimenti dei giorni successivi (stessa regola del saldo attuale); prima del primo saldo di partenza non c'è saldo (null).
+// Per ogni movimento il saldo totale dei conti con un saldo di partenza, DOPO quel movimento. Ogni coppia (struttura, conto) parte dal suo saldo di partenza
+// e si muove solo con i movimenti di quella struttura dei giorni successivi (stessa regola del saldo attuale); il saldo mostrato è la somma. Il vecchio saldo
+// comune (senza struttura) vale solo con l'ambito "all" e copre le strutture senza saldo proprio su quel conto. Prima del primo saldo di partenza non c'è saldo (null).
 export interface Ledger { order: Map<string, number>; balanceAfter: Map<string, number | null>; included: Set<string> /* movimenti del giorno del saldo di partenza: già compresi nell'importo scritto */ }
-export function computeLedger(movs: Mov[]): Ledger {
-  const seq = movs.map((m, i) => ({ m, i })).sort((a, b) => {
+export function computeLedger(movs: Mov[], scope: CashScope = "all"): Ledger {
+  const list = movs.filter((m) => scopeVisible(movSid(m) || undefined, scope));
+  const seq = list.map((m, i) => ({ m, i })).sort((a, b) => {
     if (a.m.date !== b.m.date) return a.m.date < b.m.date ? -1 : 1;
     const oa = a.m.cat === OPENING_CAT ? 0 : 1, ob = b.m.cat === OPENING_CAT ? 0 : 1; // nello stesso giorno prima i saldi di partenza
     return oa - ob || a.i - b.i;
   });
-  // saldo di partenza in vigore per conto: il più recente
+  // saldo di partenza in vigore per (struttura, conto): il più recente
   const effective = new Map<string, Mov>();
-  for (const { m } of seq) if (m.cat === OPENING_CAT) effective.set(m.conto, m);
+  for (const { m } of seq) if (m.cat === OPENING_CAT) effective.set(`${movSid(m)}|${m.conto}`, m);
+  const keyOf = (m: Mov): string | null => {
+    const own = `${movSid(m)}|${m.conto}`;
+    if (effective.has(own)) return own;
+    const common = `|${m.conto}`;
+    return scope === "all" && effective.has(common) ? common : null; // il vecchio saldo comune copre le strutture senza saldo proprio
+  };
   const bal = new Map<string, number>();
   const order = new Map<string, number>();
   const balanceAfter = new Map<string, number | null>();
@@ -477,11 +560,12 @@ export function computeLedger(movs: Mov[]): Ledger {
   let started = false;
   seq.forEach(({ m }, idx) => {
     order.set(m.id, idx);
-    if (m.cat === OPENING_CAT) { if (effective.get(m.conto)?.id === m.id) { bal.set(m.conto, signed(m)); started = true; } }
-    else {
-      const op = effective.get(m.conto);
-      if (op && m.date > op.date && bal.has(m.conto)) bal.set(m.conto, roundCents((bal.get(m.conto) ?? 0) + signed(m)));
-      else if (op && m.date === op.date) included.add(m.id);
+    const k = keyOf(m);
+    if (m.cat === OPENING_CAT) { if (k && effective.get(k)?.id === m.id) { bal.set(k, signed(m)); started = true; } }
+    else if (k) {
+      const op = effective.get(k)!;
+      if (m.date > op.date && bal.has(k)) bal.set(k, roundCents((bal.get(k) ?? 0) + signed(m)));
+      else if (m.date === op.date) included.add(m.id);
     }
     balanceAfter.set(m.id, started ? sumCents([...bal.values()]) : null);
   });
