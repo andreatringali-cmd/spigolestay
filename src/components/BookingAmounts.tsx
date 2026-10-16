@@ -1,5 +1,5 @@
 import type { Booking, Structure } from "@/lib/types";
-import { bookingPaidTotal, cityTaxOf, cityTaxPayers, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOf, groupTaxShareOf, cityTaxPayers, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
@@ -16,7 +16,7 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
   const total = bookingPaidTotal(b);
   const paid = b.paid ?? 0;
   const resid = Math.max(0, total - paid);
-  const tax = cityTaxOf(structure, cityTaxPayers(structure, b), n, acc, b.cityTaxExempt);
+  const tax = groupTaxShareOf(b.id) ?? cityTaxOf(structure, cityTaxPayers(structure, b), n, acc, b.cityTaxExempt); // camera di un gruppo: quota della tassa del gruppo
   const comm = commissionOf(b);
   const payFee = paymentFeeOf(b);
   const pm = effectivePayMethod(b).method;

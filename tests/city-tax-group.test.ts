@@ -49,3 +49,16 @@ test("residuo di un gruppo: ogni camera con la sua quota di tassa, la somma è i
   assert.equal(Math.round(bals.reduce((a, r) => a + r.balance * 100, 0)), 693); // camere già pagate: resta solo la tassa del gruppo
   assert.deepEqual(bals.map((r) => r.balance).sort(), [3.46, 3.47]);
 });
+
+test("contesto di gruppo: elenco e totali usano la quota del gruppo (6,93 in tutto), le prenotazioni singole restano com'erano", async () => {
+  const { setGroupTaxContext, cityTaxOfBooking: ctb, bookingGrandTotal } = await import("../src/lib/booking.ts");
+  const g = (id: string) => ({ ...room(id), groupId: "g", status: "confirmed", channel: "booking", structureId: "cp", cleaningFee: 0 });
+  const single = { ...room("s"), status: "confirmed", channel: "booking", structureId: "cp" };
+  setGroupTaxContext([g("a"), g("b"), single] as never, () => CP);
+  const a = ctb(CP, g("a") as never), b = ctb(CP, g("b") as never);
+  assert.equal(Math.round((a + b) * 100), 693);
+  assert.equal(ctb(CP, single as never), 3.47);
+  assert.equal(bookingGrandTotal(g("a") as never, CP), Math.round((86.63 + a) * 100) / 100);
+  setGroupTaxContext([], () => CP); // pulizia: nessuna quota residua
+  assert.equal(ctb(CP, g("a") as never), 3.47);
+});

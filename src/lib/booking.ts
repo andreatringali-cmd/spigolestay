@@ -33,16 +33,42 @@ export function cityTaxOf(structure: Structure | undefined, adults: number, n: n
 }
 
 type BookingLike = {
-  checkIn: string; checkOut: string; adults?: number; children?: number; childAges?: number[];
+  id?: string; checkIn: string; checkOut: string; adults?: number; children?: number; childAges?: number[];
   total?: number; cleaningFee?: number; extras?: { price?: number }[]; cityTaxExempt?: boolean;
 };
 
 // Persone paganti la tassa: adulti + minori NON esenti (età >= soglia comunale).
 // Se non sono note le età dei bambini, si considerano esenti (comportamento prudente).
 /** Imposta di soggiorno di una prenotazione: paganti = adulti + minori sopra la soglia, divisore = tutti gli ospiti. Un solo punto di calcolo per elenco, fatture, fascicolo, adempimenti e check-in. */
-export function cityTaxOfBooking(structure: Structure | undefined, b: { adults?: number; children?: number; childAges?: number[]; checkIn: string; checkOut: string; total?: number; cityTaxExempt?: boolean }): number {
+// Quote di tassa dei GRUPPI di camere (id prenotazione → quota), calcolate una volta sull'insieme delle camere e aggiornate dallo store a ogni modifica delle prenotazioni
+// (setGroupTaxContext): così elenco, fatture, report e totali usano tutti la stessa cifra, senza che ogni schermata conosca i gruppi.
+let groupTaxShares = new Map<string, number>();
+export function setGroupTaxContext(bookings: (GroupTaxRow & { groupId?: string; status?: string; channel?: string; structureId?: string })[], structureOf: (id: string) => Structure | undefined): void {
+  const groups = new Map<string, typeof bookings>();
+  for (const b of bookings) {
+    if (!b.groupId || !b.id || b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked") continue;
+    const k = b.groupId + "|" + (b.structureId ?? "");
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push(b);
+  }
+  const next = new Map<string, number>();
+  for (const rows of groups.values()) {
+    if (rows.length < 2) continue;
+    const st = structureOf(rows[0].structureId ?? "");
+    for (const r of rows) next.set(r.id!, cityTaxShareOf(st, rows, r.id!));
+  }
+  groupTaxShares = next;
+}
+/** Quota di tassa di questa prenotazione se fa parte di un gruppo di camere (altrimenti undefined). */
+export const groupTaxShareOf = (id?: string): number | undefined => (id ? groupTaxShares.get(id) : undefined);
+/** Imposta di una prenotazione SENZA quote di gruppo (calcolo base). */
+export function cityTaxOfBookingRaw(structure: Structure | undefined, b: { adults?: number; children?: number; childAges?: number[]; checkIn: string; checkOut: string; total?: number; cityTaxExempt?: boolean }): number {
   const n = Math.max(0, Math.round((Date.parse(b.checkOut + "T00:00:00Z") - Date.parse(b.checkIn + "T00:00:00Z")) / 86400000));
   return cityTaxOf(structure, cityTaxPayers(structure, b), n, b.total ?? 0, b.cityTaxExempt, (b.adults ?? 0) + (b.children ?? 0));
+}
+export function cityTaxOfBooking(structure: Structure | undefined, b: { id?: string; adults?: number; children?: number; childAges?: number[]; checkIn: string; checkOut: string; total?: number; cityTaxExempt?: boolean }): number {
+  const share = b.id ? groupTaxShares.get(b.id) : undefined; // camera di un gruppo: la sua quota della tassa calcolata sull'insieme
+  return share !== undefined ? share : cityTaxOfBookingRaw(structure, b);
 }
 /** Riga di una prenotazione per il calcolo della tassa di GRUPPO (più camere prenotate insieme, stesso groupId). */
 export type GroupTaxRow = { id?: string; adults?: number; children?: number; childAges?: number[]; checkIn: string; checkOut: string; total?: number; cityTaxExempt?: boolean };
@@ -53,10 +79,10 @@ const cents = (n: number) => Math.round(n * 100);
  */
 export function cityTaxOfGroup(structure: Structure | undefined, rows: GroupTaxRow[]): number {
   if (rows.length === 0) return 0;
-  if (rows.length === 1) return cityTaxOfBooking(structure, rows[0]);
+  if (rows.length === 1) return cityTaxOfBookingRaw(structure, rows[0]);
   const same = rows.every((r) => r.checkIn === rows[0].checkIn && r.checkOut === rows[0].checkOut);
-  if (!same) return Math.round(rows.reduce((a, r) => a + cents(cityTaxOfBooking(structure, r)), 0)) / 100;
-  return cityTaxOfBooking(structure, {
+  if (!same) return Math.round(rows.reduce((a, r) => a + cents(cityTaxOfBookingRaw(structure, r)), 0)) / 100;
+  return cityTaxOfBookingRaw(structure, {
     adults: rows.reduce((a, r) => a + (r.adults ?? 0), 0), children: rows.reduce((a, r) => a + (r.children ?? 0), 0),
     childAges: rows.flatMap((r) => r.childAges ?? []), checkIn: rows[0].checkIn, checkOut: rows[0].checkOut,
     total: rows.reduce((a, r) => a + (r.total ?? 0), 0), cityTaxExempt: rows.every((r) => r.cityTaxExempt),
@@ -103,7 +129,8 @@ export function bookingGrandTotal(b: BookingLike, structure: Structure | undefin
   const acc = b.total ?? 0;
   if (!acc) return 0;
   const clean = b.cleaningFee ?? 0;
-  const tax = cityTaxOf(structure, cityTaxPayers(structure, b), nights(b.checkIn, b.checkOut), acc, b.cityTaxExempt);
+  const share = b.id ? groupTaxShares.get(b.id) : undefined; // camera di un gruppo: quota della tassa del gruppo
+  const tax = share !== undefined ? share : cityTaxOf(structure, cityTaxPayers(structure, b), nights(b.checkIn, b.checkOut), acc, b.cityTaxExempt);
   return acc + clean + bookingExtrasTotal(b) + tax;
 }
 

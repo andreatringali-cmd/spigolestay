@@ -9,6 +9,7 @@ import { kvGet, kvSet, kvRemove, kvKeys, kvFlush } from "./bigstore";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
 import { CHANNELS } from "./types";
 import { computeCommissionEstimates, setCommissionEstimates } from "./commission-estimate";
+import { setGroupTaxContext } from "./booking";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
@@ -367,6 +368,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ready, structures, activeStructureId, subsetIds]);
 
   // Stima della commissione per le prenotazioni senza cifra reale: si ricalcola quando cambiano le prenotazioni, PRIMA che i componenti figli la leggano.
+  // Tassa di soggiorno dei gruppi di camere: una quota per camera, calcolata sull'insieme (vedi setGroupTaxContext in booking.ts); PRIMA dei componenti figli.
+  useMemo(() => { setGroupTaxContext(bookings as never, (id) => structures.find((x) => x.id === id)); }, [bookings, structures]);
   useMemo(() => { setCommissionEstimates(computeCommissionEstimates(bookings, new Date().toISOString().slice(0, 10))); }, [bookings]);
 
   const value = useMemo<DataContextValue>(() => {

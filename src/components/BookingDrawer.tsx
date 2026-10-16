@@ -20,7 +20,7 @@ import { entriesTotal } from "@/lib/booking-extras";
 import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
-import { cityTaxOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
+import { cityTaxOf, groupTaxShareOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -185,7 +185,7 @@ export default function BookingDrawer() {
   const cleanV = booking.cleaningFee ?? 0;
   const extrasList = booking.extras ?? [];
   const extrasV = extrasList.reduce((a, e) => a + (e.price || 0), 0);
-  const taxV = cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);
+  const taxV = groupTaxShareOf(booking.id) ?? cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);
   // "Totale ospite" = quanto pagato per il soggiorno (senza tassa di soggiorno, riscossa
   // localmente e mai transitata dall'OTA): torna con l'importo che mostra Booking.com ecc.
   const totalV = accV + cleanV + extrasV;
