@@ -34,6 +34,7 @@ import DateField from "@/components/DateField";
 import SearchInput from "@/components/SearchInput";
 import { normName } from "@/lib/guest-key";
 import { bookingCode } from "@/lib/bookingCode";
+import { useToast } from "@/components/ToastProvider";
 
 // Scheda camera: opzioni frequenza servizio e giorni della settimana.
 const FREQ_OPTS = ["Ogni partenza", "1 Giorno", "2 Giorni", "3 Giorni", "4 Giorni", "5 Giorni", "7 Giorni"];
@@ -108,6 +109,7 @@ const readLS = <T,>(key: string, fallback: T): T => { try { const r = localStora
 
 export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
   const { structures, units, roomTypes, bookings, guests, events: allEvents, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit, raw } = useData();
+  const toast = useToast();
   // Eventi: con una struttura selezionata solo i suoi (quelli senza struttura valgono per tutte).
   const events = activeStructureId === "all" ? allEvents : allEvents.filter((e) => !e.structureId || e.structureId === activeStructureId);
   const router = useRouter();
@@ -556,7 +558,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const view = dragViewRef.current;
     setDragView(null);
     if (!s) return;
-    if (!s.moved) { const b = bookingsRef.current.find((x) => x.id === s.id); if (b && b.channel === "blocked") openOosEdit(b); else openBooking(s.id); return; } // click semplice → scheda (o editor fuori servizio)
+    if (!s.moved) { const b = bookingsRef.current.find((x) => x.id === s.id); if (b && b.channel === "blocked") openOosEdit(b); else openBooking(s.id); return; }
+    // Rilasciata su una camera non valida: prima non succedeva niente e non si capiva perché; ora si dice il motivo.
+    if (view && !view.valid && view.reason && view.reason !== "—") toast(`Non posso spostarla qui: ${view.reason}`, "error"); // click semplice → scheda (o editor fuori servizio)
     if (view && view.valid && view.targetUnitId?.startsWith(UNASSIGNED_PREFIX)) {
       // Trascinata su "Da assegnare": esce dalla camera (le date restano), senza conferma; si rimette in camera trascinandola indietro.
       const b = bookingsRef.current.find((x) => x.id === s.id);

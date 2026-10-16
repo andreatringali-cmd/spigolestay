@@ -731,7 +731,7 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-function Splash({ label }: { label: string }) {
+function Splash({ label, forceLabel = false }: { label: string; forceLabel?: boolean }) {
   // Se resta qui più di 6 secondi scrive in che passaggio è (così, se si blocca, si sa dove) e offre di ricaricare.
   const [slow, setSlow] = useState(false);
   useEffect(() => { const t = setTimeout(() => setSlow(true), 6000); return () => clearTimeout(t); }, []);
@@ -741,10 +741,10 @@ function Splash({ label }: { label: string }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
         <img src="/xenora-mark.png" alt={label || "Xenora"} width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
-        {slow && (
+        {(slow || forceLabel) && (
           <div style={{ textAlign: "center", fontFamily: "system-ui, sans-serif", fontSize: 13, color: "#6b7280" }}>
             <div>{label}</div>
-            <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: "6px 14px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#111", fontSize: 13, cursor: "pointer" }}>Ricarica</button>
+            {!forceLabel && <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: "6px 14px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#111", fontSize: 13, cursor: "pointer" }}>Ricarica</button>}
           </div>
         )}
       </div>
@@ -784,6 +784,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [bigReady, setBigReady] = useState(false); // archivio dei dati grandi (IndexedDB) caricato in memoria
   useEffect(() => { void initBigStore().finally(() => setBigReady(true)); }, []);
   const [hydrateError, setHydrateError] = useState(false);
+  const [signingOut, setSigningOut] = useState(false); // uscita in corso: si vede subito un messaggio (il salvataggio finale può durare)
   const sessionUid = session?.user?.id;
   useEffect(() => {
     if (!sessionUid || hydrated) return;
@@ -1116,9 +1117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session?.user?.id, mfaChecked, mfaNeeded, accessAllowed, bigReady]);
 
   const signOut = async () => {
+    setSigningOut(true);
     stopPush();
     let saved = false;
     const uid = session?.user?.id;
+    // Il salvataggio finale ha al massimo 10 secondi: se la rete è lenta si esce lo stesso, e i dati restano su questo dispositivo (non si cancellano finché non sono sul server).
+    const finalSave = async () => {
     try {
       if (supabase && uid) {
         // Salvataggio finale prima di uscire: sempre tramite fusione + lucchetto, così non si
@@ -1133,6 +1137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch { /* salvataggio finale fallito: saved resta false, il locale non si cancella */ }
+    };
+    await Promise.race([finalSave(), new Promise<void>((r) => setTimeout(r, 10000))]);
     try { if (supabase) await supabase.auth.signOut(); } catch { /* si esce comunque */ }
     try { sessionStorage.removeItem("spigolestay:hydrated-for"); } catch {}
     // Svuota i dati locali SOLO se sono stati salvati sul server, altrimenti li perderei
@@ -1144,6 +1150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = { user: session?.user ?? null, session, enabled: supabaseEnabled, signOut };
 
   // Modalità solo-locale (variabili non configurate): nessun gate.
+  if (signingOut) return <Splash label="Uscita in corso…" forceLabel />;
   if (!bigReady) return <Splash label="Avvio…" />;
   if (!supabaseEnabled) return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
   if (loading) return <Splash label="Avvio…" />;
