@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { fmtDMY } from "@/lib/dates";
 
 // Campo data con calendario personalizzato che si apre SEMPRE verso il basso.
 const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
@@ -12,13 +13,23 @@ export default function DateField({
   onChange,
   className = "",
   title,
-  placeholder = "gg/mm/aaaa",
+  placeholder = "gg.mm.aaaa",
+  min,
+  max,
+  disabled = false,
+  id,
+  required = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   className?: string;
   title?: string;
   placeholder?: string;
+  min?: string; // yyyy-mm-dd: giorni prima sono disattivati
+  max?: string; // yyyy-mm-dd: giorni dopo sono disattivati
+  disabled?: boolean;
+  id?: string;
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,7 +51,8 @@ export default function DateField({
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const iso = (d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
   const todayIso = (() => { const t = new Date(); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; })();
-  const display = value ? new Date(value + "T00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) : placeholder;
+  const display = value ? fmtDMY(value) : placeholder;
+  const out = (d: number) => (!!min && iso(d) < min) || (!!max && iso(d) > max);
 
   const cells: (number | null)[] = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
@@ -48,7 +60,7 @@ export default function DateField({
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((o) => !o)} title={title} className={`flex items-center gap-1.5 ${className}`}>
+      <button type="button" id={id} aria-required={required || undefined} disabled={disabled} onClick={() => setOpen((o) => !o)} title={title} className={`flex items-center gap-1.5 ${className}`}>
         <span className={value ? "text-txt" : "text-faint"}>{display}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto shrink-0 text-dim"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
       </button>
@@ -62,7 +74,7 @@ export default function DateField({
           <div className="grid grid-cols-7 gap-0.5 text-center">
             {DOW.map((d) => <span key={d} className="py-1 text-[10px] font-semibold text-faint">{d}</span>)}
             {cells.map((d, i) => d === null ? <span key={i} /> : (
-              <button key={i} type="button" onClick={() => { onChange(iso(d)); setOpen(false); }} className={`grid h-7 place-items-center rounded-lg text-xs transition ${value === iso(d) ? "bg-focus font-semibold text-white" : iso(d) === todayIso ? "font-semibold text-focus hover:bg-wash" : "text-txt hover:bg-wash"}`}>{d}</button>
+              <button key={i} type="button" disabled={out(d)} onClick={() => { onChange(iso(d)); setOpen(false); }} className={`grid h-7 place-items-center rounded-lg text-xs transition ${value === iso(d) ? "bg-focus font-semibold text-white" : iso(d) === todayIso ? "font-semibold text-focus hover:bg-wash" : "text-txt hover:bg-wash"}`}>{d}</button>
             ))}
           </div>
           <div className="mt-1 flex gap-1">
