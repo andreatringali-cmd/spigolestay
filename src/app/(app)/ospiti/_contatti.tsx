@@ -3,7 +3,7 @@
 // Contatti da correggere: gli ospiti in arrivo il cui numero o la cui email non permette ai messaggi automatici di partire.
 // Si avvisa con anticipo (entro 10 giorni è urgente) perché ci sia ancora tempo di correggere il dato, chiedere il contatto
 // all'ospite (anche dalla chat dell'OTA) o trovare un'alternativa. Una riga per ospite, con la correzione proposta a un clic.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { toISO, fmtDM } from "@/lib/dates";
@@ -14,6 +14,7 @@ import { upcomingContactIssues, URGENT_DAYS, type UpcomingIssue } from "@/lib/co
 
 const OTA = new Set(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"]);
 const LIMIT = 6;
+const FOLD_KEY = "xn:contatti:open"; // solo preferenza di vista di questo dispositivo: tendina aperta o chiusa
 
 const whenLabel = (days: number, iso: string) => {
   const d = fmtDM(iso);
@@ -31,7 +32,10 @@ const ASK: Record<string, (name: string, place: string) => string> = {
 
 export default function ContattiDaCorreggere() {
   const { guests, bookings, activeStructureId, updateGuest, updateGuests, getStructure } = useData();
-  const [open, setOpen] = useState(false);
+  const [all, setAll] = useState(false);        // "Mostra tutti" oltre le prime righe
+  const [expanded, setExpanded] = useState(false); // tendina aperta/chiusa dal titolo (chiusa all'inizio: il titolo mostra già quanti sono e se c'è urgenza)
+  useEffect(() => { try { if (localStorage.getItem(FOLD_KEY) === "1") setExpanded(true); } catch { /* storage non disponibile */ } }, []);
+  const toggle = () => setExpanded((v) => { const n = !v; try { localStorage.setItem(FOLD_KEY, n ? "1" : "0"); } catch { /* storage non disponibile */ } return n; });
   const [copied, setCopied] = useState<string | null>(null);
   const today = toISO(new Date());
 
@@ -52,7 +56,7 @@ export default function ContattiDaCorreggere() {
   );
   if (list.length === 0) return tidyBar || null;
 
-  const shown = open ? list : list.slice(0, LIMIT);
+  const shown = all ? list : list.slice(0, LIMIT);
   const apply = (x: UpcomingIssue, field: "phone" | "email", value: string) => updateGuest(x.guest.id, { [field]: value });
   const copy = async (x: UpcomingIssue) => {
     const lang = guestLangOf(x.guest); // scheda, altrimenti Paese/prefisso
@@ -64,11 +68,15 @@ export default function ContattiDaCorreggere() {
   return (<>
     {tidyBar}
     <section className="mb-4 rounded-xl border bg-surface p-3 shadow-sm" style={{ borderColor: urgent ? "color-mix(in srgb, var(--err) 45%, var(--line))" : "color-mix(in srgb, var(--warn) 45%, var(--line))" }}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="font-display text-base font-bold text-txt">Contatti da correggere</h2>
-        <span className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums" style={{ color: urgent ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${urgent ? "var(--err)" : "var(--warn)"} 14%, transparent)` }}>{list.length}</span>
-        {urgent > 0 && <span className="text-xs font-semibold" style={{ color: "var(--err)" }}>{urgent} {urgent === 1 ? "arriva" : "arrivano"} entro {URGENT_DAYS} giorni</span>}
-      </div>
+      <h2 className="m-0">
+        <button type="button" onClick={toggle} aria-expanded={expanded} aria-controls="contatti-da-correggere" className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-left">
+          <span aria-hidden className="inline-block w-3 shrink-0 text-xs text-dim transition-transform" style={{ transform: expanded ? "rotate(90deg)" : "none" }}>▶</span>
+          <span className="font-display text-base font-bold text-txt">Contatti da correggere</span>
+          <span className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums" style={{ color: urgent ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${urgent ? "var(--err)" : "var(--warn)"} 14%, transparent)` }}>{list.length}</span>
+          {urgent > 0 && <span className="text-xs font-semibold" style={{ color: "var(--err)" }}>{urgent} {urgent === 1 ? "arriva" : "arrivano"} entro {URGENT_DAYS} giorni</span>}
+        </button>
+      </h2>
+      {expanded && <div id="contatti-da-correggere">
       <p className="mt-1 text-xs text-dim">I messaggi automatici partono solo con un numero valido o un&apos;email. Correggi il dato adesso, chiedilo all&apos;ospite o cerca un&apos;alternativa mentre c&apos;è ancora tempo.</p>
 
       <ul className="mt-2.5 flex flex-col divide-y divide-line">
@@ -99,8 +107,9 @@ export default function ContattiDaCorreggere() {
           );
         })}
       </ul>
-      {list.length > LIMIT && <button onClick={() => setOpen((v) => !v)} className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">{open ? "Mostra meno" : `Mostra tutti i ${list.length}`}</button>}
+      {list.length > LIMIT && <button onClick={() => setAll((v) => !v)} className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">{all ? "Mostra meno" : `Mostra tutti i ${list.length}`}</button>}
       <p className="mt-2 text-[11px] text-faint">Un numero può essere valido ma senza WhatsApp: non è possibile saperlo in anticipo, lo si scopre al primo invio.</p>
+      </div>}
     </section>
   </>);
 }
