@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { importBookings, importSingleRevision } from "@/lib/channex-inbound";
 import { getBookingRevision } from "@/lib/channex";
 import { verifyBookingHook, HOOK_SECRET_HEADER } from "@/lib/channex-messages";
+import { decideHook } from "@/lib/channex-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,13 +17,16 @@ export async function POST(req: Request) {
   try {
     // Segreto condiviso (intestazione impostata da /api/channex/webhook-setup). Retrocompatibile: i webhook già
     // registrati non lo inviano ancora, quindi senza segreto si accetta (con avviso) finché non c'è CHANNEX_WEBHOOK_STRICT=1.
-    const verdict = verifyBookingHook(req.headers.get(HOOK_SECRET_HEADER));
+    // Corpo GREZZO: serve intatto per verificare la firma HMAC di Channex (se presente), poi lo si interpreta come JSON.
+    const rawBody = await req.text().catch(() => "");
+    const verdict = decideHook(req.headers, rawBody, verifyBookingHook(req.headers.get(HOOK_SECRET_HEADER)));
     if (!verdict.accept) {
       console.log("[channex webhook] chiamata rifiutata:", verdict.reason);
       return NextResponse.json({ received: true }, { status: 200 });
     }
-    if (verdict.reason !== "ok") console.warn("[channex webhook] chiamata NON autenticata accettata (", verdict.reason, "): esegui /api/channex/webhook-setup e poi imposta CHANNEX_WEBHOOK_STRICT=1");
-    const payload = await req.json().catch(() => ({}));
+    if (verdict.reason !== "ok" && verdict.reason !== "signed") console.warn("[channex webhook] chiamata NON autenticata accettata (", verdict.reason, "): esegui /api/channex/webhook-setup e poi imposta CHANNEX_WEBHOOK_STRICT=1");
+    let payload: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+    try { payload = JSON.parse(rawBody || "{}") as Record<string, any>; } catch { payload = {}; } // eslint-disable-line @typescript-eslint/no-explicit-any
     const revisionId = String((payload?.payload?.revision_id as string) || (payload?.revision_id as string) || "").trim() || undefined;
     const propertyId = String((payload?.property_id as string) || (payload?.data?.property_id as string) || "").trim() || undefined;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

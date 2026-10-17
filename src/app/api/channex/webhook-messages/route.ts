@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch, siteOrigin } from "@/lib/server-auth";
 import { logInvio } from "@/lib/invii-log";
 import { parseChannexMessage, parseChannexInquiry, inquiryEmailText, echoStoredSince, appendOtaMessage, otaMessageEmailText, pickMessageStore, verifyMessageHook, HOOK_SECRET_HEADER, type InboundOtaMessage } from "@/lib/channex-messages";
+import { decideHook } from "@/lib/channex-signature";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs, otaAutoActive } from "@/lib/aiConcierge";
 import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/concierge-engine";
 import { loadOrgDatas, loadOrgData, mergeOrgData } from "@/lib/concierge-orgdata";
@@ -105,12 +106,15 @@ async function notifyOwner(admin: SupabaseClient<any>, tenantId: string, reqUrl:
 export async function POST(req: Request) {
   try {
     // Fallisce in chiusura: senza segreto configurato (in produzione) o con segreto errato non si elabora nulla, ma si risponde 200 (Channex ritenta all'infinito).
-    const verdict = verifyMessageHook(req.headers.get(HOOK_SECRET_HEADER));
+    // Corpo GREZZO: la firma HMAC di Channex si calcola sui byte esatti, prima del JSON.parse.
+    const rawBody = await req.text().catch(() => "");
+    const verdict = decideHook(req.headers, rawBody, verifyMessageHook(req.headers.get(HOOK_SECRET_HEADER)));
     if (!verdict.accept) {
       console.log("[channex webhook-messages] chiamata rifiutata:", verdict.reason);
       return NextResponse.json({ received: true });
     }
-    const body = await req.json().catch(() => ({}));
+    let body: unknown = {};
+    try { body = JSON.parse(rawBody || "{}"); } catch { body = {}; }
     const msg = parseChannexMessage(body);
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, service = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !service) return NextResponse.json({ received: true });
