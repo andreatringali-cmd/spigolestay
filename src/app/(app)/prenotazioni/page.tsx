@@ -228,8 +228,8 @@ export default function PrenotazioniPage() {
   const visibleIds = shownList.flatMap((it) => (it.kind === "single" ? [it.b.id] : groupOpen.has(it.gid) ? it.members.map((m) => m.id) : []));
   // Annullate e no-show restano nell'elenco con il loro stato, ma non entrano in KPI, totali, grafici ed export.
   const isCounted = (b: { status: BookingStatus }) => b.status !== "cancelled" && b.status !== "no_show";
-  // Cancellata: la riga è sbiadita ma la parola resta in rosso e leggibile (la trasparenza si applica alle celle, non alla parola).
-  const CancTag = () => <span className="ml-1.5 font-semibold text-[color:var(--err)]">{t("Cancellata")}</span>;
+  // Cancellata: la riga è sbiadita e al posto della camera si legge "Cancellata" in rosso, non sbiadito (la trasparenza si applica alle celle, non alla parola).
+  const CancTag = () => <span className="font-semibold text-[color:var(--err)]">{t("Cancellata")}</span>;
   const rowDim = (b: { status: BookingStatus }) => isCounted(b) ? "" : b.status === "cancelled" ? "[&>td:not([data-room])]:opacity-50" : "opacity-50";
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => (isCounted(b) ? a + f(b) : a), 0);
   const grand = (b: typeof sorted[number]) => bookingPaidTotal(b); // quanto ha pagato l'ospite (soggiorno+pulizia+extra), SENZA tassa di soggiorno — torna con l'OTA
@@ -241,7 +241,7 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
       {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
-      <td data-room className={`whitespace-nowrap px-3 py-2.5 text-dim ${indent ? "pl-8" : ""}`}>{indent && <span className="text-faint">↳ </span>}{b.status === "cancelled" ? <>{unitLabel(b) && <span className="opacity-50">{unitLabel(b)}</span>}<CancTag /></> : (unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>)}</td>
+      <td data-room className={`whitespace-nowrap px-3 py-2.5 text-dim ${indent ? "pl-8" : ""}`}>{indent && <span className="text-faint">↳ </span>}{b.status === "cancelled" ? <CancTag /> : (unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>)}</td>
       <td className="px-3 py-2.5"><BookingChannelWordmark booking={b} height={16} title={ch.label} /></td>
       <td className="px-3 py-2.5 font-medium text-txt"><span className="block max-w-[200px] truncate" title={guestName(b)}>{guestName(b)}</span></td>
       <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
@@ -518,7 +518,7 @@ export default function PrenotazioniPage() {
                   <div className="border-t border-line">
                     {members.map((m) => (
                       <button key={m.id} onClick={() => openBooking(m.id)} className={`flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash ${m.status === "no_show" ? "opacity-50" : ""}`}>
-                        <span className="truncate text-xs text-dim"><span className={m.status === "cancelled" ? "opacity-50" : ""}>{unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {m.adults + m.children} {t("osp.")}</span>{m.status === "cancelled" && <CancTag />}{m.status === "no_show" && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
+                        <span className="truncate text-xs text-dim">{m.status === "cancelled" ? <CancTag /> : (unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={m.status === "cancelled" ? "opacity-50" : ""}> · {m.adults + m.children} {t("osp.")}</span>{m.status === "no_show" && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
                         <span className={`shrink-0 font-mono text-xs text-txt ${m.status === "cancelled" ? "opacity-50" : ""}`}>{m.total ? eur(grand(m)) : "—"}</span>
                       </button>
                     ))}
@@ -542,7 +542,7 @@ export default function PrenotazioniPage() {
                 <span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span>
               </div>
               <div data-room className="mt-1 flex items-center justify-between gap-2">
-                <span className="truncate text-xs text-dim"><span className={b.status === "cancelled" ? "opacity-50" : ""}>{unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {b.adults + b.children} {t("osp.")}</span>{b.status === "cancelled" && <CancTag />}</span>
+                <span className="truncate text-xs text-dim">{b.status === "cancelled" ? <CancTag /> : (unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={b.status === "cancelled" ? "opacity-50" : ""}> · {b.adults + b.children} {t("osp.")}</span></span>
                 <span className={`shrink-0 font-mono font-semibold text-txt ${b.status === "cancelled" ? "opacity-50" : ""}`}>
                   {b.total ? eur(grand(b)) : "—"}
                   {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="ml-1 font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
