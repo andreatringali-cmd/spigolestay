@@ -167,3 +167,8 @@ body {
   button, a, [role="button"], summary, label { touch-action: manipulation; } /* niente zoom a doppio tap, niente ritardo */
 }
 html, body { overflow-x: clip; } /* un popover che sporge non fa più "ballare" la pagina di lato */
+
+/* Pannello laterale (scheda prenotazione): entra da destra. Niente fill-mode: un transform che resta attivo ancora i figli position:fixed al pannello. */
+@keyframes slideInRight { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.anim-slide-r { animation: slideInRight 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+@media (prefers-reduced-motion: reduce) { .anim-slide-r { animation: none; } }

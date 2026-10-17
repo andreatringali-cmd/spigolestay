@@ -77,6 +77,9 @@ interface Form {
   extras: NonNullable<Booking["extras"]>; paymentMethod: PayMethod | "";
 }
 
+type PanelTab = "info" | "rev" | "timeline" | "msg" | "manage";
+const PANEL_TABS: [PanelTab, string][] = [["info", "Informazioni"], ["rev", "Revisioni"], ["timeline", "Timeline"], ["msg", "Messaggi"], ["manage", "Gestione"]];
+
 const inputCls = "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
 export default function BookingDrawer() {
@@ -94,6 +97,7 @@ export default function BookingDrawer() {
   const booking = bookings.find((b) => b.id === selectedBookingId) ?? null;
 
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const [tab, setTab] = useState<PanelTab>("manage"); // scheda del pannello: all'apertura si parte da Gestione (la vista di lavoro)
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
   const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
@@ -113,6 +117,9 @@ export default function BookingDrawer() {
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
   const [incassoAmt, setIncassoAmt] = useState<number | null>(null);
   const checkinRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  // Su telefono le schede scorrono: la scheda attiva si porta in vista (altrimenti "Gestione" resta fuori schermo).
+  useEffect(() => { (tabsRef.current?.querySelector('[aria-selected="true"]') as HTMLElement | null)?.scrollIntoView({ inline: "center", block: "nearest" }); }, [tab, selectedBookingId]);
   const voucherPdfRef = useRef<HTMLDivElement>(null);
 
   const loadForm = () => {
@@ -139,6 +146,7 @@ export default function BookingDrawer() {
   // All'apertura di una prenotazione: torna in vista e ricarica i dati.
   useEffect(() => {
     setMode("view");
+    setTab("manage");
     setExpanded(false);
     setQa(null);
     setIncassoAmt(null); // importo/messaggi di un'altra prenotazione non devono restare nei campi della nuova
@@ -355,10 +363,6 @@ export default function BookingDrawer() {
   // ── ANTEPRIMA compatta ──
   const previewBody = (
     <div className="flex flex-col gap-3 px-5 py-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Contatti")}</span>
-        {contactIcons}
-      </div>
       {guest && (gReturning || gVip || !!guest.preferences?.trim() || (guest.tags ?? []).length > 0) && (
         <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 30%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 5%, transparent)" }}>
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
@@ -955,18 +959,24 @@ export default function BookingDrawer() {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex justify-end">
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
-      <div className={`anim-in relative z-10 flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[max-width] ${expanded || mode === "edit" ? "max-w-2xl" : "max-w-lg"}`}>
+      <div className="anim-slide-r relative z-10 flex h-full w-full max-w-[720px] flex-col overflow-hidden border-l border-line bg-surface shadow-2xl">
         {/* Accento canale */}
         <div className="h-1 w-full shrink-0" style={{ background: `var(${ch.cssVar})` }} />
-        {/* Intestazione */}
-        <div className="flex items-start gap-3 border-b border-line px-5 py-4">
+        {/* Titolo del pannello */}
+        <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
+          <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-txt">{t("Prenotazione")} {bookingCode(booking)}</h1>
+          <button onClick={printReceipt} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("Stampa")}</button>
+        </div>
+        {/* Intestazione: chi, quando, dove (sempre visibile) */}
+        <div className="flex items-start gap-3 border-b border-line px-5 py-3 max-sm:flex-wrap">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: `var(${ch.cssVar})` }}>{(guest?.fullName ?? "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}</div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="truncate font-display text-2xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
+              <h2 className="truncate font-display text-xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 14%, transparent)`, color: st.color }}>
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
               </span>
@@ -978,18 +988,25 @@ export default function BookingDrawer() {
               </span>
             ) : null; })()}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:justify-end">
             {structure?.logo
               ? <img src={structure.logo} alt={structure?.name ?? ""} title={structure?.name} className="h-9 w-9 rounded-lg border border-line bg-white object-contain p-0.5" />
               : structure?.name
                 ? <div className="grid h-9 w-9 place-items-center rounded-lg text-xs font-bold text-white" title={structure?.name} style={{ backgroundColor: structure?.photoColor || "#285f92" }}>{structure.name.slice(0, 2).toUpperCase()}</div>
                 : null}
-            <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+            {contactIcons}
           </div>
         </div>
 
+        {/* Schede */}
+        <div ref={tabsRef} role="tablist" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-3 [scrollbar-width:none]">
+          {PANEL_TABS.map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${tab === k ? "border-focus text-focus" : "border-transparent text-dim hover:text-txt"}`}>{t(label)}</button>
+          ))}
+        </div>
+
         {/* Avanzamento prenotazione (ispirato a Octorate, senza ripetizioni) */}
-        {mode === "view" && (() => {
+        {tab === "manage" && mode === "view" && (() => {
           const steps = [
             { label: t("Confermata"), done: booking.status === "confirmed" },
             { label: t("Check-in"), done: !!booking.webCheckin },
@@ -1014,10 +1031,14 @@ export default function BookingDrawer() {
         })()}
 
         {/* Corpo */}
-        <div className="flex-1 overflow-y-auto">{mode === "edit" ? editBody : (expanded ? viewBody : previewBody)}</div>
+        <div className="flex-1 overflow-y-auto">
+          {tab === "manage"
+            ? (mode === "edit" ? editBody : (expanded ? viewBody : previewBody))
+            : <div className="grid h-full min-h-[240px] place-items-center px-6 py-10 text-center text-sm text-dim">{t("Scheda in preparazione.")}</div>}
+        </div>
 
-        {/* Barra azioni */}
-        {mode === "edit" ? (
+        {/* Barra azioni (solo nella scheda Gestione) */}
+        {tab === "manage" && (mode === "edit" ? (
           <div className="flex items-center gap-3 border-t border-line bg-surface px-5 py-3">
             <button onClick={() => { loadForm(); setMode("view"); }} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} className="ml-auto rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva modifiche")}</button>
@@ -1029,7 +1050,7 @@ export default function BookingDrawer() {
             <button onClick={closeBooking} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash">{t("Chiudi")}</button>
             <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Modifica")}</button>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
