@@ -31,7 +31,8 @@ export interface ExportField { key: string; label: string; default?: boolean }
 // Pulsante "Esporta" neutro: al click si sceglie Excel o PDF. Il menu si apre sempre verso il basso.
 // Se `excelFields` è passato, "Excel" apre prima un picker per scegliere quali campi includere
 // (colonne di tabella + dati che stanno solo dentro la scheda, es. email, note, richieste ospite).
-export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (fields?: string[]) => void; onPdf: () => void; excelFields?: ExportField[] }) {
+// Senza `onPdf` il pulsante è uno solo, "Excel" (niente menu): così nelle pagine che esportano solo in Excel non c'è una scelta in più da fare.
+export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (fields?: string[]) => void; onPdf?: () => void; excelFields?: ExportField[] }) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [picker, setPicker] = useState<Set<string> | null>(null);
@@ -49,6 +50,12 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   const toggleField = (key: string) => setPicker((p) => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
   return (
     <div ref={ref} className="relative">
+      {!onPdf && (
+        <button onClick={openExcel} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0" title="Excel" aria-label="Excel">
+          <ExcelIcon /> <span className="max-sm:sr-only">Excel</span>
+        </button>
+      )}
+      {onPdf && (<>
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0">
         <span className="max-sm:sr-only">{t("Esporta")}</span> <Icon name="chevron" size={14} />
       </button>
@@ -57,11 +64,12 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
           <button onClick={openExcel} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-txt hover:bg-wash">
             <ExcelIcon /> Excel
           </button>
-          <button onClick={() => { onPdf(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-txt hover:bg-wash">
+          <button onClick={() => { onPdf?.(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-txt hover:bg-wash">
             <PdfIcon /> PDF
           </button>
         </div>
       )}
+      </>)}
       {picker && excelFields && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
           <button aria-label={t("Chiudi")} onClick={() => setPicker(null)} className="absolute inset-0 bg-black/40" />

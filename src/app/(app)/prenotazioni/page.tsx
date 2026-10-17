@@ -13,7 +13,7 @@ import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionIsEst
 import { loadWeekendPct } from "@/lib/pricing";
 import { otaGroupName, MIXED_OTA_LABEL } from "@/lib/channel-name";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
-import { exportExcel, exportPdf } from "@/lib/export";
+import { exportExcel } from "@/lib/export";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
@@ -404,14 +404,6 @@ export default function PrenotazioniPage() {
     { key: "note", label: "Note", default: false, get: (b) => b.note ?? "" },
     { key: "guestRequests", label: "Richieste ospite", default: false, get: (b) => b.guestRequests ?? "" },
   ];
-  // PDF = stampa della pagina: prima si mostrano TUTTE le righe che rispondono ai filtri (non solo le prime 150), poi si stampa e al termine si torna alla paginazione.
-  const printAll = () => {
-    if (displayList.length > limit) {
-      setLimit(displayList.length);
-      window.addEventListener("afterprint", () => setLimit(PAGE), { once: true });
-      window.setTimeout(exportPdf, 300);
-    } else exportPdf();
-  };
   const doExcel = (selected?: string[]) => {
     const keys = selected ?? excelFields.filter((f) => f.default !== false).map((f) => f.key);
     const fields = excelFields.filter((f) => keys.includes(f.key));
@@ -484,7 +476,7 @@ export default function PrenotazioniPage() {
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
           <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
-          <ExportMenu onExcel={doExcel} onPdf={printAll} excelFields={excelFields} />
+          <ExportMenu onExcel={doExcel} excelFields={excelFields} />
         </div>
         </div>
         </div>
