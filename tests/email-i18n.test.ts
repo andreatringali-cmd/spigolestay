@@ -34,23 +34,34 @@ test("politica di cancellazione dai dati strutturati, in ogni lingua", () => {
   assert.match(cancelPolicyIn("it", true, 5), /fino a 5 giorni/);
 });
 
+test("politica di cancellazione: 1 giorno al singolare in ogni lingua (mai '1 giorni' / '1 days')", () => {
+  assert.match(cancelPolicyIn("it", true, 1), /fino a 1 giorno prima/);
+  assert.match(cancelPolicyIn("en", true, 1), /up to 1 day before/);
+  assert.match(cancelPolicyIn("fr", true, 1), /jusqu'à 1 jour avant/);
+  assert.match(cancelPolicyIn("de", true, 1), /bis 1 Tag vor/);
+  assert.match(cancelPolicyIn("es", true, 1), /hasta 1 día antes/);
+  for (const l of ["it", "en", "fr", "de", "es"] as const) assert.doesNotMatch(cancelPolicyIn(l, true, 1), /\b1 (giorni|days|jours|Tage|días)\b/);
+});
+
 test("tassa di soggiorno: percentuale con tetto e bambini, oppure importo fisso", () => {
   const pct = cityTaxRuleIn("en", { mode: "percent", percent: 4, cap: 5, childFreeUnder: 14 });
   assert.match(pct, /4% of the booking/);
   assert.match(pct, /Maximum 5 EUR/);
   assert.match(pct, /under 14/);
-  assert.match(pct, /not included in the total/);
+  assert.match(pct, /not included in the booking total/);
   const fixed = cityTaxRuleIn("it", { mode: "amount", amount: 2 });
   assert.match(fixed, /2 EUR a persona per notte/);
   assert.doesNotMatch(fixed, /Massimo/);
 });
 
 test("ogni T(\"…\") usato dalla route /api/email ha le 4 traduzioni, con gli stessi segnaposto", () => {
-  const src = readFileSync(new URL("../src/app/api/email/route.ts", import.meta.url), "utf8");
+  // route + i costruttori delle email (src/lib/mail) + PDF di ripiego: tutti i testi tradotti passano da T()/et()
+  const files = ["../src/app/api/email/route.ts", "../src/lib/mail/guest-emails.ts", "../src/lib/mail/shell.ts", "../src/lib/voucher-pdf.ts"];
+  const src = files.map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n");
   const lit = String.raw`"((?:[^"\\]|\\.)*)"`;
   const keys = new Set<string>();
   for (const m of src.matchAll(new RegExp(String.raw`\bT\(\s*` + lit, "g"))) keys.add(JSON.parse(`"${m[1]}"`));
-  for (const m of src.matchAll(new RegExp(String.raw`\bet\(\s*emailLang\(b\),\s*` + lit, "g"))) keys.add(JSON.parse(`"${m[1]}"`));
+  for (const m of src.matchAll(new RegExp(String.raw`\bet\(\s*(?:emailLang\(b\)|L|lang),\s*` + lit, "g"))) keys.add(JSON.parse(`"${m[1]}"`));
   assert.ok(keys.size > 30, `trovate ${keys.size} chiavi`);
   const ph = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join(",");
   const bad: string[] = [];

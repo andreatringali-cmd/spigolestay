@@ -12,6 +12,8 @@
 //   - in chat compare un messaggio di sistema con id deterministico (pay:<sessione>).
 // ============================================================
 
+import { eur } from "./format";
+
 export type ChatPayKind = "saldo" | "tassa";
 
 /** Minimo accettato da Stripe per EUR: 0,50 €. */
@@ -21,8 +23,7 @@ export const toCents = (eur: number): number => Math.round((Number(eur) || 0) * 
 
 /** "€ 1.234,50" (formato italiano, sempre 2 decimali). */
 export function fmtEur(cents: number): string {
-  const v = (Number.isFinite(cents) ? cents : 0) / 100;
-  return `€ ${v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return eur((Number.isFinite(cents) ? cents : 0) / 100);
 }
 
 /** Giorno di calendario italiano (yyyy-mm-dd, Europe/Rome) di un istante. */
@@ -54,9 +55,12 @@ export interface ChatPayContext {
   /** conto Stripe Connect collegato della STRUTTURA della prenotazione */
   stripeAccount?: string;
   stripeChargesEnabled?: boolean;
+  /** stato della prenotazione: annullata / no-show = nessun pagamento (un link vecchio non deve far incassare su una prenotazione chiusa) */
+  bookingStatus?: string;
 }
 
 export type ChatPayError =
+  | "cancelled"           // prenotazione annullata / no-show
   | "no_total"            // prenotazione senza importo
   | "already_paid"        // niente da incassare
   | "stripe_not_connected"
@@ -67,6 +71,7 @@ export type ChatPayError =
   | "amount_exceeds_balance";
 
 export const CHAT_PAY_ERROR_MSG: Record<ChatPayError, string> = {
+  cancelled: "La prenotazione risulta annullata: non è possibile incassare online.",
   no_total: "Questa prenotazione non ha un importo: impostalo nella scheda prenotazione.",
   already_paid: "Il saldo è già stato pagato: non c'è nulla da incassare.",
   stripe_not_connected: "Stripe non risulta collegato e attivo per questa struttura: controlla in Strutture → Pagamenti (se è appena collegato, completa i dati richiesti da Stripe).",
@@ -96,6 +101,7 @@ export function maxChatPayCents(ctx: ChatPayContext, kind: ChatPayKind): number 
  * invece di rifiutare; non alza mai oltre l'importo richiesto.
  */
 export function planChatPayment(ctx: ChatPayContext, kind: ChatPayKind, requestedEur?: number | null, opts?: { clamp?: boolean }): ChatPayPlan {
+  if (ctx.bookingStatus === "cancelled" || ctx.bookingStatus === "no_show") return fail("cancelled");
   if ((ctx.totalCents || 0) <= 0) return fail("no_total");
   if ((ctx.balanceCents || 0) <= 0) return fail("already_paid");
   if (!ctx.stripeAccount || !ctx.stripeChargesEnabled) return fail("stripe_not_connected");
@@ -131,6 +137,8 @@ export interface ApplyPaymentInput {
   cityTaxCents: number;
   cityTaxExempt?: boolean;
   now: number;
+  /** payment intent Stripe della sessione: finisce in stripeExtraPayments (rimborsi) insieme all'importo incassato */
+  paymentIntent?: string;
 }
 
 export interface ApplyPaymentResult {
@@ -158,6 +166,14 @@ export function applyChatPayment(booking: Json, p: ApplyPaymentInput): ApplyPaym
   const hasOnline = typeof booking.paidOnline === "number" && Number.isFinite(booking.paidOnline);
   const onlineBefore = hasOnline ? (booking.paidOnline as number) : booking.stripePaymentIntent ? paidNow : 0;
   const patch: Json = { paid: newPaid, paidSessions: [...sessions, p.sessionId], updatedAt: p.now, paidOnline: Math.round(onlineBefore * 100 + p.cents) / 100, paidAt: romeYmd(p.now) };
+  // Ogni incasso online lascia il suo payment intent: servono ai rimborsi (annullamento, eccedenza) e, con il metodo "carta", alla Cassa e al codice pagamento della fattura elettronica (MP08).
+  if (p.paymentIntent) {
+    const extra = Array.isArray(booking.stripeExtraPayments) ? (booking.stripeExtraPayments as Json[]) : [];
+    if (booking.stripePaymentIntent !== p.paymentIntent && !extra.some((x) => x && x.pi === p.paymentIntent)) patch.stripeExtraPayments = [...extra, { pi: p.paymentIntent, amount: Math.round(p.cents) / 100 }];
+  }
+  // Il metodo "carta" si imposta solo se questo e' il PRIMO incasso (paid precedente 0): se parte era gia' stata incassata in contanti/bonifico senza metodo,
+  // marcare tutta la prenotazione "carta" falserebbe Cassa e codice pagamento MP08 della fattura elettronica.
+  if (paidNow <= 0 && !["bonifico", "contanti", "carta", "altro", "ota"].includes(String(booking.paymentMethod ?? ""))) patch.paymentMethod = "carta";
   // La tassa risulta incassata se pagata col link "tassa", oppure se il saldo (tassa inclusa) azzera il residuo.
   const taxApplies = (p.cityTaxCents || 0) > 0 && !p.cityTaxExempt;
   if (taxApplies && (p.kind === "tassa" || p.cents >= before)) patch.cityTaxPaid = true;
@@ -178,12 +194,14 @@ export interface ThreadMsg { id: string; dir: "in" | "out"; text: string; ts: nu
 
 export const PAYMENT_MSG_ID = (sessionId: string) => `pay:${sessionId}`;
 
-export function paymentNoticeText(p: { cents: number; kind: ChatPayKind; balanceAfterCents: number; overpaidCents?: number }): string {
+export function paymentNoticeText(p: { cents: number; kind: ChatPayKind; balanceAfterCents: number; overpaidCents?: number; overpaidRefunded?: boolean; cancelled?: boolean }): string {
   const what = p.kind === "tassa" ? "tassa di soggiorno" : "saldo";
   const lines = [`💳 Pagamento ricevuto ${fmtEur(p.cents)} (${what})`];
-  if (p.balanceAfterCents <= 0) lines.push("Prenotazione saldata ✓");
+  if (p.cancelled) { /* nessun residuo da mostrare: l'incasso non e' stato registrato */ }
+  else if (p.balanceAfterCents <= 0) lines.push("Prenotazione saldata ✓");
   else lines.push(`Resta da pagare ${fmtEur(p.balanceAfterCents)}`);
-  if ((p.overpaidCents || 0) > 0) lines.push(`⚠ Eccedenza di ${fmtEur(p.overpaidCents!)} rispetto al residuo: verifica ed eventualmente rimborsa da Stripe`);
+  if (p.cancelled) lines.push(`⚠ Prenotazione annullata: il pagamento di ${fmtEur(p.cents)} non è stato registrato${p.overpaidRefunded ? " ed è stato rimborsato automaticamente" : ": rimborsalo da Stripe"}`);
+  else if ((p.overpaidCents || 0) > 0) lines.push(p.overpaidRefunded ? `⚠ Eccedenza di ${fmtEur(p.overpaidCents!)} rispetto al residuo (doppio pagamento): rimborsata automaticamente` : `⚠ Eccedenza di ${fmtEur(p.overpaidCents!)} rispetto al residuo: verifica ed eventualmente rimborsa da Stripe`);
   return lines.join(" · ");
 }
 
@@ -207,7 +225,7 @@ export function chatPayGuestMessage(lang: GuestLang, kind: ChatPayKind, cents: n
     it: { saldo: `Può pagare il saldo del soggiorno (${a}) online con carta, in modo sicuro: ${url}`, tassa: `Può pagare la tassa di soggiorno (${a}) online con carta, in modo sicuro: ${url}` },
     en: { saldo: `You can pay the balance of your stay (${a}) online by card, securely, here: ${url}`, tassa: `You can pay the city tax (${a}) online by card, securely, here: ${url}` },
     fr: { saldo: `Vous pouvez régler le solde de votre séjour (${a}) en ligne par carte, en toute sécurité, ici : ${url}`, tassa: `Vous pouvez régler la taxe de séjour (${a}) en ligne par carte, en toute sécurité, ici : ${url}` },
-    de: { saldo: `Den Restbetrag Ihres Aufenthalts (${a}) können Sie hier sicher online per Karte bezahlen: ${url}`, tassa: `Die Ortstaxe (${a}) können Sie hier sicher online per Karte bezahlen: ${url}` },
+    de: { saldo: `Den Restbetrag Ihres Aufenthalts (${a}) können Sie hier sicher online per Karte bezahlen: ${url}`, tassa: `Die Kurtaxe (${a}) können Sie hier sicher online per Karte bezahlen: ${url}` },
     es: { saldo: `Puedes pagar el saldo de tu estancia (${a}) online con tarjeta, de forma segura, aquí: ${url}`, tassa: `Puedes pagar la tasa turística (${a}) online con tarjeta, de forma segura, aquí: ${url}` },
   };
   return (T[lang] ?? T.it)[kind];

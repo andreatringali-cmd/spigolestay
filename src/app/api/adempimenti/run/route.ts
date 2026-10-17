@@ -75,15 +75,15 @@ export async function POST(req: Request) {
         status: sent === 0 && simulated > 0 && errs.length === simulated ? "prova" : errs.length && sent === 0 ? "errore" : "fatto",
         detail: sent === 0 && simulated > 0 && errs.length === simulated
           ? `${errs[0]} Nulla è stato inviato.`
-          : `Inviate ${sent} schedine alla Questura${errs.length ? ` · ${errs.join(" · ")}` : ""}.`, count: sent,
+          : `${sent === 1 ? "Inviata 1 schedina" : `Inviate ${sent} schedine`} alla Questura${errs.length ? ` · ${errs.join(" · ")}` : ""}.`, count: sent,
       };
     } else {
       // Prova: gate OFF oppure fase di preparazione → NON viene inviato nulla davvero.
       schedStep = {
         key: "schedine", label: "Schedine Alloggiati (Questura)", status: "prova",
         detail: ALLOGGIATI_LIVE
-          ? `${schedReady} schedine pronte: verranno inviate alla conferma.`
-          : `${schedReady} schedine pronte (prova): invio reale non attivo, nulla è stato inviato.`,
+          ? `${schedReady === 1 ? "1 schedina pronta: verrà inviata" : `${schedReady} schedine pronte: verranno inviate`} alla conferma.`
+          : `${schedReady === 1 ? "1 schedina pronta" : `${schedReady} schedine pronte`} (prova): invio reale non attivo, nulla è stato inviato.`,
         count: schedReady,
       };
     }

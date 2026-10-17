@@ -79,6 +79,53 @@ export function parseChannexMessage(body: unknown, apiBase: string = channexApiB
   return { id, text, bookingId, propertyId, sender, ...(ts !== undefined ? { ts } : {}), ...(attachments.length ? { attachments } : {}) };
 }
 
+/**
+ * Messaggio dell'ospite che NON è legato a una prenotazione (richiesta di informazioni su Airbnb, domanda prima di prenotare su Booking…): Channex lo manda senza booking_id.
+ * Non entra in nessuna chat (non c'è un ospite in anagrafica), ma non va perso: il titolare riceve un'email con l'id della conversazione.
+ */
+export interface OtaInquiry { id: string; text: string; propertyId: string; threadId: string; channel: string }
+export function parseChannexInquiry(body: unknown, apiBase: string = channexApiBase()): OtaInquiry | null {
+  const b = (body ?? {}) as { event?: string; property_id?: string; payload?: Record<string, unknown> };
+  // Evento `inquiry` (Airbnb): richiesta di informazioni, senza testo né booking_id; ha message_thread_id e i dati del soggiorno richiesto (booking_details).
+  if (b.event === "inquiry") {
+    const p = b.payload ?? {};
+    const propertyId = String(p.property_id ?? b.property_id ?? "").trim();
+    const threadId = String(p.message_thread_id ?? "").trim();
+    const id = String(p.live_feed_event_id ?? threadId).trim();
+    if (!propertyId || !id) return null;
+    const d = (p.booking_details && typeof p.booking_details === "object" ? p.booking_details : {}) as Record<string, unknown>;
+    const pick = (...keys: string[]) => { for (const k of keys) { const v = d[k]; if (typeof v === "string" && v.trim()) return v.trim(); if (typeof v === "number") return String(v); } return ""; };
+    const guest = pick("guest_name", "guest", "name");
+    const ci = pick("checkin_date", "check_in_date", "arrival_date", "check_in"), co = pick("checkout_date", "check_out_date", "departure_date", "check_out");
+    const guests = pick("total_guests", "guests", "number_of_guests");
+    const bits = [guest && `da ${guest}`, ci && co && `${ci} → ${co}`, guests && `${guests} ospiti`].filter(Boolean);
+    return { id, text: `Nuova richiesta di informazioni${bits.length ? ` (${bits.join(", ")})` : ""}. Il messaggio dell'ospite è visibile sul portale.`, propertyId, threadId, channel: "Airbnb" };
+  }
+  if (b.event !== "message") return null;
+  const p = b.payload ?? {};
+  if (p.sender !== "guest") return null;
+  if (String(p.booking_id ?? "").trim()) return null; // con prenotazione: lo gestisce parseChannexMessage
+  const id = String(p.id ?? p.ota_message_id ?? "").trim();
+  const propertyId = String(p.property_id ?? b.property_id ?? "").trim();
+  if (!id || !propertyId) return null;
+  const raw = typeof p.message === "string" ? p.message.trim() : "";
+  const attachments = parseAttachments(p.attachments, apiBase);
+  const text = raw || (attachments.length || p.have_attachment ? "📎 Allegato (aprilo sul portale)" : "");
+  if (!text) return null;
+  const threadId = String(p.message_thread_id ?? p.thread_id ?? p.ota_thread_id ?? "").trim();
+  const channel = otaLabel(String(p.ota_name ?? p.ota ?? p.channel ?? ""));
+  return { id, text, propertyId, threadId, channel };
+}
+
+/** Testo dell'email per un messaggio OTA senza prenotazione (con l'id della conversazione, per ritrovarla sul portale). */
+export function inquiryEmailText(channel: string, preview: string, threadId: string, bookingId?: string): string {
+  const lines = [`Un ospite ti ha scritto su ${channel} senza una prenotazione collegata (richiesta di informazioni):`, "", `«${preview}»`, ""];
+  if (threadId) lines.push(`Conversazione: ${threadId}`);
+  if (bookingId) lines.push(`Prenotazione ${bookingId} non ancora presente in Xenora.`);
+  lines.push("", "Rispondi dal portale (extranet o app del canale): questo messaggio non è collegato a nessuna prenotazione, quindi non compare nelle chat di Xenora.");
+  return lines.join("\n");
+}
+
 // Stessa funzione di ota-label.ts (lì per il browser): qui copiata perché i test Node non risolvono import senza estensione.
 export function otaLabel(channel?: string): string {
   const c = (channel ?? "").toLowerCase();
@@ -96,7 +143,7 @@ export type AppendResult =
 type BookingRef = { id?: string; extId?: string; guestId?: string; channel?: string; code?: string; checkIn?: string; checkOut?: string; adults?: number; children?: number; structureId?: string; roomTypeId?: string };
 
 /** Dati della prenotazione da mostrare nell'email di avviso: chi ha scritto, dove, quando. Vuoti se non si trovano. */
-export interface BookingMailDetails { guestName: string; structureName: string; roomTypeName: string; checkIn: string; checkOut: string; nights: number; adults: number; children: number; code: string }
+export interface BookingMailDetails { guestName: string; structureName: string; structureLogo?: string; structureColor?: string; roomTypeName: string; checkIn: string; checkOut: string; nights: number; adults: number; children: number; code: string }
 
 const strOf = (x: unknown) => (typeof x === "string" ? x : "");
 const nameIn = (d: DataObj, list: string, id: string | undefined, field: string) => {
@@ -110,6 +157,7 @@ export function bookingMailDetails(d: DataObj, b: BookingRef): BookingMailDetail
   return {
     guestName: nameIn(d, "guests", b.guestId, "fullName").replace(/ +/g, " ").trim(),
     structureName: nameIn(d, "structures", b.structureId, "name"),
+    structureLogo: nameIn(d, "structures", b.structureId, "logo") || undefined, structureColor: nameIn(d, "structures", b.structureId, "photoColor") || undefined,
     roomTypeName: nameIn(d, "roomTypes", b.roomTypeId, "name"),
     checkIn: strOf(b.checkIn), checkOut: strOf(b.checkOut), nights,
     adults: Number(b.adults) || 0, children: Number(b.children) || 0, code: strOf(b.code),
@@ -154,6 +202,16 @@ export const OUT_DEDUP_MS = 10 * 60 * 1000;
 export function hasSameOut(list: { dir: string; text: string; ts: number }[], text: string, ts: number): boolean {
   const n = normText(text);
   return list.some((m) => m.dir === "out" && normText(m.text ?? "") === n && Math.abs(m.ts - ts) <= OUT_DEDUP_MS);
+}
+
+/**
+ * Dopo l'invio di una risposta automatica: l'eco della stessa risposta riletta da Channex (id `chx:…`, stesso testo) è arrivato DOPO l'inizio dell'invio?
+ * Solo in quel caso la risposta è già nello storico. Un messaggio uguale più vecchio (la stessa risposta data a una domanda ripetuta entro 10 minuti) NON conta:
+ * la risposta è partita davvero e va salvata comunque, con un id diverso.
+ */
+export function echoStoredSince(list: { id?: string; dir: string; text: string; ts: number }[], text: string, sinceTs: number, slackMs = 30_000): boolean {
+  const n = normText(text);
+  return list.some((m) => m.dir === "out" && typeof m.id === "string" && m.id.startsWith("chx:") && normText(m.text ?? "") === n && m.ts >= sinceTs - slackMs);
 }
 
 /** Aggiunge il messaggio al thread dell'ospite dentro il blob di stato (modifica `blob` sul posto). Idempotente sull'id del messaggio.

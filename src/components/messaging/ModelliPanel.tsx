@@ -29,10 +29,11 @@ interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; t
 const emptyTpl = (structureIds?: string[]): MsgTemplate => ({ ...(structureIds?.length ? { structureIds } : {}), id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
 const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
   if (tpl.trigger === "manual") return tr("Invio manuale");
-  if (tpl.trigger === "on_arrival") return `${tr("Il giorno del check-in")} · ${tpl.time}`;
-  if (tpl.trigger === "on_checkout") return `${tr("Il giorno del check-out")} · ${tpl.time}`;
+  // L'invio automatico parte dal cron UNA volta al giorno (mattina italiana): l'orario scritto nel modello non lo sposta, quindi non lo si mostra come se fosse l'ora d'invio.
+  if (tpl.trigger === "on_arrival") return `${tr("Il giorno del check-in")} · ${tr("invio al mattino")}`;
+  if (tpl.trigger === "on_checkout") return `${tr("Il giorno del check-out")} · ${tr("invio al mattino")}`;
   const w = tpl.trigger === "before_arrival" ? tr("prima dell'arrivo") : tpl.trigger === "after_arrival" ? tr("dopo l'arrivo") : tr("dopo il check-out");
-  return `${tpl.days} ${tr("gg")} ${w} · ${tpl.time}`;
+  return `${tpl.days} ${tr("gg")} ${w} · ${tr("invio al mattino")}`;
 };
 
 // Modelli & automazioni: crea i messaggi riutilizzabili (tab di /messaggi).
@@ -182,6 +183,9 @@ export default function ModelliPanel() {
                   <label className="block text-xs font-medium text-dim">{t("Orario")}<input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
                 )}
               </div>
+              {editing.trigger !== "manual" && (
+                <p className="mt-1.5 text-[11px] text-faint">{t("L'invio automatico parte una volta al giorno, la mattina (tra le 9:00 e le 10:00 ora italiana): l'orario qui sopra è indicativo e non sposta l'invio.")}</p>
+              )}
               {editing.trigger !== "manual" && (
                 <label className="mt-2 block text-xs font-medium text-dim">{t("Collega a un'attività del «Da fare oggi»")} <span className="font-normal text-faint">{t("(mostra lì la spunta automatica con l'orario)")}</span>
                   <select value={editing.srcId ?? ""} onChange={(e) => setEditing({ ...editing, srcId: e.target.value || undefined })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">

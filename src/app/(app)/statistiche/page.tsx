@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
+import { csvCell } from "@/lib/invoicing/csv";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf, revenueInRange, nightlyRevenue } from "@/lib/booking";
 import { toISO, addDays, nights, parseISO, fmtDM } from "@/lib/dates";
@@ -127,7 +128,7 @@ export default function StatistichePage() {
   // Esporta in CSV (separatore ; e BOM: si apre bene in Excel italiano) le righe della tabella mostrata.
   const csvNum = (n: number) => n.toFixed(2).replace(".", ",");
   const exportRegistro = (fileLabel: string, periodLabel: string, rows: { label: string; storico: boolean; camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number }[], tot: { camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number; netto: number }) => {
-    const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
+    const q = csvCell;
     const head = [periodLabel, "Stato", "Camere vendute", "Occupazione %", "Arrivi", "Partenze", "Ospiti", "ADR", "Revenue", "Commissioni", "Netto"];
     const body: (string | number)[][] = rows.map((r) => [r.label, r.storico ? "Storico" : "Previsione", r.camere, Math.round(r.occ * 100), r.arrivi, r.partenze, r.ospiti, csvNum(r.camere ? r.adr : 0), csvNum(r.lordo), csvNum(r.commissioni), csvNum(r.lordo - r.commissioni)]);
     body.push(["Totale", "", tot.camere, Math.round(tot.occ * 100), tot.arrivi, tot.partenze, tot.ospiti, csvNum(tot.camere ? tot.adr : 0), csvNum(tot.lordo), csvNum(tot.commissioni), csvNum(tot.netto)]);
@@ -156,7 +157,7 @@ export default function StatistichePage() {
       const iso = `${repMonth}-${pad2(d)}`;
       const occ = active.filter((b) => b.unitId && b.channel !== "blocked" && scopedUnits.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
       const pct = scopedUnits.length ? Math.round((occ / scopedUnits.length) * 100) : 0;
-      const w = new Date(iso).getDay();
+      const w = new Date(iso.slice(0, 10) + "T00:00:00Z").getUTCDay();
       wdAgg[w].sum += pct; wdAgg[w].cnt++;
     }
   }

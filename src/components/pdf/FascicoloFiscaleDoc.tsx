@@ -3,6 +3,8 @@
 // dell'app (Planning pulizie, Preventivi): componente React renderizzato off-screen in formato A4
 // e catturato con html2canvas+jsPDF (captureA4ToPdfBlob) — il PDF è una fotocopia esatta di questa
 // anteprima, mai un disegno ricostruito a parte. Dimensioni fisse 794×1123 (A4 a 96dpi).
+import { eur } from "@/lib/format";
+
 export interface ChannelRow {
   label: string;
   count: number;
@@ -45,7 +47,8 @@ const INK = "#1B1A17";
 const DIM = "#55524A";
 const FAINT = "#8A8577";
 const LINE = "#E3E0D6";
-const money = (n: number) => "€ " + Math.round(n).toLocaleString("it-IT");
+// Importi ai centesimi (imponibile + IVA = totale): niente arrotondamento all'euro.
+const money = (n: number) => eur(n);
 
 const stat = (label: string, value: string) => (
   <div key={label}>

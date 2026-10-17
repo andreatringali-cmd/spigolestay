@@ -25,22 +25,31 @@ const post = async (handler: (r: Request) => Promise<unknown>, body: unknown, he
 };
 
 // ---- stripe/quote: URL di ritorno e testi ----
+// Un preventivo valido (struttura del proprietario con conto Stripe): ora la route ricava conto e importo dal server (vedi stripe-quote.test.ts).
+function quoteScenario() {
+  const data = { structures: [{ id: "st-1", name: "Casa", stripeAccount: "acct_REAL" }], roomTypes: [{ id: "rt-1", structureId: "st-1", name: "Doppia", basePrice: 100 }], units: [{ id: "u1", roomTypeId: "rt-1", structureId: "st-1" }], guests: [], bookings: [] };
+  const { client } = makeFakeDb({ app_state: [{ user_id: "owner-1", rev: 1, data: { [DATA_KEY]: JSON.stringify(data) } }], memberships: [], org_state: [] });
+  G.__stubs.calls = {}; G.__stubs.admin = client; G.__stubs.rateLimited = false;
+}
+const validQuote = (over: Record<string, unknown> = {}) => ({ amount: 150, metadata: { sid: "st-1", rt: "rt-1", ci: "2027-05-10", co: "2027-05-13", tot: "300", dep: "150", uid: "owner-1" }, ...over });
 test("quote: successUrl/cancelUrl su un altro dominio = rifiutati; sul nostro sito = ok", async () => {
-  G.__stubs.calls = {};
-  const bad = await post(quote.POST, { amount: 5, successUrl: "https://sito-falso.example/ok", cancelUrl: "https://xenora.test/x" });
+  quoteScenario();
+  const bad = await post(quote.POST, validQuote({ successUrl: "https://sito-falso.example/ok", cancelUrl: "https://xenora.test/x" }));
   assert.equal(bad.status, 400); assert.equal(bad.json.error, "invalid_return_url");
-  const bad2 = await post(quote.POST, { amount: 5, successUrl: "https://xenora.test/x", cancelUrl: "javascript:alert(1)" });
+  const bad2 = await post(quote.POST, validQuote({ successUrl: "https://xenora.test/x", cancelUrl: "javascript:alert(1)" }));
   assert.equal(bad2.status, 400);
   assert.equal(G.__stubs.calls.sessionCreate, undefined);
-  const ok = await post(quote.POST, { amount: 5, successUrl: "https://xenora.test/checkin?b=1&site=a", cancelUrl: "https://xenora.test/checkin?b=1" });
+  const ok = await post(quote.POST, validQuote({ successUrl: "https://xenora.test/checkin?b=1&site=a", cancelUrl: "https://xenora.test/checkin?b=1" }));
   assert.equal(ok.status, 200);
-  const none = await post(quote.POST, { amount: 5 });
+  const none = await post(quote.POST, validQuote());
   assert.equal(none.status, 200);
 });
 
-test("quote: label e desc senza link", async () => {
-  G.__stubs.calls = {};
-  await post(quote.POST, { amount: 5, label: "Verifica account https://evil.example/x conferma carta", desc: "vai su www.evil.example ora" });
+test("quote: label e desc senza link (saldo dal check-in: testi liberi del client, ripuliti)", async () => {
+  const data = { structures: [{ id: "st-1", name: "Casa", stripeAccount: "acct_REAL" }], roomTypes: [{ id: "rt-1", structureId: "st-1" }], units: [], guests: [], bookings: [{ id: "b-1", structureId: "st-1", roomTypeId: "rt-1", status: "confirmed", channel: "direct", checkIn: "2027-05-10", checkOut: "2027-05-13", total: 300, paid: 0 }] };
+  const { client } = makeFakeDb({ app_state: [{ user_id: "owner-1", rev: 1, data: { [DATA_KEY]: JSON.stringify(data) } }], memberships: [], org_state: [] });
+  G.__stubs.calls = {}; G.__stubs.admin = client; G.__stubs.rateLimited = false;
+  await post(quote.POST, { amount: 5, label: "Verifica account https://evil.example/x conferma carta", desc: "vai su www.evil.example ora", metadata: { bookingId: "b-1" } });
   const li = G.__stubs.calls.sessionCreate[0].line_items[0].price_data.product_data;
   assert.ok(!/evil/.test(li.name)); assert.ok(!/evil/.test(li.description));
   assert.equal(li.name, "Verifica account conferma carta");

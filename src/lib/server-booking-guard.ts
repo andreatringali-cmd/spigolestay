@@ -84,3 +84,66 @@ export function hasFreeUnit(d: OwnerStructureData, rtId: string, ci: string, co:
 export function clientIp(req: Request): string {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
 }
+
+/** Data di calendario reale (rifiuta 2026-02-30 e simili: il solo formato non basta, Date.parse("2026-02-30") sfora a marzo). */
+export function isRealIsoDate(s: unknown): s is string {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}
+
+/**
+ * La struttura `sid` (con il suo stripeAccount) tra i dati del proprietario: prima le organizzazioni condivise di cui è membro
+ * (fonte di verità per le strutture in società, evita copie personali vecchie con un conto di test), poi il suo stato personale.
+ * null = la struttura NON appartiene a questo utente. È l'unico modo fidato di sapere su quale conto Stripe incassare.
+ */
+export async function findOwnerStructure(admin: SupabaseClient, ownerId: string, sid: string): Promise<Json | null> {
+  if (!ownerId || !sid) return null;
+  try {
+    let orgSt: Json | null = null;
+    const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
+    for (const m of arr(ms)) {
+      const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
+      const found = arr(parse((os as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid);
+      if (found) { orgSt = found; if (found.stripeAccount) return found; }
+    }
+    const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
+    const perSt = arr(parse((row as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid) || null;
+    if (perSt?.stripeAccount) return perSt;
+    return orgSt || perSt;
+  } catch { return null; }
+}
+
+/** Piani tariffari (spigolestay:rateplans) del proprietario, come stringa JSON già parsificata. null = nessuno salvato (vale l'elenco predefinito). */
+export function ratePlansFromBlob(blob: unknown): unknown[] | null {
+  try {
+    const raw = (blob as Record<string, string> | null)?.["spigolestay:rateplans"];
+    const a = raw ? JSON.parse(raw) : null;
+    return Array.isArray(a) && a.length ? a : null;
+  } catch { return null; }
+}
+
+export async function loadOwnerRatePlans(admin: SupabaseClient, ownerId: string): Promise<unknown[] | null> {
+  const read = ratePlansFromBlob;
+  try {
+    const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
+    const own = read((row as { data?: unknown } | null)?.data);
+    if (own) return own;
+    const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
+    for (const m of arr(ms)) {
+      const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
+      const o = read((os as { data?: unknown } | null)?.data);
+      if (o) return o;
+    }
+  } catch { /* nessun piano leggibile: valgono quelli predefiniti */ }
+  return null;
+}
+
+/** L'account Stripe collegato può incassare? true/false se Stripe risponde, null se non verificabile (errore di rete: non si blocca, deciderà Checkout). */
+export async function stripeAccountChargesEnabled(stripe: { accounts: { retrieve: (id: string) => Promise<{ charges_enabled?: boolean }> } }, acct: string): Promise<boolean | null> {
+  try {
+    const a = await stripe.accounts.retrieve(acct);
+    return a.charges_enabled === undefined ? null : !!a.charges_enabled;
+  } catch { return null; }
+}

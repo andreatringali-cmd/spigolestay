@@ -13,7 +13,7 @@ import { sendDaily, type DailyMovement } from "@/lib/istat/turistat";
 // Invio reale al portale regionale (Turist@t) attivo solo con ISTAT_LIVE=1 e credenziali complete.
 const ISTAT_LIVE = process.env.ISTAT_LIVE === "1";
 const DATA_KEY = "spigolestay:data:v1";
-type Blob = { structures?: Structure[]; bookings?: Booking[]; guests?: Guest[] };
+type Blob = { structures?: Structure[]; bookings?: Booking[]; guests?: Guest[]; units?: { id: string; structureId: string; outOfService?: boolean }[] };
 
 // Dati del tenant: personali + strutture CONDIVISE (org_state delle sue membership). Senza le org le strutture condivise risultavano vuote
 // e la pulizia degli "orfani" cancellava le schedine/righe non inviate.
@@ -60,7 +60,8 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
     const { data: alreadySent } = await admin.from("istat_rows").select("id").eq("tenant_id", tenantId).eq("booking_id", b.id).eq("stato", "sent").limit(1);
     if (alreadySent && alreadySent.length) continue;
     const g = guestsById.get(b.guestId);
-    const provenance = g?.province || g?.country || (g?.citizenship ?? "");
+    // Provenienza: residenza dalla scheda ospite; altrimenti cittadinanza di chi ha fatto il check-in (primaryGuest della prenotazione prima dell'anagrafica condivisa).
+    const provenance = g?.province || g?.country || b.primaryGuest?.citizenship || (g?.citizenship ?? "");
     const { error } = await admin.from("istat_rows").insert({
       tenant_id: tenantId, structure_id: b.structureId, booking_id: b.id,
       arrival: b.checkIn, departure: b.checkOut, provenance,
@@ -72,8 +73,9 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
 }
 
 // Costruisce la chiusura giornaliera (stile Turist@t) dai dati prenotazione per un giorno.
-function buildDailyMovement(blob: Blob, structureId: string, day: string): DailyMovement {
-  const units = 0; // le camere totali stanno nel client; qui non servono al calcolo movimento
+export function buildDailyMovement(blob: Blob, structureId: string, day: string): DailyMovement {
+  // Camere totali della struttura (escluse quelle fuori servizio): servono al tasso di occupazione del portale.
+  const units = (blob.units ?? []).filter((u) => u.structureId === structureId && !u.outOfService).length;
   const guestsById = new Map((blob.guests ?? []).map((g) => [g.id, g]));
   const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const act = (blob.bookings ?? []).filter((b) => b.structureId === structureId && !isInactive(b));
@@ -89,10 +91,11 @@ function buildDailyMovement(blob: Blob, structureId: string, day: string): Daily
   const ospiti = act.filter((b) => b.checkIn === day).flatMap((b) => {
     const g = guestsById.get(b.guestId);
     const pg = b.primaryGuest ?? {};
+    // Dati di chi ha fatto il check-in: prima quelli della prenotazione (primaryGuest), poi l'anagrafica ospite (condivisa fra le camere di un gruppo).
     const main = {
       permanenza: nights(b.checkIn, b.checkOut), camera: b.unitId ?? undefined,
-      eta: ageFrom(g?.birthDate ?? pg.birthDate), sesso: (g?.sex ?? pg.sex) as "M" | "F" | undefined,
-      cittadinanza: g?.citizenship ?? pg.citizenship, luogoNascita: g?.birthPlace ?? pg.birthPlace,
+      eta: ageFrom(pg.birthDate || g?.birthDate), sesso: (pg.sex || g?.sex || undefined) as "M" | "F" | undefined,
+      cittadinanza: pg.citizenship || g?.citizenship, luogoNascita: pg.birthPlace || g?.birthPlace,
       luogoResidenza: g?.province ?? g?.country ?? undefined,
     };
     const extra = (b.extraGuests ?? []).map((c) => ({ permanenza: nights(b.checkIn, b.checkOut), camera: b.unitId ?? undefined, eta: ageFrom(c.birthDate), sesso: c.sex as "M" | "F" | undefined, cittadinanza: c.citizenship, luogoNascita: c.birthPlace, luogoResidenza: undefined }));
@@ -111,6 +114,11 @@ export const ISTAT_SIMULATED_MSG = "Simulato (invio reale non attivo): nulla è 
 export async function closeDay(admin: SupabaseClient, tenantId: string, structureId: string, day?: string): Promise<{ ok: boolean; message: string; sent: number; simulated?: boolean }> {
   const { data: sett } = await admin.from("istat_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
   const today = todayRome();
+  // Un giorno futuro non si chiude: i movimenti non sono ancora avvenuti.
+  if (day) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, message: "Data non valida.", sent: 0 };
+    if (day > today) return { ok: false, message: "Non puoi chiudere un giorno futuro: scegli oggi o una data passata.", sent: 0 };
+  }
   let q = admin.from("istat_rows").select("id, booking_id, arrival").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
   // Si invia per gli arrivi già avvenuti: senza un giorno specifico, escludi gli arrivi futuri.
   if (day) q = q.eq("arrival", day);
@@ -121,7 +129,7 @@ export async function closeDay(admin: SupabaseClient, tenantId: string, structur
   if (!ids.length) return { ok: false, message: "Nessuna riga da inviare.", sent: 0 };
 
   const istatPassword = decryptCred(sett?.password_enc);
-  if (!sett?.username || !istatPassword) return { ok: false, message: "Credenziali ISTAT mancanti: aprile impostazioni e inserisci username e password.", sent: 0 };
+  if (!sett?.username || !istatPassword) return { ok: false, message: "Credenziali ISTAT mancanti: apri le impostazioni e inserisci username e password.", sent: 0 };
 
   const live = ISTAT_LIVE && !!sett.username && !!istatPassword;
   // Invio reale non attivo: esito SIMULATO, nessuna riga segnata come inviata.

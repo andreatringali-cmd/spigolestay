@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanStructure, cleanUnit, cleanBookings, STRUCT_PRIVATE } from "../src/lib/publicsanitize.ts";
+import { cleanStructure, cleanUnit, cleanBookings, STRUCT_PRIVATE, STRUCT_PUBLIC, UNIT_PRIVATE, UNIT_PUBLIC } from "../src/lib/publicsanitize.ts";
 
 test("struttura: i campi sensibili non compaiono nello snapshot, quelli pubblici restano", () => {
   const st = {
@@ -43,4 +43,18 @@ test("prenotazioni: solo occupazione, id reali sostituiti da un indice, nessun d
   for (const secret of ["real-uuid", "g1", "333", "pi_1", "SPG-1", "200"]) assert.ok(!json.includes(secret), secret);
   assert.equal(out[0].checkIn, "2026-10-01");
   assert.equal(out[0].channel, "direct");
+});
+
+test("lista bianca: un campo nuovo o sconosciuto sulla struttura/camera NON finisce nello snapshot pubblico", () => {
+  const st = { id: "s1", name: "Casa Test", city: "Siracusa", orgId: "org-segreta", contactName: "Mario Rossi", campoFuturo: "dato interno", webhookUrl: "https://x", checkInFrom: "15:00", depositPct: 30, logo: "data:image/png;base64,AA" };
+  const out = cleanStructure(st);
+  assert.deepEqual(Object.keys(out).sort(), ["checkInFrom", "city", "depositPct", "id", "logo", "name"]);
+  const u = cleanUnit({ id: "u1", structureId: "s1", roomTypeId: "r1", name: "Allegra", serviceDays: ["Lu"], linenFreq: "3 Giorni", campoFuturo: "x", photos: ["a"] });
+  assert.deepEqual(Object.keys(u).sort(), ["id", "name", "photos", "roomTypeId", "structureId"]);
+});
+
+test("lista bianca e lista nera non si sovrappongono", () => {
+  assert.deepEqual(STRUCT_PUBLIC.filter((k) => STRUCT_PRIVATE.includes(k)), []);
+  assert.deepEqual(UNIT_PUBLIC.filter((k) => UNIT_PRIVATE.includes(k)), []);
+  for (const k of ["iban", "vat", "taxCode", "accessInfo", "stripeAccount", "alloggiatiUser", "gcalId", "pec", "sdi"]) assert.ok(!STRUCT_PUBLIC.includes(k), k);
 });

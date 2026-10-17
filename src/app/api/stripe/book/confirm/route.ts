@@ -2,33 +2,24 @@ import Stripe from "stripe";
 import { internalFetch } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import { findOwnerStructure, clientIp, loadOrgDataParts, mergeOwnerData } from "@/lib/server-booking-guard";
+import { rateLimited } from "@/lib/server-auth";
+import { publicBookingBodyFromSession, bookingSummaryFrom, bookingWriteFailure, type BookingSummary } from "@/lib/book-session";
+
+type Json = Record<string, unknown>;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DATA_KEY = "spigolestay:data:v1";
-type Json = Record<string, unknown>;
-const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
-
 // Ritorna lo stripeAccount della struttura (personale o org condivisa) collegata allo slug.
-async function acctForSlug(admin: SupabaseClient, slug: string): Promise<{ ownerId: string; sid: string; acct: string } | null> {
+async function acctForSlug(admin: Parameters<typeof findOwnerStructure>[0], slug: string): Promise<{ ownerId: string; sid: string; acct: string } | null> {
   const { data: site } = await admin.from("public_sites").select("user_id, structure_id").eq("slug", slug).maybeSingle();
   const s0 = site as { user_id?: string; structure_id?: string } | null;
   const ownerId = (s0?.user_id as string) || ""; const sid = (s0?.structure_id as string) || "";
   if (!ownerId || !sid) return null;
-  const parse = (data: unknown): Json => { const blob = ((data ?? {}) as Record<string, string>) || {}; try { return JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { return {}; } };
-  // ORG condivise per prime (fonte di verità), poi personale: evita account Stripe vecchi/di test.
-  const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
-  for (const m of arr(ms)) {
-    const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
-    const found = arr(parse((os as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid);
-    if (found?.stripeAccount) return { ownerId, sid, acct: String(found.stripeAccount) };
-  }
-  const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
-  const perSt = arr(parse((row as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid) || null;
-  if (perSt?.stripeAccount) return { ownerId, sid, acct: String(perSt.stripeAccount) };
-  return { ownerId, sid, acct: "" };
+  const st = await findOwnerStructure(admin, ownerId, sid);
+  return { ownerId, sid, acct: st && st.stripeAccount ? String(st.stripeAccount) : "" };
 }
 
 // Verifica che la sessione Stripe sia PAGATA, poi registra la prenotazione (via public-booking,
@@ -44,6 +35,7 @@ export async function POST(req: Request) {
     const sessionId = String(b?.session_id || "").trim();
     const slug = String(b?.slug || "").trim();
     if (!sessionId || !slug) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
+    if (rateLimited("bcf:" + clientIp(req), 30, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
     const resolved = await acctForSlug(admin, slug);
@@ -54,7 +46,7 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] });
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid", status: session.payment_status }, { status: 402 });
     const m = (session.metadata ?? {}) as Record<string, string>;
-    // Solo sessioni create da /api/stripe/book (kind "book", dopo tutti i controlli) per QUESTA struttura: le sessioni di /api/stripe/quote hanno metadata scelti dal chiamante.
+    // Solo sessioni create da /api/stripe/book (kind "book", dopo tutti i controlli) per QUESTA struttura: le sessioni di /api/stripe/quote hanno altri metadata.
     if (m.kind !== "book" || m.slug !== slug || (m.s && m.s !== resolved.sid)) return NextResponse.json({ ok: false, error: "not_a_booking_session" }, { status: 400 });
     const pi = session.payment_intent;
     const paymentIntent = typeof pi === "string" ? pi : (pi?.id || "");
@@ -63,18 +55,33 @@ export async function POST(req: Request) {
     const origin = siteOrigin(req);
     const pb = await internalFetch(`${origin}/api/public-booking`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        slug, rt: m.rt, ci: m.ci, co: m.co,
-        adults: Number(m.ad) || 1, children: Number(m.ch) || 0,
-        total: Number(m.tot) || 0, deposit: Number(m.dep) || 0,
-        note: m.note || "", code: m.code || "", token: m.token || sessionId,
-        planName: m.rpn || "", refundable: m.ref === "1", cancelDays: Number(m.cd) || 0,
-        stripePaymentIntent: paymentIntent, stripeSessionId: session.id, stripeAccountId: resolved.acct,
-        guest: { firstName: (m.gn || "").split(" ")[0] || "", lastName: (m.gn || "").split(" ").slice(1).join(" "), email: m.ge || "", phone: m.gp || "", country: m.gc || "" },
-      }),
+      body: JSON.stringify(publicBookingBodyFromSession(session, { slug, paymentIntent, accountId: resolved.acct })),
     });
     const pj = await pb.json().catch(() => ({}));
-    return NextResponse.json({ ok: !!pj?.ok, already: pj?.already });
+    // Riepilogo per la pagina /prenota: si rilegge la prenotazione registrata (anche con already:true), altrimenti si ricava dai metadata della sessione.
+    let booking: BookingSummary | undefined;
+    if (pj?.ok) {
+      try {
+        const extId = `site:${slug}:${m.token || session.id}`;
+        const parts: Json[] = [];
+        const { data: row } = await admin.from("app_state").select("data").eq("user_id", resolved.ownerId).maybeSingle();
+        try { parts.push(JSON.parse(String(((row as { data?: Record<string, string> } | null)?.data ?? {})["spigolestay:data:v1"] || "{}")) as Json); } catch { /* stato illeggibile */ }
+        parts.push(...(await loadOrgDataParts(admin, resolved.ownerId)));
+        const merged = mergeOwnerData(parts);
+        const bk = merged.bookings.find((x) => x.extId === extId) ?? null;
+        const sid = String(bk?.structureId || resolved.sid);
+        const structure = merged.structures.find((x) => x.id === sid) ?? (await findOwnerStructure(admin, resolved.ownerId, sid));
+        const roomType = merged.roomTypes.find((x) => x.id === String(bk?.roomTypeId || m.rt)) ?? null;
+        const guest = bk ? (parts.flatMap((p) => (Array.isArray(p.guests) ? (p.guests as Json[]) : [])).find((x) => x.id === bk.guestId) ?? null) : null;
+        booking = bookingSummaryFrom({ session, booking: bk, structure, roomType, guest });
+      } catch { /* il riepilogo non e' critico: la pagina ripiega sui dati salvati */ }
+    }
+    // Scrittura non riuscita (pagamento gia' incassato): mai 200 con ok:false e senza `error` — il client non saprebbe se ritentare. Transitorio = 409/502, permanente = 422.
+    if (!pj?.ok) {
+      const fail = bookingWriteFailure(pb.status, pj);
+      return NextResponse.json({ ok: false, error: fail.error, paid: true, retryable: !fail.permanent }, { status: fail.httpStatus });
+    }
+    return NextResponse.json({ ok: true, already: pj?.already, ...(booking ? { booking } : {}) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "error" }, { status: 500 });
   }

@@ -10,7 +10,7 @@ import { inScope, newItemStructureId } from "@/lib/scope";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 
-const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
+const isWeekend = (iso: string) => { const d = new Date(iso.slice(0, 10) + "T00:00:00Z").getUTCDay(); return d === 5 || d === 6 || d === 0; };
 const fmt = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
 
 // Eventi locali: li aggiunge il gestore a mano (sagre, concerti, crociere…) — nessuna fonte

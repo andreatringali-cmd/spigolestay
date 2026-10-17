@@ -8,6 +8,7 @@ import { FORFETTARIO_NOTE } from "@/lib/invoicing/folio";
 import { apiPost } from "@/lib/invoicing/client";
 import { validateIssuerSettings, hasErrors, normalizeVat, normalizeCf } from "@/lib/invoicing/validate";
 import { useTenantId } from "@/lib/tenant";
+import { friendlyError } from "@/lib/friendly-error";
 
 interface Settings {
   regime: string; denominazione: string; vat: string; tax_code: string;
@@ -51,7 +52,7 @@ export default function ImpostazioniFatturaPage() {
     let off = false;
     void Promise.resolve(supabase.from("tenant_invoice_settings").select("*").eq("tenant_id", tenantId).maybeSingle()).then(({ data, error }) => {
       if (off) return;
-      if (error) setLoadErr("Impossibile leggere le impostazioni: " + error.message + ". Il salvataggio è disattivato per non sovrascriverle.");
+      if (error) setLoadErr("Impossibile leggere le impostazioni: " + friendlyError(error) + " Il salvataggio è disattivato per non sovrascriverle.");
       else { loadedFor.current = tenantId; if (data) setS({ ...DEF, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null)) as Partial<Settings> }); }
       setLoading(false);
     });
@@ -93,12 +94,12 @@ export default function ImpostazioniFatturaPage() {
   const connectFic = async () => {
     setFicBusy("connect"); setFicMsg("");
     try { const r = await apiPost<{ url?: string }>("invoicing/fic/start", {}); if (r.url) window.location.href = r.url; }
-    catch (e) { setFicMsg(e instanceof Error ? e.message : "Errore"); setFicBusy(""); }
+    catch (e) { setFicMsg(friendlyError(e)); setFicBusy(""); }
   };
   const ficAction = async (action: string, extra: Record<string, unknown> = {}) => {
     setFicBusy(action); setFicMsg("");
     try { const r = await apiPost<{ message?: string }>("invoicing/provider", { provider: "fattureincloud", action, ...extra }); setFicMsg(r.message || "OK"); await loadFic(); }
-    catch (e) { setFicMsg(e instanceof Error ? e.message : "Errore"); } finally { setFicBusy(""); }
+    catch (e) { setFicMsg(friendlyError(e)); } finally { setFicBusy(""); }
   };
 
   const saveCred = async () => {
@@ -108,12 +109,12 @@ export default function ImpostazioniFatturaPage() {
       setCredMsg(r.message || "Salvato ✓"); setToken("");
       const st = await apiPost<{ hasToken: boolean; sandbox: boolean; signature: boolean; legalStorage: boolean }>("invoicing/provider", { provider: s.default_provider, action: "status" });
       setCred({ hasToken: st.hasToken, sandbox: st.sandbox, signature: st.signature, legalStorage: st.legalStorage });
-    } catch (e) { setCredMsg(e instanceof Error ? e.message : "Errore"); } finally { setCredBusy(""); }
+    } catch (e) { setCredMsg(friendlyError(e)); } finally { setCredBusy(""); }
   };
   const testCred = async () => {
     setCredBusy("test"); setCredMsg("");
     try { const r = await apiPost<{ ok: boolean; message?: string }>("invoicing/provider", { provider: s.default_provider, action: "test" }); setCredMsg(r.message || (r.ok ? "OK" : "Errore")); }
-    catch (e) { setCredMsg(e instanceof Error ? e.message : "Errore"); } finally { setCredBusy(""); }
+    catch (e) { setCredMsg(friendlyError(e)); } finally { setCredBusy(""); }
   };
 
   const save = async () => {
@@ -133,7 +134,7 @@ export default function ImpostazioniFatturaPage() {
     const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: tenantId, ...clean, updated_at: new Date().toISOString() });
     setSaving(false);
     if (!error) { setS(clean); setDirty(false); }
-    setMsg(error ? "Errore: " + error.message : "Impostazioni salvate ✓");
+    setMsg(error ? "Errore: " + friendlyError(error) : "Impostazioni salvate ✓");
   };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";

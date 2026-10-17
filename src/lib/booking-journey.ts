@@ -2,6 +2,7 @@
 // calcolati dai dati che Xenora ha già. Funzione pura: nessuna scrittura, nessuna chiamata di rete.
 
 import { fmtDM } from "./dates";
+import { eur } from "./format";
 import type { Booking, Guest, Structure } from "./types";
 import { bookingPaidTotal, cityTaxOfBooking } from "./booking";
 import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
@@ -26,7 +27,7 @@ const expectedPax = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ??
 const primaryDone = (b: Booking) => b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
 const declaredPax = (b: Booking) => (primaryDone(b) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0);
 const daysTo = (iso: string, today: string) => Math.round((Date.parse(iso) - Date.parse(today)) / 86400000);
-const eurRound = (n: number) => `€ ${Math.round(n * 100) % 100 === 0 ? Math.round(n) : n.toFixed(2).replace(".", ",")}`;
+const eurRound = (n: number) => eur(n); // sempre 2 decimali e migliaia separate, come ovunque
 const fmtShort = (iso: string) => fmtDM(iso);
 
 /** Nota interna della prenotazione, senza la dicitura "Importato da…" messa dall'importazione. Vuota se resta solo quella. Non è una nota dell'ospite: quelle sono le richieste (guestRequests). */

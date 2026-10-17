@@ -1,7 +1,12 @@
-// Calcolo tassa/imposta di soggiorno — logica UNICA condivisa fra la pagina
-// "Tassa di soggiorno" e l'azione "Elabora tutto" degli Adempimenti (niente duplicati).
-// Regole di default = preset Comune di Siracusa.
+// Calcolo tassa/imposta di soggiorno — logica UNICA condivisa fra la pagina "Tassa di soggiorno",
+// l'azione "Elabora tutto" degli Adempimenti, il check-in, le fatture e il fascicolo fiscale:
+// l'importo di una prenotazione è sempre quello di `cityTaxOfBooking` (lib/booking.ts), che conosce le quote dei GRUPPI di camere,
+// le età dei bambini (esenzione sotto la soglia del Comune) e il tetto a persona/notte. Qui si traducono solo le "regole" della pagina
+// (modificabili per simulazione) in una struttura equivalente.
+// DEFAULT_CITY_TAX_RULES = preset Comune di Siracusa, usato SOLO come punto di partenza della simulazione nella pagina "Tassa di soggiorno" (struttura senza regole).
+// La soglia d'età di una struttura SENZA valore impostato e' DEFAULT_CITY_TAX_FREE_UNDER (lib/booking.ts), la stessa di totali, fatture e check-in.
 import { nights } from "@/lib/dates";
+import { cityTaxOfBooking, cityTaxOfBookingRaw, cityTaxPayers, DEFAULT_CITY_TAX_FREE_UNDER } from "@/lib/booking";
 import type { Booking, Structure } from "@/lib/types";
 
 export interface CityTaxRules {
@@ -20,8 +25,8 @@ export const DEFAULT_CITY_TAX_RULES: CityTaxRules = {
 };
 
 // Regole di una struttura, dalla sua configurazione (Strutture → Tassa di soggiorno), nel formato
-// di questa pagina. null = tassa di soggiorno non attiva per la struttura. Le età dei minori e i
-// default seguono lib/booking.ts (cityTaxOf / cityTaxPayers).
+// di questa pagina. null = tassa di soggiorno non attiva per la struttura. Se la soglia d'età dei minori non è impostata
+// vale DEFAULT_CITY_TAX_FREE_UNDER (18, come lib/booking.ts): cosi' pagina, adempimenti e totali dell'ospite danno lo stesso importo.
 export function cityTaxRulesOf(st: Structure | undefined): CityTaxRules | null {
   if (!st?.cityTax) return null;
   const percent = st.cityTaxMode === "percent";
@@ -32,51 +37,63 @@ export function cityTaxRulesOf(st: Structure | undefined): CityTaxRules | null {
     cap: st.cityTaxCap ?? 0, // 0 = nessun tetto
     maxNights: st.cityTaxMaxNights ?? (percent ? 7 : 3),
     childrenExempt: true,    // minori senza età nota: esenti (come booking.ts)
-    exemptAge: st.cityTaxChildFreeUnder ?? 18,
+    exemptAge: st.cityTaxChildFreeUnder ?? DEFAULT_CITY_TAX_FREE_UNDER,
   };
 }
 
-// Imposta dovuta per una singola prenotazione, dato l'insieme di regole.
-export function cityTaxForBooking(b: Booking, rules: CityTaxRules): { persons: number; taxable: number; tax: number } {
-  // Persone paganti: se ho le età dei bambini uso la soglia (es. under 14 esenti); altrimenti il toggle "minori esenti".
-  const payingKids = (b.childAges && b.childAges.length)
-    ? b.childAges.filter((a) => a >= rules.exemptAge).length
-    : (rules.childrenExempt ? 0 : b.children);
-  const persons = b.cityTaxExempt ? 0 : b.adults + payingKids;
-  const nN = nights(b.checkIn, b.checkOut);
-  const taxable = Math.min(nN, rules.maxNights);
-  let tax: number;
-  if (rules.taxMode === "percentuale") {
-    // Siracusa: (prezzo camera a notte ÷ n. ospiti) × %, con tetto € a persona/notte, × persone paganti × notti.
-    const guestsTot = Math.max(1, b.adults + b.children);
-    const nightlyRate = nN > 0 ? (b.total ?? 0) / nN : 0;
-    const rawPerPerson = (nightlyRate / guestsTot) * (rules.pct / 100);
-    const perPersonTax = rules.cap > 0 ? Math.min(rawPerPerson, rules.cap) : rawPerPerson; // cap 0 = nessun tetto
-    tax = Math.round(perPersonTax * persons * taxable * 100) / 100;
-  } else {
-    tax = persons * taxable * rules.amount;
-  }
+const sameRules = (a: CityTaxRules, b: CityTaxRules) =>
+  a.taxMode === b.taxMode && a.amount === b.amount && a.pct === b.pct && a.cap === b.cap && a.maxNights === b.maxNights && a.exemptAge === b.exemptAge;
+
+/** Struttura equivalente alle regole date (per riusare il calcolo condiviso di lib/booking.ts). */
+export function structureFromRules(r: CityTaxRules): Structure {
+  return {
+    cityTax: true, cityTaxMode: r.taxMode === "percentuale" ? "percent" : "fixed", cityTaxPercent: r.pct, cityTaxCap: r.cap,
+    cityTaxAmount: r.amount, cityTaxMaxNights: r.maxNights, cityTaxChildFreeUnder: r.exemptAge,
+  } as unknown as Structure;
+}
+
+
+/**
+ * Imposta dovuta per una singola prenotazione, dato l'insieme di regole.
+ * Con `structure` e regole uguali a quelle della struttura il calcolo è IDENTICO a quello di check-in, fatture e fascicolo (`cityTaxOfBooking`, quote di gruppo incluse);
+ * con regole modificate a mano (simulazione) si calcola la prenotazione da sola con le regole indicate.
+ */
+export function cityTaxForBooking(b: Booking, rules: CityTaxRules, structure?: Structure): { persons: number; taxable: number; tax: number } {
+  const real = structure?.cityTax && sameRules(cityTaxRulesOf(structure)!, rules) ? structure : null;
+  const st = real ?? structureFromRules(rules);
+  // Toggle "minori esenti (senza età)" spento: i bambini di cui non si conosce l'età pagano (età fittizia sopra qualunque soglia).
+  const bb = !rules.childrenExempt && !(b.childAges && b.childAges.length) && b.children > 0
+    ? { ...b, childAges: Array.from({ length: b.children }, () => 99) }
+    : b;
+  const persons = b.cityTaxExempt ? 0 : cityTaxPayers(st, bb);
+  const taxable = Math.min(nights(b.checkIn, b.checkOut), rules.maxNights);
+  const tax = real ? cityTaxOfBooking(st, bb) : cityTaxOfBookingRaw(st, bb);
   return { persons, taxable, tax };
 }
 
-// Come cityTaxTotal ma ogni prenotazione usa le regole della SUA struttura (strutture senza tassa: saltate).
+const isLiveBooking = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
+
+// Come cityTaxTotal ma ogni prenotazione usa le regole della SUA struttura (strutture senza tassa: saltate). Annullate, no-show e blocchi non contano.
 export function cityTaxTotalByStructure(bookings: Booking[], getStructure: (id: string) => Structure | undefined): { total: number; persons: number; nights: number; count: number } {
   let total = 0, persons = 0, nightsSum = 0, count = 0;
   for (const b of bookings) {
-    const rules = cityTaxRulesOf(getStructure(b.structureId));
+    if (!isLiveBooking(b)) continue;
+    const st = getStructure(b.structureId);
+    const rules = cityTaxRulesOf(st);
     if (!rules) continue;
-    const r = cityTaxForBooking(b, rules);
+    const r = cityTaxForBooking(b, rules, st);
     total += r.tax; persons += r.persons; nightsSum += r.taxable; count++;
   }
   return { total: Math.round(total * 100) / 100, persons, nights: nightsSum, count };
 }
 
 // Imposta totale dovuta su un insieme di prenotazioni (già filtrate per periodo/struttura).
-export function cityTaxTotal(bookings: Booking[], rules: CityTaxRules): { total: number; persons: number; nights: number; count: number } {
-  let total = 0, persons = 0, nightsSum = 0;
+export function cityTaxTotal(bookings: Booking[], rules: CityTaxRules, structure?: Structure): { total: number; persons: number; nights: number; count: number } {
+  let total = 0, persons = 0, nightsSum = 0, count = 0;
   for (const b of bookings) {
-    const r = cityTaxForBooking(b, rules);
-    total += r.tax; persons += r.persons; nightsSum += r.taxable;
+    if (!isLiveBooking(b)) continue;
+    const r = cityTaxForBooking(b, rules, structure);
+    total += r.tax; persons += r.persons; nightsSum += r.taxable; count++;
   }
-  return { total: Math.round(total * 100) / 100, persons, nights: nightsSum, count: bookings.length };
+  return { total: Math.round(total * 100) / 100, persons, nights: nightsSum, count };
 }

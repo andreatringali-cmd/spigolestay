@@ -133,7 +133,7 @@ export interface IcsImportCtx {
   addGuest: (g: { fullName?: string }) => string;
   addBooking: (b: Omit<Booking, "id">) => void;
   updateBooking: (id: string, patch: Partial<Booking>) => void;
-  deleteBooking: (id: string) => void;
+  deleteBooking: (id: string, opts?: { keepFiles?: boolean }) => void;
   addRoomType: (rt: { structureId: string; name: string; beds: number; basePrice: number }) => string;
   addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string;
   t: (s: string) => string;
@@ -170,7 +170,7 @@ export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: Ic
   // da Channex, dal sito, da Stripe o da Octorate (hanno un extId con prefisso), né quelle inserite a mano.
   const del = replacePrev ? previousImportsToReplace(bookings, structureId, forced?.id) : [];
   const delIds = new Set(del.map((b) => b.id));
-  del.forEach((b) => deleteBooking(b.id));
+  del.forEach((b) => deleteBooking(b.id, { keepFiles: true })); // la sostituzione di un import non deve mai cancellare documenti e firma dallo Storage
 
   const fallbackName = t("Camere importate");
   // Posti letto dedotti dal numero massimo di ospiti (pax) visto per quella camera nel file.

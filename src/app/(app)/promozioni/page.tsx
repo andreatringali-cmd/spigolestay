@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, fmtDate } from "@/lib/dates";
+import { eur } from "@/lib/format";
 import DateField from "@/components/DateField";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
@@ -24,7 +25,7 @@ const RIPRENOTA_PROMO: Promo = {
   description: "Per gli ex ospiti arrivati da OTA: riprenotano diretto e tu risparmi la commissione.",
   discountPct: 10, code: "RITORNO10",
   features: ["Miglior prezzo prenotando diretto", "Nessun intermediario", "Self check-in", "Assistenza diretta con noi"],
-  body: "Ciao {nome},\n\nè stato un piacere ospitarti a {struttura}! Se pensi di tornare a Siracusa, prenotando DIRETTO con noi hai il {sconto}% di sconto con il codice {codice} — stesso servizio, senza intermediari.\n\nScrivici o prenota qui: {contatti}\n\nA presto! — {struttura}",
+  body: "Ciao {nome},\n\nè stato un piacere ospitarti a {struttura}! Se pensi di tornare a trovarci, prenotando DIRETTO con noi hai il {sconto}% di sconto con il codice {codice} — stesso servizio, senza intermediari.\n\nScrivici o prenota qui: {contatti}\n\nA presto! — {struttura}",
 };
 
 // I segmenti "intelligenti" (calcolati dallo storico) + le categorie ospite (flag VIP e tag "tag:<nome>").
@@ -191,7 +192,7 @@ export default function PromozioniPage() {
       <PageHeader title="Promozioni" subtitle="Crea le tue promo, salvale e inviale quando vuoi · max 4 invii l'anno" />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {([["Commissioni OTA (storico)", `€ ${Math.round(otaCommission).toLocaleString("it-IT")}`], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!promoRecipientEmail(g)) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
+        {([["Commissioni OTA (storico)", eur(otaCommission)], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!promoRecipientEmail(g)) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
           <StatCard key={lab} label={lab} value={val} />
         ))}
       </div>

@@ -1,12 +1,20 @@
 import { schedulePoolPush } from "@/lib/pool-push";
 import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { NextResponse } from "next/server";
-import { stayFloor, hasFreeUnit, clientIp, loadOrgDataParts, mergeOwnerData, type OwnerStructureData } from "@/lib/server-booking-guard";
+import { stayFloor, clientIp, loadOrgDataParts, mergeOwnerData, isRealIsoDate, loadOwnerRatePlans, type OwnerStructureData } from "@/lib/server-booking-guard";
+import { rootRoomTypeId, loadOwnerPromos, resolveBookPromo, floorWithPromo, priceBookExtras } from "@/lib/book-order";
+import { resolvePlanPolicy } from "@/lib/plan-policy";
+import { cityTaxOfBookingRaw } from "@/lib/booking";
+import { parseNotifPrefs } from "@/lib/notifPrefs";
+import { notifyBookingLines } from "@/lib/booking-notify";
+import { addDaysYmd } from "@/lib/dates-rome";
+import type { Structure } from "@/lib/types";
 import { isInternalRequest, rateLimited } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { ymdRome } from "@/lib/dates-rome";
+import { plural } from "@/lib/plural";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +33,10 @@ type Booking = Json & { id: string; structureId: string; roomTypeId: string; uni
 type Unit = { id: string; roomTypeId: string; structureId?: string; outOfService?: boolean };
 
 const overlaps = (b: { checkIn: string; checkOut: string }, ci: string, co: string) => b.checkIn < co && b.checkOut > ci;
-const isISO = (s: unknown) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+const isEmail = (s: string) => /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]{2,}$/.test(s) && s.length <= 120;
+// Solo l'avviso di camera da assegnare (la nota dell'ospite viaggia a parte, come "richieste").
+const overbookedNote = (b: Booking) => (String(b.note || "").includes("nessuna camera libera") ? "⚠ nessuna camera libera in quelle date: da assegnare a mano" : undefined);
+const clip = (v: unknown, n: number) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, n);
 
 export async function POST(req: Request) {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,30 +59,44 @@ export async function POST(req: Request) {
     // Importi ai CENTESIMI (Stripe incassa ai centesimi: arrotondare all'euro falsava paid/total).
     const total = Math.min(1_000_000, Math.max(0, Math.round((Number(body?.total) || 0) * 100) / 100)) || undefined;
     const deposit = internal ? Math.max(0, Math.round((Number(body?.deposit) || 0) * 100) / 100) || 0 : 0;
-    const note = String(body?.note || "").slice(0, 500);
+    // Richieste scritte dall'ospite: limite ampio, così non si taglia in coda quello che ha scritto.
+    const note = String(body?.note || "").trim().slice(0, 1500);
     const token = String(body?.token || "").trim().slice(0, 80);
     // Politica di cancellazione + riferimenti pagamento Stripe (per rimborso self-service)
     const planName = String(body?.planName || "").slice(0, 60);
-    const refundable = internal && body?.refundable === true;
-    const cancelDays = Math.max(0, parseInt(String(body?.cancelDays ?? "0"), 10) || 0);
+    // Politica di cancellazione: dalle chiamate interne (webhook/conferma, già calcolata dal server) arriva nel corpo; per l'anonimo si ricava
+    // dai piani del proprietario (più sotto), non da quello che dichiara il browser.
+    let refundable = internal && body?.refundable === true;
+    let cancelDays = internal ? Math.max(0, parseInt(String(body?.cancelDays ?? "0"), 10) || 0) : 0;
     const stripePaymentIntent = internal ? String(body?.stripePaymentIntent || "").slice(0, 120) : "";
     const stripeSessionId = internal ? String(body?.stripeSessionId || "").slice(0, 120) : "";
     const stripeAccountId = internal ? String(body?.stripeAccountId || "").slice(0, 120) : "";
     const g = (body?.guest ?? {}) as Record<string, string>;
-    const gFirst = String(g.firstName || "").trim();
-    const gLast = String(g.lastName || "").trim();
-    const gEmail = String(g.email || "").trim();
-    const gPhone = String(g.phone || "").trim();
-    const gCountry = String(g.country || "").trim();
+    const gFirst = clip(g.firstName, 80);
+    const gLast = clip(g.lastName, 80);
+    let gEmail = clip(g.email, 120);
+    // Lingua della pagina dell'ospite (it/en/fr/de/es): per l'email voucher e la scheda ospite.
+    const langRaw = String(body?.lang || g.language || "").slice(0, 2).toLowerCase();
+    const guestLanguage = ["it", "en", "fr", "de", "es"].includes(langRaw) ? langRaw : "";
+    const promoCode = String(body?.promoCode || "").trim().slice(0, 40);
+    const gPhone = clip(g.phone, 30);
+    const gCountry = clip(g.country, 60);
 
-    if (!slug || !rt || !isISO(ci) || !isISO(co) || co <= ci) return NextResponse.json({ error: "bad_request" }, { status: 400 });
-    // Date ragionevoli: soggiorno fino a 60 notti, non nel passato (ieri è tollerato per i fusi), non oltre 2 anni.
+    // Date reali (rifiuta 2026-02-30: il solo formato non basta).
+    if (!slug || !rt || !isRealIsoDate(ci) || !isRealIsoDate(co) || co <= ci) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    // Email non valida: dal browser anonimo si rifiuta (l'ospite la corregge); da una chiamata INTERNA (pagamento gia' incassato, /api/stripe/book accetta ogni indirizzo con "@")
+    // NON si rifiuta, altrimenti l'incasso resterebbe non registrato: la prenotazione si salva senza email e l'indirizzo scritto finisce in nota.
+    let badEmailNote = "";
+    if (gEmail && !isEmail(gEmail)) {
+      if (!internal) return NextResponse.json({ error: "bad_email" }, { status: 400 });
+      badEmailNote = gEmail; gEmail = "";
+    }
+    // Date ragionevoli: soggiorno fino a 60 notti, non nel passato (ieri è tollerato per i fusi), non oltre 2 anni. Giorni di calendario italiani.
     const nNights = Math.round((Date.parse(co) - Date.parse(ci)) / 86400000);
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const yesterdayUtc = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const limitUtc = new Date(Date.now() + 2 * 365 * 86400000).toISOString().slice(0, 10);
-    if (!internal && (nNights > 60 || ci < yesterdayUtc || ci > limitUtc)) return NextResponse.json({ error: "bad_dates" }, { status: 400 });
-    void todayUtc;
+    const todayIt = ymdRome(Date.now());
+    const yesterdayIt = addDaysYmd(todayIt, -1);
+    const limitIt = addDaysYmd(todayIt, 730);
+    if (!internal && (nNights > 60 || ci < yesterdayIt || ci > limitIt)) return NextResponse.json({ error: "bad_dates" }, { status: 400 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -107,13 +132,20 @@ export async function POST(req: Request) {
     // Idempotenza (anche sulle prenotazioni già smistate nelle organizzazioni)
     if (mBookings.some((b) => b.extId === extId)) return NextResponse.json({ ok: true, already: true });
 
+    // Politica di cancellazione per l'anonimo: dal piano scelto (per nome) tra quelli del proprietario o predefiniti. Piano sconosciuto = non rimborsabile.
+    if (!internal) {
+      // Stessa fonte di /api/stripe/book (stato personale, poi organizzazioni): un piano che sta solo nell'organizzazione non deve diventare "non rimborsabile" nel voucher.
+      const pol = resolvePlanPolicy(await loadOwnerRatePlans(admin, ownerId), planName, { roomTypeId: rt, checkIn: ci, nights: nNights, structureId: sid });
+      refundable = pol.refundable; cancelDays = pol.cancelDays;
+    }
+
     // Ospite: riusa per email, altrimenti crea
     let guestId = "";
     if (gEmail) { const found = guests.find((x) => (x.email || "").toLowerCase() === gEmail.toLowerCase()); if (found) guestId = found.id; }
     if (!guestId) {
       guestId = (globalThis.crypto?.randomUUID?.() ?? `g_${Date.now()}`);
       const fullName = `${gFirst} ${gLast}`.trim() || gEmail || "Ospite";
-      guests.push({ id: guestId, firstName: gFirst || undefined, lastName: gLast || undefined, fullName, email: gEmail || undefined, phone: gPhone || undefined, country: gCountry || undefined } as Json & { id: string });
+      guests.push({ id: guestId, firstName: gFirst || undefined, lastName: gLast || undefined, fullName, email: gEmail || undefined, phone: gPhone || undefined, country: gCountry || undefined, language: guestLanguage || undefined } as Json & { id: string });
       data.guests = guests;
     }
 
@@ -123,26 +155,31 @@ export async function POST(req: Request) {
     if (!internal && !mRoomTypes.some((x) => (x as { id?: string; structureId?: string }).id === rt && (x as { structureId?: string }).structureId === sid)) {
       return NextResponse.json({ error: "room_type_not_found" }, { status: 400 });
     }
-    const ofType = mUnits.filter((u) => u.roomTypeId === rt && !u.outOfService);
+    // Tariffe derivate (deriveFrom): le camere fisiche sono della tipologia madre, come nella pagina /prenota. Prezzo e prenotazione restano della tipologia scelta.
+    const rootRt = rootRoomTypeId(mRoomTypes, rt);
+    const ofType = mUnits.filter((u) => u.roomTypeId === rootRt && !u.outOfService);
     // Strutture che mostrano le stesse camere fisiche: la tipologia deve avere camere libere anche nel gruppo (le camere uguali si dividono le stesse camere fisiche).
     const pool = parsePool(blob[POOL_KEY]);
     const poolOcc = inPool(pool, sid) ? poolOccupancy(pool, mRoomTypes as never, mUnits, mBookings) : null;
-    const poolBlocks = poolOcc ? !poolOcc.canSell(rt, ci, co) : false;
+    const poolBlocks = poolOcc ? !poolOcc.canSell(rootRt, ci, co) : false;
     const free = poolBlocks ? undefined : ofType.find((u) => !mBookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
     let overbooked = false;
     let unitId: string | null = free?.id ?? null;
     if (!free && !internal) return NextResponse.json({ error: "no_availability" }, { status: 409 }); // anche se tutte le camere della tipologia sono fuori servizio
     if (!free) { overbooked = true; unitId = null; } // avviso anche quando i dati non mostrano camere: il gestore deve assegnarla a mano
+    // Codice promo ed extra scelti dall'ospite: validati sui dati del proprietario (prezzi e sconti non arrivano mai dal browser).
+    const stOwn = merged.structures.find((x) => (x as { id?: string }).id === sid) as Json | undefined;
+    const promoValid = promoCode ? resolveBookPromo(await loadOwnerPromos(admin, ownerId), promoCode, { structureId: sid, checkIn: ci, today: ymdRome(Date.now()) }) : null;
+    const chosenExtras = priceBookExtras(body?.extras, stOwn, { checkIn: ci, checkOut: co, adults });
     // Prezzo minimo (metà del listino): impedisce soggiorni "regalati" scrivendo un totale basso nella richiesta.
     if (!internal && total !== undefined) {
       const od: OwnerStructureData | null = merged.structures.some((x) => (x as { id?: string }).id === sid)
         ? { roomTypes: mRoomTypes as never, units: mUnits as never, bookings: mBookings as never, rateOverrides: merged.rateOverrides }
         : null;
       const floor = od ? stayFloor(od, rt, ci, co) : null;
-      if (floor !== null && total < floor) return NextResponse.json({ error: "price_mismatch" }, { status: 400 });
+      // total e' gia' al netto del codice promo: la soglia scende solo per una promo VALIDATA sulle promo del proprietario (e al massimo del 50%).
+      if (floor !== null && total < floorWithPromo(floor, promoValid?.pct ?? 0)) return NextResponse.json({ error: "price_mismatch" }, { status: 400 });
     }
-    void hasFreeUnit;
-
     const groupId = (globalThis.crypto?.randomUUID?.() ?? `grp_${Date.now()}`);
     const booking: Booking = {
       id: (globalThis.crypto?.randomUUID?.() ?? `b_${Date.now()}`),
@@ -155,7 +192,7 @@ export async function POST(req: Request) {
       status: "confirmed",
       checkIn: ci,
       checkOut: co,
-      bookedOn: new Date().toISOString().slice(0, 10),
+      bookedOn: ymdRome(Date.now()),
       adults,
       children,
       childAges: childAges.length ? childAges : undefined,
@@ -169,7 +206,9 @@ export async function POST(req: Request) {
       extId,
       source: "sito", // origine: sito ufficiale → in gestionale si mostra il logo della struttura (lib/direct-origin.ts)
       code: String((body as { code?: string })?.code || "").trim().slice(0, 40) || undefined,
-      note: (note || "Prenotazione dal sito") + (overbooked ? " · ⚠ nessuna camera libera in quelle date: da assegnare a mano" : ""),
+      note: (note || "Prenotazione dal sito") + (overbooked ? " · ⚠ nessuna camera libera in quelle date: da assegnare a mano" : "") + (badEmailNote ? ` · ⚠ email indicata dall'ospite non valida: ${badEmailNote}` : ""),
+      ...(chosenExtras.length ? { extras: chosenExtras } : {}),
+      ...(promoValid ? { promoCode: promoValid.code, promoPct: promoValid.pct } : {}),
       ratePlanName: planName || undefined,
       refundable: refundable || undefined,
       cancelDays: cancelDays || undefined,
@@ -201,8 +240,8 @@ export async function POST(req: Request) {
       const bkAll2 = merged2.bookings as unknown as Booking[];
       const pool2 = parsePool(blob2[POOL_KEY]);
       const poolOcc2 = inPool(pool2, sid) ? poolOccupancy(pool2, merged2.roomTypes as never, units2, bkAll2) : null;
-      const ofType2 = units2.filter((u) => u.roomTypeId === rt && !u.outOfService);
-      const free2 = poolOcc2 && !poolOcc2.canSell(rt, ci, co) ? undefined : ofType2.find((u) => !bkAll2.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
+      const ofType2 = units2.filter((u) => u.roomTypeId === rootRt && !u.outOfService);
+      const free2 = poolOcc2 && !poolOcc2.canSell(rootRt, ci, co) ? undefined : ofType2.find((u) => !bkAll2.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
       if (free2) { booking.unitId = free2.id; }
       else {
         if (!internal) return NextResponse.json({ error: "no_availability" }, { status: 409 });
@@ -241,35 +280,71 @@ export async function POST(req: Request) {
           }
         }
       }
-      if (gEmail && st) {
+      if (st) {
         const origin = siteOrigin(req);
         const nN = Math.max(1, Math.round((Date.parse(co) - Date.parse(ci)) / 86400000));
         const g = (k: string) => (st[k] as string) || undefined;
         // Testo della politica di cancellazione (per email + pagina di gestione).
         const cancelPolicy = refundable
-          ? (cancelDays > 0 ? `Cancellazione gratuita fino a ${cancelDays} giorni prima dell'arrivo.` : "Cancellazione gratuita.")
+          ? (cancelDays > 0 ? `Cancellazione gratuita fino a ${plural(cancelDays, "giorno", "giorni")} prima dell'arrivo.` : "Cancellazione gratuita.")
           : "Tariffa non rimborsabile.";
-        await internalFetch(`${origin}/api/email`, {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            kind: "voucher",
-            checkinUrl: `${origin}/checkin?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
-            manageUrl: `${origin}/gestisci?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
-            booking: {
-              code: (booking.code as string) || booking.id.slice(0, 8).toUpperCase(),
-              structureName: g("name"), structureEmail: g("email"), color: g("photoColor"),
-              guestName: `${gFirst} ${gLast}`.trim() || gEmail, guestEmail: gEmail,
-              guestPhone: gPhone || undefined, guestCountry: gCountry || undefined, // lingua dell'email: dal Paese o dal prefisso del telefono
-              refundable, cancelDays,
-              roomType: (rtObj?.name as string) || undefined, checkIn: ci, checkOut: co, nights: nN,
-              adults, children, total, currency: g("currency") || "€",
-              checkInFrom: g("checkInFrom"), checkOutBy: g("checkOutBy"),
-              address: [g("address"), g("streetNumber"), g("city")].filter(Boolean).join(" "), phone: g("phone"),
-              ratePlan: planName || undefined, cancelPolicy,
-              logo: g("logo"), website: g("website"), cin: g("cin"), vat: g("vat"),
-            },
-          }),
-        });
+        const unitName = (mUnits.find((u) => u.id === booking.unitId) as { name?: string } | undefined)?.name || undefined;
+        const bookingCode = (booking.code as string) || booking.id.slice(0, 8).toUpperCase();
+        // Tassa di soggiorno e importi: stessa formula del gestionale (lib/booking.ts), così voucher e scheda prenotazione coincidono.
+        const cityTaxAmount = cityTaxOfBookingRaw(st as unknown as Structure, { adults, children, childAges, checkIn: ci, checkOut: co, total: total ?? 0 });
+        const grandTotal = Math.round(((total ?? 0) + chosenExtras.reduce((a, e) => a + e.price, 0) + cityTaxAmount) * 100) / 100; // soggiorno + extra + tassa (come bookingGrandTotal)
+        const paidNow = typeof booking.paid === "number" ? booking.paid : 0;
+        if (gEmail) {
+          await internalFetch(`${origin}/api/email`, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              kind: "voucher",
+              checkinUrl: `${origin}/checkin?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
+              manageUrl: `${origin}/gestisci?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
+              booking: {
+                code: bookingCode, status: String(booking.status),
+                structureName: g("name"), structureEmail: g("email"), color: g("photoColor"),
+                guestName: `${gFirst} ${gLast}`.trim() || gEmail, guestEmail: gEmail,
+                guestPhone: gPhone || undefined, guestCountry: gCountry || undefined, // lingua dell'email: dal Paese o dal prefisso del telefono
+                refundable, cancelDays, guestLanguage: guestLanguage || undefined,
+                roomType: (rtObj?.name as string) || undefined, unitName, checkIn: ci, checkOut: co, nights: nN,
+                adults, children, total, currency: g("currency") || "€",
+                // Importi del dettaglio: acconto versato, tassa di soggiorno (da pagare in struttura), extra e richieste scritte dall'ospite.
+                bookingTotal: total, cityTaxAmount: cityTaxAmount > 0 ? cityTaxAmount : undefined, grandTotal, paid: paidNow, due: Math.max(0, Math.round((grandTotal - paidNow) * 100) / 100),
+                extras: Array.isArray(booking.extras) && (booking.extras as unknown[]).length ? booking.extras : undefined,
+                guestRequests: note || undefined,
+                checkInFrom: g("checkInFrom"), checkOutBy: g("checkOutBy"),
+                address: [g("address"), g("streetNumber"), g("city")].filter(Boolean).join(" "), phone: g("phone"),
+                ratePlan: planName || undefined, cancelPolicy,
+                logo: g("logo"), website: g("website"), cin: g("cin"), vat: g("vat"),
+              },
+            }),
+          });
+        }
+        // Avviso al TITOLARE: nuova prenotazione dal sito (rispetta il toggle "Nuove prenotazioni" delle Impostazioni → Notifiche).
+        try {
+          const hostEmail = g("email");
+          if (hostEmail && parseNotifPrefs(blob["spigolestay:notifs"]).newBooking) {
+            const lines = notifyBookingLines({
+              ev: "newBooking",
+              booking: { code: bookingCode, checkIn: ci, checkOut: co, adults, children, total, paid: paidNow, guestRequests: note || undefined, note: overbookedNote(booking) },
+              guest: { fullName: `${gFirst} ${gLast}`.trim() || gEmail, phone: gPhone, email: gEmail, country: gCountry },
+              structureName: g("name"), roomLabel: [rtObj?.name as string, unitName].filter(Boolean).join(" · "), channelLabel: "Diretto",
+            });
+            const logo = g("logo");
+            await internalFetch(`${origin}/api/email`, {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                kind: "notify", to: hostEmail, event: "newBooking",
+                subject: `Nuova prenotazione ${bookingCode} · ${g("name") || ""}`.trim(),
+                brand: { name: g("name"), logoUrl: logo && /^https?:\/\//i.test(logo) ? logo : undefined, color: g("photoColor"), address: [g("address"), g("streetNumber"), g("city")].filter(Boolean).join(" ") || undefined },
+                channelLabel: "Diretto",
+                text: lines.join("\n"),
+                ctaUrl: `${origin}/prenotazioni?b=${encodeURIComponent(booking.id)}`, ctaLabel: "Apri la prenotazione",
+              }),
+            });
+          }
+        } catch { /* avviso al titolare non critico */ }
       }
     } catch { /* email non critica */ }
 

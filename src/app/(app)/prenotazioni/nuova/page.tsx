@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType, type Booking, type Guest } from "@/lib/types";
-import { sendVoucher, voucherPayload, type VoucherPayload } from "@/lib/mailer";
+import { sendVoucher, sendVoucherGroup, voucherPayload, type VoucherPayload } from "@/lib/mailer";
 import { bookingCode } from "@/lib/bookingCode";
 import { captureA4ToPdfBlob, blobToBase64 } from "@/lib/pdf-capture";
 import VoucherDoc from "@/components/pdf/VoucherDoc";
@@ -186,6 +186,7 @@ export default function NuovaPrenotazionePage() {
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
     let ci = 0; // cursore per distribuire le età dei bambini tra le camere del gruppo
     let primary: Booking | undefined;
+    const createdAll: Booking[] = []; // tutte le camere create (gruppo): un solo voucher con l'elenco delle camere
     flat.forEach((r, i) => {
       const kids = nR > 1 ? dist(children, i) : children;
       const ages = childAges.slice(ci, ci + kids); ci += kids;
@@ -193,17 +194,21 @@ export default function NuovaPrenotazionePage() {
       const depositN = Math.max(0, Number(deposit) || 0);
       const created = addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, parking: parking || undefined, paid: i === 0 && depositN > 0 ? depositN : undefined, total: linePrice(r.rt) || undefined, extras: i === 0 && bookingExtras.length ? bookingExtras : undefined, note: [isGroup && groupName.trim() ? groupName.trim() : "", note.trim()].filter(Boolean).join(" · ") || undefined });
       if (i === 0) primary = created;
+      createdAll.push(created);
     });
     // Conferma all'ospite (voucher via email). Uso i dati appena inseriti per evitare i ritardi dello stato.
     if (sendConfirm && email.trim() && primary) {
       const guestObj = { id: guestId, fullName: `${firstName} ${lastName}`.trim(), firstName, lastName, email: email.trim(), phone: phone.trim() } as Guest;
       const deps = { getStructure, getGuest: () => guestObj, getRoomType, getUnit };
       const primaryBooking = primary;
+      const groupBookings = createdAll.length > 1 ? createdAll : null;
       // Cattura l'anteprima reale del voucher (VoucherDoc, fuori schermo) come vero PDF allegato —
       // stessa tecnica dei preventivi. Serve prima renderizzare l'anteprima con i dati appena creati
       // (setPdfVp) e aspettare che React la disegni, poi si può catturare. Se qualcosa va storto,
       // l'email parte comunque (il server ripiega sul disegno pdf-lib): non blocca mai l'invio.
       (async () => {
+        // Gruppo di camere: UN voucher con tutte le camere, totale e saldo dell'insieme (il PDF lo disegna il server; l'anteprima catturata mostrerebbe una camera sola).
+        if (groupBookings) { await sendVoucherGroup(groupBookings, deps); return; }
         let pdf: { pdfBase64?: string; pdfFilename?: string } | undefined;
         try {
           const vp = voucherPayload(primaryBooking, deps);
@@ -624,7 +629,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
           ``,
           `Check-in: ${dmy(checkIn)}`,
           `Check-out: ${dmy(checkOut)} (${nightsN} ${nightsN === 1 ? "notte" : "notti"})`,
-          `Ospiti: ${adults} adulti${children > 0 ? `, ${children} bambini` : ""}`,
+          `Ospiti: ${adults} ${adults === 1 ? "adulto" : "adulti"}${children > 0 ? `, ${children} ${children === 1 ? "bambino" : "bambini"}` : ""}`,
           ...selected.map((rt) => `- ${qty[rt.id]}x ${rt.name}`),
           `Totale: ${eur(grandFinal)}`,
           ``,
@@ -654,7 +659,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               {!(sendConfirm && g?.email) && <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>}
               <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
               {!sendConfirm && g?.email && (
-                <button onClick={async () => { setEmailState({ sending: true }); const r = await sendVoucher(created, { getStructure, getGuest, getRoomType, getUnit }); setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") }); }} disabled={emailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash disabled:opacity-60"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</button>
+                <button onClick={async () => { setEmailState({ sending: true }); const deps = { getStructure, getGuest, getRoomType, getUnit }; const grp = created.groupId ? bookings.filter((x) => x.groupId === created.groupId) : []; const r = grp.length > 1 ? await sendVoucherGroup(grp, deps) : await sendVoucher(created, deps); setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") }); }} disabled={emailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash disabled:opacity-60"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</button>
               )}
             </div>
 
@@ -687,7 +692,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               checkIn={fmtLongDate(pdfVp.checkIn)} checkOut={fmtLongDate(pdfVp.checkOut)}
               checkInFrom={pdfVp.checkInFrom} checkOutBy={pdfVp.checkOutBy} adults={pdfVp.adults ?? 1} children={pdfVp.children ?? 0}
               nights={pdfVp.nights} ratePlan={pdfVp.ratePlanName}
-              total={typeof pdfVp.grandTotal === "number" ? `${pdfVp.currency || "€"} ${pdfVp.grandTotal.toLocaleString("it-IT")}` : undefined}
+              total={typeof pdfVp.grandTotal === "number" ? eur(pdfVp.grandTotal, pdfVp.currency || "€") : undefined}
               cancelText={pdfVp.cancelPolicy || ""}
             />
           </div>

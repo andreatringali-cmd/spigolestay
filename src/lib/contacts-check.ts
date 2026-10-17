@@ -69,6 +69,14 @@ export function checkPhone(raw?: string, o: { country?: string; defaultCountry?:
     return { status: "invalid", reason: lengthReason(s) };
   }
 
+  // Un mobile italiano (3xx, 9-10 cifre) scritto senza prefisso da un ospite con Paese straniero (DE, US…): le numerazioni di altri Paesi lo "accettano" quasi sempre
+  // (es. 347… è un fisso tedesco e un prefisso di New York), ma di fatto è un numero italiano. Si prova prima il Paese della struttura, SALVO che il numero sia
+  // un vero MOBILE del Paese dichiarato (allora è plausibile che sia suo).
+  if (fallbackCountry === "IT" && guestCountry && guestCountry !== "IT" && /^3\d{8,9}$/.test(s)) {
+    const it = parsePhoneNumberFromString(s, "IT");
+    const theirs = parsePhoneNumberFromString(s, guestCountry);
+    if (it?.isValid() && it.getType() === "MOBILE" && !(theirs?.isValid() && (theirs.getType() === "MOBILE" || theirs.getType() === "FIXED_LINE_OR_MOBILE"))) return done(it, true);
+  }
   // Senza "+": prima il Paese dell'ospite, poi quello della struttura, poi come se avesse già il prefisso internazionale (es. "442036847925").
   for (const c of tries) {
     const p = parsePhoneNumberFromString(s, c);

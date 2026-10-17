@@ -49,11 +49,11 @@ export const DEFAULT_TEMPLATES: MsgTemplateSeed[] = [
     // Pre-arrivo (giorno prima): check-in online + guida + come entrare. La struttura non ha reception: l'ospite scrive su WhatsApp.
     id: "seed-benvenuto-guida", name: "Benvenuto e guida", trigger: "before_arrival", days: 1, time: "10:00", active: true,
     texts: {
-      it: "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\nLa struttura non ha una reception: l'arrivo è autonomo e vi accompagniamo noi.\n\n1) Check-in online (2 minuti, dati e documento):\n👉 {link_checkin}\n2) Guida con accesso, Wi-Fi e consigli utili:\n👉 {link_guida}\n\nQuando siete in arrivo scriveteci su WhatsApp ({whatsapp}) e vi guidiamo all'ingresso. Il check-in è {checkin}.\n— {struttura}",
-      en: "Hello {ospite}, we're delighted to welcome you to {struttura}! 🌿\nThe property has no reception: arrival is self-service and we'll guide you every step of the way.\n\n1) Online check-in (2 minutes, details and ID):\n👉 {link_checkin}\n2) Guide with access, Wi-Fi and useful tips:\n👉 {link_guida}\n\nWhen you're on your way, message us on WhatsApp ({whatsapp}) and we'll guide you to the entrance. Check-in is {checkin}.\n— {struttura}",
-      fr: "Bonjour {ospite}, nous sommes ravis de vous accueillir à {struttura} ! 🌿\nLe logement n'a pas de réception : l'arrivée est autonome et nous vous guidons pas à pas.\n\n1) Check-in en ligne (2 minutes, données et pièce d'identité) :\n👉 {link_checkin}\n2) Guide avec accès, Wi-Fi et conseils utiles :\n👉 {link_guida}\n\nEn route, écrivez-nous sur WhatsApp ({whatsapp}) et nous vous guidons jusqu'à l'entrée. L'arrivée est {checkin}.\n— {struttura}",
-      de: "Guten Tag {ospite}, wir freuen uns, Sie in {struttura} begrüßen zu dürfen! 🌿\nDie Unterkunft hat keine Rezeption: Die Ankunft läuft selbstständig und wir führen Sie Schritt für Schritt.\n\n1) Online-Check-in (2 Minuten, Daten und Ausweis):\n👉 {link_checkin}\n2) Guide mit Zugang, WLAN und nützlichen Tipps:\n👉 {link_guida}\n\nWenn Sie unterwegs sind, schreiben Sie uns per WhatsApp ({whatsapp}) und wir lotsen Sie zum Eingang. Check-in: {checkin}.\n— {struttura}",
-      es: "¡Buenos días {ospite}, estamos encantados de recibirte en {struttura}! 🌿\nEl alojamiento no tiene recepción: la llegada es autónoma y te guiamos nosotros.\n\n1) Check-in online (2 minutos, datos y documento):\n👉 {link_checkin}\n2) Guía con acceso, Wi-Fi y consejos útiles:\n👉 {link_guida}\n\nCuando vayas de camino, escríbenos por WhatsApp ({whatsapp}) y te guiamos hasta la entrada. El check-in es {checkin}.\n— {struttura}",
+      it: "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\nEcco tutto il necessario per un arrivo senza pensieri.\n\n1) Check-in online (2 minuti, dati e documento):\n👉 {link_checkin}\n2) Guida con accesso, Wi-Fi e consigli utili:\n👉 {link_guida}\n\nPer qualsiasi cosa siamo a disposizione su WhatsApp ({whatsapp}): quando siete in arrivo scriveteci e vi aiutiamo con l'ingresso. Il check-in è {checkin}.\n— {struttura}",
+      en: "Hello {ospite}, we're delighted to welcome you to {struttura}! 🌿\nHere is everything you need for a worry-free arrival.\n\n1) Online check-in (2 minutes, details and ID):\n👉 {link_checkin}\n2) Guide with access, Wi-Fi and useful tips:\n👉 {link_guida}\n\nWe're available on WhatsApp ({whatsapp}) for anything you need: when you're on your way, message us and we'll help you get in. Check-in is {checkin}.\n— {struttura}",
+      fr: "Bonjour {ospite}, nous sommes ravis de vous accueillir à {struttura} ! 🌿\nVoici tout ce qu'il faut pour une arrivée sans souci.\n\n1) Check-in en ligne (2 minutes, données et pièce d'identité) :\n👉 {link_checkin}\n2) Guide avec accès, Wi-Fi et conseils utiles :\n👉 {link_guida}\n\nNous sommes joignables sur WhatsApp ({whatsapp}) pour toute question : en route, écrivez-nous et nous vous aidons à entrer. L'arrivée est {checkin}.\n— {struttura}",
+      de: "Guten Tag {ospite}, wir freuen uns, Sie in {struttura} begrüßen zu dürfen! 🌿\nHier alles für eine unkomplizierte Ankunft.\n\n1) Online-Check-in (2 Minuten, Daten und Ausweis):\n👉 {link_checkin}\n2) Guide mit Zugang, WLAN und nützlichen Tipps:\n👉 {link_guida}\n\nBei Fragen sind wir per WhatsApp ({whatsapp}) für Sie da: Wenn Sie unterwegs sind, schreiben Sie uns, wir helfen Ihnen beim Zugang. Check-in: {checkin}.\n— {struttura}",
+      es: "¡Buenos días {ospite}, estamos encantados de recibirte en {struttura}! 🌿\nAquí tienes todo lo necesario para una llegada sin preocupaciones.\n\n1) Check-in online (2 minutos, datos y documento):\n👉 {link_checkin}\n2) Guía con acceso, Wi-Fi y consejos útiles:\n👉 {link_guida}\n\nEstamos a tu disposición por WhatsApp ({whatsapp}): cuando vayas de camino, escríbenos y te ayudamos con la entrada. El check-in es {checkin}.\n— {struttura}",
     },
   },
   {
@@ -79,11 +79,11 @@ export const DEFAULT_TEMPLATES: MsgTemplateSeed[] = [
   {
     id: "seed-checkin", name: "Istruzioni check-in", trigger: "on_arrival", days: 0, time: "09:00", active: true,
     texts: {
-      it: "Ciao {ospite}, oggi è il giorno dell'arrivo! 🎉\nGuida con accesso, Wi-Fi e dintorni: {link_guida}\nIl check-in è {checkin}. Non c'è reception: all'arrivo, o se fate tardi, scriveteci su WhatsApp ({whatsapp}) e vi aiutiamo subito. Buon viaggio!",
-      en: "Hi {ospite}, today is arrival day! 🎉\nGuide with access, Wi-Fi and the area: {link_guida}\nCheck-in is {checkin}. There's no reception: when you arrive, or if you're running late, message us on WhatsApp ({whatsapp}) and we'll help right away. Safe travels!",
-      fr: "Bonjour {ospite}, c'est le jour de l'arrivée ! 🎉\nGuide avec accès, Wi-Fi et alentours : {link_guida}\nL'arrivée est {checkin}. Il n'y a pas de réception : à l'arrivée, ou en cas de retard, écrivez-nous sur WhatsApp ({whatsapp}) et nous vous aidons tout de suite. Bon voyage !",
-      de: "Hallo {ospite}, heute ist Anreisetag! 🎉\nGuide mit Zugang, WLAN und Umgebung: {link_guida}\nCheck-in: {checkin}. Es gibt keine Rezeption: Schreiben Sie uns bei Ankunft oder Verspätung per WhatsApp ({whatsapp}), wir helfen sofort. Gute Reise!",
-      es: "¡Hola {ospite}, hoy es el día de llegada! 🎉\nGuía con acceso, Wi-Fi y alrededores: {link_guida}\nEl check-in es {checkin}. No hay recepción: al llegar, o si te retrasas, escríbenos por WhatsApp ({whatsapp}) y te ayudamos enseguida. ¡Buen viaje!",
+      it: "Ciao {ospite}, oggi è il giorno dell'arrivo! 🎉\nGuida con accesso, Wi-Fi e dintorni: {link_guida}\nIl check-in è {checkin}. All'arrivo, o se fate tardi, scriveteci su WhatsApp ({whatsapp}) e vi aiutiamo subito. Buon viaggio!",
+      en: "Hi {ospite}, today is arrival day! 🎉\nGuide with access, Wi-Fi and the area: {link_guida}\nCheck-in is {checkin}. When you arrive, or if you're running late, message us on WhatsApp ({whatsapp}) and we'll help right away. Safe travels!",
+      fr: "Bonjour {ospite}, c'est le jour de l'arrivée ! 🎉\nGuide avec accès, Wi-Fi et alentours : {link_guida}\nL'arrivée est {checkin}. À l'arrivée, ou en cas de retard, écrivez-nous sur WhatsApp ({whatsapp}) et nous vous aidons tout de suite. Bon voyage !",
+      de: "Hallo {ospite}, heute ist Anreisetag! 🎉\nGuide mit Zugang, WLAN und Umgebung: {link_guida}\nCheck-in: {checkin}. Schreiben Sie uns bei Ankunft oder Verspätung per WhatsApp ({whatsapp}), wir helfen sofort. Gute Reise!",
+      es: "¡Hola {ospite}, hoy es el día de llegada! 🎉\nGuía con acceso, Wi-Fi y alrededores: {link_guida}\nEl check-in es {checkin}. Al llegar, o si te retrasas, escríbenos por WhatsApp ({whatsapp}) y te ayudamos enseguida. ¡Buen viaje!",
     },
   },
   {
@@ -102,28 +102,40 @@ export const DEFAULT_TEMPLATES: MsgTemplateSeed[] = [
 
 // Testi PRECEDENTI dei modelli d'esempio che abbiamo migliorato: un modello salvato i cui testi sono ancora identici a questi (cioè mai
 // modificato dall'host) passa in automatico alla versione nuova. Se l'host ha cambiato anche solo una parola, non si tocca.
-const LEGACY_SEED_TEXTS: Record<string, Record<string, string>> = {
-  "seed-benvenuto-guida": {
+const LEGACY_SEED_TEXTS: Record<string, Record<string, string>[]> = {
+  "seed-benvenuto-guida": [{
     it: "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\nA seguire la guida che vi permetterà di accedere alla struttura e vivere al meglio il soggiorno: check-in, Wi-Fi, consigli utili e i nostri contatti.\n\n👉 {link_guida}\n\nRestiamo a disposizione per qualsiasi cosa. A presto!\n— {struttura}",
     en: "Hello {ospite}, we're delighted to welcome you to {struttura}! 🌿\nHere is the guide that will let you access the property and make the most of your stay: check-in, Wi-Fi, useful tips and our contacts.\n\n👉 {link_guida}\n\nWe're here for anything you need. See you soon!\n— {struttura}",
     fr: "Bonjour {ospite}, nous sommes ravis de vous accueillir à {struttura} ! 🌿\nVoici le guide qui vous permettra d'accéder au logement et de profiter au mieux de votre séjour : arrivée, Wi-Fi, conseils utiles et nos contacts.\n\n👉 {link_guida}\n\nNous restons à votre disposition. À bientôt !\n— {struttura}",
     de: "Guten Tag {ospite}, wir freuen uns, Sie in {struttura} begrüßen zu dürfen! 🌿\nHier der Guide für den Zugang zur Unterkunft und einen perfekten Aufenthalt: Check-in, WLAN, nützliche Tipps und unsere Kontakte.\n\n👉 {link_guida}\n\nBei Fragen sind wir für Sie da. Bis bald!\n— {struttura}",
     es: "¡Buenos días {ospite}, estamos encantados de recibirte en {struttura}! 🌿\nA continuación la guía que te permitirá acceder al alojamiento y disfrutar al máximo tu estancia: check-in, Wi-Fi, consejos útiles y nuestros contactos.\n\n👉 {link_guida}\n\nQuedamos a tu disposición para cualquier cosa. ¡Hasta pronto!\n— {struttura}",
-  },
-  "seed-checkin": {
+  }, {
+      it: "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\nLa struttura non ha una reception: l'arrivo è autonomo e vi accompagniamo noi.\n\n1) Check-in online (2 minuti, dati e documento):\n👉 {link_checkin}\n2) Guida con accesso, Wi-Fi e consigli utili:\n👉 {link_guida}\n\nQuando siete in arrivo scriveteci su WhatsApp ({whatsapp}) e vi guidiamo all'ingresso. Il check-in è {checkin}.\n— {struttura}",
+      en: "Hello {ospite}, we're delighted to welcome you to {struttura}! 🌿\nThe property has no reception: arrival is self-service and we'll guide you every step of the way.\n\n1) Online check-in (2 minutes, details and ID):\n👉 {link_checkin}\n2) Guide with access, Wi-Fi and useful tips:\n👉 {link_guida}\n\nWhen you're on your way, message us on WhatsApp ({whatsapp}) and we'll guide you to the entrance. Check-in is {checkin}.\n— {struttura}",
+      fr: "Bonjour {ospite}, nous sommes ravis de vous accueillir à {struttura} ! 🌿\nLe logement n'a pas de réception : l'arrivée est autonome et nous vous guidons pas à pas.\n\n1) Check-in en ligne (2 minutes, données et pièce d'identité) :\n👉 {link_checkin}\n2) Guide avec accès, Wi-Fi et conseils utiles :\n👉 {link_guida}\n\nEn route, écrivez-nous sur WhatsApp ({whatsapp}) et nous vous guidons jusqu'à l'entrée. L'arrivée est {checkin}.\n— {struttura}",
+      de: "Guten Tag {ospite}, wir freuen uns, Sie in {struttura} begrüßen zu dürfen! 🌿\nDie Unterkunft hat keine Rezeption: Die Ankunft läuft selbstständig und wir führen Sie Schritt für Schritt.\n\n1) Online-Check-in (2 Minuten, Daten und Ausweis):\n👉 {link_checkin}\n2) Guide mit Zugang, WLAN und nützlichen Tipps:\n👉 {link_guida}\n\nWenn Sie unterwegs sind, schreiben Sie uns per WhatsApp ({whatsapp}) und wir lotsen Sie zum Eingang. Check-in: {checkin}.\n— {struttura}",
+      es: "¡Buenos días {ospite}, estamos encantados de recibirte en {struttura}! 🌿\nEl alojamiento no tiene recepción: la llegada es autónoma y te guiamos nosotros.\n\n1) Check-in online (2 minutos, datos y documento):\n👉 {link_checkin}\n2) Guía con acceso, Wi-Fi y consejos útiles:\n👉 {link_guida}\n\nCuando vayas de camino, escríbenos por WhatsApp ({whatsapp}) y te guiamos hasta la entrada. El check-in es {checkin}.\n— {struttura}",
+    }],
+  "seed-checkin": [{
     it: "Ciao {ospite}, oggi è il giorno dell'arrivo! Qui trovi la guida con tutte le info utili (accesso, wi-fi, dintorni): {link_guida}. Il check-in è {checkin}. Buon viaggio!",
     en: "Hi {ospite}, today is arrival day! Here's the guide with all the useful info (access, wi-fi, area): {link_guida}. Check-in is {checkin}. Safe travels!",
     fr: "Bonjour {ospite}, c'est le jour de l'arrivée ! Voici le guide avec toutes les infos utiles (accès, wi-fi, alentours) : {link_guida}. L'arrivée est {checkin}. Bon voyage !",
     de: "Hallo {ospite}, heute ist Anreisetag! Hier der Guide mit allen Infos (Zugang, WLAN, Umgebung): {link_guida}. Check-in: {checkin}. Gute Reise!",
     es: "¡Hola {ospite}, hoy es el día de llegada! Aquí tienes la guía con toda la info útil (acceso, wi-fi, alrededores): {link_guida}. El check-in es {checkin}. ¡Buen viaje!",
-  },
-  "seed-review": {
+  }, {
+      it: "Ciao {ospite}, oggi è il giorno dell'arrivo! 🎉\nGuida con accesso, Wi-Fi e dintorni: {link_guida}\nIl check-in è {checkin}. Non c'è reception: all'arrivo, o se fate tardi, scriveteci su WhatsApp ({whatsapp}) e vi aiutiamo subito. Buon viaggio!",
+      en: "Hi {ospite}, today is arrival day! 🎉\nGuide with access, Wi-Fi and the area: {link_guida}\nCheck-in is {checkin}. There's no reception: when you arrive, or if you're running late, message us on WhatsApp ({whatsapp}) and we'll help right away. Safe travels!",
+      fr: "Bonjour {ospite}, c'est le jour de l'arrivée ! 🎉\nGuide avec accès, Wi-Fi et alentours : {link_guida}\nL'arrivée est {checkin}. Il n'y a pas de réception : à l'arrivée, ou en cas de retard, écrivez-nous sur WhatsApp ({whatsapp}) et nous vous aidons tout de suite. Bon voyage !",
+      de: "Hallo {ospite}, heute ist Anreisetag! 🎉\nGuide mit Zugang, WLAN und Umgebung: {link_guida}\nCheck-in: {checkin}. Es gibt keine Rezeption: Schreiben Sie uns bei Ankunft oder Verspätung per WhatsApp ({whatsapp}), wir helfen sofort. Gute Reise!",
+      es: "¡Hola {ospite}, hoy es el día de llegada! 🎉\nGuía con acceso, Wi-Fi y alrededores: {link_guida}\nEl check-in es {checkin}. No hay recepción: al llegar, o si te retrasas, escríbenos por WhatsApp ({whatsapp}) y te ayudamos enseguida. ¡Buen viaje!",
+    }],
+  "seed-review": [{
     it: "Grazie {ospite} per aver soggiornato a {struttura}! Se ti sei trovato bene, una recensione ci aiuterebbe tantissimo. A presto! 🙏",
     en: "Thank you {ospite} for staying at {struttura}! If you enjoyed it, a review would help us a lot. See you soon! 🙏",
     fr: "Merci {ospite} d'avoir séjourné à {struttura} ! Si vous avez apprécié, un avis nous aiderait beaucoup. À bientôt ! 🙏",
     de: "Danke {ospite} für Ihren Aufenthalt in {struttura}! Wenn es Ihnen gefallen hat, würde uns eine Bewertung sehr helfen. Bis bald! 🙏",
     es: "¡Gracias {ospite} por alojarte en {struttura}! Si te ha gustado, una reseña nos ayudaría mucho. ¡Hasta pronto! 🙏",
-  },
+  }],
 };
 
 const norm = (s: unknown) => (typeof s === "string" ? s.replace(/\r\n/g, "\n").trim() : "");
@@ -136,9 +148,9 @@ export function mergeSeedTemplates<T extends { id: string; texts?: Record<string
   const have = new Set(saved.map((x) => x.id));
   for (const id of deletedSeedIds) have.add(id); // un modello d'esempio eliminato dall'host non torna più (tombstone)
   const upgraded = saved.map((tp) => {
-    const old = LEGACY_SEED_TEXTS[tp.id]; const seed = DEFAULT_TEMPLATES.find((d) => d.id === tp.id);
-    if (!old || !seed || !tp.texts) return tp;
-    const untouched = (Object.keys(old) as (keyof typeof seed.texts)[]).every((l) => norm(tp.texts?.[l]) === norm(old[l]));
+    const gens = LEGACY_SEED_TEXTS[tp.id]; const seed = DEFAULT_TEMPLATES.find((d) => d.id === tp.id);
+    if (!gens || !seed || !tp.texts) return tp;
+    const untouched = gens.some((old) => (Object.keys(old) as (keyof typeof seed.texts)[]).every((l) => norm(tp.texts?.[l]) === norm(old[l])));
     return untouched ? ({ ...tp, texts: { ...seed.texts } } as T) : tp;
   });
   return [...upgraded, ...(DEFAULT_TEMPLATES.filter((d) => !have.has(d.id)) as unknown as T[])];

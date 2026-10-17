@@ -294,7 +294,7 @@ export interface Guest {
 export const GUEST_TAGS = ["Cliente abituale", "Business", "Famiglia", "Coppia", "Luna di miele", "Animali", "Lungo soggiorno", "Recensore", "Da recuperare"];
 
 // Tipi documento accettati dal Portale Alloggiati.
-export const DOC_TYPES = ["Carta d'identità", "Passaporto", "Patente di guida"];
+export const DOC_TYPES = ["Carta d'identità", "Passaporto", "Patente di guida", "Permesso di soggiorno"];
 
 // Tipologia alloggiato (codici ufficiali Alloggiati Web).
 export const ALLOGGIATI_ROLES = [
@@ -346,6 +346,9 @@ export interface Booking {
   source?: "sito" | "manuale"; // origine di una prenotazione DIRETTA: dal sito ufficiale (logo struttura) o inserita a mano dal gestionale (logo Xenora). Vedi lib/direct-origin.ts (per i dati vecchi senza campo si deduce)
   cleaningFee?: number; // € pulizia finale
   cityTaxExempt?: boolean; // esente tassa di soggiorno
+  cityTaxInPaid?: boolean; // la tassa incassata è già dentro `paid` (pagata col link "tassa"): non si toglie dal dovuto (vedi lib/incassi.ts)
+  privacyConsentAt?: string; // ISO — quando è stato dato il consenso privacy nel check-in online
+  privacyConsentBy?: "guest" | "operator"; // chi l'ha dato: l'ospite dal link o l'operatore per suo conto
   cityTaxPaid?: boolean; // tassa di soggiorno incassata
   depositPaid?: boolean; // caparra ricevuta
   parking?: boolean; // l'ospite ha prenotato il parcheggio (seleziona i codici "con parcheggio" nella guida)

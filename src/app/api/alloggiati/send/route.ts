@@ -13,6 +13,6 @@ export async function POST(req: Request) {
     const structureId = String(body?.structureId || "").trim();
     if (!structureId) return NextResponse.json({ error: "missing_structure" }, { status: 400 });
     const res = await sendReady(auth.admin, auth.tenantId, structureId, body?.arrival || undefined);
-    return NextResponse.json({ ok: res.ok, message: res.message, sent: res.sent, simulated: !!res.simulated });
+    return NextResponse.json({ ok: res.ok, message: res.message, sent: res.sent, simulated: !!res.simulated, blocked: res.blocked ?? 0 });
   } catch (e) { return NextResponse.json({ error: "send_failed", message: (e as Error)?.message ?? "errore" }, { status: 400 }); }
 }

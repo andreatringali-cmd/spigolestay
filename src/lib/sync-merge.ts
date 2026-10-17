@@ -153,3 +153,27 @@ export function stripVolatileUsers(v: unknown): unknown {
     return rest;
   });
 }
+
+/**
+ * REGISTRO INVII (`spigolestay:msgsent`, array di { key, guest, tpl, via, ts } con la più recente per prima). Lo scrive anche il cron dei messaggi automatici
+ * (auto-trace.ts) direttamente sul server: se il browser ha aggiunto una voce nel frattempo, vincere "il locale" in blocco faceva sparire quella del cron e la riga
+ * tornava «da inviare» (doppio invio all'ospite). Unione per `key`: parte dal locale (una voce tolta qui, ad es. «Pulisci», resta tolta) e aggiunge le voci
+ * presenti SOLO sul server se non erano già nella base. Più recenti prima, tetto 200 come la sorgente. Ritorna null se il locale non è un array valido.
+ */
+export function mergeSentLog(baseRaw: string | undefined, localRaw: string | undefined, serverRaw: string | undefined): string | null {
+  const parse = (r: string | undefined): unknown[] | null => { try { const p = JSON.parse(r ?? "[]"); return Array.isArray(p) ? p : null; } catch { return null; } };
+  const local = parse(localRaw);
+  if (!local) return null;
+  const server = parse(serverRaw) ?? [];
+  const base = parse(baseRaw) ?? [];
+  const keyOf = (e: unknown): string | null => { const k = e && typeof e === "object" ? (e as { key?: unknown }).key : undefined; return typeof k === "string" && k ? k : null; };
+  const tsOf = (e: unknown) => { const t = (e as { ts?: unknown } | null)?.ts; return typeof t === "number" && isFinite(t) ? t : 0; };
+  const baseKeys = new Set<string>();
+  for (const e of base) { const k = keyOf(e); if (k) baseKeys.add(k); }
+  const seen = new Set<string>();
+  const out: unknown[] = [];
+  for (const e of local) { const k = keyOf(e); if (k) { if (seen.has(k)) continue; seen.add(k); } out.push(e); }
+  for (const e of server) { const k = keyOf(e); if (!k || seen.has(k) || baseKeys.has(k)) continue; seen.add(k); out.push(e); }
+  out.sort((a, b) => tsOf(b) - tsOf(a));
+  return JSON.stringify(out.slice(0, 200));
+}

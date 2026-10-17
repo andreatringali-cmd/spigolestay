@@ -26,7 +26,7 @@ export function relDay(iso: string, today: string): string {
   if (n === 0) return "oggi";
   if (n === 1) return "domani";
   if (n === -1) return "ieri";
-  return n > 0 ? `tra ${n} giorni` : `${-n} giorni fa`;
+  return n > 0 ? `tra ${n} giorni` : `${-n} giorni fa` /* ±1 già gestiti sopra (domani/ieri) */;
 }
 
 /** Durata leggibile: "12 minuti", "5 ore", "1 giorno e 3 ore", "3 giorni". */
@@ -55,7 +55,7 @@ export type Ente = "questura" | "istat" | "tassa" | "checkin" | "pagamenti" | "f
 /** Ordine di lettura: prima gli enti con una scadenza di legge. */
 export const ENTI: readonly Ente[] = ["questura", "istat", "tassa", "checkin", "pagamenti", "fatture"];
 export const ENTE_META: Record<Ente, { label: string; short: string; sub: string; icon: string; allDone: string }> = {
-  questura: { label: "Questura · Alloggiati Web", short: "Questura", sub: "Schedine entro 24 ore dall'arrivo", icon: "shield", allDone: "Tutte le schedine sono state inviate" },
+  questura: { label: "Questura · Alloggiati Web", short: "Questura", sub: "Schedine entro 24 ore dall'arrivo (scadenza stimata: arrivo alle 14:00)", icon: "shield", allDone: "Tutte le schedine sono state inviate" },
   istat: { label: "ISTAT · Turist@t", short: "ISTAT", sub: "Movimenti turistici dagli arrivi", icon: "chart", allDone: "Nessun movimento da comunicare" },
   tassa: { label: "Tassa di soggiorno", short: "Tassa", sub: "Da incassare dopo la partenza", icon: "coins", allDone: "Nessuna tassa da incassare" },
   checkin: { label: "Check-in online e documenti", short: "Check-in", sub: "Dati e documenti di tutti gli ospiti", icon: "id", allDone: "Check-in completi" },
@@ -99,7 +99,7 @@ export interface Task {
   secondary?: TaskAction;
 }
 
-export interface PGuest { firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; country?: string; docType?: string; docNumber?: string }
+export interface PGuest { firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; country?: string; docType?: string; docNumber?: string; docPlace?: string }
 export interface ABooking {
   id: string; structureId: string; code?: string; groupId?: string; guestId: string;
   checkIn: string; checkOut: string; status: string; channel: string; adults: number; children: number;
@@ -121,7 +121,7 @@ const guestFieldsOk = (g?: PGuest): boolean => !!(g?.lastName && g?.firstName &&
 /** Dati validi per la schedina, calcolati sui dati VERI della prenotazione (non sulla copia nella schedina). */
 export function bookingDataValid(b: ABooking, primary?: PGuest): boolean {
   const p = primary ?? b.primaryGuest;
-  if (!guestFieldsOk(p) || !(p?.docType && p?.docNumber)) return false;
+  if (!guestFieldsOk(p) || !(p?.docType && p?.docNumber && p?.docPlace)) return false; // la schedina richiede anche il luogo di rilascio del documento
   for (const e of b.extraGuests ?? []) if (!guestFieldsOk(e)) return false;
   return true;
 }
@@ -211,7 +211,7 @@ export function buildTasks<B extends ABooking>(inp: TasksInput<B>): TasksOut {
     if (gr.cat === "fix") {
       tasks.push({ ...base, id: `checkin_fix:${gr.key}`, kind: "checkin_fix", status: "Dati da correggere", action: { kind: "fix", label: "Correggi" }, secondary: { kind: "compila", label: "Apri il check-in" } });
     } else {
-      tasks.push({ ...base, id: `checkin:${gr.key}`, kind: "checkin", status: partial ? `Incompleto ${gr.declared}/${gr.expected}` : "Da compilare", action: { kind: "resolve", step: "checkin", label: "Sollecita" }, secondary: { kind: "compila", label: "Compila tu" } });
+      tasks.push({ ...base, id: `checkin:${gr.key}`, kind: "checkin", status: partial ? `Incompleto ${gr.declared}/${gr.expected}` : urgency === "soon" ? "Da compilare" : "Check-in mancante", action: { kind: "resolve", step: "checkin", label: "Sollecita" }, secondary: { kind: "compila", label: "Compila tu" } });
     }
   }
 

@@ -17,10 +17,12 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
 import type { PreviewItem } from "@/lib/invoicing/fic-received";
-import { groupTotals, dueSummary, matchesDue, toCashRow, findDuplicate, signedCents, csvCell, type DueFilter } from "@/lib/purchases";
+import { groupTotals, dueSummary, matchesDue, toCashRow, findDuplicate, signedCents, type DueFilter } from "@/lib/purchases";
+import { csvCell } from "@/lib/invoicing/csv";
 import { useTenantId } from "@/lib/tenant";
 import { parseDecimalIT, formatDecimalIT } from "@/lib/num-it";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
+import { friendlyError } from "@/lib/friendly-error";
 
 // Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
 const OTA_META: Record<string, { name: string; country: string }> = {
@@ -108,7 +110,7 @@ export default function FatturePassivePage() {
       supabase.from("purchase_documents").select("*").order("doc_date", { ascending: false }),
       supabase.from("suppliers").select("id, name, vat, category").order("name"),
     ]);
-    if (d.error) setErr(d.error.message); else setDocs((d.data ?? []) as Doc[]);
+    if (d.error) setErr(friendlyError(d.error)); else setDocs((d.data ?? []) as Doc[]);
     setSuppliers((s.data ?? []) as Supplier[]);
     // Documenti già registrati in Cassa: il movimento ha lo stesso id del documento.
     if (!d.error) {
@@ -173,13 +175,13 @@ export default function FatturePassivePage() {
     if (!(await ask({ title: "Autofattura reverse charge", message: "Generare l'autofattura TD17 per questa fattura estera? Se il provider SdI è configurato verrà anche trasmessa.", confirmLabel: "Genera" }))) return;
     setAfBusy("gen"); setAfMsg("");
     try { const r = await apiPost<{ ok: boolean; message?: string; number?: string; status?: string }>("invoicing/autofattura", { purchaseDocId: edit.id }); setAfMsg(r.message || ""); if (r.number) setAf({ number: r.number, status: r.status }); await load(); }
-    catch (e) { setAfMsg(e instanceof Error ? e.message : "Errore"); } finally { setAfBusy(""); }
+    catch (e) { setAfMsg(friendlyError(e)); } finally { setAfBusy(""); }
   };
   const dlAutofattura = async () => {
     if (!edit?.id) return;
     setAfBusy("xml"); setAfMsg("");
     try { const r = await apiPost<{ xml: string }>("invoicing/autofattura", { purchaseDocId: edit.id, action: "xml" }); const blob = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `autofattura-${(af.number ?? edit.id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); }
-    catch (e) { setAfMsg(e instanceof Error ? e.message : "Errore"); } finally { setAfBusy(""); }
+    catch (e) { setAfMsg(friendlyError(e)); } finally { setAfBusy(""); }
   };
 
   // #2 — commissioni tracciate da Xenora per mese/canale (imponibile autofattura).
@@ -249,7 +251,7 @@ export default function FatturePassivePage() {
     };
     const res = edit.id ? await supabase.from("purchase_documents").update(row).eq("id", edit.id) : await supabase.from("purchase_documents").insert(row);
     setSaving(false);
-    if (res.error) { setErr(res.error.message); return; }
+    if (res.error) { setErr(friendlyError(res.error)); return; }
     // Se il documento era già in Cassa, il movimento resta allineato (o viene tolto se non è più pagato).
     if (edit.id && inCassa.has(edit.id)) await syncCash({ id: edit.id, ...row } as unknown as Doc);
     setEdit(null); await load();
@@ -276,7 +278,7 @@ export default function FatturePassivePage() {
     const rows = list.map((d) => toCashRow(d, tenantId, todayISO())).filter((x): x is NonNullable<typeof x> => !!x);
     if (!rows.length) { setInfo("Nessun documento pagato da registrare in Cassa."); return; }
     const { error } = await supabase.from("cash_movements").upsert(rows, { onConflict: "id" });
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     setInfo(`${rows.length} ${rows.length === 1 ? "documento registrato" : "documenti registrati"} in Cassa.`); setSel(new Set()); await load();
   };
   const unregisterCash = async (id: string) => {
@@ -296,7 +298,7 @@ export default function FatturePassivePage() {
     if (!ids.length) { setInfo("I documenti selezionati risultano già pagati."); return; }
     if (!(await ask({ title: "Segna come pagate", message: `Segnare ${ids.length} document${ids.length === 1 ? "o" : "i"} come pagat${ids.length === 1 ? "o" : "i"} con data di oggi?`, confirmLabel: "Segna pagate" }))) return;
     const { error } = await supabase.from("purchase_documents").update({ paid: true, paid_at: todayISO(), updated_at: new Date().toISOString() }).in("id", ids);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     setInfo(`${ids.length} document${ids.length === 1 ? "o segnato" : "i segnati"} come pagat${ids.length === 1 ? "o" : "i"}.`); setSel(new Set()); await load();
   };
 
@@ -328,7 +330,7 @@ export default function FatturePassivePage() {
       if (!r.ok) { setFic((p) => p && { ...p, busy: "", msg: r.message || "Impossibile leggere le fatture ricevute.", reconnect: !!r.needsReconnect }); return; }
       const items = r.items ?? [];
       setFic((p) => p && { ...p, busy: "", items, pick: new Set(items.filter((i) => i.status === "new").map((i) => i.ficId)), msg: items.length ? "" : "Nessuna fattura ricevuta nel periodo." });
-    } catch (e) { setFic((p) => p && { ...p, busy: "", msg: e instanceof Error ? e.message : "Errore" }); }
+    } catch (e) { setFic((p) => p && { ...p, busy: "", msg: friendlyError(e) }); }
   };
   const ficImport = async () => {
     if (!fic || !fic.pick.size) return;
@@ -339,12 +341,12 @@ export default function FatturePassivePage() {
       if (!r.ok) { setFic((p) => p && { ...p, busy: "", msg: r.message || "Import non riuscito.", reconnect: !!r.needsReconnect }); return; }
       setInfo(`${r.imported ?? 0} ${r.imported === 1 ? "fattura importata" : "fatture importate"} da Fatture in Cloud${r.suppliersCreated ? ` · ${r.suppliersCreated} ${r.suppliersCreated === 1 ? "nuovo fornitore" : "nuovi fornitori"}` : ""}${r.skipped ? ` · ${r.skipped} già presenti, saltate` : ""}.`);
       setFic(null); await load();
-    } catch (e) { setFic((p) => p && { ...p, busy: "", msg: e instanceof Error ? e.message : "Errore" }); }
+    } catch (e) { setFic((p) => p && { ...p, busy: "", msg: friendlyError(e) }); }
   };
   // Stesso flusso di Impostazioni fattura: ottiene l'URL di autorizzazione e vi reindirizza.
   const ficReconnect = async () => {
     try { const r = await apiPost<{ url: string }>("invoicing/fic/start", {}); window.location.href = r.url; }
-    catch (e) { setFic((p) => p && { ...p, msg: e instanceof Error ? e.message : "Errore" }); }
+    catch (e) { setFic((p) => p && { ...p, msg: friendlyError(e) }); }
   };
 
   const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";

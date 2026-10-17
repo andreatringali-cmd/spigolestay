@@ -3,6 +3,7 @@ import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { channexEnabled, listReviews, replyToReview, isReviewsNotInstalled, getPropertyScoresDetailed, type ChxReview } from "@/lib/channex";
 import { normalizeReviewScores, parseDetailedScores, mergeSummaries, REVIEW_CHANNELS, type ReviewScore, type ReviewChannel, type ScoreSummary } from "@/lib/channex-review-scores";
 import { channelFromOta } from "@/lib/channex-inbound";
+import { ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ const asText = (v: unknown): string => {
 function normalize(r: ChxReview): ReviewRow {
   const rating = Math.max(0, Math.min(10, Math.round(Number(r.overall_score) || 0)));
   const dateRaw = r.received_at || r.inserted_at || "";
-  const date = /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const date = /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : ymdRome(new Date());
   const src = channelFromOta(r.ota);
   return {
     id: `chx-${r.id}`,

@@ -21,6 +21,7 @@ import { fmtDateTime } from "@/lib/dates";
 import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
 import { isValidEmail, structuresToShare, humanInviteError } from "@/lib/user-access";
+import { friendlyError } from "@/lib/friendly-error";
 
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
@@ -91,7 +92,7 @@ export default function UserSchedaPage() {
       const { error: e1 } = await supabase.auth.signInWithPassword({ email: authUser.email, password: curPw });
       if (e1) { setPwMsg({ ok: false, text: t("Password attuale errata.") }); return; }
       const { error: e2 } = await supabase.auth.updateUser({ password: newPw });
-      if (e2) { setPwMsg({ ok: false, text: e2.message }); return; }
+      if (e2) { setPwMsg({ ok: false, text: friendlyError(e2) }); return; }
       resetPwFields(); setPwOpen(false); setPwMsg({ ok: true, text: t("Password aggiornata ✅") });
       const who = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username || authUser.email;
       addActivity("auth", `Password cambiata — ${who}`);
@@ -104,7 +105,7 @@ export default function UserSchedaPage() {
     setPwBusy(true); setPwMsg(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(target, { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined });
-      setPwMsg(error ? { ok: false, text: error.message } : { ok: true, text: `${t("Email di reset inviata a")} ${target}.` });
+      setPwMsg(error ? { ok: false, text: friendlyError(error) } : { ok: true, text: `${t("Email di reset inviata a")} ${target}.` });
       if (!error) {
         const who = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username || target;
         addActivity("auth", `Email di reset password inviata — ${who}`);

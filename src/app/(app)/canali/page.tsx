@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { eur } from "@/lib/format";
 import Icon from "@/components/Icon";
 import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
@@ -218,7 +219,6 @@ export default function CanaliPage() {
   const scope = useMemo(() => channelStats(bookings, { ...range, structureId: effStructure === "all" ? undefined : effStructure }), [bookings, range, effStructure]);
   const statsBySid = useMemo(() => { const m: Record<string, ChannelStatsResult> = {}; for (const s of structures) m[s.id] = channelStats(bookings, { ...range, structureId: s.id }); return m; }, [bookings, range, structures]);
   const otaShare = Math.round(scope.rows.filter((r) => r.channel !== "direct").reduce((a, r) => a + r.shareGross, 0));
-  const eur = (n: number) => n.toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
   const chColor = (ch: Channel) => loadChannelColor(ch) || `var(${CHANNELS[ch]?.cssVar ?? ""})`;
   // Quando abbiamo mandato per l'ultima volta l'intera finestra di prezzi e disponibilità (dato del browser in uso).
   const lastFullTs = (sid: string): number | null => { try { const v = JSON.parse(localStorage.getItem("spigolestay:channex-lastfullsync") || "{}")[sid]; return typeof v === "number" ? v : null; } catch { return null; } };
@@ -283,7 +283,7 @@ export default function CanaliPage() {
               </div>
             </div>
             <div className="flex flex-1 flex-col">
-              <ChannelBars rows={scope.rows.map((r) => ({ label: CHANNELS[r.channel]?.label ?? r.channel, color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel }))} fmtEur={eur} />
+              <ChannelBars rows={scope.rows.map((r) => ({ label: r.mixed ? "Altre OTA" : (CHANNELS[r.channel]?.label ?? r.channel), color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel, name: r.name }))} fmtEur={eur} />
               {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[10px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
             </div>
           </Card>

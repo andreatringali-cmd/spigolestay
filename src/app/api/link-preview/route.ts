@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 // niente fetch di indirizzi arbitrari (SSRF). I redirect sono seguiti a mano, controllando
 // l'host a ogni salto (i link corti /g/<codice> rimandano a /guida, /checkin, /preventivo).
 const ALLOWED = new Set(["xenora.it", "www.xenora.it", "spigole-guest-guide.vercel.app"]);
+// Anche il dominio impostato in NEXT_PUBLIC_SITE_URL (se diverso): i link ospite usano quello.
+try { const h = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it").hostname; if (h) { ALLOWED.add(h); ALLOWED.add(h.replace(/^www\./, "")); } } catch { /* variabile non valida: restano gli host fissi */ }
 
 const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 const meta = (html: string, key: string) => {

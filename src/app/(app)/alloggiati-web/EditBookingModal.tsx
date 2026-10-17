@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { DOC_TYPES } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
+import { docTypeFromText } from "@/lib/checkin-flow";
 
 type Co = NonNullable<import("@/lib/types").Booking["extraGuests"]>[number];
 type PG = NonNullable<import("@/lib/types").Booking["primaryGuest"]>;
@@ -28,9 +29,12 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
   const roleFor = (idx: number) => { const tot = 1 + cosOf().length; if (idx === 0) return tot > 1 ? (group ? "18" : "17") : "16"; return group ? "20" : "19"; };
 
   const primaryOf = (): PG & { fullName?: string } => {
+    // I dati di chi ha fatto il check-in stanno sulla PRENOTAZIONE (primaryGuest): l'anagrafica è condivisa fra le camere di un gruppo e fra soggiorni diversi, quindi vale solo dove la prenotazione non ha dati propri.
+    const pg = b.primaryGuest ?? {};
+    if (pg.lastName) return { ...pg, fullName: `${pg.firstName ?? ""} ${pg.lastName ?? ""}`.trim() };
     const g = guest(b.guestId);
     if (g) return { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber, docPlace: g.docPlace, fullName: g.fullName };
-    const pg = b.primaryGuest ?? {}; return { ...pg, fullName: `${pg.firstName ?? ""} ${pg.lastName ?? ""}`.trim() };
+    return { ...pg, fullName: `${pg.firstName ?? ""} ${pg.lastName ?? ""}`.trim() };
   };
   const setPrimary = (id: string, patch: Record<string, unknown>) => {
     const g = guest(id); const next = { ...g, ...patch } as Record<string, unknown>;
@@ -38,12 +42,25 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
     updateGuest(id, next);
   };
   // Se la prenotazione ha già primaryGuest (es. dal check-in online) la sync Alloggiati lo preferisce alla scheda ospite: la correzione va applicata a entrambi.
-  const setPrimaryOf = (patch: Record<string, unknown>) => { if (guest(b.guestId)) { setPrimary(b.guestId, patch); if (b.primaryGuest) updateBooking(b.id, { primaryGuest: { ...b.primaryGuest, ...patch } }); } else updateBooking(b.id, { primaryGuest: { ...(b.primaryGuest ?? {}), ...patch } }); };
+  // La correzione si scrive SEMPRE sulla prenotazione (così conta come check-in compilato e la schedina nasce dai dati giusti); sull'anagrafica solo per prenotazioni singole:
+  // nei gruppi l'anagrafica è quella del prenotante, non di chi guida questa camera.
+  const setPrimaryOf = (patch: Record<string, unknown>) => {
+    const cur = primaryOf();
+    // Prenotazione SENZA check-in: i dati mostrati vengono dalla scheda ospite (anche di un soggiorno precedente). Copiarli sulla prenotazione la fa contare come "check-in fatto":
+    // l'operatore deve confermare di voler usare quei dati per questo soggiorno (si chiede una volta sola: dopo, la prenotazione ha il suo primaryGuest).
+    if (!b.primaryGuest && (cur.lastName || cur.docNumber)) {
+      const ok = typeof window === "undefined" || window.confirm("Questa prenotazione non ha ancora un check-in. I dati mostrati vengono dalla scheda ospite (potrebbero essere di un soggiorno precedente): se prosegui verranno copiati su questa prenotazione, che risulterà con check-in fatto e la schedina per la Questura sarà generata con questi dati. Verifica che siano quelli di questo soggiorno. Continuare?");
+      if (!ok) return;
+    }
+    const base: Record<string, unknown> = b.primaryGuest ?? { firstName: cur.firstName, lastName: cur.lastName, sex: cur.sex, birthDate: cur.birthDate, birthPlace: cur.birthPlace, citizenship: cur.citizenship, docType: cur.docType, docNumber: cur.docNumber, docPlace: cur.docPlace };
+    updateBooking(b.id, { primaryGuest: { ...base, ...patch } as PG });
+    if (guest(b.guestId) && !b.groupId) setPrimary(b.guestId, patch);
+  };
   const setCo = (i: number, patch: Partial<Co>) => updateBooking(b.id, { extraGuests: cosOf().map((c, j) => (j === i ? { ...c, ...patch } : c)) });
   const addCo = () => updateBooking(b.id, { extraGuests: [...cosOf(), { firstName: "", lastName: "" } as Co] });
   const delCo = (i: number) => updateBooking(b.id, { extraGuests: cosOf().filter((_, j) => j !== i) });
 
-  const normDoc = (d?: string): string | undefined => { if (!d) return undefined; if (DOC_TYPES.includes(d)) return d; if (/patente/i.test(d)) return "Patente di guida"; if (/passa/i.test(d)) return "Passaporto"; if (/identit|carta/i.test(d)) return "Carta d'identità"; return undefined; };
+  const normDoc = (d?: string): string | undefined => { if (!d) return undefined; if (DOC_TYPES.includes(d)) return d; const t = docTypeFromText(d); return t && DOC_TYPES.includes(t) ? t : undefined; };
   const patchFrom = (f: Record<string, string>, withDoc: boolean): Record<string, unknown> => {
     const p: Record<string, unknown> = {};
     if (f.firstName) p.firstName = f.firstName; if (f.lastName) p.lastName = f.lastName;

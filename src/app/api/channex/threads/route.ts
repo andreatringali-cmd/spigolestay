@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // Azioni (POST JSON): list · messages · send · send_attachment · close · no_reply.
 // L'account Channex è UNICO per tutti i clienti: ogni azione verifica che la property del thread sia tra quelle dell'utente (proprie o di una struttura condivisa).
 const MAX_PROPERTIES = 12;     // oltre: si prendono le prime (chiamate a Channex limitate a 20/min)
-const PAGES = 2;               // 2 pagine da 100 per property: le conversazioni più recenti bastano per il lavoro quotidiano
+const PAGES = 3;               // al massimo 3 pagine per property: le conversazioni più recenti bastano per il lavoro quotidiano (Channex può ignorare la dimensione di pagina: si segue meta.limit/total)
 
 // Thread → property, in memoria per qualche minuto: evita una chiamata a Channex per ogni azione sulla stessa conversazione.
 const threadCache = new Map<string, { t: OtaThread; at: number }>();
@@ -42,21 +42,24 @@ export async function POST(req: Request) {
     const props = [...allowed].slice(0, MAX_PROPERTIES);
     if (!props.length) return NextResponse.json({ ok: true, threads: [], note: "Nessuna struttura collegata a Channex." });
     const errors: string[] = [];
+    let forbidden = false; // 403/404 = app "Messages" non installata su Channex per quella struttura
     const lists = await Promise.all(props.map(async (pid) => {
       const out: OtaThread[] = [];
       for (let page = 1; page <= PAGES; page++) {
         const res = await listMessageThreadsFor(pid, page, 100);
-        if (!res.ok) { errors.push(res.error || `errore Channex (status ${res.status})`); break; }
+        if (!res.ok) { errors.push(res.error || `errore Channex (status ${res.status})`); if (res.status === 403 || res.status === 404) forbidden = true; break; }
         const rows = Array.isArray(res.data?.data) ? res.data!.data! : [];
         for (const r of rows) { const t = normalizeThread(r); if (t && threadAllowed(t, allowed)) { out.push(t); threadCache.set(t.id, { t, at: Date.now() }); } }
-        if (rows.length < 100) break;
+        const per = typeof res.data?.meta?.limit === "number" && res.data.meta.limit > 0 ? res.data.meta.limit : 100;
+        const total = typeof res.data?.meta?.total === "number" ? res.data.meta.total : 0;
+        if (rows.length === 0 || rows.length < per || (total > 0 && page * per >= total)) break;
       }
       return out;
     }));
     const threads = mergeThreads(lists);
     // Tutte le chiamate fallite e nessuna conversazione: l'app "Messages" non è installata o Channex non risponde. Si dice com'è, senza inventare un elenco vuoto.
-    if (!threads.length && errors.length) return NextResponse.json({ ok: false, error: errors[0], threads: [] });
-    return NextResponse.json({ ok: true, threads, ...(errors.length ? { partial: true } : {}) });
+    if (!threads.length && errors.length) return NextResponse.json({ ok: false, error: errors[0], notInstalled: forbidden, threads: [] });
+    return NextResponse.json({ ok: true, threads, ...(errors.length ? { partial: true, partialNotInstalled: forbidden } : {}) });
   }
 
   const threadId = String(body.threadId || "").trim();
@@ -67,11 +70,19 @@ export async function POST(req: Request) {
   const thread = lt.t;
 
   if (action === "messages") {
-    const res = await listThreadMessages(threadId, 100);
-    if (!res.ok) return NextResponse.json({ ok: false, error: res.error || `errore Channex (status ${res.status})` });
+    // Più pagine se Channex ne manda meno del richiesto (limite ignorato): si fermano a 5 per non consumare il limite di chiamate.
+    const rows: unknown[] = [];
+    for (let page = 1; page <= 5; page++) {
+      const res = await listThreadMessages(threadId, 100, page);
+      if (!res.ok) { if (page === 1) return NextResponse.json({ ok: false, error: res.error || `errore Channex (status ${res.status})` }); break; }
+      const part = Array.isArray(res.data?.data) ? res.data!.data! : [];
+      rows.push(...part);
+      const per = typeof res.data?.meta?.limit === "number" && res.data.meta.limit > 0 ? res.data.meta.limit : 100;
+      const total = typeof res.data?.meta?.total === "number" ? res.data.meta.total : 0;
+      if (part.length === 0 || part.length < per || (total > 0 && rows.length >= total)) break;
+    }
     const base = channexBase();
-    const rows = Array.isArray(res.data?.data) ? res.data!.data! : [];
-    const messages = rows.map((r) => normalizeMessage(r, (raw) => parseAttachments(raw, base))).filter((m): m is NonNullable<typeof m> => !!m).sort((a, b) => a.ts - b.ts);
+    const messages = rows.map((r) => normalizeMessage(r, (raw) => parseAttachments(raw, base))).filter((m): m is NonNullable<typeof m> => !!m).sort((a, b) => a.ts - b.ts).filter((m, i, a) => a.findIndex((x) => x.id === m.id) === i);
     return NextResponse.json({ ok: true, thread, messages });
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtDM } from "@/lib/dates";
+import { addDaysYmd, todayRome } from "@/lib/dates-rome";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,8 +19,8 @@ import { cityTaxTotalByStructure } from "@/lib/citytax";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
-// Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
-const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
+// "Oggi" nel fuso italiano (Europe/Rome), NON UTC: altrimenti vicino a mezzanotte sfasa di un giorno.
+const today = () => todayRome();
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
 const fmtDay = (iso?: string) => (iso ? fmtDM(iso) : "—");
 const omini = (n: number) => (n <= 5 ? "👤".repeat(Math.max(1, n)) : `👤 ${n}`); // ospiti come icone
@@ -132,7 +133,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
       <div className="flex items-center justify-between gap-2">
         <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{rooms && rooms > 1 ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {rooms} camere</span> : b.groupId ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span> : null}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
         <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
-          {partial ? `Incompleto ${declared}/${expected}` : "Da fare"}
+          {partial ? `Incompleto ${declared}/${expected}` : declared === 0 ? "Check-in mancante" : "Da fare"}
         </span>
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-faint">
@@ -244,7 +245,7 @@ export default function AdempimentiPage() {
     const p2 = (n: number) => String(n).padStart(2, "0");
     const start = `${y}-${p2(startM + 1)}-01`;
     const end = startM + 3 >= 12 ? `${y + 1}-01-01` : `${y}-${p2(startM + 4)}-01`;
-    const taxBookings = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn >= start && b.checkIn < end); // bookings è già limitato alla struttura attiva
+    const taxBookings = bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn >= start && b.checkIn < end); // bookings è già limitato alla struttura attiva
     // Ogni soggiorno è calcolato con le regole della SUA struttura (Strutture → Tassa di soggiorno).
     const { total, count } = cityTaxTotalByStructure(taxBookings, getStructure);
     return {
@@ -289,10 +290,10 @@ export default function AdempimentiPage() {
   const guestFieldsOk = (g?: { lastName?: string; firstName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; country?: string }) =>
     !!(g?.lastName && g?.firstName && g?.sex && g?.birthDate && g?.birthPlace && (g?.citizenship || g?.country));
   const bookingDataValid = (b: Booking) => {
-    const p = getGuest(b.guestId) ?? b.primaryGuest;
-    if (!guestFieldsOk(p) || !(p?.docType && p?.docNumber)) return false;
+    const p = b.primaryGuest ?? getGuest(b.guestId); // i dati del check-in stanno sulla prenotazione; l'anagrafica è condivisa fra le camere di un gruppo
+    if (!guestFieldsOk(p) || !(p?.docType && p?.docNumber && p?.docPlace)) return false; // anche il luogo di rilascio: la schedina lo richiede
     for (const e of (b.extraGuests ?? [])) if (!guestFieldsOk(e)) return false;
-    return true;
+    return !bookingsWithInvalid.has(b.id); // se la schedina è già stata generata e il controllo (codici inclusi / portale) l'ha rifiutata, il check-in NON è "valido"
   };
   // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dati ospite non validi),
   // CHECK-IN FATTI (completi e validi). Lo stato dipende dai DATI della prenotazione, non dalla schedina.
@@ -343,7 +344,7 @@ export default function AdempimentiPage() {
   const schedSent = sched.filter((s) => s.stato === "inviata");
   // Prenotazioni con check-in COMPLETO ma SENZA schedine ancora generate → "da trasferire alle schedine".
   const schedBookingIds = new Set(sched.map((s) => s.booking_id).filter(Boolean) as string[]);
-  const weekAgo = (() => { const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const weekAgo = addDaysYmd(t, -7); // aritmetica di calendario: niente toISOString (UTC), che sfasava di un giorno
   const needsTransfer = bookings.filter((b) => isActiveArrival(b) && isComplete(b) && (b.checkIn || "") >= weekAgo && !schedBookingIds.has(b.id));
   // Tra i "check-in fatti" (completi e validi), quali non hanno ancora la schedina generata → da trasferire.
   const toTransfer = arrivalsCheckedIn.filter((b) => !schedBookingIds.has(b.id));
@@ -379,7 +380,7 @@ export default function AdempimentiPage() {
     const ms = d.getTime() - now; const over = ms < 0; const a = Math.abs(ms);
     const days = Math.floor(a / 86400000), h = Math.floor((a % 86400000) / 3600000), m = Math.floor((a % 3600000) / 60000);
     const lbl = days >= 1 ? `${days}g ${h}h` : h >= 1 ? `${h}h ${m}m` : `${m}m`;
-    return over ? `⚠ scaduta da ${lbl}` : `⏱ tra ${lbl}`;
+    return over ? `⚠ scaduta da ~${lbl}` : `⏱ tra ~${lbl}`; // stima: l'orario vero di arrivo non lo conosciamo (si assumono le 14:00)
   };
   // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
   const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id) && (s.arrival || "") <= t);

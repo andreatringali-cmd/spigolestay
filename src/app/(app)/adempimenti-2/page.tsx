@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 import { toISO, nights, parseISO, fmtDM } from "@/lib/dates";
-import { bookingPaidTotal, cityTaxOfBooking } from "@/lib/booking";
+import { bookingPaidTotal } from "@/lib/booking";
+import { cityTaxForBooking, cityTaxRulesOf } from "@/lib/citytax";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
@@ -49,7 +50,8 @@ export default function Adempimenti2() {
   const nameOf = useCallback((b: ABooking) => {
     const g = guestMap.get(b.guestId);
     const pg = (b as Booking).primaryGuest;
-    return g?.fullName || [pg?.firstName, pg?.lastName].filter(Boolean).join(" ") || "Ospite";
+    // Chi ha fatto il check-in di questa prenotazione (nei gruppi ogni camera ha il suo capocamera) prima dell'anagrafica condivisa.
+    return [pg?.firstName, pg?.lastName].filter(Boolean).join(" ") || g?.fullName || "Ospite";
   }, [guestMap]);
 
   // Dati: gli stessi di "Adempimenti oggi".
@@ -62,17 +64,18 @@ export default function Adempimenti2() {
   // ── Cose da fare ──
   const res = useMemo(() => buildTasks<Booking>({
     today, nowMs, bookings,
-    primaryOf: (b) => guestMap.get(b.guestId) ?? b.primaryGuest,
+    primaryOf: (b) => b.primaryGuest ?? guestMap.get(b.guestId),
     nameOf,
     sched, istat,
-    taxOf: (b) => cityTaxOfBooking(getStructure(b.structureId), b),
+    // Stesso importo di check-in, fatture e pagina Tassa di soggiorno (quota di gruppo, età dei bambini, tetto).
+    taxOf: (b) => { const st = getStructure(b.structureId); const r = cityTaxRulesOf(st); return r ? cityTaxForBooking(b, r, st).tax : 0; },
     balanceOf: (b) => Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0)),
     totalOf: (b) => bookingPaidTotal(b),
     docs, passive,
   }), [today, nowMs, bookings, guestMap, nameOf, sched, istat, getStructure, docs, passive]);
   const summary = useMemo(() => summarize(res.tasks, res.done), [res]);
   const next = useMemo(() => nextTask(res.tasks), [res.tasks]);
-  const calendar = useMemo(() => buildCalendar<Booking>(res.tasks, bookings, (b) => guestMap.get(b.guestId) ?? b.primaryGuest, today, 7), [res.tasks, bookings, guestMap, today]);
+  const calendar = useMemo(() => buildCalendar<Booking>(res.tasks, bookings, (b) => b.primaryGuest ?? guestMap.get(b.guestId), today, 7), [res.tasks, bookings, guestMap, today]);
 
   // ── Percorso della prenotazione (per la finestra "Risolvi", la stessa di Prenotazioni) e cronologia dei solleciti ──
   const windowBookings = useMemo(() => bookings.filter((b) => isLive(b) && b.checkOut >= addDaysISO(today, -14) && b.checkIn <= addDaysISO(today, 3)), [bookings, today]);

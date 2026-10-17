@@ -3,11 +3,12 @@
 // Lordo, commissioni e netto usano le stesse formule dell'elenco Prenotazioni (lib/booking.ts): i numeri tornano ovunque.
 import type { Channel } from "@/lib/types";
 import { lordoOf, commissionOf, nettoOf } from "@/lib/booking";
+import { otaGroupName } from "@/lib/channel-name";
 
 export type StatsPeriod = "last30" | "next30" | "year";
 export const PERIOD_LABEL: Record<StatsPeriod, string> = { last30: "Ultimi 30 giorni", next30: "Prossimi 30 giorni", year: "Anno in corso" };
 
-type StatBooking = Parameters<typeof lordoOf>[0] & { status: string; checkIn: string; checkOut: string; channel: Channel; structureId?: string };
+type StatBooking = Parameters<typeof lordoOf>[0] & { status: string; checkIn: string; checkOut: string; channel: Channel; structureId?: string; otaName?: string };
 
 const addDaysISO = (iso: string, n: number): string => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const nightsBetween = (a: string, b: string): number => Math.max(0, Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000));
@@ -21,6 +22,8 @@ export function periodRange(p: StatsPeriod, today: string): { from: string; to: 
 
 export interface ChannelStat {
   channel: Channel;
+  name?: string;       // nome del portale per il canale generico ("other"), per mostrare il logo giusto (bb.it…): solo se TUTTE le prenotazioni "other" sono dello stesso portale
+  mixed?: boolean;     // "other" con portali diversi: nessun logo, etichetta generica (MIXED_OTA_LABEL)
   bookings: number;
   nights: number;
   gross: number;       // lordo (soggiorno + pulizia + extra, senza tassa di soggiorno)
@@ -42,11 +45,13 @@ export function channelStats(bookings: readonly StatBooking[], opts: { from: str
     if (!r) { r = { channel: ch, bookings: 0, nights: 0, gross: 0, commission: 0, net: 0, cancelled: 0, avgNight: null, commissionPct: null, shareGross: 0 }; by.set(ch, r); }
     return r;
   };
+  const otaNames: (string | undefined)[] = []; // otaName di OGNI prenotazione "other" del perimetro (il logo vale solo se sono tutte dello stesso portale)
   for (const b of bookings) {
     if (b.channel === "blocked") continue;
     if (opts.structureId && b.structureId !== opts.structureId) continue;
     if (!(b.checkIn >= opts.from && b.checkIn < opts.to)) continue;
     const r = row(b.channel);
+    if (b.channel === "other") otaNames.push(b.otaName);
     if (b.status === "cancelled") { r.cancelled++; continue; }
     r.bookings++;
     r.nights += nightsBetween(b.checkIn, b.checkOut);
@@ -54,6 +59,8 @@ export function channelStats(bookings: readonly StatBooking[], opts: { from: str
     r.commission += commissionOf(b);
     r.net += nettoOf(b);
   }
+  const oth = by.get("other");
+  if (oth) { const g = otaGroupName(otaNames); oth.name = g.name; if (g.mixed) oth.mixed = true; }
   const rows = Array.from(by.values()).filter((r) => r.bookings > 0 || r.cancelled > 0);
   const totalGross = rows.reduce((a, r) => a + r.gross, 0);
   const totalBookings = rows.reduce((a, r) => a + r.bookings, 0);

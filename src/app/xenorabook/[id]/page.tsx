@@ -9,6 +9,7 @@
 // pubblico reale (/prenota?site=<slug>), lo stesso usato dal mini-sito Xenosite e dal
 // feed Metasearch, con le stesse tariffe/disponibilità.
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { ymdRome } from "@/lib/dates-rome";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
@@ -47,7 +48,7 @@ function Engine() {
     return () => { alive = false; };
   }, [slug]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdRome(new Date());
   const [from, setFrom] = useState(qp.get("from") || today);
   const [to, setTo] = useState(qp.get("to") || today);
   const [adults, setAdults] = useState(Number(qp.get("adults")) || 2);

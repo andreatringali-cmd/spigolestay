@@ -3,9 +3,19 @@
 import { useState } from "react";
 import type { Channel } from "@/lib/types";
 
-/** Portale di prenotazione riconosciuto dal NOME del canale su Channex (quando il codice OTA è generico, "Altro / OTA"). */
-export function isBedAndBreakfastIt(name?: string): boolean {
-  return /bed\s*(?:&|and|-and-|n)?\s*breakfast|bb\.it|bbit|\bb\s*&\s*b\b/i.test(name ?? "");
+import { isBedAndBreakfastIt } from "@/lib/channel-name";
+export { isBedAndBreakfastIt };
+
+/** Logo del chip esteso di bb.it (icona + scritta): se il file non si carica resta solo la scritta, come per BbItMark. */
+function BbItWordmark({ height, textStyle }: { height: number; textStyle: React.CSSProperties }) {
+  const [missing, setMissing] = useState(false);
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {!missing && <img src="/channels/bed-and-breakfast-it.png" alt="" width={height} height={height} style={{ width: height, height, borderRadius: "50%", objectFit: "contain", background: "#fff" }} onError={() => setMissing(true)} />}
+      <span style={{ ...textStyle, color: "#2E7D32" }}>bb.it</span>
+    </>
+  );
 }
 
 /** Logo ufficiale di bed-and-breakfast.it (public/channels/bed-and-breakfast-it.png, tazza su fondo verde); se il file non si carica resta la scritta "bb.it". */
@@ -77,8 +87,7 @@ export function ChannelWordmark({ channel, height = 20, title, name }: { channel
     case "hotelbeds":
       return chip("HotelBeds", <span style={{ ...base, color: "#2B3340" }}>hotelbeds</span>);
     case "other":
-      // eslint-disable-next-line @next/next/no-img-element
-      if (isBedAndBreakfastIt(name ?? title)) return chip("bb.it · bed-and-breakfast.it", <><img src="/channels/bed-and-breakfast-it.png" alt="" width={height} height={height} style={{ width: height, height, borderRadius: "50%" }} /><span style={{ ...base, color: "#2E7D32" }}>bb.it</span></>);
+      if (isBedAndBreakfastIt(name ?? title)) return chip("bb.it · bed-and-breakfast.it", <BbItWordmark height={height} textStyle={base} />);
       return chip("Altro / OTA", <span style={{ ...base, fontSize: Math.round(fs * 0.85), color: "#5B5F6B" }}>OTA</span>);
     case "direct":
       /* eslint-disable-next-line @next/next/no-img-element */

@@ -9,14 +9,14 @@ import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlink";
-import { chatPayGuestMessage } from "@/lib/chat-pay-core";
-import { bookingPaidTotal } from "@/lib/booking";
-import { googleReviewUrl, reviewRequestMessage } from "@/lib/reviews";
+import { chatPayGuestMessage, parseEurInput } from "@/lib/chat-pay-core";
+import { bookingGrandTotal, bookingPaidTotal } from "@/lib/booking";
+import { reviewLinksBlockFromStorage, reviewRequestMessage, reviewRequestSubject } from "@/lib/reviews";
 import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
-import { fmtDM } from "@/lib/dates";
+import { fmtDMY } from "@/lib/dates";
 import Icon from "@/components/Icon";
 
 export interface StepActionsProps {
@@ -112,13 +112,13 @@ export default function StepActions(p: StepActionsProps) {
   };
 
   // Invio di un testo su WhatsApp o email + registro "inviato".
-  const deliver = async (via: "wa" | "mail", text: string, subject: string, remKind: string, after?: () => void) => {
+  const deliver = async (via: "wa" | "mail", text: string, subject: string, remKind: string, after?: (via: "wa" | "mail") => void) => {
     const meta = { bid: b.id, rem: remKind };
     const r = via === "wa" ? await sendWhatsAppToGuest(guest, text, meta) : await sendEmailToGuest(guest, subject, text, structure, meta);
-    if (r.ok) { markReminder(b.id, remKind); after?.(); p.onChanged(); }
+    if (r.ok) { markReminder(b.id, remKind); after?.(via); p.onChanged(); }
     return r;
   };
-  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, _label: string, after?: () => void, extra?: React.ReactNode) => (
+  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, _label: string, after?: (via: "wa" | "mail") => void, extra?: React.ReactNode) => (
     <>
     {historyBox(remKind)}
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
@@ -155,7 +155,7 @@ export default function StepActions(p: StepActionsProps) {
     };
     body = (<>
       <p className="text-sm text-dim">{partial
-        ? <>L'ospite ha compilato il check-in per <b>{dec} persona su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il modulo si riapre vuoto: l'ospite deve compilare di nuovo i dati di tutti) o <b>compilare tu</b> con i dati già salvati. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
+        ? <>L'ospite ha compilato il check-in per <b>{dec} {dec === 1 ? "persona" : "persone"} su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il modulo si riapre vuoto: l'ospite deve compilare di nuovo i dati di tutti) o <b>compilare tu</b> con i dati già salvati. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
         : <>L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</>}</p>
       {sendButtons(build, "checkin", "", undefined, <button className={`${btnGhost} whitespace-nowrap`} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila tu</button>)}
     </>);
@@ -164,7 +164,8 @@ export default function StepActions(p: StepActionsProps) {
     const remKind = `pay-${kind}`;
     const sent = (hist[remKind]?.length ?? 0) > 0 || (kind === "saldo" && p.paySentInChat);
     const mk = async () => {
-      const asked = amount.trim() ? Number(amount.replace(",", ".")) : undefined;
+      // parseEurInput capisce anche "1.200,50" (Number("1.200,50".replace) dava NaN / 1.2).
+      const asked = amount.trim() ? (parseEurInput(amount) ?? NaN) : undefined;
       if (asked !== undefined && (!isFinite(asked) || asked <= 0)) throw new Error("Importo non valido.");
       const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind, ...(asked !== undefined ? { amount: asked } : {}) });
       const hi = greeting(lang, guest).trim(); // saluto su una riga a sé
@@ -173,13 +174,18 @@ export default function StepActions(p: StepActionsProps) {
     };
     const manual = async () => {
       if (kind === "saldo") {
-        const amt = amount.trim() ? Number(amount.replace(",", ".")) : due;
+        const amt = amount.trim() ? (parseEurInput(amount) ?? NaN) : due;
         if (!isFinite(amt) || amt <= 0) return { ok: false, message: "Importo non valido." };
         if (!(await ask({ title: "Registra incasso", message: `Segnare come incassati ${eur(amt)} per questa prenotazione?`, confirmLabel: "Registra incasso" }))) return;
         updateBooking(b.id, { paid: Math.round(((b.paid ?? 0) + amt) * 100) / 100 });
       } else {
         if (!(await ask({ title: "Tassa di soggiorno", message: "Segnare la tassa di soggiorno come incassata?", confirmLabel: "Sì, incassata" }))) return;
-        updateBooking(b.id, { cityTaxPaid: true });
+        // Tassa incassata "a parte" (contanti): resta fuori da `paid`. Ma se l'ospite ha già versato tutto, tassa compresa, quei soldi sono DENTRO `paid`:
+        // senza cityTaxInPaid il dovuto scenderebbe due volte della tassa e la prenotazione risulterebbe pagata in eccesso.
+        const grand = bookingGrandTotal(b, structure);
+        const inPaid = grand > 0 && (b.paid ?? 0) + 0.005 >= grand;
+        // cityTaxInPaid non è ancora nel tipo Booking (lo scrivono già il pagamento online e il link «tassa»): cast sul parametro.
+        updateBooking(b.id, inPaid ? { cityTaxPaid: true, cityTaxInPaid: true } : { cityTaxPaid: true });
       }
       p.onChanged();
       return { ok: true, message: "Registrato ✓" };
@@ -254,21 +260,22 @@ export default function StepActions(p: StepActionsProps) {
     </>);
   } else if (step.key === "checkout") {
     const hi = greeting(lang, guest).trim();
-    const dm = fmtDM(b.checkOut);
+    const dm = fmtDMY(b.checkOut); // data completa gg.mm.aaaa
     const build = async () => ({ text: `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">Manda all&apos;ospite il promemoria della partenza: data e orario del check-out, come contattarti per qualsiasi necessità e un ringraziamento.</p>
       {sendButtons(build, "checkout", "Invia il promemoria", undefined, <button className={btnGhost} onClick={() => { p.onClose(); router.push("/pulizie"); }}>Apri Pulizie</button>)}
     </>);
   } else if (step.key === "review") {
-    const url = googleReviewUrl(structure?.googlePlaceId);
-    const build = async () => ({ text: reviewRequestMessage({ guestName: guest?.fullName, structureName: structure?.name, reviewUrl: url }), subject: `Com'è andato il soggiorno${structure?.name ? ` da ${structure.name}` : ""}?` });
-    body = url ? (<>
+    // Stessi link del messaggio automatico (link scelto in Modelli & automazioni, Place ID o guida; Tripadvisor se impostato) e testo nella lingua dell'ospite.
+    const links = reviewLinksBlockFromStorage(b.structureId, structure?.googlePlaceId);
+    const build = async () => ({ text: reviewRequestMessage({ guestName: guest?.firstName || guest?.fullName, structureName: structure?.name, linksBlock: links, lang }), subject: reviewRequestSubject(lang, structure?.name) });
+    body = links ? (<>
       <p className="text-sm text-dim">L'ospite è partito: una richiesta di recensione ora ha più probabilità di essere accolta.</p>
-      {sendButtons(build, "review", "Richiedi la recensione", () => updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "whatsapp" }))}
+      {sendButtons(build, "review", "Richiedi la recensione", (via) => updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }))}
     </>) : (<>
-      <p className="text-sm text-dim">Per chiedere la recensione serve il Google Place ID della struttura: non è ancora impostato.</p>
-      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => router.push("/strutture")}>Imposta il Google Place ID</button></div>
+      <p className="text-sm text-dim">Per chiedere la recensione serve almeno un link (Google o Tripadvisor): non sono impostati né il Google Place ID della struttura né i link in Modelli &amp; automazioni.</p>
+      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => router.push("/strutture")}>Imposta il Google Place ID</button><button className={btnGhost} onClick={() => router.push("/messaggi")}>Imposta i link nei Modelli</button></div>
     </>);
   } else {
     body = (<>

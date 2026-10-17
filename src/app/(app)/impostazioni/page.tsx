@@ -2,6 +2,9 @@
 
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
 import Link from "next/link";
+import { ymdRome } from "@/lib/dates-rome";
+import { friendlyError } from "@/lib/friendly-error";
+import { CHANNELS } from "@/lib/types";
 import { RATEMODEL_DEF, RATEMODEL_KEY, parseRateModel, type RatePlanDef, type SingleDiscount } from "@/lib/rate-model";
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
@@ -107,8 +110,8 @@ export default function ImpostazioniPage() {
       }
       else if (r.error === "http_403") setGcalVerifyMsg({ text: t("Permesso negato: questo calendario non risulta condiviso con l'indirizzo del service account (o non col ruolo giusto)."), err: true, hint: t("Ripeti il passo 2 qui sopra: condividi di nuovo il calendario con quell'email, scegliendo il ruolo \"Apportare modifiche agli eventi\".") });
       else if (r.error === "http_404") setGcalVerifyMsg({ text: t("Calendario non trovato: l'ID inserito non è corretto."), err: true, hint: t("Ricontrolla il passo 3 qui sopra: riapri le impostazioni del calendario giusto su Google e ricopia l'ID (va bene anche l'intero link).") });
-      else setGcalVerifyMsg({ text: `${t("Errore")}: ${r.error || t("sconosciuto")}`, err: true });
-    } catch (e) { setGcalVerifyMsg({ text: e instanceof Error ? e.message : t("Errore di rete"), err: true }); }
+      else setGcalVerifyMsg({ text: friendlyError(r.error, t("Errore sconosciuto")), err: true });
+    } catch (e) { setGcalVerifyMsg({ text: friendlyError(e, t("Errore di rete")), err: true }); }
     finally { setGcalVerifying(false); }
   };
   // Vero solo se l'ID attualmente scritto nel campo È quello salvato per la struttura E quello
@@ -134,14 +137,14 @@ export default function ImpostazioniPage() {
       const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
       const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
       const summary = [g?.fullName || "Ospite", roomLabel].filter(Boolean).join(" — ");
-      const description = [b.code && `Codice: ${b.code}`, b.channel && `Canale: ${b.channel}`].filter(Boolean).join(" · ");
+      const description = [b.code && `Codice: ${b.code}`, b.channel && `Canale: ${CHANNELS[b.channel]?.label ?? b.channel}`].filter(Boolean).join(" · ");
       try {
         const r = await apiPost<{ ok: boolean; error?: string }>("calendar/sync-event", {
           action: "upsert", bookingId: b.id, calendarId, summary, description,
           startDate: b.checkIn, endDateExclusive: b.checkOut,
         });
-        if (r.ok) ok++; else if (!firstError) firstError = r.error || "errore sconosciuto";
-      } catch (e) { if (!firstError) firstError = e instanceof Error ? e.message : "errore sconosciuto"; }
+        if (r.ok) ok++; else if (!firstError) firstError = friendlyError(r.error, "errore sconosciuto");
+      } catch (e) { if (!firstError) firstError = friendlyError(e, "errore sconosciuto"); }
     }
     setGcalSyncing(false);
     if (!toSync.length) setGcalSyncMsg({ text: t("Nessuna prenotazione da sincronizzare per questa struttura.") });
@@ -157,7 +160,7 @@ export default function ImpostazioniPage() {
     const dump: Record<string, string> = {};
     keysOf().forEach((k) => { dump[k] = kvGet(k)!; });
     const blob = new Blob([JSON.stringify({ app: "Xenora", exportedAt: new Date().toISOString(), data: dump }, null, 2)], { type: "application/json" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `spigolestay-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `spigolestay-backup-${ymdRome(new Date())}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
   const doImport = (file?: File) => {
     if (!file) return;

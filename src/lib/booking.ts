@@ -117,9 +117,11 @@ export function groupRowBalances(structure: Structure | undefined, rows: (GroupT
   });
 }
 
+/** Soglia d'età (minori esenti sotto) quando la struttura non l'ha impostata: UNICO punto, usato da booking.ts e da citytax.ts. 18 = tutti i minorenni esenti. */
+export const DEFAULT_CITY_TAX_FREE_UNDER = 18;
 export function cityTaxPayers(structure: Structure | undefined, b: { adults?: number; childAges?: number[] }): number {
   const adults = b.adults ?? 0;
-  const freeUnder = structure?.cityTaxChildFreeUnder ?? 18; // default: tutti i minorenni esenti
+  const freeUnder = structure?.cityTaxChildFreeUnder ?? DEFAULT_CITY_TAX_FREE_UNDER;
   const payingKids = (b.childAges ?? []).filter((a) => typeof a === "number" && a >= freeUnder).length;
   return adults + payingKids;
 }

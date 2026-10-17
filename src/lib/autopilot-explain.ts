@@ -1,7 +1,7 @@
 // Revenue Autopilot — spiegazioni in linguaggio naturale.
 // Trasforma i segnali REALI già calcolati da computeSuggestions (lib/autopilot.ts)
 // in una frase italiana leggibile, del tipo:
-//   "Ho alzato il prezzo di Doppia Vista Mare per venerdì 3 del 12% perché
+//   "Ho alzato il prezzo di Doppia Vista Mare per venerdì 02.10.2026 del 12% perché
 //    l'occupazione è all'85% e il giorno è un weekend, tipicamente ad alta domanda."
 //
 // Regola: questa funzione NON introduce alcun segnale nuovo. Legge solo i campi che
@@ -10,13 +10,13 @@
 // "Rete città" se attivo). Se un segnale non è disponibile, la relativa frase viene
 // semplicemente omessa: meglio una spiegazione più corta che una inventata.
 import { GUARDRAIL_LABEL, type Suggestion } from "./autopilot";
-import { parseISO } from "./dates";
+import { parseISO, fmtDMY } from "./dates";
 
 const WEEKDAY_LONG = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
 
 function dayLabel(iso: string): string {
   const d = parseISO(iso);
-  return `${WEEKDAY_LONG[d.getDay()]} ${d.getDate()}`;
+  return `${WEEKDAY_LONG[d.getDay()]} ${fmtDMY(iso)}`; // con mese e anno: "lunedì 27.10.2026", non solo "lunedì 27"
 }
 
 // Unisce le frasi con la punteggiatura italiana ("a, b e c").

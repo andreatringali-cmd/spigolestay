@@ -1,12 +1,13 @@
 // Grafico unico per canale/tipologia: UNA barra per riga (lunghezza = ricavi),
 // con entrambi i valori a fianco (prenotazioni + ricavi). Altezza max ~2 righe, scroll verticale.
 import { CHANNELS, type Channel } from "@/lib/types";
-import ChannelLogo from "@/components/ChannelLogo";
+import ChannelLogo, { isBedAndBreakfastIt } from "@/components/ChannelLogo";
 
 // `channel`: se presente, al posto del pallino colorato compare il logo della OTA.
 // `parts`: ricavi e prenotazioni della riga divisi per canale; la barra si divide nei colori delle OTA.
-type Part = { channel: Channel; count: number; revenue: number };
-type Row = { label: string; color: string; count: number; revenue: number; channel?: Channel; parts?: Part[] };
+// `name` (facoltativo): nome del portale per i canali generici ("other"), così si riconosce bb.it e se ne mostra il logo invece di "Altro".
+type Part = { channel: Channel; count: number; revenue: number; name?: string };
+type Row = { label: string; color: string; count: number; revenue: number; channel?: Channel; parts?: Part[]; name?: string };
 
 export default function ChannelBars({ rows, fmtEur }: { rows: Row[]; fmtEur: (n: number) => string }) {
   if (!rows.length) return <div className="py-6 text-center text-sm text-faint">Nessun dato nel periodo</div>;
@@ -18,7 +19,7 @@ export default function ChannelBars({ rows, fmtEur }: { rows: Row[]; fmtEur: (n:
       {rows.map((r, i) => (
         <div key={i}>
           <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-            <span className="flex min-w-0 items-center gap-1.5 font-medium text-txt">{r.channel ? <ChannelLogo channel={r.channel} size={18} /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: r.color }} />}<span className="truncate">{r.label}</span></span>
+            <span className="flex min-w-0 items-center gap-1.5 font-medium text-txt">{r.channel ? <ChannelLogo channel={r.channel} size={18} name={r.name} /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: r.color }} />}<span className="truncate">{r.label}</span></span>
             <span className="shrink-0 font-mono text-dim"><b className="text-txt">{r.count}</b> pren · <b className="text-txt">{fmtEur(r.revenue)}</b></span>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-wash">
@@ -33,7 +34,7 @@ export default function ChannelBars({ rows, fmtEur }: { rows: Row[]; fmtEur: (n:
     </div>
       {present.length > 0 && (
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[10px] text-dim">
-          {present.map((c) => (<span key={c} className="inline-flex items-center gap-1"><ChannelLogo channel={c} size={14} />{CHANNELS[c].label}</span>))}
+          {present.map((c) => { const nm = rows.flatMap((r) => r.parts ?? []).find((p) => p.channel === c && p.name)?.name; const bb = c === "other" && isBedAndBreakfastIt(nm); return (<span key={c} className="inline-flex items-center gap-1"><ChannelLogo channel={c} size={14} name={nm} />{bb ? "bb.it" : CHANNELS[c].label}</span>); })}
         </div>
       )}
     </div>

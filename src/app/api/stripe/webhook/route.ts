@@ -6,8 +6,15 @@ import { createClient } from "@supabase/supabase-js";
 import { handleSubscriptionPaid, type SubscriptionPaidInput } from "@/lib/invoicing/subscription-billing";
 import { planByKey } from "@/lib/stripe-plans";
 import { adminFromEnv, recordChatPayment } from "@/lib/chat-pay-server";
+import { publicBookingBodyFromSession, bookingWriteFailure } from "@/lib/book-session";
+import { findOwnerStructure } from "@/lib/server-booking-guard";
+import { registerQuotePayment } from "@/lib/quote-pay";
+import { recordCheckinPayment } from "@/lib/checkin-pay";
+import { findBookingStoreById } from "@/lib/manage-booking";
+import { reconcileCharge } from "@/lib/stripe-reconcile";
 import { fmtDMY } from "@/lib/dates";
 import { ymdRome } from "@/lib/dates-rome";
+import { eur } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +40,8 @@ export async function POST(req: Request) {
 
   const origin = siteOrigin(req);
   try {
-    if (event.type === "checkout.session.completed") {
+    // Pagamento completato. Con le sole carte arriva "completed"; "async_payment_succeeded" copre i metodi asincroni (bonifico, SEPA) se mai attivati.
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object as Stripe.Checkout.Session;
       const m = (session.metadata ?? {}) as Record<string, string>;
       if (session.payment_status === "paid" && m.kind === "book" && m.slug) {
@@ -51,18 +59,19 @@ export async function POST(req: Request) {
         // Registra la prenotazione (idempotente sul token) — stessa logica del ritorno pagina.
         const pbRes = await internalFetch(`${origin}/api/public-booking`, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            slug: m.slug, rt: m.rt, ci: m.ci, co: m.co,
-            adults: Number(m.ad) || 1, children: Number(m.ch) || 0,
-            total: Number(m.tot) || 0, deposit: Number(m.dep) || 0,
-            note: m.note || "", code: m.code || "", token: m.token || session.id,
-            planName: m.rpn || "", refundable: m.ref === "1", cancelDays: Number(m.cd) || 0,
-            stripePaymentIntent: pi, stripeSessionId: session.id, stripeAccountId: acctId,
-            guest: { firstName: (m.gn || "").split(" ")[0] || "", lastName: (m.gn || "").split(" ").slice(1).join(" "), email: m.ge || "", phone: m.gp || "", country: m.gc || "" },
-          }),
+          // Stesso corpo del ritorno pagina (lib/book-session.ts); versato = quanto Stripe ha incassato.
+          body: JSON.stringify(publicBookingBodyFromSession(session, { slug: m.slug, paymentIntent: pi, accountId: acctId })),
         });
-        // Pagamento incassato ma prenotazione non scritta: si risponde con errore così Stripe riprova (la scrittura è idempotente).
-        if (!pbRes.ok) return NextResponse.json({ ok: false, error: "booking_write_failed" }, { status: 500 });
+        // Pagamento incassato ma prenotazione non scritta. Guasto TRANSITORIO (rete, 5xx, 409 write_conflict): errore, così Stripe riprova (la scrittura è idempotente).
+        // Errore PERMANENTE (4xx: sito/struttura non trovati, richiesta incoerente…): riprovare non cambia nulla, quindi niente 500 per giorni — si avvisano titolare
+        // e amministratori con tutti i dati del pagamento. Nessun rimborso automatico: è irreversibile e i dati si possono sistemare a mano; decide una persona.
+        if (!pbRes.ok) {
+          const pbj = await pbRes.json().catch(() => ({}));
+          const fail = bookingWriteFailure(pbRes.status, pbj);
+          if (!fail.permanent) return NextResponse.json({ ok: false, error: "booking_write_failed" }, { status: 500 });
+          console.error("[stripe webhook] pagamento incassato ma prenotazione NON registrabile (errore permanente):", fail.error, "session", session.id);
+          await alertPaidNotRecorded(origin, session, pi, fail.error);
+        }
       }
       // Link di pagamento in chat (kind "chatpay"): registra l'incasso sulla prenotazione e scrive
       // "Pagamento ricevuto" nel thread. Idempotente (paidSessions + id messaggio pay:<sessione>),
@@ -73,8 +82,27 @@ export async function POST(req: Request) {
         const rec = await recordChatPayment(admin, session);
         if (!rec.ok) return NextResponse.json({ ok: false, error: "chatpay_record_failed", detail: rec.error }, { status: 500 });
       }
-      // I saldi pagati al check-in (kind "quote") vengono registrati dal ritorno pagina
-      // (pay-confirm). Qui li lasciamo passare: la creazione prenotazione non serve.
+      // Pagamenti di un preventivo e saldi dal check-in (kind "quote"): si registrano anche qui, con la STESSA logica idempotente del ritorno pagina
+      // (quote/confirm e checkin/pay-confirm), così l'incasso non si perde se l'ospite chiude il browser prima del ritorno.
+      if (session.payment_status === "paid" && m.kind === "quote") {
+        const admin = adminFromEnv();
+        if (!admin) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 500 });
+        // La sessione con il payment intent espanso: serve a sapere su quale conto è arrivato il pagamento.
+        const full = await stripe.checkout.sessions.retrieve(session.id, { expand: ["payment_intent"] });
+        if (m.bookingId) {
+          const store = await findBookingStoreById(admin, m.bookingId);
+          // Prenotazione non trovata: errore definitivo per questo evento (niente retry infiniti); resta il ritorno pagina.
+          if (store) {
+            const r = await recordCheckinPayment(admin, store, full as never, { origin });
+            if (!r.ok && (r.status >= 500 || r.error === "write_conflict" || r.error === "refund_failed")) return NextResponse.json({ ok: false, error: "checkin_record_failed", detail: r.error }, { status: 500 });
+            if (!r.ok) console.error("[stripe webhook] saldo check-in non registrato:", r.error, "session", session.id);
+          }
+        } else {
+          const r = await registerQuotePayment(admin, full as never, { origin });
+          if (!r.ok && (r.status >= 500 || r.error === "write_conflict")) return NextResponse.json({ ok: false, error: "quote_record_failed", detail: r.error }, { status: 500 });
+          if (!r.ok) console.error("[stripe webhook] preventivo non registrato:", r.error, "session", session.id);
+        }
+      }
 
       // ABBONAMENTO Xenora (piattaforma): il checkout con trial NON incassa subito → nessuna
       // fattura qui. Loggo solo l'attivazione; la fatturazione parte da invoice.paid.
@@ -99,12 +127,13 @@ export async function POST(req: Request) {
       const ch = event.data.object as Stripe.Charge;
       const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : (ch.payment_intent?.id || "");
       const isDispute = event.type === "charge.dispute.created";
-      // Rimborso PARZIALE (es. 20 € su 200 €): la prenotazione non si annulla, si annota soltanto.
-      const partialCents = !isDispute && Number(ch.amount) > 0 && Number(ch.amount_refunded) < Number(ch.amount) ? Math.max(0, Math.round(Number(ch.amount_refunded) || 0)) : 0;
       if (pi) {
-        const res = await reconcileRefund(pi, event.account || "", isDispute, partialCents);
-        // Prenotazione trovata ma scrittura non riuscita (conflitto di versione): 500 così Stripe ritenta l'evento.
-        if (res === "failed") return NextResponse.json({ ok: false, error: "reconcile_write_failed" }, { status: 500 });
+        const admin = adminFromEnv();
+        if (admin) {
+          const res = await reconcileCharge(admin, ch, pi, isDispute, async () => ({ ...((await stripe.paymentIntents.retrieve(pi)).metadata ?? {}) }));
+          // Prenotazione trovata ma scrittura non riuscita (conflitto di versione): 500 così Stripe ritenta l'evento.
+          if (res === "failed") return NextResponse.json({ ok: false, error: "reconcile_write_failed" }, { status: 500 });
+        }
       }
     }
 
@@ -119,7 +148,7 @@ export async function POST(req: Request) {
           const item0 = sub.items?.data?.[0];
           const price = item0?.price;
           const importo = typeof price?.unit_amount === "number"
-            ? `${(price.unit_amount / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })} ${(price.currency || "eur").toUpperCase()}${price.recurring?.interval ? `/${price.recurring.interval}` : ""}`
+            ? `${eur(price.unit_amount / 100, (price.currency || "eur").toLowerCase() === "eur" ? "€" : (price.currency || "eur").toUpperCase())}${price.recurring?.interval ? `/${({ month: "mese", year: "anno", week: "settimana", day: "giorno" } as Record<string, string>)[price.recurring.interval] ?? price.recurring.interval}` : ""}`
             : "";
           const piano = sub.metadata?.plan || price?.nickname || price?.id || "";
           const text = [
@@ -137,7 +166,7 @@ export async function POST(req: Request) {
           const inv = event.data.object as Stripe.Invoice;
           const a = inv as unknown as { customer?: string | { id?: string } | null; customer_email?: string | null; amount_due?: number | null; number?: string | null; hosted_invoice_url?: string | null; currency?: string | null };
           const email = a.customer_email || await customerEmail(stripe, a.customer ?? null);
-          const importo = typeof a.amount_due === "number" ? `${(a.amount_due / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })} ${(a.currency || "eur").toUpperCase()}` : "";
+          const importo = typeof a.amount_due === "number" ? eur(a.amount_due / 100, (a.currency || "eur").toLowerCase() === "eur" ? "€" : (a.currency || "eur").toUpperCase()) : "";
           const text = [
             "Il pagamento di un abbonamento Xenora è FALLITO.",
             email ? `Cliente: ${email}` : "",
@@ -200,6 +229,34 @@ export async function POST(req: Request) {
     console.error("[stripe webhook] errore inatteso, risposta 500 per il retry di Stripe:", event.type, event.id, e);
     return NextResponse.json({ ok: false, error: "handler_error", message: (e as Error)?.message ?? "handler_error" }, { status: 500 });
   }
+}
+
+// Avviso: una prenotazione dal sito e' stata PAGATA ma non si riesce a registrarla (errore permanente). Va al titolare della struttura (se si ricava dallo slug)
+// e agli amministratori. Best-effort: non deve mai far fallire il webhook.
+async function alertPaidNotRecorded(origin: string, session: Stripe.Checkout.Session, pi: string, error: string) {
+  const m = (session.metadata ?? {}) as Record<string, string>;
+  const amount = (Math.round(session.amount_total ?? 0) / 100).toFixed(2).replace(".", ",");
+  const text = [
+    "⚠ Un ospite ha PAGATO online ma la prenotazione NON è stata registrata nel gestionale.",
+    `Importo incassato: € ${amount}`,
+    `Ospite: ${m.gn || "—"}${m.ge ? ` · ${m.ge}` : ""}${m.gp ? ` · ${m.gp}` : ""}`,
+    `Date: ${m.ci || "?"} → ${m.co || "?"} · Sito: ${m.slug || "?"}`,
+    `Motivo: ${error}`,
+    `Sessione Stripe: ${session.id}${pi ? ` · Payment intent: ${pi}` : ""}`,
+    "Registra la prenotazione a mano oppure rimborsa il pagamento dalla dashboard Stripe.",
+  ].join("\n");
+  const subject = "⚠ Pagamento ricevuto ma prenotazione non registrata";
+  try {
+    const admin = adminFromEnv();
+    if (admin && m.slug) {
+      const { data: site } = await admin.from("public_sites").select("user_id, structure_id").eq("slug", m.slug).maybeSingle();
+      const uid = String((site as { user_id?: string } | null)?.user_id || ""), sid = String((site as { structure_id?: string } | null)?.structure_id || "");
+      const st = uid && sid ? await findOwnerStructure(admin, uid, sid) : null;
+      const hostEmail = typeof st?.email === "string" ? st.email : "";
+      if (hostEmail) await internalFetch(`${origin}/api/email`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "quote", to: hostEmail, subject, text, accent: "#b4472e" }) });
+    }
+  } catch { /* avviso al titolare best-effort */ }
+  try { await notifyAdmins(origin, subject, text); } catch { /* idem */ }
 }
 
 // Normalizza una Invoice Stripe di ABBONAMENTO nell'input per la fatturazione.
@@ -277,59 +334,6 @@ async function notifyAdmins(origin: string, subject: string, text: string) {
       });
     } catch { /* invio best-effort: ignora */ }
   }
-}
-
-// Trova la prenotazione col dato payment_intent (in app_state o org_state) e annota rimborso/dispute.
-// Esito: "ok" (annotata), "none" (nessuna prenotazione con quel payment_intent), "failed" (trovata ma scrittura persa sul rev).
-async function reconcileRefund(paymentIntent: string, account: string, isDispute: boolean, partialRefundCents = 0): Promise<"ok" | "none" | "failed"> {
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!sbUrl || !service) return "none";
-  const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
-  const DATA_KEY = "spigolestay:data:v1";
-  type Json = Record<string, unknown>;
-  const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
-  const parse = (data: unknown): Json => { const b = ((data ?? {}) as Record<string, string>) || {}; try { return JSON.parse(b[DATA_KEY] || "{}") as Json; } catch { return {}; } };
-
-  const patchOnce = async (table: "app_state" | "org_state", col: "user_id" | "org_id", val: string): Promise<"ok" | "none" | "conflict"> => {
-    const { data: row } = await admin.from(table).select("data, rev").eq(col, val).maybeSingle();
-    if (!row) return "none";
-    const blob = (((row as { data?: unknown }).data ?? {}) as Record<string, string>) || {};
-    const d = parse((row as { data?: unknown }).data);
-    const bookings = arr(d.bookings);
-    const idx = bookings.findIndex((b) => (b as { stripePaymentIntent?: string }).stripePaymentIntent === paymentIntent);
-    if (idx < 0) return "none";
-    const bk = bookings[idx] as Json;
-    if (partialRefundCents > 0) {
-      // Rimborso parziale: solo una nota (idempotente sul valore cumulato), nessun cambio di stato.
-      const mark = `Rimborso parziale Stripe € ${(partialRefundCents / 100).toFixed(2).replace(".", ",")}`;
-      if (String(bk.note || "").includes(mark)) return "ok";
-      bookings[idx] = { ...bk, updatedAt: Date.now(), note: [String(bk.note || ""), mark].filter(Boolean).join(" · ") };
-    } else if (isDispute) bookings[idx] = { ...bk, dispute: true, updatedAt: Date.now(), note: [String(bk.note || ""), "⚠ Dispute Stripe aperta"].filter(Boolean).join(" · ") };
-    else bookings[idx] = { ...bk, status: "cancelled", cancelledBy: (bk.cancelledBy as string) || "host", cancelledAt: (bk.cancelledAt as string) || new Date().toISOString(), updatedAt: Date.now() };
-    d.bookings = bookings;
-    const nb = { ...blob, [DATA_KEY]: JSON.stringify(d) };
-    const rev = (row as { rev?: number }).rev;
-    let w = admin.from(table).update({ data: nb, updated_at: new Date().toISOString() }).eq(col, val);
-    if (typeof rev === "number") w = w.eq("rev", rev);
-    const { data: u } = await w.select("rev");
-    return u && u.length > 0 ? "ok" : "conflict";
-  };
-  // Un retry su conflitto di rev (il proprietario ha salvato nel frattempo): riletto e riapplicato.
-  const patchInRow = async (table: "app_state" | "org_state", col: "user_id" | "org_id", val: string) => {
-    const r1 = await patchOnce(table, col, val);
-    return r1 === "conflict" ? await patchOnce(table, col, val) : r1;
-  };
-  let conflict = false;
-
-  // Cerca prima nelle org (le strutture in società tengono qui le prenotazioni), poi nei personali.
-  const { data: orgs } = await admin.from("org_state").select("org_id").limit(1000);
-  for (const o of arr(orgs)) { const r = await patchInRow("org_state", "org_id", String((o as { org_id?: string }).org_id)); if (r === "ok") return "ok"; if (r === "conflict") conflict = true; }
-  // Restringi i personali a quelli collegati a questo conto Stripe se possibile.
-  const { data: users } = await admin.from("app_state").select("user_id").limit(5000);
-  for (const u of arr(users)) { const r = await patchInRow("app_state", "user_id", String((u as { user_id?: string }).user_id)); if (r === "ok") return "ok"; if (r === "conflict") conflict = true; }
-  void account;
-  return conflict ? "failed" : "none";
 }
 
 // Mappa configurabile price.id → chiave piano, letta da STRIPE_PRICE_MAP (JSON), es.

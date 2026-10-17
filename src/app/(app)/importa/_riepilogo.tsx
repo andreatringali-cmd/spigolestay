@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Booking, Guest } from "@/lib/types";
 import { verifyOutcomes, skipReasons, outcomesToCsv, type ImportReport } from "@/lib/import/reconcile";
 import { eur } from "@/lib/format";
+import { ymdRome } from "@/lib/dates-rome";
 
 const fmtD = (iso: string) => (iso ? fmtDate(iso) : "—");
 
@@ -37,7 +38,7 @@ export default function RiepilogoImport({ report, bookings, guests, structureNam
     const blob = new Blob([outcomesToCsv(report.outcomes, miss, els)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `riepilogo-importazione-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `riepilogo-importazione-${ymdRome(new Date())}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };

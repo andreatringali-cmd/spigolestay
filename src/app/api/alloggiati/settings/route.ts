@@ -19,6 +19,8 @@ export async function POST(req: Request) {
 
     // Mostra le credenziali al proprietario autenticato (reveal), decifrate lato server.
     if (b?.action === "reveal") {
+      // Solo il titolare dell'account: un collaboratore (userId diverso dal tenant) non può leggere password e codice del portale Questura.
+      if (auth.userId !== auth.tenantId) return NextResponse.json({ error: "forbidden", message: "Solo il titolare dell'account può visualizzare le credenziali." }, { status: 403 });
       const { data } = await auth.admin.from("alloggiati_settings").select("username, password_enc, ws_code_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();
       return NextResponse.json({ ok: true, username: data?.username ?? "", password: decryptCred(data?.password_enc), wsCode: decryptCred(data?.ws_code_enc) });
     }

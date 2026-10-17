@@ -1,6 +1,10 @@
 "use client";
 
 import { fmtDM } from "@/lib/dates";
+import { todayRome } from "@/lib/dates-rome";
+import { waDigits } from "@/lib/contacts-check";
+import { guestLangOf } from "@/lib/guest-lang";
+import { buildGroupGuestLink } from "@/lib/guestlink";
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "@/lib/supabase";
@@ -682,7 +686,7 @@ export default function GuidaOspitiPage() {
   const unitCodesK = (uid?: string, hasParking = true) => codesForLink(uid, hasParking).slice(0, 3).map((c) => c.value.trim()).join("-").replace(/-+$/g, "");
 
   // Collegamento con le prenotazioni: le prossime/attuali di questa struttura.
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = todayRome(); // giorno di calendario italiano (new Date().toISOString() è in UTC e sbaglia tra mezzanotte e le 2)
   const upcoming = useMemo(() =>
     bookings.filter((b) => b.structureId === sid && b.checkOut >= todayISO && b.status !== "cancelled")
       .sort((a, b) => a.checkIn.localeCompare(b.checkIn)),
@@ -704,13 +708,16 @@ export default function GuidaOspitiPage() {
   // ---- Arrivi & invio automatico (punti 2+3) ----
   const base = typeof window !== "undefined" ? window.location.origin : "";
   // Costruisce il link ospite per una camera specifica, coi codici PER CAMERA salvati.
-  const linkFor = (opts: { room?: string; unitId?: string; guestName?: string }) => {
+  // Il parcheggio è quello della PRENOTAZIONE (opts.parking), non l'interruttore globale della pagina; lang = lingua dell'ospite (la guida si apre già in quella lingua).
+  const linkFor = (opts: { room?: string; unitId?: string; guestName?: string; parking?: boolean; lang?: string }) => {
+    const hasParking = opts.parking ?? parking;
     const p = new URLSearchParams();
     p.set("p", sid);
     if (opts.room?.trim()) p.set("c", opts.room.trim());
-    const k = unitCodesK(opts.unitId);
+    const k = unitCodesK(opts.unitId, hasParking);
     if (k.replace(/-/g, "")) p.set("k", k);
-    p.set("pk", parking ? "1" : "0");
+    p.set("pk", hasParking ? "1" : "0");
+    if (opts.lang) p.set("lang", opts.lang);
     if (docs.trim()) p.set("d", docs.trim());
     if (taxFixed) p.set("tax", "fixed");
     if (opts.guestName?.trim()) p.set("g", opts.guestName.trim());
@@ -727,8 +734,10 @@ export default function GuidaOspitiPage() {
   };
   const bkRoom = (b: typeof upcoming[number]) => { const u = getUnit(b.unitId); const rt = roomTypes.find((r) => r.id === b.roomTypeId); return u?.code || u?.name || rt?.name || ""; };
   const bkGuestName = (b: typeof upcoming[number]) => { const g = getGuest(b.guestId); return g ? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim() : ""; };
-  const todayArrivals = useMemo(() => bookings.filter((b) => b.structureId === sid && b.checkIn === todayISO && b.status !== "cancelled").sort((a, b) => bkRoom(a).localeCompare(bkRoom(b))), [bookings, sid, todayISO]); // eslint-disable-line react-hooks/exhaustive-deps
-  const nextArrivals = useMemo(() => upcoming.filter((b) => b.checkIn > todayISO), [upcoming, todayISO]);
+  // Un gruppo di camere (stesso groupId) compare UNA volta, con il link di gruppo.
+  const firstOfGroup = (list: typeof upcoming) => { const seen = new Set<string>(); return list.filter((b) => { if (!b.groupId) return true; if (seen.has(b.groupId)) return false; seen.add(b.groupId); return true; }); };
+  const todayArrivals = useMemo(() => firstOfGroup(bookings.filter((b) => b.structureId === sid && b.checkIn === todayISO && b.status !== "cancelled").sort((a, b) => bkRoom(a).localeCompare(bkRoom(b)))), [bookings, sid, todayISO]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nextArrivals = useMemo(() => firstOfGroup(upcoming.filter((b) => b.checkIn > todayISO)), [upcoming, todayISO]);
 
   // Messaggio WhatsApp precompilato per l'ospite (generatore manuale).
   const waMsg = useMemo(() => msgFor(guestName, guestLink), [guestName, guestLink, msgTemplate]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -759,12 +768,16 @@ export default function GuidaOspitiPage() {
   // Riga "arrivo": camera automatica, link e messaggio personali per quella prenotazione.
   const arrivalRow = (b: typeof upcoming[number]) => {
     const room = bkRoom(b); const name = bkGuestName(b);
-    const link = linkFor({ room, unitId: b.unitId || undefined, guestName: name });
-    const msg = msgFor(name, link);
     const g = getGuest(b.guestId);
-    const wa = (g?.phone || "").replace(/[^\d]/g, "");
+    const lang = guestLangOf(g);
+    const group = b.groupId ? bookings.filter((x) => x.groupId === b.groupId && x.status !== "cancelled") : [b];
+    const link = group.length > 1
+      ? buildGroupGuestLink({ structureId: sid, guestName: name, lang, rooms: group.map((x) => { const u = getUnit(x.unitId); return { unitId: x.unitId, unitCode: u?.code || u?.name || "", parking: !!x.parking }; }) })
+      : linkFor({ room, unitId: b.unitId || undefined, guestName: name, parking: !!b.parking, lang });
+    const msg = msgFor(name, link);
+    const wa = waDigits(g?.phone, g?.country); // con il prefisso del Paese anche se il numero è scritto senza
     const dd = (s: string) => fmtDM(s);
-    const hasCodes = !!unitCodesK(b.unitId || undefined).replace(/-/g, "");
+    const hasCodes = group.some((x) => !!unitCodesK(x.unitId || undefined, !!x.parking).replace(/-/g, ""));
     return (
       <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper p-3">
         <div className="flex min-w-0 items-center gap-3">

@@ -91,8 +91,8 @@ export function buildAiSite(slug: string, rowData: Record<string, string>, row: 
   if (st.cityTax) {
     const cap = num(st.cityTaxMaxNights);
     cityTax = st.cityTaxMode === "percent"
-      ? `Tassa di soggiorno non inclusa: ${num(st.cityTaxPercent) ?? 0}% del pernottamento a persona a notte${num(st.cityTaxCap) ? `, massimo ${num(st.cityTaxCap)} € a notte` : ""}${cap ? `, per un massimo di ${cap} notti` : ""}.`
-      : `Tassa di soggiorno non inclusa: ${num(st.cityTaxAmount) ?? 0} € a persona a notte${cap ? `, per un massimo di ${cap} notti` : ""}.`;
+      ? `Tassa di soggiorno non inclusa: ${num(st.cityTaxPercent) ?? 0}% del pernottamento a persona a notte${num(st.cityTaxCap) ? `, massimo ${num(st.cityTaxCap)} € a notte` : ""}${cap ? `, per un massimo di ${cap} ${cap === 1 ? "notte" : "notti"}` : ""}.`
+      : `Tassa di soggiorno non inclusa: ${num(st.cityTaxAmount) ?? 0} € a persona a notte${cap ? `, per un massimo di ${cap} ${cap === 1 ? "notte" : "notti"}` : ""}.`;
   }
   const lang = str(st.language, 10);
   const name = str(cfg.nome, 120) || str(st.name, 120) || row.structure_name || slug;
@@ -137,7 +137,7 @@ export function buildQuote(d: AiQuoteData, ci: string, co: string, adults: numbe
     const rt = d.roomTypes.find((x) => x.id === room.id);
     if (!rt) continue;
     if (room.maxGuests && guests > room.maxGuests) { unavailable.push({ roomTypeId: rt.id, name: rt.name, reason: `Ospiti massimi: ${room.maxGuests}` }); continue; }
-    if (room.minStay && nights.length < room.minStay) { unavailable.push({ roomTypeId: rt.id, name: rt.name, reason: `Soggiorno minimo: ${room.minStay} notti` }); continue; }
+    if (room.minStay && nights.length < room.minStay) { unavailable.push({ roomTypeId: rt.id, name: rt.name, reason: `Soggiorno minimo: ${room.minStay} ${room.minStay === 1 ? "notte" : "notti"}` }); continue; }
     const ofType = d.units.filter((u) => u.roomTypeId === rt.id && !u.outOfService);
     const busyFor = (uid: unknown) => d.bookings.some((b) => b.unitId === uid && b.status !== "cancelled" && String(b.checkIn) < co && String(b.checkOut) > ci);
     if (ofType.length > 0 && !ofType.some((u) => !busyFor(u.id))) { unavailable.push({ roomTypeId: rt.id, name: rt.name, reason: "Nessuna camera libera nelle date richieste" }); continue; }

@@ -7,7 +7,7 @@ import {
 
 const T = "2026-10-06";
 const NOW = new Date(`${T}T10:00:00`).getTime(); // ora locale: la scadenza Questura è calcolata in ora locale
-const FULL: PGuest = { firstName: "Mario", lastName: "Rossi", sex: "M", birthDate: "1980-01-01", birthPlace: "Roma", citizenship: "IT", docType: "CI", docNumber: "AB1" };
+const FULL: PGuest = { firstName: "Mario", lastName: "Rossi", sex: "M", birthDate: "1980-01-01", birthPlace: "Roma", citizenship: "IT", docType: "CI", docNumber: "AB1", docPlace: "Siracusa" };
 
 let n = 0;
 const bk = (o: Partial<ABooking> & { checkIn: string; checkOut: string }): ABooking => ({

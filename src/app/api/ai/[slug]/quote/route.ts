@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadAiSite, buildQuote } from "@/lib/ai-site";
 import { rateLimited } from "@/lib/server-auth";
 import { clientIp } from "@/lib/server-booking-guard";
+import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,8 +26,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   const children = Math.min(20, Math.max(0, parseInt(q.get("children") || "0", 10) || 0));
   if (!isISO(ci) || !isISO(co) || co <= ci) return NextResponse.json({ error: "bad_request", message: "Servono checkin e checkout nel formato AAAA-MM-GG, con checkout dopo checkin." }, { status: 400, headers: CORS });
   const nights = Math.round((Date.parse(co) - Date.parse(ci)) / 86400000);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const limit = new Date(Date.now() + 2 * 365 * 86400000).toISOString().slice(0, 10);
+  const yesterday = addDaysYmd(ymdRome(new Date()), -1); // giorno di calendario italiano
+  const limit = addDaysYmd(ymdRome(new Date()), 2 * 365);
   if (nights > 60 || ci < yesterday || ci > limit) return NextResponse.json({ error: "bad_dates", message: "Date non valide: massimo 60 notti, non nel passato e non oltre due anni." }, { status: 400, headers: CORS });
   const d = await loadAiSite(slug, req.nextUrl.origin);
   if (!d) return NextResponse.json({ error: "site_not_found" }, { status: 404, headers: CORS });

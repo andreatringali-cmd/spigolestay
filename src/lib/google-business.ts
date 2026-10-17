@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { encryptCred, decryptCred } from "@/lib/crypto-creds";
 import { signState, verifyState } from "@/lib/invoicing/fic-oauth";
+import { ymdRome } from "@/lib/dates-rome";
 
 export { signState, verifyState };
 
@@ -199,7 +200,7 @@ export function normalizeGbpReview(r: RawReview): GbpReviewRow | null {
     id: `gbp-${reviewId}`,
     reviewName,
     guest: r.reviewer?.isAnonymous ? "Utente Google" : (r.reviewer?.displayName || "").trim() || "Utente Google",
-    date: /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    date: /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : ymdRome(new Date()),
     rating,
     text: (r.comment || "").trim(),
     source: "google",

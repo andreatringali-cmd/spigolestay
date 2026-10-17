@@ -105,7 +105,8 @@ export default function IstatPage() {
       const nn = nightsBetween(r.arrival, r.departure);
       const cam = b ? unitName(b.unitId) || roomName(b.roomTypeId) : "";
       const g = b ? guestById.get(b.guestId) : undefined; const pg = b?.primaryGuest ?? {};
-      out.push([fmtDate(r.arrival), "Principale", String(nn), cam, ageOn(g?.birthDate ?? pg.birthDate, r.arrival), (g?.sex ?? pg.sex) ?? "", g?.citizenship ?? pg.citizenship ?? r.provenance, g?.birthPlace ?? pg.birthPlace ?? "", g?.province ?? g?.country ?? ""]);
+      // Dati di chi ha fatto il check-in: prima quelli della prenotazione (primaryGuest), poi l'anagrafica ospite (condivisa fra le camere di un gruppo).
+      out.push([fmtDate(r.arrival), "Principale", String(nn), cam, ageOn(pg.birthDate || g?.birthDate, r.arrival), pg.sex || g?.sex || "", pg.citizenship || g?.citizenship || r.provenance, pg.birthPlace || g?.birthPlace || "", g?.province ?? g?.country ?? ""]);
       for (const c of b?.extraGuests ?? []) out.push([fmtDate(r.arrival), "Ospite", String(nn), cam, ageOn(c.birthDate, r.arrival), c.sex ?? "", c.citizenship ?? "", c.birthPlace ?? "", ""]);
     }
     const lines = [head.join(";"), ...out.map((row) => row.map(esc).join(";"))];

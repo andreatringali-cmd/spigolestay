@@ -20,6 +20,9 @@ export function downscaleImage(file: File, maxDim = 500, quality = 0.72): Promis
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) return reject(new Error("Canvas non disponibile"));
+        // Sfondo bianco prima di disegnare: il JPEG non ha trasparenza e un PNG trasparente (logo) diventerebbe NERO.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL("image/jpeg", quality));
       };

@@ -126,8 +126,8 @@ export function parseDetailedScores(data: unknown): DetailedScores {
 
 // "BookingCom" | "AirBNB" | "Expedia" → canale (stessa logica di channelFromOta, ma senza dipendenze).
 export function channelOfOta(ota: unknown): ReviewChannel | null {
-  const s = String(ota ?? "").toLowerCase();
-  if (s.includes("book")) return "booking";
+  const s = String(ota ?? "").toLowerCase().replace(/[\s._-]+/g, "");
+  if (s === "booking" || s.startsWith("bookingcom")) return "booking"; // non ogni nome che contiene "book" (123booking, Simplebooking, ...)
   if (s.includes("airbnb")) return "airbnb";
   if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
   return null;

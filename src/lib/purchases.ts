@@ -91,4 +91,4 @@ export function findDuplicate(docs: PDoc[], c: { id?: string; supplier_name: str
 }
 
 // ---- CSV -----------------------------------------------------------------------------------
-export const csvCell = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
+// La cella CSV (con protezione da formule) è unica per tutta l'app: vedi csvCell in lib/invoicing/csv.ts.

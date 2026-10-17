@@ -10,6 +10,7 @@ import { nights, parseISO, toISO, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionIsEstimate, COMMISSION_ESTIMATE_HINT, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
+import { otaGroupName, MIXED_OTA_LABEL } from "@/lib/channel-name";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
@@ -281,7 +282,9 @@ export default function PrenotazioniPage() {
   const byStructure = structures.map((s, i) => ({ label: s.name, value: counted.filter((b) => b.structureId === s.id).length, color: PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
   const revByChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: counted.filter((b) => b.channel === c).reduce((a, b) => a + grand(b), 0), color: chColor(c) })).filter((x) => x.value > 0);
   // Dati unici per canale: prenotazioni + ricavi insieme (un solo grafico)
-  const channelRows = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, color: chColor(c), channel: c, count: counted.filter((b) => b.channel === c).length, revenue: Math.round(counted.filter((b) => b.channel === c).reduce((a, b) => a + grand(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
+  // "Altro": logo/nome del portale solo se tutte le prenotazioni del gruppo vengono dallo stesso; se sono portali diversi, etichetta generica "Altre OTA".
+  const otaG = otaGroupName(counted.filter((b) => b.channel === "other").map((b) => b.otaName));
+  const channelRows = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: c === "other" && otaG.mixed ? MIXED_OTA_LABEL : CHANNELS[c].label, color: chColor(c), channel: c, name: c === "other" ? otaG.name : undefined, count: counted.filter((b) => b.channel === c).length, revenue: Math.round(counted.filter((b) => b.channel === c).reduce((a, b) => a + grand(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
   const revByStructure = structures.map((s) => ({ label: s.name, value: counted.filter((b) => b.structureId === s.id).reduce((a, b) => a + grand(b), 0), color: "var(--ok)", fmt: eur })).filter((x) => x.value > 0);
   // Dati unici per struttura: prenotazioni + ricavi insieme (un solo grafico)
   const structureRows = structures.map((s, i) => ({ label: s.name, color: PALETTE[i % PALETTE.length], count: counted.filter((b) => b.structureId === s.id).length, revenue: Math.round(counted.filter((b) => b.structureId === s.id).reduce((a, b) => a + grand(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
@@ -312,20 +315,20 @@ export default function PrenotazioniPage() {
   counted.forEach((b) => { const c = guestMap.get(b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
   const byCountry = Object.entries(countryAgg).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
     // Divisione per canale (colori delle OTA): per struttura, per tipologia e per mese.
-    type Parts = Map<string, Map<Channel, { count: number; revenue: number }>>;
-    const addPart = (m: Parts, key: string, ch: Channel, rev: number) => { let c = m.get(key); if (!c) { c = new Map(); m.set(key, c); } const x = c.get(ch) ?? { count: 0, revenue: 0 }; x.count++; x.revenue += rev; c.set(ch, x); };
+    type Parts = Map<string, Map<Channel, { count: number; revenue: number; name?: string }>>;
+    const addPart = (m: Parts, key: string, ch: Channel, rev: number, otaName?: string) => { let c = m.get(key); if (!c) { c = new Map(); m.set(key, c); } const x = c.get(ch) ?? { count: 0, revenue: 0 }; x.count++; x.revenue += rev; if (ch === "other" && otaName && !x.name) x.name = otaName; c.set(ch, x); };
     const stParts: Parts = new Map(), rtParts: Parts = new Map(), moParts: Parts = new Map();
     const stName = new Map(structures.map((s) => [s.id, s.name]));
     counted.forEach((b) => {
       const rev = grand(b);
-      const sn = stName.get(b.structureId); if (sn) addPart(stParts, sn, b.channel, rev);
-      const u = b.unitId ? unitMap.get(b.unitId) : undefined; const tn = u ? rtMap.get(u.roomTypeId) : null; if (tn) addPart(rtParts, tn, b.channel, rev);
-      addPart(moParts, monthKeyOf(b), b.channel, rev);
+      const sn = stName.get(b.structureId); if (sn) addPart(stParts, sn, b.channel, rev, b.otaName);
+      const u = b.unitId ? unitMap.get(b.unitId) : undefined; const tn = u ? rtMap.get(u.roomTypeId) : null; if (tn) addPart(rtParts, tn, b.channel, rev, b.otaName);
+      addPart(moParts, monthKeyOf(b), b.channel, rev, b.otaName);
     });
-    const partsOf = (m: Parts, key: string) => Array.from(m.get(key) ?? []).map(([channel, v]) => ({ channel, count: v.count, revenue: Math.round(v.revenue) }));
+    const partsOf = (m: Parts, key: string) => Array.from(m.get(key) ?? []).map(([channel, v]) => ({ channel, count: v.count, revenue: Math.round(v.revenue), name: v.name }));
     const structureRowsCh = structureRows.map((r) => ({ ...r, parts: partsOf(stParts, r.label) }));
     const roomTypeRowsCh = roomTypeRows.map((r) => ({ ...r, parts: partsOf(rtParts, r.label) }));
-    const monthStack = monthKeys.map((k) => ({ label: monthLabelOf(k), segs: partsOf(moParts, k).map((p) => ({ channel: p.channel, value: p.count })) }));
+    const monthStack = monthKeys.map((k) => ({ label: monthLabelOf(k), segs: partsOf(moParts, k).map((p) => ({ channel: p.channel, value: p.count, name: p.name })) }));
     return { byChannel, channelRows, structureRows: structureRowsCh, stayDist, byMonth, revByMonth, roomTypeRows: roomTypeRowsCh, byCountry, monthStack };
   }, [counted, guests, units, roomTypes, structures, from]);
   /* eslint-enable react-hooks/exhaustive-deps */

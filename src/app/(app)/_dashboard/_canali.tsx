@@ -7,7 +7,8 @@ import type { Channel } from "@/lib/types";
 import { num } from "@/lib/format";
 import { CountUp, MoreLink, SERIES, Tile, TileHead, useEnter } from "./_kit";
 
-export interface ChannelRow { channel: Channel; label: string; color: string; revenue: number; count: number; share: number }
+// `name` (facoltativo): nome del portale quando il canale è generico ("other"): serve a riconoscere bb.it e mostrarne il logo invece di "Altro".
+export interface ChannelRow { channel: Channel; label: string; color: string; revenue: number; count: number; share: number; name?: string }
 
 export default function Canali({ rows, total, monthName, delay = 0 }: { rows: ChannelRow[]; total: number; monthName: string; delay?: number }) {
   const { on, reduced } = useEnter();
@@ -51,7 +52,7 @@ export default function Canali({ rows, total, monthName, delay = 0 }: { rows: Ch
               title={`${r.label}: € ${num(r.revenue)} · ${r.count} ${r.count === 1 ? "prenotazione" : "prenotazioni"}`}
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: r.color || SERIES[i % SERIES.length] }} />
-              <ChannelLogo channel={r.channel} size={18} title={r.label} />
+              <ChannelLogo channel={r.channel} size={18} title={r.label} name={r.name} />
               <span className="min-w-0 flex-1 truncate text-xs font-semibold text-txt">{r.label}</span>
               <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-txt">{r.share}%</span>
             </li>

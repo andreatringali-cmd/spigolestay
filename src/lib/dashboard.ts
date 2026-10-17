@@ -6,6 +6,8 @@
 export interface DBooking {
   id: string; guestId: string; structureId: string; unitId: string | null; channel: string; status: string;
   checkIn: string; checkOut: string; adults: number; children: number;
+  /** nome del portale per i canali generici ("other"): serve a riconoscere bb.it & co. nei grafici */
+  otaName?: string;
 }
 export interface DUnit { id: string; structureId: string; outOfService?: boolean }
 
@@ -96,7 +98,7 @@ export function occupancyStrip<B extends DBooking>(live: B[], units: DUnit[], st
 }
 
 // ---------- Ricavi del mese ----------
-export interface MonthStats { daily: number[]; total: number; earned: number; ahead: number; byChannel: { channel: string; revenue: number; count: number }[] }
+export interface MonthStats { daily: number[]; total: number; earned: number; ahead: number; byChannel: { channel: string; revenue: number; count: number; name?: string; mixed?: boolean }[] }
 /**
  * Ricavi per competenza (per notte) nell'intervallo [from, toExcl). `nightRev(b, iso)` dà il ricavo di quella notte.
  * earned = notti già vissute (prima di oggi), ahead = notti ancora da vivere ma già prenotate.
@@ -104,7 +106,8 @@ export interface MonthStats { daily: number[]; total: number; earned: number; ah
 export function monthStats<B extends DBooking>(live: B[], from: string, toExcl: string, today: string, nightRev: (b: B, iso: string) => number): MonthStats {
   const base = dayNum(from), n = dayNum(toExcl) - base;
   const daily = new Array<number>(Math.max(0, n)).fill(0);
-  const ch = new Map<string, { revenue: number; count: number }>();
+  const ch = new Map<string, { revenue: number; count: number; name?: string; mixed?: boolean }>();
+  const otaNames: (string | undefined)[] = []; // otaName di OGNI prenotazione "other": il logo vale solo se sono tutti lo stesso portale
   let total = 0, earned = 0;
   const todayIdx = dayNum(today) - base;
   for (const b of live) {
@@ -114,7 +117,15 @@ export function monthStats<B extends DBooking>(live: B[], from: string, toExcl: 
     for (let d = s; d < e; d++) { const v = nightRev(b, isoOfDayNum(d)) || 0; daily[d - base] += v; r += v; if (d - base < todayIdx) earned += v; }
     total += r;
     const c = ch.get(b.channel) ?? { revenue: 0, count: 0 };
-    c.revenue += r; c.count++; ch.set(b.channel, c);
+    c.revenue += r; c.count++; if (b.channel === "other") otaNames.push(b.otaName); ch.set(b.channel, c);
+  }
+  const oth = ch.get("other");
+  if (oth) {
+    // Il nome del portale (logo) vale solo se TUTTE le prenotazioni "other" lo condividono (stessa regola di lib/channel-name.ts otaGroupName;
+    // qui inline perché questo modulo resta senza dipendenze). Portali diversi (o alcuni senza nome) = "misto": nessun logo, etichetta "Altre OTA".
+    const keys = new Set(otaNames.map((x) => (x ?? "").trim().toLowerCase()));
+    if (keys.size > 1) { oth.name = undefined; oth.mixed = true; }
+    else oth.name = (otaNames[0] ?? "").trim() || undefined;
   }
   const byChannel = [...ch.entries()].map(([channel, v]) => ({ channel, ...v })).sort((a, b) => b.revenue - a.revenue);
   return { daily, total, earned, ahead: total - earned, byChannel };

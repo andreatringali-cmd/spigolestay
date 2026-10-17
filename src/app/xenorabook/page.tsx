@@ -8,6 +8,7 @@
 // Nessun dataset di esempio: se oggi sono pubblicate 1-2 strutture, il portale mostra
 // esattamente quelle — niente riempitivo finto per sembrare più popolato.
 import { useMemo, useState, useEffect, useRef } from "react";
+import { ymdRome } from "@/lib/dates-rome";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
@@ -49,7 +50,7 @@ export default function XenoraBookPublicPage() {
   const [minBeds, setMinBeds] = useState(0);
   const [types, setTypes] = useState<string[]>([]);
   const [moreOpen, setMoreOpen] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdRome(new Date());
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const guestsRef = useRef<HTMLDivElement>(null);

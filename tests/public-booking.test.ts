@@ -117,9 +117,10 @@ test("prenotazione dal sito: riga confermata, diretta, prima camera libera, ospi
   assert.equal(b.extId, "site:casa-ortigia:tok-1");
   assert.equal(b.note, "Arrivo tardi");
   assert.equal(b.paid, 0, "l'anonimo non puo' dichiarare un acconto");
-  assert.equal(b.refundable, undefined);
+  // La politica NON si prende dal browser: "Flessibile" e' un piano predefinito (rimborsabile, 3 giorni) e vale quello del piano, non `cancelDays: 7` dichiarato dal client.
+  assert.equal(b.refundable, true); assert.equal(b.cancelDays, 3);
   assert.equal(b.stripePaymentIntent, undefined); assert.equal(b.stripeSessionId, undefined); assert.equal(b.stripeAccountId, undefined);
-  assert.equal(b.ratePlanName, "Flessibile"); assert.equal(b.cancelDays, 7);
+  assert.equal(b.ratePlanName, "Flessibile");
   const g = sc.state().guests.find((x: any) => x.id === b.guestId);
   assert.equal(g.fullName, "Giulia Rossi"); assert.equal(g.email, "giulia.rossi@example.com");
 });
@@ -139,7 +140,8 @@ test("idempotenza: lo stesso token due volte = una sola prenotazione ('already')
   assert.equal(r2.status, 200); assert.equal(r2.json.already, true);
   assert.equal(sc.state().bookings.length, 1);
   assert.equal(sc.state().guests.length, 1);
-  assert.equal(calls("internalFetch").length, 1, "una sola email di conferma");
+  assert.equal(calls("internalFetch").filter((c) => c.body.kind === "voucher").length, 1, "una sola email di conferma all'ospite");
+  assert.equal(calls("internalFetch").filter((c) => c.body.kind === "notify").length, 1, "un solo avviso al titolare");
 });
 
 test("ospite gia' presente (stessa email, maiuscole diverse) viene riusato", async () => {
@@ -396,14 +398,14 @@ test("errore di scrittura nel database = 500 write_error", async () => {
 test("email di conferma all'ospite (voucher) con i dati della struttura; disponibilita' inviata ai portali per struttura e tipologia prenotate", async () => {
   scenario();
   await post(body({ planName: "Flessibile", refundable: true, cancelDays: 3 }));
-  assert.equal(calls("internalFetch").length, 1);
+  assert.equal(calls("internalFetch").length, 2, "voucher all'ospite + avviso al titolare");
   const m = calls("internalFetch")[0];
   assert.equal(m.url, "https://test.xenora.local/api/email");
   assert.equal(m.body.kind, "voucher");
   assert.equal(m.body.booking.guestEmail, "giulia.rossi@example.com");
   assert.equal(m.body.booking.structureName, "Casa Ortigia");
   assert.equal(m.body.booking.nights, 3);
-  assert.equal(m.body.booking.cancelPolicy, "Tariffa non rimborsabile."); // l'anonimo non puo' dichiarare "rimborsabile"
+  assert.equal(m.body.booking.cancelPolicy, "Cancellazione gratuita fino a 3 giorni prima dell'arrivo."); // politica del piano "Flessibile"
   assert.match(m.body.manageUrl, /\/gestisci\?site=casa-ortigia&b=/);
   assert.deepEqual(calls("poolPush")[0].touched, [{ structureId: "st-1", roomTypeId: "rt-dbl" }]);
 });
@@ -411,7 +413,7 @@ test("email di conferma all'ospite (voucher) con i dati della struttura; disponi
 test("senza email dell'ospite nessuna email, ma la disponibilita' parte comunque", async () => {
   scenario();
   await post(body({ guest: { firstName: "Anonimo" } }));
-  assert.equal(calls("internalFetch").length, 0);
+  assert.equal(calls("internalFetch").filter((c) => c.body.kind === "voucher").length, 0);
   assert.equal(calls("poolPush").length, 1);
 });
 

@@ -10,6 +10,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
+import { balanceDue } from "@/lib/incassi";
 import { nights, fmtDate, fmtDateTime } from "@/lib/dates";
 import { cityTaxOfBooking } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
@@ -21,6 +22,7 @@ import { todayRome } from "@/lib/dates-rome";
 import NumInput from "@/components/NumInput";
 import { parseDecimalIT } from "@/lib/num-it";
 import { cashScopeOf } from "@/lib/cassa";
+import { friendlyError } from "@/lib/friendly-error";
 
 interface Doc { id: string; tenant_id: string; structure_id: string | null; booking_id: string | null; booking_code: string | null;
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
@@ -144,7 +146,7 @@ export default function DocumentoPage() {
     if (!tenantId) { setMsg("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
     const fullName = `${cp.name} ${cp.lastName}`.trim();
     const { error } = await supabase.from("counterparts").insert({ tenant_id: tenantId, kind: cp.kind, name: fullName, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || null, pec: f.pec || null });
-    setMsg(error ? "Errore anagrafica: " + error.message : "Intestatario salvato in anagrafica ✓");
+    setMsg(error ? "Errore anagrafica: " + friendlyError(error) : "Intestatario salvato in anagrafica ✓");
     if (!error) loadCounterparts();
   };
   // Se in alto è selezionata UNA struttura, il documento in bozza la eredita (menu nascosto),
@@ -252,9 +254,9 @@ export default function DocumentoPage() {
     // Si controlla ogni passaggio: se l'inserimento fallisce si ripristinano le righe di prima,
     // così il documento non resta mai senza righe a metà salvataggio.
     const { data: oldLines, error: selErr } = await supabase.from("document_lines").select("*").eq("document_id", id);
-    if (selErr) { setMsg("Errore salvataggio righe: " + selErr.message + " Il documento non è stato modificato."); return false; }
+    if (selErr) { setMsg("Errore salvataggio righe: " + friendlyError(selErr) + " Il documento non è stato modificato."); return false; }
     const { error: delErr } = await supabase.from("document_lines").delete().eq("document_id", id);
-    if (delErr) { setMsg("Errore salvataggio righe: " + delErr.message + " Il documento non è stato modificato."); return false; }
+    if (delErr) { setMsg("Errore salvataggio righe: " + friendlyError(delErr) + " Il documento non è stato modificato."); return false; }
     if (lines.length) {
       const { error: insErr } = await supabase.from("document_lines").insert(lines.map((l, i) => ({
         document_id: id, tenant_id: tenantId, pos: i + 1, description: l.description || "—", qty: l.qty || 1,
@@ -266,8 +268,8 @@ export default function DocumentoPage() {
         let restored = true;
         if (oldLines && oldLines.length) { const { error: rErr } = await supabase.from("document_lines").insert(oldLines); restored = !rErr; }
         setMsg(restored
-          ? "Errore salvataggio righe: " + insErr.message + " Le righe precedenti sono state ripristinate: riprova."
-          : "ATTENZIONE: salvataggio righe non riuscito (" + insErr.message + ") e le righe precedenti non si sono potute ripristinare. Non chiudere la pagina: ricaricala e controlla le righe del documento prima di continuare.");
+          ? "Errore salvataggio righe: " + friendlyError(insErr) + " Le righe precedenti sono state ripristinate: riprova."
+          : "ATTENZIONE: salvataggio righe non riuscito (" + friendlyError(insErr) + ") e le righe precedenti non si sono potute ripristinare. Non chiudere la pagina: ricaricala e controlla le righe del documento prima di continuare.");
         return false;
       }
     }
@@ -279,11 +281,11 @@ export default function DocumentoPage() {
       counterpart, taxable_cents: totals.taxable, vat_cents: totals.vat, out_of_scope_cents: totals.out, bollo_cents: totals.bolloCents,
       rounding_cents: totals.roundingCents, total_cents: totals.total,
     }).eq("id", id);
-    if (error) { setMsg("Errore salvataggio: " + error.message); return false; }
+    if (error) { setMsg("Errore salvataggio: " + friendlyError(error)); return false; }
     return true;
   };
 
-  const act = async (label: string, fn: () => Promise<void>) => { setBusy(label); setMsg(""); try { await fn(); await load(); } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); } };
+  const act = async (label: string, fn: () => Promise<void>) => { setBusy(label); setMsg(""); try { await fn(); await load(); } catch (e) { setMsg(friendlyError(e)); } finally { setBusy(""); } };
   const onSave = () => act("save", async () => { if (await saveDraft()) setMsg("Bozza salvata ✓"); });
   const blockMsg = () => setMsg("Non posso emettere: correggi prima gli errori elencati in “Controlli prima dell'emissione”.");
   const onIssue = () => { if (blocked) { blockMsg(); return; } act("issue", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); setMsg("Documento emesso ✓"); } }); };
@@ -313,7 +315,7 @@ export default function DocumentoPage() {
       if (r.valid) { setVies({ status: "valid", msg: r.name || "P.IVA valida" }); if (r.name && !cp.name) setCp((c) => ({ ...c, name: r.name as string })); }
       else if (r.status === "invalid") setVies({ status: "invalid", msg: "P.IVA non valida" });
       else setVies({ status: "unknown", msg: r.message || "Verifica non disponibile" });
-    } catch (e) { setVies({ status: "unknown", msg: e instanceof Error ? e.message : "Errore" }); }
+    } catch (e) { setVies({ status: "unknown", msg: friendlyError(e) }); }
   };
   // Dopo l'incasso in Xenora, segna il pagamento anche sul documento di Fatture in Cloud (in background: non blocca né fa fallire l'incasso).
   const syncFicPayment = (paidFlag: boolean) => {
@@ -321,7 +323,7 @@ export default function DocumentoPage() {
     setFicNote(null);
     invPost<{ ok?: boolean; skipped?: boolean; kind?: string; message?: string }>("fic/payments", { documentId: id, paid: paidFlag })
       .then((r) => { if (r.skipped && r.ok) return; setFicNote({ ok: !!r.ok, text: r.ok ? (r.message ?? "") : "Incasso registrato; su Fatture in Cloud non aggiornato: " + (r.message ?? "motivo sconosciuto") }); })
-      .catch((e) => setFicNote({ ok: false, text: "Incasso registrato; su Fatture in Cloud non aggiornato: " + (e instanceof Error ? e.message : "errore") }));
+      .catch((e) => setFicNote({ ok: false, text: "Incasso registrato; su Fatture in Cloud non aggiornato: " + friendlyError(e) }));
   };
   const addPayment = async (amountCents: number, method: string) => {
     if (!supabase || !user || amountCents <= 0) return;
@@ -329,9 +331,9 @@ export default function DocumentoPage() {
     await act("pay", async () => {
       const { error: payErr } = await supabase!.from("document_payments").insert({ document_id: id, tenant_id: tenantId, amount_cents: amountCents, method });
       // Se il pagamento non è stato registrato NON si tocca booking.paid (altrimenti incassi e documento divergono).
-      if (payErr) throw new Error("Pagamento non registrato: " + payErr.message);
+      if (payErr) throw new Error("Pagamento non registrato: " + friendlyError(payErr));
       // Fonte di verità = prenotazione: propaga l'incasso su booking.paid (in €).
-      if (link.bookingId) { const b = raw.bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(amountCents) / 100) }); }
+      if (link.bookingId) { const b = raw.bookings.find((x) => x.id === link.bookingId); if (b) { const due = Math.round(amountCents) / 100; const add = (b.total ?? 0) > 0 ? Math.min(due, balanceDue(b, getStructure(b.structureId))) : due; if (add > 0) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + add) }); } } // al massimo il residuo vero: niente raddoppio se booking.paid include gia' quei soldi
       syncFicPayment(true);
     });
   };
@@ -340,7 +342,7 @@ export default function DocumentoPage() {
     if (!(await ask({ title: "Elimina bozza", message: "Eliminare questa bozza di documento?", danger: true, confirmLabel: "Elimina" }))) return;
     setBusy("del"); setMsg("");
     const { error } = await supabase.from("documents").delete().eq("id", id);
-    if (error) { setMsg("Errore: " + error.message); setBusy(""); return; }
+    if (error) { setMsg("Errore: " + friendlyError(error)); setBusy(""); return; }
     router.push("/documenti");
   };
 

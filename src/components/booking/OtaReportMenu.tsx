@@ -5,6 +5,7 @@
 // un click esplicito + finestra di conferma che spiega l'effetto e richiede di scrivere una
 // parola. Nessun automatismo la richiama. L'esito viene accodato alla nota della prenotazione.
 import { useState } from "react";
+import { ymdRome } from "@/lib/dates-rome";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { apiPost } from "@/lib/invoicing/client";
@@ -24,7 +25,7 @@ export default function OtaReportMenu({ booking }: { booking: Booking }) {
   if (!canReportToOta(booking)) return null;
   const chxId = channexBookingIdFromExtId(booking.extId)!;
   const info = pending ? OTA_ACTION_INFO[pending] : null;
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = ymdRome(new Date());
   const hint = pending ? windowHint(pending, booking.checkIn, todayISO) : null;
 
   const close = () => { if (busy) return; setPending(null); setWord(""); };

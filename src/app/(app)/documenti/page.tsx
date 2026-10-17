@@ -14,6 +14,7 @@ import { centsEur, DOC_KIND_LABEL, STATO, apiPost } from "@/lib/invoicing/client
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, todayLocalISO } from "@/lib/invoicing/receivables";
 import { isTrialSend, sdiBadge } from "@/lib/invoicing/sdi-status";
+import { friendlyError } from "@/lib/friendly-error";
 
 interface DocRow {
   id: string; structure_id: string | null; booking_code: string | null; doc_kind: string; regime: string | null;
@@ -55,7 +56,7 @@ export default function DocumentiPage() {
       supabase.from("document_payments").select("document_id, amount_cents"),
       supabase.from("document_events").select("document_id, kind, message, meta, ts").eq("kind", "sent").order("ts", { ascending: false }),
     ]);
-    if (d.error) setErr(d.error.message); else setRows((d.data ?? []) as DocRow[]);
+    if (d.error) setErr(friendlyError(d.error)); else setRows((d.data ?? []) as DocRow[]);
     const m: Record<string, number> = {};
     for (const x of (p.data ?? []) as { document_id: string; amount_cents: number }[]) m[x.document_id] = (m[x.document_id] ?? 0) + x.amount_cents;
     setPaid(m);
@@ -145,7 +146,7 @@ export default function DocumentiPage() {
     try {
       const r = await apiPost<{ documentId: string }>("invoicing/new", { structureId });
       router.push(`/documenti/${r.documentId}`);
-    } catch (e) { setErr(e instanceof Error ? e.message : "Errore"); setCreating(false); }
+    } catch (e) { setErr(friendlyError(e)); setCreating(false); }
   };
 
   return (

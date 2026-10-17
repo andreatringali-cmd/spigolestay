@@ -9,6 +9,7 @@ import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { buildPublishData, slugify, RESERVED_SLUGS, siteConfigKey, getSiteConfigRaw } from "@/lib/publicdata";
+import { friendlyError } from "@/lib/friendly-error";
 
 interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
 const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
@@ -124,10 +125,10 @@ export default function SitoPage() {
       const { error } = await supabase.from("public_sites").upsert({
         slug: finalSlug, user_id: user.id, structure_id: sid, structure_name: siteName, data, updated_at: new Date().toISOString(),
       });
-      if (error) { setPubMsg(t("Pubblicazione non riuscita.") + " " + error.message); }
+      if (error) { setPubMsg(t("Pubblicazione non riuscita.") + " " + friendlyError(error)); }
       else { setSlug(finalSlug); setPublishedSlug(finalSlug); setPubMsg(t("Sito online e aggiornato ✓")); }
     } catch (e) {
-      setPubMsg(t("Pubblicazione non riuscita.") + " " + (e instanceof Error ? e.message : ""));
+      setPubMsg(t("Pubblicazione non riuscita.") + " " + friendlyError(e, ""));
     } finally { setPubBusy(false); }
   };
 

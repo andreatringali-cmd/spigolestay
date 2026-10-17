@@ -25,6 +25,11 @@ import { commissionIsEstimate, COMMISSION_ESTIMATE_HINT, cityTaxOfBooking, cityT
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
+import { plural } from "@/lib/plural";
+import { friendlyError } from "@/lib/friendly-error";
+import { ymdRome } from "@/lib/dates-rome";
+import { bookingGrandTotal } from "@/lib/booking";
+import { balanceDue, paymentStatus } from "@/lib/incassi";
 import { describeCancelPenalties } from "@/lib/channex-guestdata";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
@@ -101,7 +106,7 @@ export default function BookingDrawer() {
       setEmit({}); // la scheda resta montata nel layout: senza reset il pulsante resterebbe bloccato anche per le prenotazioni successive
       closeBooking();
       router.push(`/documenti/${r.documentId}`);
-    } catch (e) { setEmit({ msg: e instanceof Error ? e.message : "Errore" }); }
+    } catch (e) { setEmit({ msg: friendlyError(e) }); }
   };
   const [checkinQr, setCheckinQr] = useState("");
   const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
@@ -169,7 +174,7 @@ export default function BookingDrawer() {
   const gLastPrior = priorStays.map((b) => b.checkIn).sort().pop();
   const gVip = !!guest?.vip || gTimes >= 3; // VIP manuale oppure automatico dal 3° soggiorno
   // ── Recensione Google dopo il check-out ──
-  const departed = booking.checkOut <= new Date().toISOString().slice(0, 10);
+  const departed = booking.checkOut <= ymdRome(new Date());
   const reviewUrl = (() => { try { return JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")?.[booking.structureId]?.reviewUrl || ""; } catch { return ""; } })();
   const structure = getStructure(booking.structureId);
   const roomType = getRoomType(booking.roomTypeId);
@@ -208,25 +213,31 @@ export default function BookingDrawer() {
     if (noPrice) { window.alert(t("Prezzo mancante: imposta l'importo del soggiorno prima di stampare la ricevuta.")); return; }
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
-    const money = (x: number) => "€ " + x.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const money = eur;
     const today = fmtDateIt(new Date());
     const unitV = getUnit(booking.unitId);
     const rows: [string, string][] = [
-      [`Soggiorno · ${nView} ${nView === 1 ? "notte" : "notti"} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)})`, money(accV)],
-      ["Pulizia finale", money(cleanV)],
+      [`Soggiorno · ${plural(nView, "notte", "notti")} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)})`, money(accV)],
     ];
-    for (const e of extrasList) if (e.price || e.name) rows.push([e.name || "Extra", money(e.price || 0)]);
+    if (cleanV > 0) rows.push(["Pulizia finale", money(cleanV)]);
+    for (const e of extrasList) if ((e.price || 0) > 0) rows.push([e.name || "Extra", money(e.price || 0)]);
     if (taxV > 0) rows.push(["Tassa di soggiorno", money(taxV)]);
-    const paidV = Math.max(0, totalV - balanceV);
+    // Totale e saldo dalle stesse funzioni usate nel resto dell'app: il totale è la somma delle righe qui sopra (tassa compresa).
+    const totalR = bookingGrandTotal(booking, structure);
+    const balanceR = balanceDue(booking, structure);
+    const paidR = Math.max(0, roundCents(totalR - balanceR));
+    const payStatus = paymentStatus(booking, structure);
+    const stampLabel = payStatus === "saldato" ? "Saldato" : payStatus === "acconto" ? "Acconto versato" : "Da saldare";
+    const stampColor = payStatus === "saldato" ? "#0e7c4a" : "#c98a12";
     const accent = structure?.photoColor || "#285f92";
-    const esc = (s: unknown) => String(s ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
+    const esc = (s: unknown) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] || c));
     const contacts = [structure?.email, structure?.phone, structure?.website].filter(Boolean).map(esc).join(" · ");
     const addr = [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).map(esc).join(" ");
     const ids = [structure?.cin ? `CIN ${esc(structure.cin)}` : "", structure?.vat ? `P.IVA ${esc(structure.vat)}` : ""].filter(Boolean).join(" · ");
     const logo = structure?.logo
-      ? `<img src="${structure.logo}" alt="" style="height:56px;width:auto;max-width:180px;object-fit:contain"/>`
+      ? `<img src="${esc(structure.logo)}" alt="" style="height:56px;width:auto;max-width:180px;object-fit:contain"/>`
       : `<div style="height:56px;width:56px;border-radius:12px;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;font-weight:800;font-size:22px">${esc((structure?.name ?? "XN").slice(0, 2).toUpperCase())}</div>`;
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricevuta ${esc(bookingCode(booking))}</title>
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricevuta di soggiorno ${esc(bookingCode(booking))}</title>
     <style>
       *{box-sizing:border-box} body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2131;margin:0;padding:52px 58px;font-size:14px;line-height:1.55}
       .head{display:flex;justify-content:space-between;align-items:center;gap:18px;padding-bottom:20px;margin-bottom:6px;border-bottom:3px solid ${accent}}
@@ -246,7 +257,7 @@ export default function BookingDrawer() {
       tr.pay td{border-bottom:none;padding:6px 4px;color:#4b5563;font-size:13px}
       tr.pay td.amt.paid{color:#0e7c4a;font-weight:700}
       tr.pay td.amt.due{color:${accent};font-weight:800}
-      .stamp{display:inline-block;margin-top:20px;border:2px solid ${paidV >= totalV && totalV > 0 ? "#0e7c4a" : "#c98a12"};color:${paidV >= totalV && totalV > 0 ? "#0e7c4a" : "#c98a12"};border-radius:8px;padding:4px 12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;font-size:12px;transform:rotate(-3deg)}
+      .stamp{display:inline-block;margin-top:20px;border:2px solid ${stampColor};color:${stampColor};border-radius:8px;padding:4px 12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;font-size:12px;transform:rotate(-3deg)}
       .note{margin-top:30px;font-size:10.5px;color:#9aa2b6;border-top:1px solid #eceef4;padding-top:14px}
       .foot{margin-top:6px;font-size:10.5px;color:#b6bccb;text-align:center}
       @media print{body{padding:26px 32px}}
@@ -258,19 +269,19 @@ export default function BookingDrawer() {
           ${contacts ? `<div class="brandsub">${contacts}</div>` : ""}
           ${ids ? `<div class="ids">${ids}</div>` : ""}
         </div></div>
-        <div class="meta">Ricevuta n.<br><b style="color:#1a2131;font-size:15px">${esc(bookingCode(booking))}</b><br>${today}</div>
+        <div class="meta">Riferimento prenotazione<br><b style="color:#1a2131;font-size:15px">${esc(bookingCode(booking))}</b><br>${today}</div>
       </div>
       <h1>Ricevuta di soggiorno</h1>
       <div class="sub">Soggiorno turistico · ${esc(ch.label)}</div>
       <div class="box"><b>Ospite</b>${esc(guest?.fullName ?? "—")}${guest?.email ? " · " + esc(guest.email) : ""}${guest?.phone ? " · " + esc(guest.phone) : ""}<br>
-      <span style="color:#6b7280;font-size:13px">${esc(roomType?.name ?? "")}${unitV?.name ? " — " + esc(unitV.name) : ""} · ${booking.adults} adulti${booking.children ? " · " + booking.children + " bambini" : ""}</span></div>
+      <span style="color:#6b7280;font-size:13px">${esc(roomType?.name ?? "")}${unitV?.name ? " — " + esc(unitV.name) : ""} · ${plural(booking.adults, "adulto", "adulti")}${booking.children ? " · " + plural(booking.children, "bambino", "bambini") : ""}</span></div>
       <table>
         ${rows.map((r) => `<tr><td>${esc(r[0])}</td><td class="amt">${r[1]}</td></tr>`).join("")}
-        <tr class="tot"><td>Totale</td><td class="amt">${money(totalV)}</td></tr>
-        <tr class="pay"><td>Incassato</td><td class="amt paid">${money(paidV)}</td></tr>
-        <tr class="pay"><td>Saldo dovuto</td><td class="amt due">${money(balanceV)}</td></tr>
+        <tr class="tot"><td>Totale</td><td class="amt">${money(totalR)}</td></tr>
+        <tr class="pay"><td>Incassato</td><td class="amt paid">${money(paidR)}</td></tr>
+        <tr class="pay"><td>Saldo dovuto</td><td class="amt due">${money(balanceR)}</td></tr>
       </table>
-      <div class="stamp">${paidV >= totalV && totalV > 0 ? "Pagato" : "Saldo a saldo"}</div>
+      <div class="stamp">${stampLabel}</div>
       <div class="note">Documento non fiscale, rilasciato a titolo di ricevuta. La tassa di soggiorno è versata al Comune${structure?.city ? " di " + esc(structure.city) : ""}.</div>
       <div class="foot">Generato con Xenora · Digital Solution</div>
       <script>window.onload=function(){window.print()}<\/script>
@@ -658,7 +669,7 @@ export default function BookingDrawer() {
             const short = await shortenGuideLink(gLink);
             const msg = guideMsgWith(short);
             try {
-              const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
+              const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: guestLangOf(guest), to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
               const j = await r.json().catch(() => ({}));
               if (r.ok && j?.ok) window.alert(`${t("Guida inviata a")} ${to}`);
               else window.open(gmailGuide(msg), "_blank");
@@ -756,7 +767,7 @@ export default function BookingDrawer() {
                 code={vp.code} guestName={vp.guestName || ""} guestEmail={vp.guestEmail}
                 roomType={vp.roomType || ""} unitName={vp.unitName} checkIn={fmtLong(vp.checkIn)} checkOut={fmtLong(vp.checkOut)}
                 checkInFrom={vp.checkInFrom} checkOutBy={vp.checkOutBy} adults={vp.adults ?? 1} children={vp.children ?? 0}
-                nights={vp.nights} ratePlan={vp.ratePlanName} total={typeof vp.grandTotal === "number" ? `${vp.currency || "€"} ${vp.grandTotal.toLocaleString("it-IT")}` : undefined}
+                nights={vp.nights} ratePlan={vp.ratePlanName} total={typeof vp.grandTotal === "number" ? eur(vp.grandTotal, vp.currency || "€") : undefined}
                 cancelText={vp.cancelPolicy || ""}
               />
             );

@@ -53,7 +53,7 @@ export async function GET(req: Request) {
         const mail = rejectionEmail({ numberLabel: n.numberLabel, issueDate: n.issueDate, customer: n.customer, reason: n.reason });
         const r = await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ kind: "notify", to, subject: mail.subject, text: mail.text, ctaUrl: `${origin}/documenti/${n.documentId}`, ctaLabel: "Apri il documento" }),
+          body: JSON.stringify({ kind: "notify", event: "alert", to, subject: mail.subject, text: mail.text, ctaUrl: `${origin}/documenti/${n.documentId}`, ctaLabel: "Apri il documento" }),
         });
         const j = (await r.json().catch(() => ({}))) as { ok?: boolean; skipped?: string };
         // "skipped" (es. freno antiraffica) = non inviata: il marcatore non si scrive e si riprova al prossimo passaggio.

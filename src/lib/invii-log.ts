@@ -27,12 +27,13 @@ export async function giaInviato(admin: SupabaseClient, tenantId: string, job: I
 export function spiegaErroreWa(detail?: string): string {
   const d = (detail ?? "").toLowerCase();
   if (!d) return "";
-  if (/131047|24 ?hour|re-?engagement|outside the allowed window/.test(d)) return "Meta non consente il testo libero se il destinatario non ha scritto negli ultimi 24 ore: serve un modello approvato.";
+  if (/131047|24 ?hour|re-?engagement|outside the allowed window/.test(d)) return "Meta non consente il testo libero se il destinatario non ha scritto nelle ultime 24 ore: serve un modello approvato.";
   if (/132001|template.*(does not exist|not found)|does not exist in the translation/.test(d)) return "Il modello di messaggio non esiste o non è approvato su WhatsApp Business.";
   if (/132000|132005|132007|132012|132015|132016|parameter/.test(d)) return "Il modello è stato rifiutato: numero o formato delle variabili non corretto.";
   if (/131026|not a valid whatsapp|undeliverable/.test(d)) return "Il numero non risulta su WhatsApp o non è raggiungibile.";
   if (/131049|ecosystem|marketing/.test(d)) return "Meta ha limitato l'invio di questo modello a questo numero (troppi messaggi promozionali).";
-  if (/190|oauth|token/.test(d)) return "Il collegamento WhatsApp non è più valido: va ricollegato.";
+  // Codice 190 (token scaduto/non valido) SOLO come numero a sé: un numero di telefono o un id che contiene «190» non è un token scaduto.
+  if (/(^|[^\d])190([^\d]|$)|oauth|access token|invalid token|token.*(expired|invalid)|session has expired/.test(d)) return "Il collegamento WhatsApp non è più valido: va ricollegato.";
   if (/131030|not in allowed list/.test(d)) return "Il numero non è tra quelli autorizzati.";
   return "";
 }

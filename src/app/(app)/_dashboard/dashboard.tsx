@@ -129,8 +129,8 @@ export default function Dashboard2() {
   const cur = useMemo(() => monthStats(live, monthStart, nextMonthStart, today, nightlyRevenue), [live, monthStart, nextMonthStart, today]);
   const prev = useMemo(() => monthStats(live, prevStart, monthStart, today, nightlyRevenue), [live, prevStart, monthStart, today]);
   const channelRows: ChannelRow[] = useMemo(() => cur.byChannel.filter((r) => r.revenue > 0 && r.channel in CHANNELS).slice(0, 5).map((r) => ({
-    channel: r.channel as Channel, label: CHANNELS[r.channel as Channel].label, color: loadChannelColor(r.channel as Channel) || `var(${CHANNELS[r.channel as Channel].cssVar})`, // il colore scelto in Canali, altrimenti quello del portale
-    revenue: Math.round(r.revenue), count: r.count, share: cur.total ? Math.round((r.revenue / cur.total) * 100) : 0,
+    channel: r.channel as Channel, label: r.mixed ? "Altre OTA" : CHANNELS[r.channel as Channel].label, color: loadChannelColor(r.channel as Channel) || `var(${CHANNELS[r.channel as Channel].cssVar})`, // il colore scelto in Canali, altrimenti quello del portale
+    revenue: Math.round(r.revenue), count: r.count, share: cur.total ? Math.round((r.revenue / cur.total) * 100) : 0, name: r.name,
   })), [cur]);
 
   // ADR e RevPAR degli ultimi 14 giorni (ricavo per notte / camere occupate, e / camere disponibili).

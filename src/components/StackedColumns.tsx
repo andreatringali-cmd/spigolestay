@@ -1,8 +1,9 @@
 import type { Channel } from "@/lib/types";
 import { CHANNELS } from "@/lib/types";
-import ChannelLogo from "@/components/ChannelLogo";
+import ChannelLogo, { isBedAndBreakfastIt } from "@/components/ChannelLogo";
 
-export interface StackedBar { label: string; segs: { channel: Channel; value: number }[] }
+// `name` (facoltativo) di un segmento: nome del portale per i canali generici ("other"), per riconoscere bb.it e mostrarne il logo invece di "Altro".
+export interface StackedBar { label: string; segs: { channel: Channel; value: number; name?: string }[] }
 
 const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1).replace(".", ",")}k` : String(Math.round(n)));
 const niceCeil = (v: number) => {
@@ -63,7 +64,7 @@ export default function StackedColumns({ bars, height = 132, barWidth = 26, form
       </div>
       {present.length > 1 && (
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[10px] text-dim">
-          {present.map((c) => (<span key={c} className="inline-flex items-center gap-1"><ChannelLogo channel={c} size={14} />{CHANNELS[c].label}</span>))}
+          {present.map((c) => { const nm = bars.flatMap((b) => b.segs).find((s) => s.channel === c && s.name)?.name; const bb = c === "other" && isBedAndBreakfastIt(nm); return (<span key={c} className="inline-flex items-center gap-1"><ChannelLogo channel={c} size={14} name={nm} />{bb ? "bb.it" : CHANNELS[c].label}</span>); })}
         </div>
       )}
     </div>

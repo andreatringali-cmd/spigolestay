@@ -10,6 +10,8 @@ import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
 import { logUnanswered } from "@/lib/concierge-unanswered";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { verifyMetaSignature } from "@/lib/meta-signature";
+import { notifyStructure, type WaStructure } from "@/lib/wa-notify";
+import { todayRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,7 +97,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
     }
     const key = guest?.id || `wa:${fromDigits}`;
     const list = threads[key] ?? [];
-    if (list.some((m) => m.id === msgId)) return { ok: true, guestName: guest?.fullName }; // già ricevuto (retry di Meta), idempotente
+    if (list.some((m) => m.id === msgId)) return { ok: true, isNew: false, guestName: guest?.fullName }; // già ricevuto (retry di Meta), idempotente
     threads[key] = [...list, { id: msgId, dir: "in", text, ts: Date.now(), ...(media ? { media } : {}) }];
     blob[THREADS_KEY] = JSON.stringify(threads);
 
@@ -105,6 +107,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
     if (updated && updated.length > 0) {
       return {
         ok: true,
+        isNew: true, // messaggio davvero nuovo (non un retry di Meta): solo per questi si notifica e risponde il Concierge
         guestName: guest?.fullName,
         notifPrefsRaw: blob["spigolestay:notifs"],
         aiConciergeRaw: blob[AI_CONCIERGE_KEY],
@@ -176,7 +179,7 @@ async function applyStatuses(admin: SupabaseClient<any>, tenantId: string, statu
 // toggle "Concierge AI" in Impostazioni (src/lib/aiConcierge.ts, default SPENTO) e l'AI è sicura
 // della risposta (src/lib/ai/guest-concierge.ts). Fire-and-forget: non deve MAI ritardare né far
 // fallire il salvataggio del messaggio dell'ospite in applyIncoming(), che è già completato quando
-// questa funzione viene chiamata. Chiamata solo per messaggi NUOVI (vedi guardia su notifPrefsRaw
+// questa funzione viene chiamata. Chiamata solo per messaggi NUOVI (vedi guardia su isNew
 // nel POST qui sotto), quindi un retry di Meta sullo stesso messaggio non genera una doppia risposta.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: {
@@ -317,24 +320,32 @@ export async function POST(req: Request) {
           if (!res.ok) { saveFailed = true; console.error("[whatsapp webhook] salvataggio messaggio fallito dopo i tentativi (conflitto di versione), risposta 500 per il retry di Meta:", m.id); continue; }
 
           // Notifica email al gestore (interruttore "Messaggi degli ospiti") — fire-and-forget.
-          if (res.ok && res.notifPrefsRaw !== undefined) {
+          // `isNew` è esplicito: prima si deduceva dalla presenza di "spigolestay:notifs" nel blob, e senza quella chiave (mai salvata) si perdevano notifica e risposta del Concierge.
+          if (res.ok && res.isNew) {
             try {
               const notifs = parseNotifPrefs(res.notifPrefsRaw as string | undefined);
               if (notifs.message) {
-                const structures = (Array.isArray(res.structures) ? res.structures : []) as { email?: string; photoColor?: string }[];
-                const st = structures.find((s) => s.email) ?? structures[0];
+                // Strutture e prenotazioni anche delle strutture condivise (stanno in org_state): la struttura giusta è quella della prenotazione dell'ospite.
+                const merged = mergeOrgData({ structures: res.structures, bookings: res.bookings }, await loadOrgDatas(admin, tenantId));
+                const structures = (Array.isArray(merged.structures) ? merged.structures : []) as WaStructure[];
+                const st = notifyStructure(structures, (Array.isArray(merged.bookings) ? merged.bookings : []) as BookingLite[], (res.guest as { id?: string } | undefined)?.id, todayRome());
                 if (st?.email) {
                   const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it";
                   internalFetch(`${origin}/api/email`, {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ kind: "notify", to: st.email, accent: st.photoColor, subject: `Nuovo messaggio WhatsApp${res.guestName ? ` · ${res.guestName}` : ""}`, text }),
+                    body: JSON.stringify({
+                      kind: "notify", to: st.email, accent: st.photoColor,
+                      subject: `Nuovo messaggio WhatsApp${res.guestName ? ` · ${res.guestName}` : ""}`, text,
+                      event: "message", channelLabel: "WhatsApp", structureName: st.name,
+                      brand: { name: st.name, logoUrl: st.logo, color: st.photoColor },
+                    }),
                   }).catch(() => {});
                 }
               }
             } catch {}
 
-            // Concierge AI — SOLO per messaggi davvero nuovi (notifPrefsRaw è assente sui retry di
-            // Meta/duplicati, vedi applyIncoming). Fire-and-forget: non blocca la risposta 200 al webhook.
+            // Concierge AI — SOLO per messaggi davvero nuovi (isNew=false sui retry di
+            // Meta/duplicati: isNew=false, vedi applyIncoming). Fire-and-forget: non blocca la risposta 200 al webhook.
             if (!voiceNoText) after(() => tryAutoReply(admin, tenantId, {
               aiConciergeRaw: res.aiConciergeRaw as string | undefined,
               conciergeFaqRaw: res.conciergeFaqRaw as Record<string, string> | undefined,

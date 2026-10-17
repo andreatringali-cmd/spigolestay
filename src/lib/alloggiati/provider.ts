@@ -25,7 +25,7 @@ export class MockAlloggiati implements AlloggiatiProvider {
     const t = await this.test(c);
     if (!t.ok) return { ok: false, message: t.message };
     if (!records.length) return { ok: false, message: "Nessuna schedina da inviare." };
-    return { ok: true, ricevuta: "MOCK-RIC-" + new Date().toISOString().slice(0, 10) + "-" + records.length, message: `Inviate ${records.length} schedine (mock).` };
+    return { ok: true, ricevuta: "MOCK-RIC-" + new Date().toISOString().slice(0, 10) + "-" + records.length, message: `${records.length === 1 ? "Inviata 1 schedina" : `Inviate ${records.length} schedine`} (mock).` };
   }
 }
 

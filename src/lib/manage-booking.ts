@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { addDaysYmd, ymdRome } from "./dates-rome";
 
 // Helper server-side per la GESTIONE prenotazione da parte dell'OSPITE (pagina /gestisci).
 // Una prenotazione può vivere in app_state (struttura personale) oppure in org_state
@@ -175,15 +176,47 @@ export async function writeBookingPatch(admin: SupabaseClient, store: BookingSto
 }
 
 // Valuta la politica di rimborso: entro la finestra gratuita?
+// Le date sono giorni di calendario ITALIANI (Europe/Rome): il server gira in UTC, e tra le 00:00 e le 02:00 italiane "oggi" in UTC e' ancora ieri
+// (la finestra gratuita sarebbe rimasta aperta un giorno in piu'). La scadenza e' arrivo meno N giorni (aritmetica di calendario, senza fusi).
 export function refundEligible(booking: Json, nowISO: string): { free: boolean; freeUntil: string | null } {
   const refundable = (booking as { refundable?: boolean }).refundable === true;
-  const cancelDays = Math.max(0, Number((booking as { cancelDays?: number }).cancelDays) || 0);
+  const cancelDays = Math.max(0, Math.round(Number((booking as { cancelDays?: number }).cancelDays) || 0));
   const checkIn = String((booking as { checkIn?: string }).checkIn || "");
-  if (!refundable || !checkIn) return { free: false, freeUntil: null };
-  // Scadenza = checkIn - cancelDays giorni
-  const d = new Date(checkIn + "T00:00:00");
-  d.setDate(d.getDate() - cancelDays);
-  const freeUntil = d.toISOString().slice(0, 10);
-  const today = nowISO.slice(0, 10);
+  if (!refundable || !/^\d{4}-\d{2}-\d{2}$/.test(checkIn)) return { free: false, freeUntil: null };
+  // Con 0 giorni di preavviso l'ultimo giorno utile e' comunque la vigilia: dal giorno dell'arrivo l'ospite non puo' piu' annullare da solo
+  // (cancel e "cancellable" rifiutano arrivo <= oggi), quindi la pagina non deve promettere "gratis fino al giorno dell'arrivo".
+  const freeUntil = addDaysYmd(checkIn, -Math.max(1, cancelDays));
+  const t = new Date(nowISO);
+  const today = ymdRome(Number.isNaN(t.getTime()) ? new Date() : t);
   return { free: today <= freeUntil, freeUntil };
+}
+
+/**
+ * Importo pagato e NON rimborsato su una prenotazione annullata dall'ospite (la struttura deve restituirlo a mano). Il valore scritto all'annullamento
+ * (`unrefundedAmount`) vale sempre; per i dati vecchi si ricava: annullata dall'ospite in finestra gratuita e rimborsata meno di quanto pagato.
+ */
+export function unrefundedOf(b: Json): number {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  if (typeof b.unrefundedAmount === "number" && Number.isFinite(b.unrefundedAmount)) return Math.max(0, b.unrefundedAmount);
+  if (b.status !== "cancelled" || b.cancelledBy !== "guest") return 0;
+  const at = typeof b.cancelledAt === "string" && b.cancelledAt ? b.cancelledAt : new Date().toISOString();
+  if (!refundEligible(b, at).free) return 0;
+  return Math.max(0, Math.round((num(b.paid) - num(b.refundedAmount)) * 100) / 100);
+}
+
+/**
+ * Pagamenti Stripe da rimborsare all'annullamento: il pagamento principale (si rimborsa per intero) piu' quelli successivi (saldo, ognuno per il suo importo).
+ * `estimate` e' la cifra che la pagina /gestisci promette all'ospite: coincide con quanto la cancellazione rimborsa davvero (somma dei due, mai oltre l'incassato).
+ */
+export function stripeRefundPlan(b: Json): { main: string; extras: { pi: string; amount: number }[]; estimate: number } {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const main = typeof b.stripePaymentIntent === "string" ? b.stripePaymentIntent : "";
+  const extras = (Array.isArray(b.stripeExtraPayments) ? (b.stripeExtraPayments as Json[]) : [])
+    .map((x) => ({ pi: typeof x.pi === "string" ? x.pi : "", amount: num(x.amount) }))
+    .filter((x) => x.pi && x.pi !== main && x.amount > 0);
+  const extraSum = Math.round(extras.reduce((a, x) => a + x.amount, 0) * 100) / 100;
+  const paid = Math.max(0, num(b.paid));
+  const online = num(b.paidOnline) > 0 ? num(b.paidOnline) : paid;
+  const mainAmount = main ? Math.max(0, Math.min(paid, online) - extraSum) : 0;
+  return { main, extras, estimate: Math.round(Math.min(paid, mainAmount + extraSum) * 100) / 100 };
 }

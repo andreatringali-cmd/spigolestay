@@ -13,14 +13,17 @@ import { bookingExtrasTotal } from "@/lib/booking";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
-import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
+import { GUIDE_MSG, CHECKIN_MSG, emailBrandPayload, type Lang } from "@/lib/guest-messages";
+import { asLang, autoSubject, decideSend, dedupeGroups, fillTokens, guestFallback, sentKeysFor, stayTimeText, structureFallback } from "@/lib/auto-messages-core";
+import { slotDateOf, stepsOfTemplate } from "@/lib/auto-schedule";
+import { messageBalance } from "@/lib/msg-balance";
 import { guestLangOf } from "@/lib/guest-lang";
 import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
 import { mergeSeedTemplates } from "@/lib/msg-templates";
 import { waDigits } from "@/lib/contacts-check";
 import { todayRome, addDaysYmd } from "@/lib/dates-rome";
-import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens } from "@/lib/auto-review";
+import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewDecision, reviewLinksFor, reviewTokens, usesReviewLinks } from "@/lib/auto-review";
 import { structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
 import { apiPost } from "@/lib/invoicing/client";
 import { supabase } from "@/lib/supabase";
@@ -115,7 +118,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   // Il sync automatico di authsync.tsx (ogni 4s, o al ritorno sulla scheda) scrive i messaggi
   // arrivati via webhook nel localStorage e avvisa con questo evento: senza ri-leggere qui, la
   // pagina restava ferma alla prima apertura e un nuovo messaggio compariva solo ricaricando.
-  useEffect(() => { const h = () => loadThreads(); window.addEventListener("spigolestay:datasync", h); return () => window.removeEventListener("spigolestay:datasync", h); }, []);
+  // Anche il registro «Invii programmati» (msgsent) viene scritto dal server quando il cron manda un messaggio automatico: si rilegge, così la coda non lo ripropone.
+  useEffect(() => {
+    const h = () => { loadThreads(); try { const s = localStorage.getItem("spigolestay:msgsent"); if (s) { const list = JSON.parse(s); if (Array.isArray(list)) { sentRef.current = list; setSent(list); } } } catch {} };
+    window.addEventListener("spigolestay:datasync", h); return () => window.removeEventListener("spigolestay:datasync", h);
+  }, []);
   useEffect(() => { if (!ready) return; try { localStorage.setItem(KEY, JSON.stringify(threads)); window.dispatchEvent(new Event("spigolestay:threads")); } catch {} }, [threads, ready]);
 
   // Modelli salvati + registro invii (condivisi con la pagina Modelli & automazioni).
@@ -162,6 +169,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [sel, setSel] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
+  // Su telefono/tablet (tastiera a schermo) «Invio» va a capo e si invia con il pulsante; su computer Invio invia e Shift+Invio va a capo.
+  const [touchKb, setTouchKb] = useState(false);
+  useEffect(() => { try { setTouchKb(!!window.matchMedia?.("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)); } catch { /* resta tastiera fisica */ } }, []);
   const [queueOpen, setQueueOpen] = useState(false); // elenco degli invii automatici in arrivo per l'ospite aperto (menu nell'intestazione)
   const queueRef = useRef<HTMLDivElement>(null);
   const fitList = useFitViewport();
@@ -353,7 +363,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             const mid = `chx:${m.id}`;
             if (list.some((x) => x.id === mid)) continue;
             const text = textOf(m);
-            if (m.sender === "guest") { list = [...list, { id: mid, dir: "in", text, ts: Date.now(), via, ...(m.att?.length ? { att: m.att } : {}) }]; changed = true; continue; }
+            // Ora del messaggio = quella vera su Booking/Airbnb (inserted_at), non l'istante in cui lo importiamo: altrimenti un messaggio vecchio sembra nuovo (e fa suonare l'avviso).
+            if (m.sender === "guest") { list = [...list, { id: mid, dir: "in", text, ts: when(m.inserted_at), via, ...(m.att?.length ? { att: m.att } : {}) }]; changed = true; continue; }
             // Risposta della struttura data fuori da Xenora (extranet, Booking Pulse…): entra come "out", salvo sia la stessa già registrata da qui (stesso testo, entro 10 minuti).
             const ts = when(m.inserted_at);
             if (list.some((x) => x.dir === "out" && norm(x.text) === norm(text) && Math.abs(x.ts - ts) <= 10 * 60 * 1000)) continue;
@@ -361,7 +372,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
           }
           return changed ? { ...tt, [gid]: list } : tt;
         });
-        if (nuovi.some((m) => m.sender === "guest")) playSound("received");
+        // Suono solo per messaggi davvero recenti (ultimi 10 minuti): aprire una chat vecchia non deve suonare.
+        if (nuovi.some((m) => m.sender === "guest" && Date.now() - when(m.inserted_at) < 10 * 60 * 1000)) playSound("received");
         if (nuovi.length) { try { localStorage.setItem(seenKey, JSON.stringify([...seen, ...nuovi.map((m) => m.id)].slice(-300))); } catch {} }
       })
       .catch(() => {});
@@ -493,16 +505,19 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     chatBusyRef.current = true; setSending(true);
     try {
       const text = draft; const to = current.email; const gid = sel;
+      // Struttura giusta (quella della prenotazione dell'ospite, non la prima): carta intestata con nome, logo, colore, indirizzo, telefono, e risposte dell'ospite alla struttura.
+      const stMail = current.b ? getStructure(current.b.structureId) : undefined;
+      const subject = autoSubject(asLang(langOf(guests.find((x) => x.id === current.id))), stMail?.name ?? "", current.b?.checkIn);
       // Invio automatico dal server (Resend); ripiego Gmail se non configurato. In chat solo dopo l'esito.
       let ok = false;
       try {
-        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", to, subject: t("Messaggio"), text }) });
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: langOf(guests.find((x) => x.id === current.id)), to, subject, text, ...emailBrandPayload(stMail) }) });
         const j = await r.json().catch(() => ({}));
         ok = !!(r.ok && j?.ok);
       } catch { ok = false; }
       if (!ok) {
         // Il ripiego si apre dopo un await: se il browser (Safari) lo blocca, si avvisa e non si registra nulla come inviato.
-        const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank");
+        const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`, "_blank");
         if (!w) { window.alert(t("Invio email non riuscito: il messaggio NON è stato inviato.")); return; }
       }
       if (gid) addTo(gid, "out", text, "Email");
@@ -594,23 +609,27 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     let raw: string | null = null; try { raw = localStorage.getItem(REVIEW_SETTINGS_KEY); } catch { /* storage non disponibile */ }
     return reviewLinksFor({ structureId: b.structureId, placeId: getStructure(b.structureId)?.googlePlaceId, guideReviewUrl, settings: parseReviewSettings(raw) });
   };
+  // Stessa sostituzione dei segnaposto del cron dei messaggi automatici (lib/auto-messages-core.ts): orari nella lingua dell'ospite, {saldo} come il voucher
+  // (con la tassa dovuta, 2 decimali), segnaposto sconosciuti o vuoti non lasciati scritti.
   const fillFor = (raw: string, b: Booking, g: Guest) => {
     const st = getStructure(b.structureId); const unit = getUnit(b.unitId);
-    const access = unit?.accessInfo || st?.accessInfo || "—";
-    const balance = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0);
-    return raw
-      .replace(/\{ospite\}/g, gName(g).split(" ")[0])
-      .replace(/\{struttura\}/g, st?.name ?? "")
-      .replace(/\{camera\}/g, unit?.name ?? getRoomType(b.roomTypeId)?.name ?? "")
-      .replace(/\{checkin\}/g, `${fmtLong(b.checkIn)}${st?.checkInFrom ? ` dalle ${st.checkInFrom}` : ""}`)
-      .replace(/\{checkout\}/g, `${fmtLong(b.checkOut)}${st?.checkOutBy ? ` entro le ${st.checkOutBy}` : ""}`)
-      .replace(/\{codice_accesso\}/g, access)
-      .replace(/\{saldo\}/g, eur(Math.max(0, balance)))
-      .replace(/\{notti\}/g, String(nightsOf(b)))
-      .replace(/\{link_guida\}/g, guideUrlFor(b))
-      .replace(/\{link_checkin\}/g, checkinUrlFor(b))
-      .replace(/\{whatsapp\}/g, structureWhatsapp(st ?? {}) || WHATSAPP_FALLBACK[langOf(g)] || WHATSAPP_FALLBACK.it)
-      .replace(/\{link_(recensioni|google|tripadvisor)\}/g, (_m, k: string) => reviewTokens(reviewLinksOf(b))[`link_${k}`] ?? "");
+    const lang = asLang(langOf(g));
+    const emptyStructure = !(st?.name ?? "").trim();
+    const ctx: Record<string, string> = {
+      ospite: gName(g).split(" ")[0] || guestFallback(lang),
+      struttura: emptyStructure ? structureFallback(lang) : (st?.name ?? ""),
+      camera: unit?.name ?? getRoomType(b.roomTypeId)?.name ?? "",
+      checkin: stayTimeText("checkin", lang, b.checkIn, st?.checkInFrom),
+      checkout: stayTimeText("checkout", lang, b.checkOut, st?.checkOutBy),
+      codice_accesso: unit?.accessInfo || st?.accessInfo || "",
+      saldo: eur(messageBalance(b, st)),
+      notti: String(nightsOf(b)),
+      link_guida: guideUrlFor(b),
+      link_checkin: checkinUrlFor(b),
+      whatsapp: structureWhatsapp(st ?? {}) || WHATSAPP_FALLBACK[lang] || WHATSAPP_FALLBACK.it,
+      ...reviewTokens(reviewLinksOf(b)),
+    };
+    return fillTokens(raw, ctx, { lang, emptyStructure });
   };
   const insertTemplate = (id: string) => {
     const tpl = templates.find((x) => x.id === id); if (!tpl || !current) return;
@@ -675,9 +694,16 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   };
 
   // ── Coda invii automatici (calcolata sulle prenotazioni reali) ──
-  const bookingsWithGuest = useMemo(() => bookings
-    .filter((b) => (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked")
-    .map((b) => ({ b, g: guests.find((x) => x.id === b.guestId)! })).filter((x) => x.g), [bookings, guests, activeStructureId]);
+  // Stesse regole del cron (api/cron/auto-messages): né annullate/no-show/blocchi né PROVVISORIE; un solo messaggio per gruppo di camere e per ospite+struttura+giorno
+  // di arrivo (dedupeGroups byGuest). `members` = id di tutte le camere rappresentate dalla riga: il cron scrive il registro con la prenotazione rappresentante, quindi
+  // ogni camera del gruppo risulta «inviata» se lo è la rappresentante (e viceversa).
+  const bookingsWithGuest = useMemo(() => {
+    const rows = bookings
+      .filter((b) => (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.status !== "no_show" && b.status !== "tentative" && b.channel !== "blocked")
+      .map((b) => ({ b, g: guests.find((x) => x.id === b.guestId)! })).filter((x) => x.g);
+    const grp = dedupeGroups(rows.map((r) => ({ id: r.b.id, groupId: r.b.groupId || undefined, guestId: r.b.guestId || undefined, structureId: r.b.structureId || undefined, checkIn: r.b.checkIn, r })), { byGuest: true });
+    return grp.keep.map((k) => ({ ...k.r, members: grp.membersOf.get(k.id) ?? [k.id] }));
+  }, [bookings, guests, activeStructureId]);
   const addDaysISO = (iso: string, n: number) => addDaysYmd(iso, n); // aritmetica di calendario: niente salti attraverso il cambio dell'ora legale
   const todayISO = todayRome();
   // Finestra di RECUPERO: includiamo anche gli invii "scaduti" degli ultimi giorni, così un
@@ -685,16 +711,29 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   // perso: compare come "In ritardo · da inviare subito" invece di sparire.
   const queue = useMemo(() => {
     const catchupFrom = addDaysISO(todayISO, -3);
+    let reviewRaw: string | null = null; try { reviewRaw = localStorage.getItem(REVIEW_SETTINGS_KEY); } catch { /* storage non disponibile */ }
+    const reviewSettings = parseReviewSettings(reviewRaw);
     return templates.filter((tp) => tp.active && tp.trigger !== "manual").flatMap((tp) =>
-      bookingsWithGuest.filter(({ b }) => !tp.structureIds?.length || tp.structureIds.includes(b.structureId)).map(({ b, g }) => {
-        const anchor = tp.trigger === "before_arrival" ? addDaysISO(b.checkIn, -tp.days)
-          : tp.trigger === "on_arrival" ? b.checkIn
-          : tp.trigger === "after_arrival" ? addDaysISO(b.checkIn, tp.days)
-          : tp.trigger === "on_checkout" ? b.checkOut : addDaysISO(b.checkOut, tp.days);
-        return { key: `${tp.id}-${b.id}`, date: anchor, time: tp.time, tpl: tp, g, b, late: anchor < todayISO };
+      bookingsWithGuest.filter(({ b }) => !tp.structureIds?.length || tp.structureIds.includes(b.structureId)).flatMap(({ b, g, members }) => {
+        const anchor = slotDateOf(tp, b.checkIn, b.checkOut) ?? b.checkIn; // stesso giorno previsto del cron
+        if (anchor < catchupFrom) return [];
+        const st = getStructure(b.structureId);
+        const group = members.length > 1 ? bookings.filter((x) => members.includes(x.id)) : undefined;
+        const balance = messageBalance(b, st, group);
+        const lite = { status: b.status, checkIn: b.checkIn, checkOut: b.checkOut, webCheckin: b.webCheckin === true, bookedOn: b.bookedOn };
+        // Regole di esclusione del cron (provvisoria, check-in online già fatto, saldo zero) valutate nel giorno previsto…
+        if (!decideSend({ tpl: tp, booking: lite, today: anchor, balance }).send) return [];
+        // …richiesta di recensione: stesse esclusioni e link obbligatorio.
+        if (stepsOfTemplate(tp).includes("review")) {
+          if (!reviewDecision({ status: b.status, channel: b.channel, reviewRequestedAt: b.reviewRequestedAt, note: b.note, guestRequests: b.guestRequests }, { tags: g.tags, notes: g.notes }, reviewSettings).send) return [];
+          if (usesReviewLinks(Object.values(tp.texts ?? {}).join("\n")) && !reviewTokens(reviewLinksOf(b)).link_recensioni) return [];
+        }
+        // «Invia oggi» parte solo da ciò che il cron manderebbe oggi (giorno previsto = oggi, o recupero last-minute): gli arretrati restano visibili e inviabili a mano con «Invia ora».
+        const dueNow = decideSend({ tpl: tp, booking: lite, today: todayISO, balance }).send;
+        return [{ key: `${tp.id}-${b.id}`, date: anchor, time: tp.time, tpl: tp, g, b, members, dueNow, late: anchor < todayISO }];
       })
-    ).filter((x) => x.date >= catchupFrom).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1)).slice(0, 40);
-  }, [templates, bookingsWithGuest, todayISO]);
+    ).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1)).slice(0, 40);
+  }, [templates, bookingsWithGuest, bookings, todayISO]);
 
   const sendLinkFor = (tpl: MsgTemplate, b: Booking, g: Guest): { href: string; kind: "wa" | "email" } | null => {
     const body = fillFor(tpl.texts[langOf(g)] || tpl.texts.it || "", b, g);
@@ -704,12 +743,15 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     return null;
   };
   const sentKey = (x: { tpl: MsgTemplate; b: Booking; date: string }) => `${x.tpl.srcId || x.tpl.id}-${x.b.id}-${x.date}`;
-  const isSent = (x: { tpl: MsgTemplate; b: Booking; date: string }) => sent.some((s) => s.key === sentKey(x));
+  // Il cron registra la voce con la prenotazione RAPPRESENTANTE del gruppo: vale per ogni camera rappresentata (`members`).
+  const sentKeysOf = (x: { tpl: MsgTemplate; b: Booking; date: string; members?: string[] }) => sentKeysFor(x.tpl.srcId || x.tpl.id, x.b.id, x.date, x.members);
+  const isSent = (x: { tpl: MsgTemplate; b: Booking; date: string; members?: string[] }) => { const ks = sentKeysOf(x); return sent.some((s) => ks.includes(s.key)); };
   // Ritorna true se il messaggio è partito (e registrato). In modalità bulk ("Invia oggi") non si aprono schede: chi richiede l'invio manuale resta in coda.
-  const sendScheduled = async (x: { tpl: MsgTemplate; b: Booking; g: Guest; date: string }, opts?: { bulk?: boolean }): Promise<boolean> => {
+  const sendScheduled = async (x: { tpl: MsgTemplate; b: Booking; g: Guest; date: string; members?: string[] }, opts?: { bulk?: boolean }): Promise<boolean> => {
     const l = sendLinkFor(x.tpl, x.b, x.g); if (!l) return false;
     const key = sentKey(x);
-    if (sentRef.current.some((s) => s.key === key) || sendingRef.current.has(key)) return false; // già inviato o in corso (doppio clic, "Invia oggi" ripetuto)
+    const keys = sentKeysOf(x);
+    if (sentRef.current.some((s) => keys.includes(s.key)) || sendingRef.current.has(key)) return false; // già inviato o in corso (doppio clic, "Invia oggi" ripetuto)
     sendingRef.current.add(key);
     try {
       const body = fillFor(x.tpl.texts[langOf(x.g)] || x.tpl.texts.it || "", x.b, x.g);
@@ -722,7 +764,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       } else if (l.kind === "email" && x.g.email) {
         const st = getStructure(x.b.structureId);
         try {
-          const r = await apiPost<{ ok?: boolean }>("email", { kind: "guest_message", to: x.g.email, subject: x.tpl.name, text: body, booking: { structureName: st?.name, structureEmail: st?.email } });
+          // Oggetto nella lingua dell'ospite (mai il nome interno del modello) e carta intestata della struttura giusta.
+          const r = await apiPost<{ ok?: boolean }>("email", { kind: "guest_message", lang: langOf(x.g), to: x.g.email, subject: autoSubject(asLang(langOf(x.g)), st?.name ?? "", x.b.checkIn), text: body, ...emailBrandPayload(st) });
           sentReal = r?.ok !== false;
         } catch { sentReal = false; }
       }
@@ -747,8 +790,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     finally { setSendingAll(false); }
     if (skipped > 0) window.alert(`${skipped} ${t("invii non partiti in automatico (WhatsApp non collegato o invio non riuscito): usa «Invia ora» sulla singola riga.")}`);
   };
-  // "Invia oggi" copre oggi + gli arretrati non ancora inviati (finestra di recupero).
-  const todayQueue = queue.filter((x) => x.date <= todayISO && !isSent(x));
+  // "Invia oggi" copre ciò che il cron manderebbe oggi (giorno previsto = oggi o recupero last-minute) e non risulta ancora inviato.
+  const todayQueue = queue.filter((x) => x.dueNow && !isSent(x));
   const guestQueue = sel ? queue.filter((x) => x.g.id === sel && !isSent(x)) : [];
 
   const chipBase = "inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] text-dim";
@@ -1071,7 +1114,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {aiErr && <span className="text-[11px] text-[color:var(--err)]">{t("Non sono riuscito a generare la bozza. Riprova.")}</span>}
               </div>
               <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (!touchKb && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={touchKb ? t("Scrivi un messaggio…") : t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim() || sending} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
                   <button onClick={sendMail} disabled={!draft.trim() || !current.email || sending} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>

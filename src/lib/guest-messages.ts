@@ -136,12 +136,27 @@ export async function sendWhatsAppToGuest(g: Guest | undefined, text: string, me
   return { ok: true, how: "link", message: "Ho aperto WhatsApp col testo pronto: premi invio lì per mandarlo." };
 }
 
-export async function sendEmailToGuest(g: Guest | undefined, subject: string, text: string, structure?: { name?: string; email?: string; photoColor?: string }, meta?: SendMeta): Promise<SendResult> {
+/** Dati della struttura che servono alla carta intestata dell'email (nome, logo, colore, indirizzo, contatti). */
+export interface EmailStructure { name?: string; email?: string; photoColor?: string; logo?: string; website?: string; address?: string; streetNumber?: string; city?: string; phone?: string; cin?: string; vat?: string }
+/** Parte `booking` + `replyTo` del corpo di /api/email per un messaggio all'ospite: stessa carta intestata del cron (le risposte dell'ospite tornano alla struttura). */
+export function emailBrandPayload(structure?: EmailStructure): { accent?: string; booking: Record<string, string | undefined>; replyTo?: string } {
+  const st = structure ?? {};
+  return {
+    accent: st.photoColor,
+    booking: {
+      structureName: st.name, structureEmail: st.email, color: st.photoColor, logo: st.logo, website: st.website,
+      address: [st.address, st.streetNumber, st.city].filter(Boolean).join(" ") || undefined, phone: st.phone, cin: st.cin, vat: st.vat,
+    },
+    replyTo: st.email || undefined,
+  };
+}
+
+export async function sendEmailToGuest(g: Guest | undefined, subject: string, text: string, structure?: EmailStructure, meta?: SendMeta): Promise<SendResult> {
   if (!g?.email) return { ok: false, how: "none", message: "L'ospite non ha un indirizzo email." };
   try {
     const r = await fetch("/api/email", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "guest_message", to: g.email, subject, text, accent: structure?.photoColor, booking: { structureName: structure?.name, structureEmail: structure?.email, color: structure?.photoColor } }),
+      body: JSON.stringify({ kind: "guest_message", lang: guestLangOf(g), to: g.email, subject, text, ...emailBrandPayload(structure) }),
     });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j?.ok) { recordOutgoing(g.id, text, "Email", undefined, meta); return { ok: true, how: "api", message: "Email inviata ✓" }; }
@@ -155,7 +170,7 @@ export async function sendEmailToGuest(g: Guest | undefined, subject: string, te
 // e i check-in mandati direttamente dalla chat (riconosciuti dal testo).
 export interface ReminderEntry { ts: number; via: string }
 export type ReminderLog = Record<string, Record<string, ReminderEntry[]>>; // prenotazione → tipo → invii (dal più vecchio)
-type ThreadMsgLite = { dir?: string; text?: string; ts?: number; via?: string; bid?: string; rem?: string };
+type ThreadMsgLite = { dir?: string; text?: string; ts?: number; via?: string; bid?: string; rem?: string; rems?: string[] };
 
 export function readReminderLog(bookings: { id: string; guestId: string }[]): ReminderLog {
   const out: ReminderLog = {};
@@ -167,7 +182,8 @@ export function readReminderLog(bookings: { id: string; guestId: string }[]): Re
     for (const m of threads[b.guestId] ?? []) {
       if (m.dir !== "out" || typeof m.ts !== "number") continue;
       const via = m.via || "Messaggio";
-      if (m.rem && m.bid === b.id) { add(b.id, m.rem, m.ts, via); continue; }
+      // rems: un solo messaggio (es. automatico con link check-in + guida) copre più passaggi
+      if (m.rem && m.bid === b.id) { for (const k of new Set([m.rem, ...(Array.isArray(m.rems) ? m.rems : [])])) add(b.id, k, m.ts, via); continue; }
       if (m.rem) continue; // appartiene a un'altra prenotazione dello stesso ospite
       const t = m.text || "";
       if (t.includes("chat-pay/go")) add(b.id, /tass|tax|taxe|steuer|tasa/i.test(t) ? "pay-tassa" : "pay-saldo", m.ts, via);

@@ -3,10 +3,10 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
-import { cityTaxOfBookingRaw, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, sanitizeChosenExtras, type GroupTaxRow } from "@/lib/booking";
+import { cityTaxOfBookingRaw, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, sanitizeChosenExtras } from "@/lib/booking";
 import type { ExtraService, Structure } from "@/lib/types";
 import { guestLangOrNull } from "@/lib/guest-lang";
-import { sanitizeDoc, sanitizeInvoiceRequest } from "@/lib/checkin-sanitize";
+import { accessInfoVisible, birthDateInvalid, checkinInactiveReason, childAgesFromBirthDates, mergeArrivalTime, mergeExtraGuests, mergeInvoiceRequest, mergePrimaryGuest, mergeText, sanitizeDoc, sanitizeExtra, sanitizeInvoiceRequest } from "@/lib/checkin-sanitize";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { clientIp } from "@/lib/server-booking-guard";
 import { rateLimited } from "@/lib/server-auth";
@@ -14,6 +14,7 @@ import { PRIVATE_BUCKET } from "@/lib/media";
 import { memberOrgIds, putMedia, removeMedia } from "@/lib/media-server";
 import { privateRefsIn, orphanedRefs } from "@/lib/media-orphans";
 import { AttachmentError, MAX_EXTRA_GUESTS, canViewStore, createAttachmentResolver, storeMediaTarget, uploadSecret } from "@/lib/checkin-media";
+import { todayRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,7 +64,19 @@ export async function GET(req: Request) {
     const rt = (store.roomType ?? {}) as Json;
     const g = (store.guest ?? {}) as Json;
     const seeDocs = await viewerCanSeeDocs(req, admin, store);
+    const today = todayRome();
+
+    // Prenotazione annullata / no-show / soggiorno concluso: niente modulo, niente dati. Un operatore loggato può invece riaprire un soggiorno concluso (correzioni a posteriori).
+    const inactive = checkinInactiveReason(b, today);
+    if (inactive === "cancelled" || (inactive === "concluded" && !seeDocs)) {
+      return NextResponse.json({
+        ok: false, inactive: true, reason: inactive,
+        structure: { id: s(st.id), name: s(st.name), color: s(st.photoColor), logo: s(st.logo), phone: s(st.phone), email: s(st.email) },
+      });
+    }
+
     const unit = arr(store.data.units).find((x) => (x as { id?: string }).id === s(b.unitId)) as Json | undefined;
+    const showAccess = accessInfoVisible(b, today);
     // Tassa di soggiorno calcolata sul server (dipende dalla configurazione struttura).
     // Stesso calcolo di elenco, fatture e link di pagamento: paganti = adulti + minori sopra la soglia d'età del Comune, divisore = tutti gli ospiti.
     let cityTax = cityTaxOfBookingRaw(st as unknown as Structure, { adults: n(b.adults) || 1, children: n(b.children), childAges: (Array.isArray(b.childAges) ? (b.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(b.checkIn), checkOut: s(b.checkOut), total: n(b.total), cityTaxExempt: b.cityTaxExempt === true });
@@ -96,8 +109,18 @@ export async function GET(req: Request) {
       try { const Stripe = (await import("stripe")).default; const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); const a = await stripe.accounts.retrieve(stripeAcct); chargesEnabled = !!a.charges_enabled; } catch {}
     }
 
+    // Ospite principale: i dati scritti dal check-in stanno sulla PRENOTAZIONE (primaryGuest). L'anagrafica ospite è condivisa fra le camere di un gruppo
+    // e fra soggiorni diversi: si usa solo dove la prenotazione non ha ancora dati propri.
+    const pg = (b.primaryGuest && typeof b.primaryGuest === "object" ? b.primaryGuest : {}) as Json;
+    const hasPg = !!s(pg.lastName).trim();
+    const pick = (k: string) => (hasPg ? s(pg[k]) : s(g[k]));
+    const sharedPhotos = !groupId; // le foto sull'anagrafica non sono di chi occupa questa camera di gruppo
+    const gPhotoFront = sharedPhotos ? s(g.docPhotoFront) : "";
+    const gPhotoBack = sharedPhotos ? s(g.docPhotoBack) : "";
+
     return NextResponse.json({
       ok: true,
+      operator: seeDocs, // operatore riconosciuto dal server (appartiene alla struttura): la pagina non deve dedurlo da una qualsiasi sessione Supabase
       group: group.length > 1 ? group : undefined,
       aiEnabled: !!process.env.ANTHROPIC_API_KEY, // l'auto-compilazione dal documento è attiva?
       booking: {
@@ -111,19 +134,20 @@ export async function GET(req: Request) {
         docPhotoFront: seeDocs ? s(b.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(b.docPhotoBack) || null : null, signature: seeDocs ? s(b.signature) || null : null,
         invoiceRequest: seeDocs ? (b.invoiceRequest as Json) || null : null,
       },
-      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: seeDocs ? s(g.email) : "", phone: seeDocs ? s(g.phone) : "", sex: s(g.sex), birthDate: seeDocs ? s(g.birthDate) : "", birthPlace: seeDocs ? s(g.birthPlace) : "", citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: seeDocs ? s(g.docNumber) : "", docPlace: seeDocs ? s(g.docPlace) : "", docPhotoFront: seeDocs ? s(g.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(g.docPhotoBack) || null : null,
+      guest: { firstName: pick("firstName") || s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: pick("lastName") || s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: seeDocs ? s(g.email) : "", phone: seeDocs ? s(g.phone) : "", sex: pick("sex"), birthDate: seeDocs ? pick("birthDate") : "", birthPlace: seeDocs ? pick("birthPlace") : "", citizenship: pick("citizenship") || (hasPg ? "" : s(g.country)), docType: pick("docType"), docNumber: seeDocs ? pick("docNumber") : "", docPlace: seeDocs ? pick("docPlace") : "", docPhotoFront: seeDocs ? gPhotoFront || null : null, docPhotoBack: seeDocs ? gPhotoBack || null : null,
         // Lingua della pagina: scheda ospite → Paese → prefisso del telefono. null se non c'è nessun dato (allora decide il browser).
         lang: guestLangOrNull({ language: s(g.language), lang: s(g.lang), country: s(g.country), phone: s(g.phone) }) },
-      // Ospite "di ritorno": ha già dati documento da un soggiorno precedente → check-in veloce.
-      returning: !!(s(g.docNumber) && s(g.firstName) && (s(g.docPhotoFront) || s(b.docPhotoFront))),
+      // Ospite "di ritorno": ha già dati documento da un soggiorno precedente → check-in veloce. Mai per le camere di un gruppo (l'anagrafica è condivisa).
+      returning: !groupId && !!(s(g.docNumber) && s(g.firstName) && (s(g.docPhotoFront) || s(b.docPhotoFront))),
       roomType: { name: s(rt.name) },
-      unit: unit ? { name: s(unit.name), accessInfo: s(unit.accessInfo) } : null,
+      unit: unit ? { name: s(unit.name), accessInfo: showAccess ? s(unit.accessInfo) : "" } : null,
       structure: {
-        name: s(st.name), color: s(st.photoColor), logo: s(st.logo), phone: s(st.phone), email: s(st.email),
+        id: s(st.id), name: s(st.name), color: s(st.photoColor), logo: s(st.logo), phone: s(st.phone), email: s(st.email),
         address: s(st.address), streetNumber: s(st.streetNumber), city: s(st.city),
-        checkInFrom: s(st.checkInFrom), checkOutBy: s(st.checkOutBy), accessInfo: s(st.accessInfo),
+        checkInFrom: s(st.checkInFrom), checkOutBy: s(st.checkOutBy), accessInfo: showAccess ? s(st.accessInfo) : "",
         currency: s(st.currency) || "€", cityTax: (st.cityTax as Json) || null,
-        stripeAccount: s(st.stripeAccount), stripeChargesEnabled: chargesEnabled,
+        // L'account Stripe serve alla pagina SOLO per mostrare/avviare "Paga ora": si espone solo quando la struttura può davvero incassare.
+        stripeAccount: chargesEnabled ? s(st.stripeAccount) : "", stripeChargesEnabled: chargesEnabled,
         extras: arr(st.extras).filter((e) => (e as { active?: boolean }).active !== false).map((e) => ({ id: s((e as Json).id), name: s((e as Json).name), desc: s((e as Json).desc), price: n((e as Json).price), per: s((e as Json).per) })),
       },
     });
@@ -146,22 +170,19 @@ export async function POST(req: Request) {
     const bid = String(body?.b || "").trim();
     if (!bid) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
 
+    // Consenso al trattamento dei dati: obbligatorio per chiunque invii (il modulo lo chiede sempre prima dell'invio).
+    if (body?.consent !== true) return NextResponse.json({ ok: false, error: "consent_required" }, { status: 400 });
+
+    const bodyDoc = (body?.doc && typeof body.doc === "object" ? body.doc : {}) as Json;
+    if (birthDateInvalid(bodyDoc.birthDate) || arr(body?.extraGuests).slice(0, MAX_EXTRA_GUESTS).some((e) => birthDateInvalid((e as Json).birthDate))) {
+      return NextResponse.json({ ok: false, error: "invalid_birth_date" }, { status: 400 });
+    }
     const doc = sanitizeDoc(body?.doc) as DocIn;
     if (!s(doc.firstName).trim() || !s(doc.lastName).trim()) return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
     const arrival = String(body?.arrival || "").slice(0, 40);
     const guestRequests = String(body?.guestRequests || "").slice(0, 800);
     // Ospiti aggiuntivi: i campi anagrafici si ripuliscono subito; foto documento (riferimenti o, solo per pagine vecchie, data URI) si risolvono dopo, quando si sa dove vive la prenotazione.
-    const extraRaw = arr(body?.extraGuests).slice(0, MAX_EXTRA_GUESTS).map((e) => {
-      const g = e as Json;
-      const pf = typeof g.docPhotoFront === "string" ? g.docPhotoFront : (typeof g.photoFront === "string" ? g.photoFront : "");
-      const pb = typeof g.docPhotoBack === "string" ? g.docPhotoBack : (typeof g.photoBack === "string" ? g.photoBack : "");
-      return {
-        firstName: s(g.firstName).slice(0, 80), lastName: s(g.lastName).slice(0, 80), sex: s(g.sex).slice(0, 1),
-        birthDate: s(g.birthDate).slice(0, 20), birthPlace: s(g.birthPlace).slice(0, 120),
-        citizenship: s(g.citizenship).slice(0, 80), docType: s(g.docType).slice(0, 60), docNumber: s(g.docNumber).slice(0, 60), docPlace: s(g.docPlace).slice(0, 120),
-        docPhotoFront: pf || undefined, docPhotoBack: pb || undefined,
-      };
-    }).filter((e) => e.firstName && e.lastName);
+    const extraRaw = arr(body?.extraGuests).slice(0, MAX_EXTRA_GUESTS).map((e) => sanitizeExtra(e)).filter((e) => e.firstName && e.lastName);
     const rawFront = typeof body?.docPhotoFront === "string" ? body.docPhotoFront : undefined;
     const rawBack = typeof body?.docPhotoBack === "string" ? body.docPhotoBack : undefined;
     const rawSignature = typeof body?.signature === "string" ? body.signature : undefined;
@@ -173,6 +194,14 @@ export async function POST(req: Request) {
     let store = slug ? await findBookingStore(admin, slug, bid) : null;
     if (!store) store = await findBookingStoreById(admin, bid);
     if (!store) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+
+    // Operatore (loggato in Xenora, della struttura) o ospite anonimo? L'operatore compila per conto dell'ospite: niente firma obbligatoria, e i dati che invia
+    // (il modulo parte dai dati già salvati) sostituiscono i precedenti. L'ospite anonimo non cancella mai dati già salvati con valori vuoti o di default.
+    const operator = await viewerCanSeeDocs(req, admin, store);
+    const inactive = checkinInactiveReason(store.booking as Json);
+    if (inactive === "cancelled" || (inactive === "concluded" && !operator)) return NextResponse.json({ ok: false, error: "booking_inactive", reason: inactive }, { status: 409 });
+    if (!operator && !rawSignature) return NextResponse.json({ ok: false, error: "signature_required" }, { status: 400 });
+
     const guestId = s((store.booking as Json).guestId);
     const extrasCatalog = arr((store.structure as Json | undefined)?.extras) as unknown as ExtraService[]; // catalogo della struttura: unica fonte di nomi e prezzi degli extra
 
@@ -210,25 +239,43 @@ export async function POST(req: Request) {
       const baseExtras = arr(bk.extras) as { name: string; price: number }[];
       const merged = [...baseExtras];
       for (const c of sanitizeChosenExtras(chosenExtrasRaw, extrasCatalog, { checkIn: s(bk.checkIn), checkOut: s(bk.checkOut), adults: n(bk.adults) || 1 }, baseExtras)) merged.push(c);
-      const primaryGuest = { firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), sex: (doc.sex || undefined) as string | undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace };
-      bookings[idx] = {
-        ...bk, webCheckin: true, arrivalTime: arrival || bk.arrivalTime, guestRequests: guestRequests || undefined,
-        extraGuests, docPhotoFront: docPhotoFront ?? bk.docPhotoFront, docPhotoBack: docPhotoBack ?? bk.docPhotoBack,
-        signature: signature ?? bk.signature, invoiceRequest: invoiceRequest ?? bk.invoiceRequest, extras: merged, primaryGuest,
+      const newPrimary = { firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), sex: (doc.sex || undefined) as string | undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace };
+      // Reinvio / riapertura del link: i dati già salvati non si cancellano con campi vuoti o di default.
+      const primaryGuest = operator ? newPrimary : mergePrimaryGuest(bk.primaryGuest && typeof bk.primaryGuest === "object" ? (bk.primaryGuest as Json) : undefined, newPrimary);
+      const prevExtras = arr(bk.extraGuests);
+      const finalExtras = operator ? extraGuests : mergeExtraGuests(prevExtras as unknown as typeof extraGuests, extraGuests);
+      // Età dei minori ricavate dalle date di nascita raccolte: servono all'esenzione dalla tassa di soggiorno.
+      const ages = childAgesFromBirthDates([s(primaryGuest.birthDate), ...finalExtras.map((x) => s(x.birthDate))], s(bk.checkIn), n(bk.children));
+      const patch: Json = {
+        webCheckin: true,
+        arrivalTime: mergeArrivalTime(bk.arrivalTime, arrival),
+        guestRequests: mergeText(bk.guestRequests, guestRequests),
+        extraGuests: finalExtras,
+        docPhotoFront: docPhotoFront ?? bk.docPhotoFront, docPhotoBack: docPhotoBack ?? bk.docPhotoBack,
+        signature: signature ?? bk.signature,
+        invoiceRequest: operator ? (invoiceRequest ?? bk.invoiceRequest) : mergeInvoiceRequest(bk.invoiceRequest, invoiceRequest),
+        extras: merged, primaryGuest,
+        // Prova del consenso privacy: quando e da chi (ospite dal link / operatore per suo conto).
+        privacyConsentAt: new Date().toISOString(), privacyConsentBy: operator ? "operator" : "guest",
         updatedAt: Date.now(),
       };
+      if (ages) patch.childAges = ages;
+      bookings[idx] = { ...bk, ...patch };
       data.bookings = bookings;
-      // Aggiorna l'anagrafica ospite.
-      const guests = arr(data.guests);
-      const gi = guests.findIndex((x) => (x as { id?: string }).id === guestId);
-      if (gi >= 0) {
-        const gcur = guests[gi] as Json;
-        guests[gi] = { ...gcur, firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), fullName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), sex: (doc.sex || undefined), birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace,
-          // Salva le foto documento SULL'ANAGRAFICA ospite: visibili nella scheda ospite e
-          // riusabili al prossimo soggiorno (check-in veloce). Solo se fornite ora.
-          docPhotoFront: docPhotoFront ?? gcur.docPhotoFront, docPhotoBack: docPhotoBack ?? gcur.docPhotoBack,
-          updatedAt: Date.now() };
-        data.guests = guests;
+      // Anagrafica ospite: la aggiorna SOLO il check-in di una prenotazione singola. Nei gruppi tutte le camere condividono la stessa anagrafica (quella del prenotante):
+      // ogni camera scrive solo il proprio primaryGuest, altrimenti il prenotante si ritroverebbe con nome, documento e foto dell'ultimo capocamera (anche un minore).
+      if (!s(bk.groupId)) {
+        const guests = arr(data.guests);
+        const gi = guests.findIndex((x) => (x as { id?: string }).id === guestId);
+        if (gi >= 0) {
+          const gcur = guests[gi] as Json;
+          guests[gi] = { ...gcur, firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), fullName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), sex: (doc.sex || gcur.sex || undefined), birthDate: doc.birthDate || gcur.birthDate, birthPlace: doc.birthPlace || gcur.birthPlace, citizenship: doc.citizenship || gcur.citizenship, docType: doc.docType || gcur.docType, docNumber: s(doc.docNumber).trim() || gcur.docNumber, docPlace: doc.docPlace || gcur.docPlace,
+            // Salva le foto documento SULL'ANAGRAFICA ospite: visibili nella scheda ospite e
+            // riusabili al prossimo soggiorno (check-in veloce). Solo se fornite ora.
+            docPhotoFront: docPhotoFront ?? gcur.docPhotoFront, docPhotoBack: docPhotoBack ?? gcur.docPhotoBack,
+            updatedAt: Date.now() };
+          data.guests = guests;
+        }
       }
       orphans = orphanedRefs(refsBefore, data);
       return true;
@@ -244,7 +291,7 @@ export async function POST(req: Request) {
     // online la schedina risulta subito "pronta da inviare" alla Questura (niente sync manuale).
     try {
       const { syncSchedine } = await import("@/lib/alloggiati/service");
-      await syncSchedine(admin, store.ownerId, { structureId: store.sid });
+      await syncSchedine(admin, store.ownerId, { structureId: store.sid, bookingId: s((store.booking as Json).id) || bid }); // solo la prenotazione appena salvata: la finestra intera costa 2 query per prenotazione (timeout)
     } catch { /* generazione schedina non critica */ }
 
     // Avvisa il gestore (best-effort).
@@ -255,10 +302,11 @@ export async function POST(req: Request) {
       const hostEmail = s(st.email);
       if (hostEmail) {
         const origin = siteOrigin(req);
-        const guests = [{ firstName: s(doc.firstName), lastName: s(doc.lastName), sex: doc.sex, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber, docPlace: doc.docPlace }, ...extraGuests.map(({ docPhotoFront: _f, docPhotoBack: _b, ...rest }) => rest)]; // l'email non porta le foto dei documenti
+        // L'email non porta dati sensibili: solo nome, cognome e cittadinanza (il resto — documento, nascita — sta nel gestionale, dietro login).
+        const guests = [{ firstName: s(doc.firstName), lastName: s(doc.lastName), citizenship: doc.citizenship }, ...extraGuests.map((x) => ({ firstName: x.firstName, lastName: x.lastName, citizenship: x.citizenship }))];
         await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ kind: "checkin", operatorEmail: hostEmail, arrival, guests, booking: { code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor), guestName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), guestEmail: s((store.guest as Json)?.email), roomType: s(rt.name), checkIn: s(b.checkIn), checkOut: s(b.checkOut) } }),
+          body: JSON.stringify({ kind: "checkin", operatorEmail: hostEmail, arrival, guests, booking: { bookingId: s(b.id), code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor), guestName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), guestEmail: s((store.guest as Json)?.email), roomType: s(rt.name), checkIn: s(b.checkIn), checkOut: s(b.checkOut) } }),
         });
       }
     } catch { /* email non critica */ }

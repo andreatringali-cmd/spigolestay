@@ -5,16 +5,28 @@
 type RoomCode = { label?: string; value?: string; cond?: "always" | "parking" | "noparking" };
 export interface GuideRoom { unitId?: string | null; unitCode?: string; parking?: boolean }
 
-/** Codici di una camera filtrati per parcheggio: `roomAccess` è il JSON (o l'oggetto) di "spigolestay:roomaccess". */
-export function roomCodes(roomAccess: unknown, unitId: string | null | undefined, hasParking: boolean): { l: string; v: string }[] {
+/** Codici di una camera filtrati per parcheggio (voci vuote comprese, nell'ordine in cui sono salvate). */
+function filteredCodes(roomAccess: unknown, unitId: string | null | undefined, hasParking: boolean): RoomCode[] {
   let ra: unknown = roomAccess;
   if (typeof ra === "string") { try { ra = JSON.parse(ra); } catch { ra = null; } }
   const raw = unitId && ra && typeof ra === "object" ? (ra as Record<string, unknown>)[unitId] : null;
   const codes: RoomCode[] = Array.isArray(raw) ? (raw as RoomCode[]) : [];
-  return codes
-    .filter((c) => (c.cond === "parking" ? hasParking : c.cond === "noparking" ? !hasParking : true))
+  return codes.filter((c) => (c.cond === "parking" ? hasParking : c.cond === "noparking" ? !hasParking : true));
+}
+
+/** Codici di una camera filtrati per parcheggio, senza le voci vuote: `roomAccess` è il JSON (o l'oggetto) di "spigolestay:roomaccess". */
+export function roomCodes(roomAccess: unknown, unitId: string | null | undefined, hasParking: boolean): { l: string; v: string }[] {
+  return filteredCodes(roomAccess, unitId, hasParking)
     .map((c) => ({ l: (c.label || "").trim(), v: (c.value || "").trim() }))
     .filter((c) => c.v);
+}
+
+/**
+ * Parametro `k` (cancello-porta-porta2) di una camera. COME il browser (guestlink.ts → unitCodesForBooking): le prime 3 voci del parcheggio scelto SENZA scartare
+ * quelle vuote prima del taglio, così le posizioni restano quelle: cancello vuoto + portone 1234 + porta 5678 → "-1234-5678" (la guida mostra 1234 come portone, non come cancello).
+ */
+export function roomKParam(roomAccess: unknown, unitId: string | null | undefined, hasParking: boolean): string {
+  return filteredCodes(roomAccess, unitId, hasParking).slice(0, 3).map((c) => (c.value || "").trim()).join("-").replace(/-+$/g, "");
 }
 
 /** Link della guida per una prenotazione (1 camera) o di gruppo (2+ camere). `origin` senza barra finale. */
@@ -33,7 +45,7 @@ export function buildGuideUrl(o: { origin: string; structureId: string; guestNam
     const r = o.rooms[0] ?? {};
     const code = (r.unitCode || "").trim();
     if (code) p.set("c", code);
-    const k = roomCodes(o.roomAccess, r.unitId, !!r.parking).slice(0, 3).map((c) => c.v).join("-").replace(/-+$/g, "");
+    const k = roomKParam(o.roomAccess, r.unitId, !!r.parking);
     if (k.replace(/-/g, "")) p.set("k", k);
     p.set("pk", r.parking ? "1" : "0");
   }

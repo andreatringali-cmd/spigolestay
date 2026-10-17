@@ -8,10 +8,11 @@ import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import type { Competitor, MarketRateRow } from "@/lib/ratecheck/service";
-import { toISO, fmtDM } from "@/lib/dates";
+import { fmtDM } from "@/lib/dates";
+import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
 
-const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-const todayISO = () => toISO(new Date());
+const addDays = addDaysYmd; // aritmetica di calendario, immune al cambio dell'ora legale
+const todayISO = () => ymdRome(new Date());
 
 const DAYS = 14;
 const cfgKey = (structureId: string) => `spigolestay:ratecheck:${structureId || "all"}`;

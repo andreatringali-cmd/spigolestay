@@ -133,6 +133,11 @@ test("twinFillPatch: riempie solo i campi vuoti", () => {
   assert.deepEqual(out, { paid: 50, cleaningFee: 30, cityTaxPaid: true, extras: [{ name: "x", price: 1 }] });
 });
 
+test("twinFillPatch: il consenso privacy del check-in (quando/da chi) si porta dalla gemella se manca", () => {
+  const out = twinFillPatch({}, { privacyConsentAt: "2026-10-10T08:00:00.000Z", privacyConsentBy: "operator" });
+  assert.deepEqual(out, { privacyConsentAt: "2026-10-10T08:00:00.000Z", privacyConsentBy: "operator" });
+});
+
 // ── c) quali prenotazioni rileggere / patch da Channex ──
 const today = "2026-10-16";
 const T0 = Date.UTC(2026, 9, 16, 12);

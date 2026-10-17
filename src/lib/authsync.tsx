@@ -27,7 +27,7 @@ import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 import { mergeKeyedList } from "./list-merge";
 import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig } from "./org-cassa-config";
-import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, stripVolatileUsers } from "./sync-merge";
+import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, mergeSentLog, stripVolatileUsers } from "./sync-merge";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -180,6 +180,7 @@ const THREADS_KEY = "spigolestay:threads:v1";
 // Preventivi (array piatto, id ma senza updatedAt): vedi mergePreventivi più sotto. Scritta anche dal
 // server (conferma dopo pagamento Stripe, src/app/api/stripe/quote/confirm/route.ts).
 const PREVENTIVI_KEY = "spigolestay:preventivi";
+const SENT_LOG_KEY = "spigolestay:msgsent";
 
 type WithId = { id?: unknown };
 function idOf(it: unknown): string | null {
@@ -469,6 +470,12 @@ function mergeSnapshots(
     if (m !== null) merged[PREVENTIVI_KEY] = m;
   }
 
+  // Registro invii («Invii programmati»): lo scrive anche il cron dal server; unione per `key`, così la voce del cron non sparisce se qui ne è stata aggiunta un'altra.
+  if (local[SENT_LOG_KEY] !== undefined || server?.[SENT_LOG_KEY] !== undefined) {
+    const m = mergeSentLog(base?.[SENT_LOG_KEY], local[SENT_LOG_KEY], server?.[SENT_LOG_KEY]);
+    if (m !== null) merged[SENT_LOG_KEY] = m;
+  }
+
   // Foto del sito (e immagini ausiliarie): dopo la migrazione su Storage il server ha i riferimenti, mentre un browser con una copia VECCHIA
   // ha ancora le data URI e, con "vince il locale", le riscriverebbe sul server. Se il locale è identico al server tranne che nelle foto,
   // si adotta la versione del server (nessuna modifica dell'utente viene scartata: vedi adoptMigratedMedia in media-migrate-plan.ts).
@@ -493,7 +500,7 @@ function mergeSnapshots(
   // Escluse le chiavi che hanno già una regola propria qui sopra e quelle per-dispositivo. Le chiavi del sito/foto NON sono escluse: adoptMigratedMedia sopra
   // copre la migrazione delle foto, ma i testi cambiati altrove vanno adottati anche qui (locale uguale alla base).
   return adoptServerFlatKeys(merged, local, server, base, (k) =>
-    k === "spigolestay:data:v1" || FLAT_ENTITY_KEYS.includes(k) || k === THREADS_KEY || k === PREVENTIVI_KEY || PULIZIE_MAP_KEYS.includes(k)
+    k === "spigolestay:data:v1" || FLAT_ENTITY_KEYS.includes(k) || k === THREADS_KEY || k === PREVENTIVI_KEY || k === SENT_LOG_KEY || PULIZIE_MAP_KEYS.includes(k)
     || k === "spigolestay:cassa:cats" || k === "spigolestay:cassa:conti" || SIG_SKIP.has(k) || k === LOCAL_OWNER_KEY);
 }
 
@@ -835,7 +842,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 2) Reindirizza al login se non autenticato.
   useEffect(() => {
     if (!supabaseEnabled) return;
-    if (!loading && !session) router.replace("/login");
+    if (!loading && !session) { const p = window.location.pathname + window.location.search; router.replace(p === "/" || p.startsWith("/login") ? "/login" : "/login?next=" + encodeURIComponent(p)); } // conserva il link (es. /prenotazioni?b=<id>) per dopo l'accesso
   }, [loading, session, router]);
 
   // 2b) Livello di sicurezza (2FA): se l'account ha il 2FA attivo e la sessione è ancora a un fattore,

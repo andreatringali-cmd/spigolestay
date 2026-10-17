@@ -2,18 +2,23 @@
 // e utilità di formato. La LETTURA dei documenti avviene direttamente via supabase
 // (RLS tenant_id = auth.uid()); la SCRITTURA fiscale passa dalle route server.
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/friendly-error";
 
 // Poster generico verso una route /api/<path> con bearer token.
 export async function apiPost<T = Record<string, unknown>>(path: string, body: unknown): Promise<T> {
   const token = (await supabase?.auth.getSession())?.data.session?.access_token;
   if (!token) throw new Error("Devi essere connesso");
-  const r = await fetch(`/api/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  });
+  let r: Response;
+  try {
+    r = await fetch(`/api/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+  } catch (e) { throw new Error(friendlyError(e)); } // "Failed to fetch" / "Load failed" → frase chiara
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || j.error) throw new Error(j.message || j.error || "Errore");
+  // Mai codici grezzi (write_conflict, http_403, ...) a schermo: l'errore diventa una frase italiana, il dettaglio resta in console.
+  if (!r.ok || j.error) throw new Error(friendlyError(j.message || j.error || (r.ok ? "" : `http_${r.status}`)));
   return j as T;
 }
 

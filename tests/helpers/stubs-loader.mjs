@@ -18,7 +18,7 @@ const STUBS = {
     export const isInternalRequest = () => !!S.internal;
     export const rateLimited = () => !!S.rateLimited;
     export const siteOrigin = () => "https://test.xenora.local";
-    export const internalFetch = async (url, init) => { rec("internalFetch", { url: String(url), body: init?.body ? JSON.parse(init.body) : null }); return { ok: true, status: 200 }; };`),
+    export const internalFetch = async (url, init) => { rec("internalFetch", { url: String(url), body: init?.body ? JSON.parse(init.body) : null }); const forced = S.internalResponse?.(String(url)); if (forced) return forced; return { ok: true, status: 200, json: async () => ({ ok: true }) }; };`),
   "@/lib/pool-push": src(`${CALLS}
     export const schedulePoolPush = async (blob, touched) => { rec("poolPush", { blob, touched }); };
     export const pushPoolAvailability = async () => ({ pushed: 0 });`),

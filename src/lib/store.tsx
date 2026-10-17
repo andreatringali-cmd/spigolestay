@@ -16,9 +16,13 @@ import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 import { apiPost } from "./invoicing/client";
 import { loadNotifPrefs } from "./notifPrefs";
 import { fmtDMY } from "./dates";
+import { ymdRome } from "./dates-rome";
 import { roomTypeCascadeIds } from "./pricing";
-import { notifyBookingLines } from "./booking-notify";
+import { buildNotifyPayload, deleteMeritsCancelEmail } from "./mail/notify-payload";
 import { moveGuestChats } from "./merge-threads";
+import { orphanedRefs, privateRefsIn } from "./media-orphans";
+import { keepsCheckinFiles } from "./checkin-sanitize";
+import { deleteMedia } from "./media-client";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -99,7 +103,7 @@ interface DataContextValue {
   /** Correzioni automatiche in background (BookingHealer): applica le modifiche con updatedAt nuovo (così la sincronizzazione le adotta) SENZA voci nel registro attività, email di avviso né Google Calendar. */
   patchBookingsSilently: (patches: { id: string; patch: Partial<Booking> }[]) => void;
   moveBooking: (id: string, to: { unitId: string; checkIn: string; checkOut: string }) => void;
-  deleteBooking: (id: string) => void;
+  deleteBooking: (id: string, opts?: { keepFiles?: boolean }) => void; // keepFiles: non toccare documenti/firma sullo Storage (es. sostituzione di un import iCal)
   deleteBookingGroup: (groupId: string) => void; // elimina tutte le camere di una prenotazione di gruppo
 
   // Eventi calendario
@@ -124,6 +128,18 @@ const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `id-${Math.floor(performance.now() * 1000)}`;
+
+/**
+ * Foto del documento e firma (file PRIVATI su Storage) di ospiti/prenotazioni eliminati: via anche dallo Storage, ma SOLO i file che dopo l'eliminazione
+ * non sono più usati da nessun'altra prenotazione o ospite (lo stesso file può stare sia sulla prenotazione sia sull'anagrafica). Best-effort: non blocca nulla.
+ */
+function dropOrphanFiles(removed: unknown[], keep: { bookings: Booking[]; guests: Guest[] }): void {
+  try {
+    // Prenotazioni con check-in fatto (e non annullate): i loro file restano (la cancellazione non è annullabile e può risorgere con la sincronizzazione).
+    const toClean = removed.filter((x) => !(x && typeof x === "object" && keepsCheckinFiles(x as { webCheckin?: unknown; status?: unknown })));
+    for (const ref of orphanedRefs(privateRefsIn(...toClean), keep)) void deleteMedia(ref);
+  } catch { /* pulizia non critica */ }
+}
 
 export function DataProvider({ children }: { children: ReactNode }) {
   // Si parte a VUOTO: i dati reali arrivano dal caricamento (localStorage) nell'effetto di mount.
@@ -198,7 +214,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Notifica via email alla struttura (non all'ospite) per nuove prenotazioni, modifiche,
   // cancellazioni e pagamenti ricevuti — rispetta i toggle di Impostazioni → Notifiche.
   // Fire-and-forget come syncGcal: non deve mai bloccare né far fallire l'azione locale.
-  const notifyOwner = (ev: "newBooking" | "modified" | "cancel" | "payment", b: Booking, extra?: { amount?: number }) => {
+  const notifyOwner = (ev: "newBooking" | "modified" | "cancel" | "payment", b: Booking, extra?: { amount?: number; deleted?: boolean }) => {
     if (b.channel === "blocked") return; // "fuori servizio" non sono prenotazioni ospiti
     // Operazioni di massa (importazioni, cancellazioni in blocco): al massimo 5 email ogni 2 minuti da questo browser.
     const nowMs = Date.now();
@@ -214,20 +230,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const unit = units.find((u) => u.id === b.unitId);
     const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
     const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
-    const guestName = g?.fullName || "Ospite";
     const chLabel = CHANNELS[b.channel]?.label ?? b.channel;
-    const subject = ev === "newBooking" ? `Nuova prenotazione · ${guestName}`
-      : ev === "cancel" ? `Prenotazione cancellata · ${guestName}`
-      : ev === "payment" ? `Pagamento ricevuto · ${guestName}`
-      : `Prenotazione modificata · ${guestName}`;
-    // Tutte le informazioni utili nell'email (ospite e contatti, camera, date, persone, canale, codice, importi, richieste) + pulsante per aprire Xenora.
-    const lines = notifyBookingLines({
+    // Email ricca al titolare: logo e nome della STRUTTURA della prenotazione, canale, importi, contatti dell'ospite e link diretto alla scheda (?b=<id>).
+    // Il corpo è costruito da buildNotifyPayload (lo stesso usato dal server per le prenotazioni delle OTA).
+    const payloadBody = buildNotifyPayload({
       ev, booking: b, guest: g ? { fullName: g.fullName, phone: g.phone, email: g.email, country: g.country } : undefined,
-      structureName: st?.name, roomLabel, channelLabel: chLabel, paymentAmount: extra?.amount,
+      structure: st, roomLabel, channelLabel: chLabel, paymentAmount: extra?.amount, deleted: extra?.deleted,
+      origin: typeof window !== "undefined" ? window.location.origin : undefined,
     });
     fetch("/api/email", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n"), accent: st?.photoColor, ctaUrl: typeof window !== "undefined" ? `${window.location.origin}/prenotazioni` : undefined, ctaLabel: "Apri le prenotazioni →" }),
+      body: JSON.stringify({ ...payloadBody, to }),
     }).catch(() => {});
   };
 
@@ -372,7 +385,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Stima della commissione per le prenotazioni senza cifra reale: si ricalcola quando cambiano le prenotazioni, PRIMA che i componenti figli la leggano.
   // Tassa di soggiorno dei gruppi di camere: una quota per camera, calcolata sull'insieme (vedi setGroupTaxContext in booking.ts); PRIMA dei componenti figli.
   useMemo(() => { setGroupTaxContext(bookings as never, (id) => structures.find((x) => x.id === id)); }, [bookings, structures]);
-  useMemo(() => { setCommissionEstimates(computeCommissionEstimates(bookings, new Date().toISOString().slice(0, 10))); }, [bookings]);
+  useMemo(() => { setCommissionEstimates(computeCommissionEstimates(bookings, ymdRome(new Date()))); }, [bookings]);
 
   const value = useMemo<DataContextValue>(() => {
     // Strutture ordinate secondo la preferenza dell'utente (campo order), poi per nome.
@@ -540,6 +553,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (g && !hasRealBooking) tombLeadContact(g);
         setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "", primaryGuest: b.primaryGuest ?? snap } : b)));
         setGuests((prev) => prev.filter((x) => x.id !== id));
+        if (g) dropOrphanFiles([g], { bookings, guests: guests.filter((x) => x.id !== id) }); // foto documento dell'anagrafica eliminata, se nessuna prenotazione le usa più
       },
       mergeGuestGroups: (groups) => {
         const dropToKeep = new Map<string, string>();
@@ -567,14 +581,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
       addBooking: (b) => {
         // Codice leggibile progressivo per anno di arrivo: XEN-2026-0001.
-        const year = (b.checkIn || new Date().toISOString()).slice(0, 4);
+        const year = (b.checkIn || ymdRome(new Date())).slice(0, 4);
         const prefix = `XEN-${year}-`;
         const maxN = bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0);
         const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
         // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
         // Origine (logo): una diretta creata dal gestionale senza id esterno è "manuale"; chi chiama può passare source esplicito (es. booking engine = "sito"). Gli import (con extId) restano senza campo: li deduce directOriginOf.
         const source = b.source ?? (b.channel === "direct" && !b.extId ? "manuale" : undefined);
-        const rec: Booking = { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, ...(source ? { source } : {}), code, updatedAt: Date.now() };
+        const rec: Booking = { id: uid(), bookedOn: ymdRome(new Date()), ...b, ...(source ? { source } : {}), code, updatedAt: Date.now() };
         setBookings((prev) => [...prev, rec]);
         const gName = (guests.find((g) => g.id === b.guestId) ?? freshGuests.current.get(b.guestId))?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`, b.structureId);
@@ -658,14 +672,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
         logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera", cur?.structureId);
       },
-      deleteBooking: (id) => {
+      deleteBooking: (id, opts) => {
         const b = bookings.find((x) => x.id === id);
         const gName = b ? guests.find((g) => g.id === b.guestId)?.fullName : undefined;
         tomb("bookings", id);
         setBookings((prev) => prev.filter((b) => b.id !== id));
+        if (b && !opts?.keepFiles) dropOrphanFiles([b], { bookings: bookings.filter((x) => x.id !== id), guests }); // foto documento e firma della prenotazione eliminata (salvo check-in fatto, vedi dropOrphanFiles)
         setSelectedBookingId((s) => (s === id ? null : s));
         logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`, b?.structureId);
-        if (b) { syncGcal(b, "delete"); notifyOwner("cancel", b); }
+        if (b) { syncGcal(b, "delete"); if (deleteMeritsCancelEmail(b, ymdRome(new Date()))) notifyOwner("cancel", b, { deleted: true }); } // già annullata/conclusa: pulizia archivio, niente avviso
       },
 
       deleteBookingGroup: (groupId) => {
@@ -675,9 +690,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const gName = guests.find((g) => g.id === members[0].guestId)?.fullName;
         tomb("bookings", ...ids);
         setBookings((prev) => prev.filter((b) => !ids.has(b.id)));
+        dropOrphanFiles(members, { bookings: bookings.filter((x) => !ids.has(x.id)), guests });
         setSelectedBookingId((s) => (s && ids.has(s) ? null : s));
         logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`, members[0].structureId);
-        members.forEach((m) => { syncGcal(m, "delete"); notifyOwner("cancel", m); });
+        const todayRome = ymdRome(new Date());
+        members.forEach((m) => { syncGcal(m, "delete"); if (deleteMeritsCancelEmail(m, todayRome)) notifyOwner("cancel", m, { deleted: true }); });
       },
 
       addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e, updatedAt: Date.now() }]); logAct("event", `Evento: ${e.name}`, e.structureId); },

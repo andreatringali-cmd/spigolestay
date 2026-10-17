@@ -5,6 +5,7 @@ import type { ConciergeTone } from "@/lib/aiConcierge";
 import { isTranslateLang, toTranslationMap, type GuestLang } from "@/lib/concierge-i18n";
 import { loadTranslations } from "@/lib/concierge-translations";
 import { guestLangHint } from "@/lib/guest-lang";
+import { todayRome, addDaysYmd } from "@/lib/dates-rome";
 import { accessCodeOf, kbLang, renderEntry, resolveEntries, toFaqItems, selectRelevant, SENSITIVE_CATEGORIES, type ConciergeEntry } from "@/lib/concierge-kb";
 
 // Motore unico del Concierge (solo server): lo usano sia il webhook WhatsApp sia la casella "Prova" di Xenora,
@@ -17,14 +18,24 @@ interface RoomTypeLite { id: string; amenities?: string[] }
 export interface BookingLite { id: string; structureId: string; unitId: string | null; roomTypeId: string; guestId: string; checkIn: string; checkOut: string; adults?: number; total?: number; cityTaxExempt?: boolean; parking?: boolean; status?: string; channel?: string }
 
 const arr = <T,>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : []);
-const todayISO = () => new Date().toISOString().slice(0, 10);
+/** "Oggi" in Italia (il server gira in UTC: tra mezzanotte e le 1/2 italiane toISOString darebbe ancora il giorno prima). */
+const todayISO = () => todayRome();
 
-// Prenotazione "in corso o futura" di un ospite (la più vicina); altrimenti nessuna.
-export function activeBookingOf(bookings: BookingLite[], guestId: string): BookingLite | undefined {
-  const oggi = todayISO();
-  return bookings
-    .filter((b) => b.guestId === guestId && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && (b.checkOut || "") >= oggi)
-    .sort((a, b) => (a.checkIn < b.checkIn ? -1 : 1))[0];
+/**
+ * Una prenotazione dà diritto a Wi-Fi, codici e istruzioni d'accesso solo se è CONFERMATA e l'arrivo è imminente o già avvenuto
+ * (da domani in poi: check-in <= oggi+1) e la partenza non è passata. Chi ha prenotato per febbraio NON riceve i codici adesso.
+ */
+export function bookingGivesAccess(b: Pick<BookingLite, "status" | "checkIn" | "checkOut" | "channel"> | undefined, today: string = todayISO()): boolean {
+  if (!b || b.status !== "confirmed" || b.channel === "blocked") return false;
+  return (b.checkIn || "") <= addDaysYmd(today, 1) && (b.checkOut || "") >= today;
+}
+
+// Prenotazione "in corso o futura" di un ospite (la più vicina); altrimenti nessuna. Tra quelle che danno accesso ai codici si preferisce la prima.
+export function activeBookingOf(bookings: BookingLite[], guestId: string, today: string = todayISO()): BookingLite | undefined {
+  const mine = bookings
+    .filter((b) => b.guestId === guestId && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && (b.checkOut || "") >= today)
+    .sort((a, b) => (a.checkIn < b.checkIn ? -1 : 1));
+  return mine.find((b) => bookingGivesAccess(b, today)) ?? mine[0];
 }
 
 // Struttura di riferimento: prenotazione dell'ospite (in corso, altrimenti l'ultima), poi struttura unica, poi quella predefinita.
@@ -82,7 +93,7 @@ async function runConcierge(inp: EngineInput, ms: { total: number; kb: number; a
   const bk = inp.bookingId
     ? bookings.find((b) => b.id === inp.bookingId)
     : inp.guest?.id ? activeBookingOf(bookings, inp.guest.id) : undefined;
-  const hasBooking = (!!bk && bk.status !== "cancelled" && (bk.checkOut || "") >= oggi) || !!inp.assumeVerified;
+  const hasBooking = bookingGivesAccess(bk, oggi) || !!inp.assumeVerified;
   const unit = bk ? units.find((u) => u.id === bk.unitId) : undefined;
   const roomType = bk ? roomTypes.find((r) => r.id === bk.roomTypeId) : undefined;
   const accessInfo = hasBooking ? ([unit?.accessInfo, st.accessInfo].filter(Boolean).join(" · ") || undefined) : undefined;

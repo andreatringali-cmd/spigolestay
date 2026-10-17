@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { fetchMarketRates, type Competitor } from "@/lib/ratecheck/service";
+import { ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const from = isISODate((body as Record<string, unknown>)?.from)
       ? String((body as Record<string, unknown>).from)
-      : new Date().toISOString().slice(0, 10);
+      : ymdRome(new Date());
     const daysRaw = Number((body as Record<string, unknown>)?.days);
     const days = Number.isFinite(daysRaw) ? Math.min(60, Math.max(1, Math.round(daysRaw))) : 14;
     const to = addDays(from, days);

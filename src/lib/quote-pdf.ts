@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { fmtDMY } from "./dates";
+import { fmtDay, money, countLabel, peopleLabel, normHex } from "./mail/shell";
+import { pdfSafe } from "./mail/pdf-text";
 
 // Genera il PDF del preventivo (A4, carta intestata) da allegare all'email.
 // Stessa libreria e stesso stile di voucher-pdf.ts (pure-JS pdf-lib, nessuna dipendenza nativa).
@@ -23,24 +24,20 @@ type RGB = ReturnType<typeof rgb>;
 const PER_LABEL: Record<string, string> = { stay: "a soggiorno", night: "a notte", day: "a giornata", person: "a persona" };
 
 function hexRgb(hex?: string) {
-  const h = (hex || "#285f92").replace("#", "");
-  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const int = parseInt(n.slice(0, 6) || "285f92", 16);
+  const int = parseInt(normHex(hex, "#285f92").slice(1), 16); // normHex gestisce 3/4/6/8 cifre (alpha escluso)
   return rgb(((int >> 16) & 255) / 255, ((int >> 8) & 255) / 255, (int & 255) / 255);
 }
 function tint(c: RGB, amt: number) {
   return rgb(c.red + (1 - c.red) * amt, c.green + (1 - c.green) * amt, c.blue + (1 - c.blue) * amt);
 }
-function fmtDate(iso?: string) {
-  if (!iso) return "";
-  try { return `${new Date(iso + "T00:00:00Z").toLocaleDateString("it-IT", { weekday: "long", timeZone: "UTC" })} ${fmtDMY(iso)}`; } catch { return fmtDMY(iso); }
-}
+const fmtDate = (iso?: string) => fmtDay(iso, "it");
 function drawCentered(page: PDFPage, text: string, y: number, size: number, font: PDFFont, color: RGB, W: number) {
+  text = pdfSafe(font)(text);
   const tw = font.widthOfTextAtSize(text, size);
   page.drawText(text, { x: (W - tw) / 2, y, size, font, color });
 }
 function wrap(text: string, font: PDFFont, size: number, maxW: number): string[] {
-  const words = text.split(" ");
+  const words = pdfSafe(font)(text).split(" ");
   let cur = ""; const lines: string[] = [];
   for (const w of words) { const t = cur ? cur + " " + w : w; if (font.widthOfTextAtSize(t, size) > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
   if (cur) lines.push(cur);
@@ -73,12 +70,14 @@ async function newPage(doc: PDFDocument, accent: RGB, font: PDFFont, bold: PDFFo
       textX = M + box + 14;
     } catch (e) { console.error("buildQuotePdf: logo non incorporabile:", e instanceof Error ? e.message : e); }
   }
-  page.drawText(b.structureName || "Xenora", { x: textX, y: H - 52, size: 22, font: bold, color: rgb(1, 1, 1) });
-  page.drawText(subtitle, { x: textX, y: H - 74, size: 12, font, color: rgb(1, 1, 1) });
+  const S = pdfSafe(font);
+  page.drawText(S(b.structureName || "Xenora"), { x: textX, y: H - 52, size: 22, font: bold, color: rgb(1, 1, 1) });
+  page.drawText(S(subtitle), { x: textX, y: H - 74, size: 12, font, color: rgb(1, 1, 1) });
   if (badgeLabel && badgeValue) {
-    const tw = bold.widthOfTextAtSize(badgeValue, 16);
-    page.drawText(badgeLabel, { x: W - M - Math.max(tw, 110), y: H - 46, size: 9, font, color: rgb(1, 1, 1) });
-    page.drawText(badgeValue, { x: W - M - tw, y: H - 68, size: 16, font: bold, color: rgb(1, 1, 1) });
+    const bv = S(badgeValue);
+    const tw = bold.widthOfTextAtSize(bv, 16);
+    page.drawText(S(badgeLabel), { x: W - M - Math.max(tw, 110), y: H - 46, size: 9, font, color: rgb(1, 1, 1) });
+    page.drawText(bv, { x: W - M - tw, y: H - 68, size: 16, font: bold, color: rgb(1, 1, 1) });
   }
   return page;
 }
@@ -96,7 +95,7 @@ function drawFooter(page: PDFPage, font: PDFFont, dim: RGB, line: RGB, b: QuoteD
 // Riga etichetta/valore con wrap del valore, identica a voucher-pdf.ts. Ritorna la nuova y.
 function row(page: PDFPage, y: number, label: string, value: string, font: PDFFont, bold: PDFFont, ink: RGB, dim: RGB, line: RGB): number {
   if (!value) return y;
-  page.drawText(label, { x: M, y, size: 10, font, color: dim });
+  page.drawText(pdfSafe(font)(label), { x: M, y, size: 10, font, color: dim });
   const maxW = W - M - (M + 150);
   const size = 11;
   const lines = wrap(value, bold, size, maxW);
@@ -121,19 +120,20 @@ export async function buildQuotePdf(b: QuoteData): Promise<Uint8Array> {
 
   // Ospite
   page1.drawText("OSPITE", { x: M, y, size: 9, font: bold, color: dim }); y -= 16;
-  page1.drawText(b.guestName || "—", { x: M, y, size: 13, font: bold, color: ink }); y -= 16;
-  if (b.guestEmail) { page1.drawText(b.guestEmail, { x: M, y, size: 10, font, color: dim }); y -= 14; }
+  const S = pdfSafe(font);
+  page1.drawText(S(b.guestName || "—"), { x: M, y, size: 13, font: bold, color: ink }); y -= 16;
+  if (b.guestEmail) { page1.drawText(S(b.guestEmail), { x: M, y, size: 10, font, color: dim }); y -= 14; }
   y -= 12;
 
   y = row(page1, y, "Check-in", fmtDate(b.checkIn), font, bold, ink, dim, line);
   y = row(page1, y, "Check-out", fmtDate(b.checkOut), font, bold, ink, dim, line);
-  if (b.nights) y = row(page1, y, "Durata", `${b.nights} nott${b.nights === 1 ? "e" : "i"}`, font, bold, ink, dim, line);
-  y = row(page1, y, "Ospiti", `${b.adults ?? 1} adulti${b.children ? ` · ${b.children} bambini` : ""}`, font, bold, ink, dim, line);
+  if (b.nights) y = row(page1, y, "Durata", countLabel("it", "night", b.nights), font, bold, ink, dim, line);
+  y = row(page1, y, "Ospiti", peopleLabel("it", b.adults ?? 1, b.children), font, bold, ink, dim, line);
 
   if (b.rooms && b.rooms.length) {
     y -= 6;
     page1.drawText("CAMERE", { x: M, y, size: 9, font: bold, color: dim }); y -= 16;
-    for (const r of b.rooms) y = row(page1, y, r.name, `${cur} ${r.amount.toLocaleString("it-IT")}`, font, bold, ink, dim, line);
+    for (const r of b.rooms) y = row(page1, y, r.name, money(r.amount, cur), font, bold, ink, dim, line);
   }
 
   // Totale soggiorno: riquadro evidenziato nel colore della struttura (come il riepilogo online).
@@ -142,15 +142,15 @@ export async function buildQuotePdf(b: QuoteData): Promise<Uint8Array> {
     const boxH = 36;
     page1.drawRectangle({ x: M, y: y - boxH + 12, width: W - 2 * M, height: boxH, color: tint(accent, 0.91) });
     page1.drawText("TOTALE SOGGIORNO", { x: M + 14, y: y - 12, size: 10, font: bold, color: ink });
-    const totalStr = `${cur} ${b.total.toLocaleString("it-IT")}`;
+    const totalStr = money(b.total, cur);
     const tw = bold.widthOfTextAtSize(totalStr, 15);
     page1.drawText(totalStr, { x: W - M - 14 - tw, y: y - 14, size: 15, font: bold, color: accent });
     y -= boxH + 14;
 
     // Acconto/saldo: mostrati solo se l'acconto richiesto è parziale (0 < acconto < totale).
     if (typeof b.deposit === "number" && b.deposit > 0 && b.deposit < b.total) {
-      y = row(page1, y, "Acconto richiesto", `${cur} ${b.deposit.toLocaleString("it-IT")}`, font, bold, ink, dim, line);
-      y = row(page1, y, "Saldo in struttura", `${cur} ${(b.total - b.deposit).toLocaleString("it-IT")}`, font, bold, ink, dim, line);
+      y = row(page1, y, "Acconto richiesto", money(b.deposit, cur), font, bold, ink, dim, line);
+      y = row(page1, y, "Saldo in struttura", money(b.total - b.deposit, cur), font, bold, ink, dim, line);
     }
   }
 
@@ -160,18 +160,18 @@ export async function buildQuotePdf(b: QuoteData): Promise<Uint8Array> {
   if (b.extras && b.extras.length) {
     const page2 = await newPage(doc, accent, font, bold, b, "Servizi extra disponibili", b.ref ? "PREVENTIVO N." : undefined, b.ref);
     let y2 = H - 140;
-    page2.drawText("SERVIZI & ESPERIENZE", { x: M, y: y2, size: 9, font: bold, color: dim }); y2 -= 20;
+    page2.drawText(S("SERVIZI & ESPERIENZE"), { x: M, y: y2, size: 9, font: bold, color: dim }); y2 -= 20;
     for (const e of b.extras) {
-      const priceStr = `${cur} ${e.price.toLocaleString("it-IT")}`;
+      const priceStr = money(e.price, cur);
       const perStr = e.per ? (PER_LABEL[e.per] ?? e.per) : "";
-      page2.drawText(e.name, { x: M, y: y2, size: 12, font: bold, color: ink });
-      const tw = bold.widthOfTextAtSize(priceStr, 12);
-      page2.drawText(priceStr, { x: W - M - tw, y: y2, size: 12, font: bold, color: ink });
-      if (perStr) { const twp = font.widthOfTextAtSize(perStr, 9); page2.drawText(perStr, { x: W - M - twp, y: y2 - 13, size: 9, font, color: dim }); }
+      page2.drawText(S(e.name), { x: M, y: y2, size: 12, font: bold, color: ink });
+      const tw = bold.widthOfTextAtSize(S(priceStr), 12);
+      page2.drawText(S(priceStr), { x: W - M - tw, y: y2, size: 12, font: bold, color: ink });
+      if (perStr) { const twp = font.widthOfTextAtSize(S(perStr), 9); page2.drawText(S(perStr), { x: W - M - twp, y: y2 - 13, size: 9, font, color: dim }); }
       y2 -= 17;
       if (e.desc) {
         const lines = wrap(e.desc, font, 10, W - 2 * M - 10);
-        lines.forEach((ln) => { page2.drawText(ln, { x: M, y: y2, size: 10, font, color: dim }); y2 -= 13; });
+        lines.forEach((ln) => { page2.drawText(S(ln), { x: M, y: y2, size: 10, font, color: dim }); y2 -= 13; });
       }
       y2 -= 8;
       page2.drawLine({ start: { x: M, y: y2 + 4 }, end: { x: W - M, y: y2 + 4 }, thickness: 0.6, color: line });

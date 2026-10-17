@@ -4,60 +4,52 @@ import QRCode from "qrcode";
 import { buildVoucherPdf } from "@/lib/voucher-pdf";
 import { buildQuotePdf, type QuotePdfRoom, type QuotePdfExtra } from "@/lib/quote-pdf";
 import { uploadPublicAsset, dataUrlToBytes } from "@/lib/email-assets";
-import { et, emailLang, cancelPolicyIn, cityTaxRuleIn, dateLocale, type CityTaxRule } from "@/lib/email-i18n";
-import type { GuestLang } from "@/lib/phone-country";
+import { et, emailLang } from "@/lib/email-i18n";
 import { fmtDMY } from "@/lib/dates";
 import { ymdRome } from "@/lib/dates-rome";
+import { asMailEvent, type Brand } from "@/lib/mail/shell";
+import {
+  brandFrom, cancelEmailHtml, checkinOwnerEmailHtml, explicitLang, messageEmailHtml, policyTextFor, reminderEmailHtml, statusKindOf, subReceiptEmailHtml, subReceiptSubject,
+  voucherEmailHtml, voucherSubject, voucherTotals, type CheckinGuest, type GuestBookingPayload, type SubReceiptPayload,
+} from "@/lib/mail/guest-emails";
+import { notifyEmailHtml, type NotifyBookingData } from "@/lib/mail/notify-email";
+import { str, cleanWebsite, validEmail, addressOnly, fromHeader, langFromEmailDomain } from "@/lib/mail/send-utils";
 
 export const runtime = "nodejs";
 
 // Mittente: dominio da verificare su Resend (fino ad allora si invia solo verso la propria email).
 const FROM = process.env.RESEND_FROM || "onboarding@resend.dev";
+// RESEND_FROM può essere "Nome <indirizzo>": qui serve solo l'indirizzo (il nome visualizzato lo decide fromHeader).
+const FROM_ADDR = addressOnly(FROM);
 const KEY = process.env.RESEND_API_KEY || "";
+const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it").replace(/\/+$/, "");
 
-const esc = (s: unknown) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] || c));
-const fmtDate = (iso?: string, lang: GuestLang = "it") => {
-  if (!iso) return "";
-  // Formato unico gg.mm.aaaa (con il nome del giorno nella lingua dell'ospite davanti).
-  try { return `${new Date(iso + "T00:00:00Z").toLocaleDateString(dateLocale(lang), { weekday: "short", timeZone: "UTC" }).replace(/\.$/, "")} ${fmtDMY(iso)}`; } catch { return fmtDMY(iso); }
+type BookingPayload = GuestBookingPayload;
+
+// Dati in ingresso nominali dal chiamante: brand "grezzo" (logoUrl/color sono alias di logo/accent).
+type InBrand = Brand & { logoUrl?: string; color?: string };
+
+// Logo: URL http(s) vero, oppure data: URI png/jpeg (diventa un URL pubblico in resolveLogoUrl). Altro → niente logo.
+const cleanLogo = (v: unknown): string | undefined => {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (/^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=]+$/i.test(s)) return s;
+  return safeHttpUrl(s);
 };
-
-interface BookingPayload {
-  code?: string; status?: string; structureName?: string; structureEmail?: string; guestName?: string; guestEmail?: string;
-  roomType?: string; unitName?: string; checkIn?: string; checkOut?: string; nights?: number;
-  adults?: number; children?: number; total?: number; currency?: string;
-  checkInFrom?: string; checkOutBy?: string; address?: string; mapsUrl?: string; phone?: string; color?: string;
-  ratePlan?: string; ratePlanName?: string; cancelPolicy?: string; refunded?: number;
-  logo?: string; website?: string; cin?: string; vat?: string;
-  // Dettaglio in stile Octorate (vedi voucherHtml): extra, tassa di soggiorno, incassi, richieste.
-  extras?: { name: string; price: number }[]; extrasTotal?: number; bookingTotal?: number;
-  cityTaxAmount?: number; cityTaxRuleText?: string; grandTotal?: number; paid?: number; due?: number;
-  guestRequests?: string;
-  // Lingua dell'email all'ospite: `lang` esplicita, altrimenti dalla scheda ospite / Paese / prefisso del telefono (lib/email-i18n.ts).
-  lang?: string; guestPhone?: string; guestCountry?: string; guestLanguage?: string;
-  refundable?: boolean; cancelDays?: number; cityTaxRule?: CityTaxRule;
+function normBrand(raw?: InBrand | null): Brand | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Brand = {
+    name: str(raw.name, 120) || undefined, logo: cleanLogo(raw.logo ?? raw.logoUrl), address: str(raw.address, 200) || undefined,
+    phone: str(raw.phone, 60) || undefined, email: str(raw.email, 160) || undefined, website: cleanWebsite(raw.website),
+    accent: safeColor(raw.accent ?? raw.color), cin: str(raw.cin, 60) || undefined, vat: str(raw.vat, 60) || undefined,
+  };
+  return Object.values(out).some(Boolean) ? out : undefined;
 }
 
-// Identità della struttura da mostrare come carta intestata (header + footer).
-interface Brand { name?: string; logo?: string; address?: string; phone?: string; email?: string; website?: string; accent?: string; cin?: string; vat?: string }
-function brandFrom(b: BookingPayload): Brand {
-  return { name: b.structureName, logo: b.logo, address: b.address, phone: b.phone, email: b.structureEmail, website: b.website, accent: b.color, cin: b.cin, vat: b.vat };
-}
-
-// Blocco logo (immagine se presente, altrimenti pastiglia con l'iniziale nel colore struttura).
-// A questo punto brand.logo, se presente, è già un URL http(s) vero (vedi resolveLogoUrl): le
-// email non mostrano immagini incorporate come data: URI, quindi qui non se ne tenta mai il render.
-function logoBlock(brand: Brand, accent: string) {
-  if (brand.logo && /^https?:\/\//i.test(brand.logo)) {
-    return `<img src="${esc(brand.logo)}" alt="${esc(brand.name || "")}" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid #eceef1;" />`;
-  }
-  const initials = esc((brand.name || "XN").replace(/[^\p{L}\p{N} ]/gu, "").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "XN");
-  return `<div style="width:52px;height:52px;border-radius:12px;background:${accent};color:#fff;text-align:center;line-height:52px;font-weight:800;font-size:20px;font-family:Arial,sans-serif;">${initials}</div>`;
-}
+class MailInputError extends Error {}
 
 // Carica il logo (data: URI) su storage pubblico e restituisce il brand con l'URL vero, pronto per
-// l'HTML dell'email. Se manca la configurazione Supabase o il caricamento fallisce, il logo viene
-// tolto (si vede comunque la pastiglia con le iniziali) invece di lasciare un'immagine rotta.
+// l'HTML dell'email (le email non mostrano immagini data:). Se manca la configurazione Supabase o il
+// caricamento fallisce, il logo viene tolto (si vedono le iniziali nel colore struttura) invece di un'immagine rotta.
 async function resolveLogoUrl(brand?: Brand): Promise<Brand | undefined> {
   if (!brand?.logo) return brand;
   const parsed = dataUrlToBytes(brand.logo);
@@ -66,262 +58,40 @@ async function resolveLogoUrl(brand?: Brand): Promise<Brand | undefined> {
   return { ...brand, logo: url ?? undefined };
 }
 
-// Carta intestata: barra colore struttura + header con logo/nome/contatti + corpo + footer con recapiti.
-function shell(title: string, accent: string, inner: string, brand?: Brand) {
-  const bd = brand || {};
-  const name = esc(bd.name || "");
-  const contacts = [bd.phone, bd.email, bd.website].filter(Boolean).map(esc).join(" · ");
-  const legal = [bd.cin ? `CIN ${esc(bd.cin)}` : "", bd.vat ? `P.IVA ${esc(bd.vat)}` : ""].filter(Boolean).join(" · ");
-  const header = bd.name
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-        <tr>
-          <td width="52" valign="top" style="padding-right:14px;">${logoBlock(bd, accent)}</td>
-          <td valign="middle">
-            <div style="font-size:19px;font-weight:800;color:#1f2430;letter-spacing:-.2px;">${name}</div>
-            ${bd.address ? `<div style="font-size:12px;color:#8a919c;margin-top:2px;">${esc(bd.address)}</div>` : ""}
-            <div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:${accent};font-weight:700;margin-top:4px;">${esc(title)}</div>
-          </td>
-        </tr>
-      </table>`
-    : `<div style="font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:${accent};font-weight:700;">${esc(title)}</div>`;
-  const footer = bd.name
-    ? `<div style="margin-top:14px;background:#fff;border:1px solid #e6e8ec;border-radius:14px;padding:16px 20px;color:#8a919c;font-size:11px;line-height:1.6;">
-         <div style="font-weight:700;color:#5b616c;">${name}</div>
-         ${bd.address ? `<div>${esc(bd.address)}</div>` : ""}
-         ${contacts ? `<div>${contacts}</div>` : ""}
-         ${legal ? `<div>${legal}</div>` : ""}
-       </div>
-       <div style="text-align:center;color:#b9bfc9;font-size:10px;margin-top:8px;">Inviato con Xenora</div>`
-    : `<div style="text-align:center;color:#9aa1ac;font-size:11px;margin-top:14px;">Inviato con Xenora · Digital Solution</div>`;
-  return `<!doctype html><html lang="it"><body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
-  <div style="max-width:680px;margin:0 auto;padding:24px 16px;">
-    <div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e8ec;">
-      <div style="height:5px;background:${accent};"></div>
-      <div style="padding:22px 24px 18px;border-bottom:1px solid #f0f1f4;">${header}</div>
-      <div style="padding:22px 24px 26px;">${inner}</div>
-    </div>
-    ${footer}
-  </div></body></html>`;
-}
-
-function row(label: string, value: string) {
-  return `<tr><td style="padding:7px 0;color:#6b7280;font-size:13px;">${esc(label)}</td><td style="padding:7px 0;text-align:right;font-size:14px;font-weight:600;color:#1f2430;">${value}</td></tr>`;
-}
-
-async function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) {
-  const accent = b.color || "#285f92";
-  const cur = b.currency || "€";
-  const L = emailLang(b);
-  const T = (s: string, v?: Record<string, string | number>) => et(L, s, v);
-  const money = (n?: number) => `${cur} ${(n ?? 0).toLocaleString(dateLocale(L))}`;
-  // Politica di cancellazione e tassa di soggiorno: in italiano il testo già composto, nelle altre lingue ricomposto dai dati strutturati.
-  const policyText = L !== "it" && b.refundable !== undefined ? cancelPolicyIn(L, b.refundable, b.cancelDays) : b.cancelPolicy;
-  const taxText = L !== "it" && b.cityTaxRule ? cityTaxRuleIn(L, b.cityTaxRule) : b.cityTaxRuleText;
-  // Calcolati qui (non fidandosi del chiamante) così ogni punto che manda un voucher — dal pannello
-  // prenotazioni o dalla prenotazione diretta dal sito — mostra totali corretti anche se non passa
-  // già tutti i campi derivati (es. public-booking manda solo "total", non extrasTotal/grandTotal).
-  const extrasTotal = b.extrasTotal ?? (b.extras || []).reduce((s, e) => s + (e.price || 0), 0);
-  const bookingTotal = b.bookingTotal ?? ((b.total ?? 0) + extrasTotal);
-  const cityTaxAmount = b.cityTaxAmount ?? 0;
-  const grandTotal = b.grandTotal ?? (bookingTotal + cityTaxAmount);
-  const paid = b.paid ?? 0;
-  const due = b.due ?? Math.max(0, grandTotal - paid);
-  const ratePlanName = b.ratePlanName || b.ratePlan;
-  const brand = await resolveLogoUrl(brandFrom(b));
-  // QR per gestire la prenotazione dal telefono (come su Octorate): inquadrandolo si apre lo
-  // stesso link del pulsante "Gestisci". Se generazione/caricamento falliscono l'email parte
-  // comunque, solo senza QR.
-  let qrHtml = "";
-  const qrTarget = manageUrl || checkinUrl;
-  if (qrTarget) {
-    try {
-      const qrBytes = await QRCode.toBuffer(qrTarget, { type: "png", margin: 1, width: 220 });
-      const qrUrl = await uploadPublicAsset(qrBytes, "png", "image/png");
-      if (qrUrl) {
-        qrHtml = `<div style="margin:18px 0 0;text-align:center;">
-          <img src="${esc(qrUrl)}" width="120" height="120" alt="${esc(T("QR gestione prenotazione"))}" style="display:inline-block;border:1px solid #eceef1;border-radius:10px;padding:6px;background:#fff;" />
-          <div style="margin-top:6px;font-size:11px;color:#9aa1ac;">${esc(T("Inquadra per gestire la prenotazione dal telefono"))}</div>
-        </div>`;
-      }
-    } catch { /* niente QR se fallisce: non blocca l'invio */ }
-  }
-  const extrasLines = (b.extras || []).filter((e) => e.name);
-  const inner = `
-    <p style="margin:0 0 4px;font-size:16px;">${T("Ciao <b>{name}</b>,", { name: esc((b.guestName || "").split(" ")[0] || T("ospite")) })}</p>
-    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">${T("la tua prenotazione presso <b>{structure}</b> è confermata. Ecco il riepilogo completo.", { structure: esc(b.structureName) })}</p>
-    <div style="background:#f8f9fb;border:1px solid #eceef1;border-radius:12px;padding:14px 16px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div><div style="font-size:12px;color:#9aa1ac;">${esc(T("Codice prenotazione"))}</div>
-      <div style="font-size:20px;font-weight:800;letter-spacing:1px;color:${accent};font-family:monospace;">${esc(b.code || "")}</div></div>
-      ${b.status ? `<div style="background:${accent};color:#fff;font-size:11px;font-weight:700;padding:5px 12px;border-radius:99px;">${esc(T(b.status))}</div>` : ""}
-    </div>
-    <table style="width:100%;border-collapse:collapse;">
-      ${row(T("Arrivo"), esc(fmtDate(b.checkIn, L)) + (b.checkInFrom ? ` <span style="color:#9aa1ac;font-weight:400;">${esc(T("dalle {time}", { time: b.checkInFrom }))}</span>` : ""))}
-      ${row(T("Partenza"), esc(fmtDate(b.checkOut, L)) + (b.checkOutBy ? ` <span style="color:#9aa1ac;font-weight:400;">${esc(T("entro {time}", { time: b.checkOutBy }))}</span>` : ""))}
-      ${row(T("Notti"), String(b.nights ?? ""))}
-    </table>
-
-    <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">${esc(T("Riepilogo economico"))}</div>
-    <table style="width:100%;border-collapse:collapse;">
-      ${row(T("Totale camere"), money(b.total))}
-      ${row(T("Totale extra"), money(extrasTotal))}
-      ${row(T("Totale prenotazione"), money(bookingTotal))}
-      ${cityTaxAmount > 0 ? row(T("Tassa di soggiorno"), money(cityTaxAmount)) : ""}
-      ${row(T("Totale"), `<b style="color:${accent};">${money(grandTotal)}</b>`)}
-      ${row(T("Totale incassato"), money(paid))}
-      ${row(T("Totale da incassare"), money(due))}
-    </table>
-
-    <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">${esc(T("Dettaglio costi"))}</div>
-    <table style="width:100%;border-collapse:collapse;">
-      ${row(T("Camera"), esc([b.roomType, b.unitName].filter(Boolean).join(" · ")))}
-      ${ratePlanName ? row(T("Tariffa"), esc(ratePlanName)) : ""}
-      ${row(T("Servizi extra"), extrasLines.length ? extrasLines.map((e) => esc(e.name) + (e.price ? ` (${money(e.price)})` : "")).join(", ") : T("Nessuno"))}
-      ${row(T("Ospiti"), String(b.adults ?? 1))}
-      ${row(T("Bambini"), String(b.children ?? 0))}
-    </table>
-
-    <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">${esc(T("Richieste speciali"))}</div>
-    <p style="margin:0;font-size:13px;color:#4b5563;">${b.guestRequests ? esc(b.guestRequests) : esc(T("Nessuna richiesta specificata."))}</p>
-
-    ${(policyText || taxText) ? `<div style="margin:18px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;line-height:1.6;"><b style="color:#1f2430;">${esc(T("Termini e condizioni di prenotazione"))}</b><br>${policyText ? esc(policyText) : ""}${policyText && taxText ? "<br><br>" : ""}${taxText ? esc(taxText) : ""}</div>` : ""}
-
-    <div style="margin:22px 0 6px;">
-      <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">${esc(T("Gestisci la tua prenotazione →"))}</a>
-    </div>
-    <ul style="margin:8px 0 0;padding:0 0 0 18px;font-size:12px;color:#6b7280;line-height:1.9;">
-      <li>${T("Completare i dati mancanti e fare il <b>check-in online</b>")}</li>
-      <li>${T("Vedere lo stato del pagamento e <b>saldare</b> l'importo dovuto")}</li>
-      <li>${T("Inviare <b>richieste particolari</b> alla struttura")}</li>
-    </ul>
-    ${manageUrl ? `<div style="margin:12px 0 6px;">
-      <a href="${esc(manageUrl)}" style="display:block;text-align:center;background:#fff;border:1px solid ${accent};color:${accent};text-decoration:none;font-weight:700;font-size:14px;padding:12px;border-radius:10px;">${esc(T("Gestisci la prenotazione (modifica o annulla)"))}</a>
-    </div>` : ""}
-    ${qrHtml}
-    ${(b.website || b.mapsUrl) ? `<div style="margin:16px 0 0;text-align:center;font-size:12px;">${b.website ? `<a href="${esc(/^https?:\/\//i.test(b.website) ? b.website : `https://${b.website}`)}" style="color:${accent};text-decoration:none;font-weight:600;">${esc(T("Visita il nostro sito"))}</a>` : ""}${b.website && b.mapsUrl ? " &nbsp;·&nbsp; " : ""}${b.mapsUrl ? `<a href="${esc(b.mapsUrl)}" style="color:${accent};text-decoration:none;font-weight:600;">${esc(T("Apri in Google Maps"))}</a>` : ""}</div>` : ""}
-  `;
-  return shell(T("Conferma prenotazione"), accent, inner, brand);
-}
-
-// Email di annullamento (all'ospite): conferma la cancellazione ed eventuale rimborso.
-async function cancelHtml(b: BookingPayload) {
-  const accent = b.color || "#b4472e";
-  const cur = b.currency || "€";
-  const L = emailLang(b);
-  const T = (s: string, v?: Record<string, string | number>) => et(L, s, v);
-  // Nessun rimborso: nelle lingue diverse dall'italiano la politica si ricompone dai dati strutturati se ci sono.
-  const policyText = L !== "it" && b.refundable !== undefined ? cancelPolicyIn(L, b.refundable, b.cancelDays) : b.cancelPolicy;
-  const refunded = typeof b.refunded === "number" ? b.refunded : 0;
-  const brand = await resolveLogoUrl(brandFrom(b));
-  const inner = `
-    <p style="margin:0 0 4px;font-size:16px;">${T("Ciao <b>{name}</b>,", { name: esc((b.guestName || "").split(" ")[0] || T("ospite")) })}</p>
-    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">${T("la tua prenotazione presso <b>{structure}</b> è stata <b>annullata</b>.", { structure: esc(b.structureName) })}</p>
-    <table style="width:100%;border-collapse:collapse;">
-      ${row(T("Codice"), `<span style="font-family:monospace;">${esc(b.code || "")}</span>`)}
-      ${row(T("Struttura"), esc(b.structureName))}
-      ${row(T("Periodo"), esc(fmtDate(b.checkIn, L)) + " → " + esc(fmtDate(b.checkOut, L)))}
-    </table>
-    <div style="margin:16px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:14px 16px;">
-      ${refunded > 0
-        ? `<div style="font-size:14px;color:#0E7C4A;font-weight:700;">${esc(T("Rimborso emesso: {amount}", { amount: `${cur} ${refunded.toLocaleString(dateLocale(L))}` }))}</div>
-           <div style="margin-top:4px;font-size:12px;color:#6b7280;">${esc(T("L'importo tornerà sul metodo di pagamento usato entro 5–10 giorni lavorativi (tempi della banca)."))}</div>`
-        : `<div style="font-size:14px;color:#1f2430;font-weight:700;">${esc(T("Nessun rimborso previsto"))}</div>
-           <div style="margin-top:4px;font-size:12px;color:#6b7280;">${esc(policyText || T("Secondo le condizioni della tariffa prenotata."))}</div>`}
-    </div>
-    <p style="margin:18px 0 0;font-size:13px;color:#4b5563;">${esc(T("Ci dispiace vederti annullare. Sarai sempre il benvenuto in futuro."))}</p>
-  `;
-  return shell(T("Prenotazione annullata"), accent, inner, brand);
-}
-
-interface CheckinGuest { role?: string; firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string; docPlace?: string }
-async function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string) {
-  const accent = b.color || "#0E9F6E";
-  const brand = await resolveLogoUrl(brandFrom(b));
-  const list = guests.map((g, i) => `
-    <div style="border:1px solid #eceef1;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
-      <div style="font-size:12px;color:#9aa1ac;margin-bottom:6px;">${i === 0 ? "Ospite principale" : `Ospite ${i + 1}`}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        ${row("Nome", esc([g.firstName, g.lastName].filter(Boolean).join(" ")))}
-        ${g.sex ? row("Sesso", esc(g.sex)) : ""}
-        ${g.birthDate ? row("Nascita", esc(fmtDMY(g.birthDate)) + (g.birthPlace ? ` · ${esc(g.birthPlace)}` : "")) : ""}
-        ${g.citizenship ? row("Cittadinanza", esc(g.citizenship)) : ""}
-        ${g.docNumber ? row("Documento", esc([g.docType, g.docNumber].filter(Boolean).join(" · ")) + (g.docPlace ? ` · ${esc(g.docPlace)}` : "")) : ""}
-      </table>
-    </div>`).join("");
-  const inner = `
-    <p style="margin:0 0 14px;font-size:15px;">Nuovo <b>check-in online</b> completato per la prenotazione <b style="font-family:monospace;">${esc(b.code || "")}</b>.</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
-      ${row("Struttura", esc(b.structureName))}
-      ${row("Sistemazione", esc([b.roomType, b.unitName].filter(Boolean).join(" · ")))}
-      ${row("Arrivo", esc(fmtDate(b.checkIn)))}
-      ${arrival ? row("Orario previsto", esc(arrival)) : ""}
-    </table>
-    <div style="font-size:12px;color:#9aa1ac;margin-bottom:8px;">Dati ospiti raccolti (${guests.length})</div>
-    ${list}
-    <p style="margin:14px 0 0;font-size:12px;color:#9aa1ac;">Apri il gestionale → Alloggiati Web per generare il tracciato e inviarlo alla Questura.</p>
-  `;
-  return shell("Check-in ricevuto", accent, inner, brand);
-}
-
-// Sollecito check-in all'OSPITE: email diretta con il link per compilare il check-in online.
-async function reminderHtml(b: BookingPayload, checkinUrl: string) {
-  const accent = b.color || "#0E9F6E";
-  const L = emailLang(b);
-  const T = (s: string, v?: Record<string, string | number>) => et(L, s, v);
-  const brand = await resolveLogoUrl(brandFrom(b));
-  const inner = `
-    <p style="margin:0 0 4px;font-size:16px;">${T("Ciao <b>{name}</b>,", { name: esc((b.guestName || "").split(" ")[0] || T("ospite")) })}</p>
-    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">${T("manca poco al tuo arrivo presso <b>{structure}</b>. Completa il <b>check-in online</b> adesso: è veloce e al tuo arrivo eviti l'attesa.", { structure: esc(b.structureName) })}</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
-      ${b.code ? row(T("Codice"), `<span style="font-family:monospace;">${esc(b.code)}</span>`) : ""}
-      ${b.checkIn ? row(T("Arrivo"), esc(fmtDate(b.checkIn, L)) + (b.checkInFrom ? ` <span style="color:#9aa1ac;font-weight:400;">${esc(T("dalle {time}", { time: b.checkInFrom }))}</span>` : "")) : ""}
-    </table>
-    <div style="margin:20px 0 6px;">
-      <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">${esc(T("Fai il check-in online →"))}</a>
-    </div>
-    <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">${esc(T("Compila i dati prima dell'arrivo: risparmi tempo al check-in."))}</p>
-  `;
-  return shell(T("Completa il check-in"), accent, inner, brand);
-}
-
-// Ricevuta di pagamento dell'ABBONAMENTO Xenora (email sobria all'abbonato).
-interface SubReceiptPayload { plan?: string | null; planName?: string | null; totalCents?: number; currency?: string; periodStart?: number | null; periodEnd?: number | null; invoiceId?: string }
-function subReceiptHtml(s: SubReceiptPayload) {
-  const accent = "#285f92";
-  const cur = (s.currency || "EUR").toUpperCase() === "EUR" ? "€" : (s.currency || "EUR");
-  const amount = typeof s.totalCents === "number" ? `${cur} ${(s.totalCents / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })}` : "";
-  const plan = s.planName || (s.plan ? s.plan.charAt(0).toUpperCase() + s.plan.slice(1) : "");
-  const fmt = (u?: number | null) => { if (!u) return ""; try { return fmtDMY(ymdRome(u * 1000)); } catch { return ""; } };
-  const periodo = s.periodStart && s.periodEnd ? `${fmt(s.periodStart)} → ${fmt(s.periodEnd)}` : "";
-  const inner = `
-    <p style="margin:0 0 4px;font-size:16px;">Grazie,</p>
-    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">abbiamo ricevuto il pagamento del tuo abbonamento <b>Xenora</b>. Ecco il riepilogo.</p>
-    <table style="width:100%;border-collapse:collapse;">
-      ${plan ? row("Piano", esc(plan)) : ""}
-      ${periodo ? row("Periodo", esc(periodo)) : ""}
-      ${amount ? row("Importo", esc(amount)) : ""}
-      ${s.invoiceId ? row("Riferimento", `<span style="font-family:monospace;">${esc(s.invoiceId)}</span>`) : ""}
-    </table>
-    <div style="margin:18px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;">
-      Il <b>documento fiscale</b> relativo a questo pagamento ti sarà recapitato a seguire.
-    </div>
-    <p style="margin:18px 0 0;font-size:13px;color:#4b5563;">Grazie per aver scelto Xenora.</p>
-  `;
-  return shell("Ricevuta abbonamento", accent, inner);
-}
-
 // fromName: nome visualizzato del mittente (es. "B&b Spigolehouse") — l'indirizzo resta sempre
 // quello verificato su Resend, cambia solo il nome che l'ospite vede in casella, come fa Octorate
 // (mittente = la struttura, non la piattaforma). "Xenora" resta il default per le email di sistema.
 async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[], fromName?: string) {
+  if (!validEmail(to)) throw new MailInputError("Indirizzo email del destinatario non valido");
+  const reply = validEmail(replyTo) ? replyTo.trim() : undefined; // reply_to non valido: si omette (l'email parte comunque)
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: `${(fromName || "Xenora").replace(/[<>]/g, "")} <${FROM}>`, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
+    body: JSON.stringify({ from: fromHeader(fromName, FROM_ADDR), to: [to.trim()], subject: String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300), html, ...(reply ? { reply_to: reply } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || `Resend ${res.status}`);
   return data;
 }
+
+// Dati strutturati della prenotazione per le notifiche al titolare: si copiano SOLO i campi noti, con tipi controllati.
+const NOTIFY_STR = ["bookingId", "code", "status", "guestName", "guestPhone", "guestEmail", "guestCountry", "roomLabel", "checkIn", "checkOut", "arrivalTime", "checkInFrom", "checkOutBy", "bookedOn", "currency", "guestRequests", "note"] as const;
+const NOTIFY_NUM = ["nights", "adults", "children", "cribs", "stay", "extras", "cleaning", "cityTax", "total", "paid", "due", "payment", "commission", "net"] as const;
+function sanitizeNotifyBooking(raw: unknown): NotifyBookingData | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of NOTIFY_STR) {
+    // Richieste e note dell'ospite: solo trim e taglio (gli a capo servono, la mail li mostra con pre-wrap).
+    const v = k === "guestRequests" || k === "note" ? (typeof r[k] === "string" ? (r[k] as string).replace(/\r\n?/g, "\n").replace(/[^\S\n]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, 1500) : "") : str(r[k], 200);
+    if (v) out[k] = v;
+  }
+  for (const k of NOTIFY_NUM) { const v = r[k]; if (typeof v === "number" && Number.isFinite(v)) out[k] = v; }
+  for (const k of ["parking", "commissionEstimate", "netEstimate"] as const) if (typeof r[k] === "boolean") out[k] = r[k];
+  return Object.keys(out).length ? (out as NotifyBookingData) : undefined;
+}
+
+const safeName = (s: unknown, fallback: string) => String(s || fallback).replace(/[^A-Za-z0-9_-]/g, "-") || fallback;
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
@@ -332,8 +102,10 @@ export async function POST(req: Request) {
     if (rateLimited("email:" + who.userId, 60, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
   }
   let body: {
-    kind?: string; booking?: BookingPayload; brand?: Brand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string;
+    kind?: string; booking?: BookingPayload; brand?: InBrand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; schedina?: string;
     to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string; subscription?: SubReceiptPayload;
+    // Notifica al titolare (kind "notify"): evento, canale e struttura; i dati della prenotazione stanno in `booking` (vedi NotifyBookingData).
+    event?: string; channelLabel?: string; structureName?: string; lang?: string;
     // Dati strutturati del preventivo (kind: "quote"), usati per generare il PDF allegato SOLO come
     // fallback (vedi pdfBase64 sotto) quando il chiamante non fornisce già un PDF pronto.
     guestName?: string; checkIn?: string; checkOut?: string; nights?: number; adults?: number; children?: number;
@@ -343,92 +115,121 @@ export async function POST(req: Request) {
     pdfBase64?: string; pdfFilename?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
-  const b = body.booking || {};
+  const b: BookingPayload = body.booking || {};
   // URL e colori finiscono dentro href/src/style: si accettano solo http(s) ed esadecimali (niente javascript:, niente stili iniettati).
   body.ctaUrl = safeHttpUrl(body.ctaUrl); body.checkinUrl = safeHttpUrl(body.checkinUrl) ?? ""; body.manageUrl = safeHttpUrl(body.manageUrl);
   body.accent = safeColor(body.accent);
-  if (body.brand) { body.brand = { ...body.brand, accent: safeColor(body.brand.accent), website: safeHttpUrl(body.brand.website) }; }
-  b.color = safeColor(b.color); b.mapsUrl = safeHttpUrl(b.mapsUrl); b.website = safeHttpUrl(b.website);
+  b.color = safeColor(b.color); b.mapsUrl = safeHttpUrl(typeof b.mapsUrl === "string" ? b.mapsUrl.trim().replace(/'/g, "%27") : b.mapsUrl); b.website = cleanWebsite(b.website);
+  const inBrand = normBrand(body.brand);
   try {
     if (body.kind === "voucher") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
-      const subject = `${et(emailLang(b), "Conferma prenotazione")} ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      // Allega il voucher in PDF (carta intestata). Se il chiamante ha già catturato l'anteprima
-      // reale (VoucherDoc via html2canvas, vedi BookingDrawer) usa quella — fotocopia esatta di
-      // quanto si vede a schermo. Solo se manca (es. invii automatici senza browser) si ripiega
-      // sul disegno pdf-lib. Se anche quello fallisce, l'email parte comunque senza allegato.
+      const L = emailLang(b);
+      const kind = statusKindOf(b);
+      const brand = await resolveLogoUrl(brandFrom(b));
+      // QR per gestire la prenotazione dal telefono (come su Octorate): inquadrandolo si apre lo
+      // stesso link del pulsante "Gestisci". Se generazione/caricamento falliscono l'email parte comunque, solo senza QR.
+      let qrUrl: string | undefined;
+      const qrTarget = body.manageUrl || body.checkinUrl;
+      if (qrTarget && kind !== "cancelled") {
+        try {
+          const qrBytes = await QRCode.toBuffer(qrTarget, { type: "png", margin: 1, width: 220 });
+          qrUrl = (await uploadPublicAsset(qrBytes, "png", "image/png")) ?? undefined;
+        } catch { /* niente QR se fallisce: non blocca l'invio */ }
+      }
+      // Allega il voucher in PDF (carta intestata). Se il chiamante ha già catturato l'anteprima reale (VoucherDoc via html2canvas,
+      // vedi BookingDrawer) usa quella — fotocopia esatta di quanto si vede a schermo. Solo se manca (es. invii automatici senza
+      // browser) si ripiega sul disegno pdf-lib. Se anche quello fallisce l'email parte comunque senza allegato, ma l'errore
+      // viene registrato e segnalato nella risposta (`pdf: "skipped"`), non ingoiato.
       let attachments: { filename: string; content: string }[] | undefined;
+      let pdf: "attached" | "fallback" | "skipped" = "skipped";
       try {
         if (body.pdfBase64) {
-          attachments = [{ filename: body.pdfFilename || `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: body.pdfBase64 }];
+          attachments = [{ filename: body.pdfFilename || `voucher-${safeName(b.code, "prenotazione")}.pdf`, content: body.pdfBase64 }];
+          pdf = "attached";
         } else {
-          const pdf = await buildVoucherPdf({ ...b, manageUrl: body.manageUrl });
-          attachments = [{ filename: `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
+          const totals = voucherTotals(b);
+          const bytes = await buildVoucherPdf({ ...b, ...totals, lang: L, statusKey: kind, cancelPolicy: policyTextFor(b, L), manageUrl: body.manageUrl });
+          attachments = [{ filename: `voucher-${safeName(b.code, "prenotazione")}.pdf`, content: Buffer.from(bytes).toString("base64") }];
+          pdf = "fallback";
         }
-      } catch { attachments = undefined; }
-      const data = await send(b.guestEmail, subject, await voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments, b.structureName);
-      return NextResponse.json({ ok: true, id: data?.id });
+      } catch (e) { console.error("email voucher: PDF non generato, invio senza allegato:", e instanceof Error ? e.message : e); attachments = undefined; }
+      const html = voucherEmailHtml(b, { checkinUrl: body.checkinUrl || "", manageUrl: body.manageUrl, qrUrl, brand });
+      const data = await send(b.guestEmail, voucherSubject(b), html, b.structureEmail, attachments, b.structureName);
+      return NextResponse.json({ ok: true, id: data?.id, pdf });
     }
     if (body.kind === "cancel") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
-      const subject = `${et(emailLang(b), "Prenotazione annullata")} ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, await cancelHtml(b), b.structureEmail, undefined, b.structureName);
+      const L = emailLang(b);
+      const subject = `${et(L, "Prenotazione annullata")} ${b.code || ""} · ${b.structureName || "Xenora"}`.replace(/\s+/g, " ").trim();
+      const brand = await resolveLogoUrl(brandFrom(b));
+      const data = await send(b.guestEmail, subject, cancelEmailHtml(b, { brand }), b.structureEmail, undefined, b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "checkin") {
+      // Avviso al titolare: solo nomi, numero di ospiti e link alla scheda. Nessun numero di documento, luogo/data di nascita in email.
       const to = body.operatorEmail || b.structureEmail;
       if (!to) return NextResponse.json({ ok: false, error: "Email struttura mancante" }, { status: 400 });
-      const subject = `Check-in online · ${b.code || ""} · ${b.guestName || ""}`.trim();
-      const data = await send(to, subject, await checkinHtml(b, body.guests || [], body.arrival), b.guestEmail);
+      const subject = `Check-in online · ${b.code || ""} · ${b.guestName || ""}`.replace(/\s+/g, " ").replace(/[ ·]+$/, "").trim();
+      const brand = await resolveLogoUrl(brandFrom(b));
+      const ctaUrl = body.ctaUrl || `${SITE_ORIGIN}/prenotazioni${b.bookingId ? `?b=${encodeURIComponent(b.bookingId)}` : ""}`;
+      const html = checkinOwnerEmailHtml(b, body.guests || [], { brand, arrival: body.arrival, ctaUrl, schedina: body.schedina });
+      const data = await send(to, subject, html, b.guestEmail, undefined, "Xenora");
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "checkin_reminder") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
-      const subject = `${et(emailLang(b), "Completa il check-in online")} · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, await reminderHtml(b, body.checkinUrl || ""), b.structureEmail, undefined, b.structureName);
+      const L = emailLang(b);
+      const subject = `${et(L, "Completa il check-in online")} · ${b.structureName || "Xenora"}`.trim();
+      const brand = await resolveLogoUrl(brandFrom(b));
+      const data = await send(b.guestEmail, subject, reminderEmailHtml(b, { checkinUrl: body.checkinUrl || "", brand }), b.structureEmail, undefined, b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "guest_message") {
-      // Messaggio libero all'ospite (modelli/automazioni): invio reale via Resend, non una bozza mailto.
+      // Messaggio libero all'ospite (modelli/automazioni/guida): invio reale via Resend, non una bozza mailto. Niente PDF.
       if (!body.to) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
-      const subject = body.subject || (b.structureName ? `Messaggio da ${b.structureName}` : "Messaggio");
-      const accent = body.accent || b.color || "#285f92";
-      const brand = await resolveLogoUrl(body.brand || (b.structureName ? { ...brandFrom(b), accent } : undefined));
-      const title = body.subject || "Messaggio";
-      const html = shell(title, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`, brand);
-      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail, undefined, brand?.name || b.structureName);
+      // Senza `lang` esplicita: dalla scheda ospite/Paese/telefono in `booking` (emailLang); se non c'è nessun dato, ripiego sul dominio del destinatario (.de, .fr…).
+      const hasGuestHints = !!(b.lang || b.guestLanguage || b.guestCountry || b.guestPhone);
+      const L = body.lang ? explicitLang(body.lang) : (hasGuestHints ? undefined : langFromEmailDomain(body.to)) ?? emailLang(b);
+      const structureName = inBrand?.name || b.structureName;
+      const subject = body.subject || (structureName ? et(L, "Messaggio da {name}", { name: structureName }) : et(L, "Messaggio"));
+      const accent = body.accent || inBrand?.accent || b.color || "#285f92";
+      const brand = await resolveLogoUrl(inBrand || (b.structureName ? { ...brandFrom(b), accent } : undefined));
+      const html = messageEmailHtml({ lang: L, title: body.subject || et(L, "Messaggio"), text: body.text || "", accent, brand, ctaUrl: body.ctaUrl, ctaLabel: body.ctaLabel });
+      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail || brand?.email, undefined, brand?.name || b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "quote") {
       if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
-      const subject = body.subject || "Preventivo";
-      const accent = body.accent || body.brand?.accent || "#285f92";
-      const brand = body.brand ? { ...body.brand, accent } : (b.structureName ? { ...brandFrom(b), accent } : undefined);
+      // Lingua del preventivo (quella scelta nella pagina Preventivi): oggetto, pulsante e nota di pagamento seguono la stessa lingua.
+      const L = explicitLang(body.lang);
+      const subject = body.subject || et(L, "Preventivo");
+      const accent = body.accent || inBrand?.accent || "#285f92";
+      const brand = inBrand ? { ...inBrand, accent } : (b.structureName ? { ...brandFrom(b), accent } : undefined);
       // Per l'HTML dell'email serve un URL pubblico vero (niente data: URI); il PDF invece usa il
       // logo originale più sotto, incorporandolo direttamente nel file.
       const emailBrand = await resolveLogoUrl(brand);
-      // Pulsante di azione (Conferma e paga): l'URL viaggia dentro il bottone, non come testo lungo.
-      const cta = body.ctaUrl
-        ? `<div style="margin:22px 0 6px;">
-             <a href="${esc(body.ctaUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">${esc(body.ctaLabel || "Conferma e paga online →")}</a>
-           </div>
-           <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.</p>`
-        : "";
-      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`, emailBrand);
-      // Allega il preventivo in PDF (carta intestata). Preferenza: il PDF già generato lato browser
-      // catturando l'anteprima REALE (QuoteDoc, con logo garantito visibile — vedi preventivi/page.tsx
-      // buildQuotePdfBlob). Se il chiamante non lo fornisce (es. invio programmatico senza browser),
-      // ripiega su buildQuotePdf (pdf-lib) come rete di sicurezza. Se anche questo fallisce, invia
-      // comunque l'email senza allegato.
+      // Pulsante di azione (Conferma e paga): "Conferma e paga online →" arriva dal chiamante in italiano → si traduce se è il testo predefinito.
+      const DEF_CTA = "Conferma e paga online →";
+      const isPayCta = !body.ctaLabel || body.ctaLabel === DEF_CTA;
+      const html = messageEmailHtml({
+        lang: L, title: subject, text: body.text || "", accent, brand: emailBrand,
+        ctaUrl: body.ctaUrl, ctaLabel: isPayCta ? et(L, DEF_CTA) : body.ctaLabel,
+        note: body.ctaUrl && isPayCta ? et(L, "Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.") : undefined,
+      });
+      // Allega il preventivo in PDF SOLO se c'è davvero un preventivo: il PDF già generato lato browser (anteprima reale QuoteDoc, con logo
+      // garantito visibile) oppure dati reali (camere o totale) da cui disegnarlo con buildQuotePdf. Senza né l'uno né l'altro (guida ospiti,
+      // conferma da Preventivi, avvisi di annullamento/modifica/pagamento/stripe, "Su misura") l'email parte senza allegato: prima usciva
+      // un "preventivo-preventivo.pdf" vuoto.
+      const hasQuoteData = (Array.isArray(body.rooms) && body.rooms.length > 0) || (typeof body.total === "number" && body.total > 0);
       let attachments: { filename: string; content: string }[] | undefined;
+      let pdf: "attached" | "fallback" | "skipped" | "none" = "none";
       if (body.pdfBase64) {
+        attachments = [{ filename: body.pdfFilename || `preventivo-${safeName(body.ref, "preventivo")}.pdf`, content: body.pdfBase64 }];
+        pdf = "attached";
+      } else if (hasQuoteData) {
         try {
-          const filename = body.pdfFilename || `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`;
-          attachments = [{ filename, content: body.pdfBase64 }];
-        } catch { attachments = undefined; }
-      } else {
-        try {
-          const pdf = await buildQuotePdf({
+          const bytes = await buildQuotePdf({
             ref: body.ref,
             structureName: brand?.name, structureEmail: brand?.email, phone: brand?.phone, address: brand?.address,
             guestName: body.guestName, guestEmail: body.to,
@@ -437,27 +238,29 @@ export async function POST(req: Request) {
             color: accent, logo: brand?.logo, website: brand?.website, cin: brand?.cin, vat: brand?.vat,
             extras: body.extras,
           });
-          attachments = [{ filename: `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
-        } catch { attachments = undefined; }
+          attachments = [{ filename: `preventivo-${safeName(body.ref, "preventivo")}.pdf`, content: Buffer.from(bytes).toString("base64") }];
+          pdf = "fallback";
+        } catch (e) { console.error("email quote: PDF non generato, invio senza allegato:", e instanceof Error ? e.message : e); pdf = "skipped"; }
       }
-      const data = await send(body.to, subject, html, body.replyTo, attachments, brand?.name);
-      return NextResponse.json({ ok: true, id: data?.id });
+      const data = await send(body.to, subject, html, body.replyTo || brand?.email, attachments, brand?.name);
+      return NextResponse.json({ ok: true, id: data?.id, pdf });
     }
     if (body.kind === "notify") {
-      // FRENO: massimo 8 notifiche al minuto per destinatario (per istanza). Oltre, si scartano in silenzio: un import o una cancellazione di massa
-      // non deve mai produrre centinaia di email. Per fermare tutto subito: variabile NOTIFY_EMAILS_PAUSED=1.
+      // FRENO: massimo 20 notifiche al minuto per destinatario (per istanza; 8 era troppo poco per un primo import OTA con molte prenotazioni). Oltre, si
+      // scartano e si risponde {ok:true, skipped:"throttled"} (i chiamanti che registrano l'invio devono controllare `skipped`): un import o una cancellazione
+      // di massa non deve mai produrre centinaia di email. Per fermare tutto subito: variabile NOTIFY_EMAILS_PAUSED=1.
       if (process.env.NOTIFY_EMAILS_PAUSED === "1" || notifyThrottled(String(body.to || ""))) return NextResponse.json({ ok: true, skipped: "throttled" });
-      // Notifica interna alla struttura (nuova prenotazione/modifica/cancellazione/pagamento):
-      // email semplice non brandizzata, niente PDF/allegati, niente risoluzione logo.
+      // Notifica interna alla struttura (nuova prenotazione/modifica/cancellazione/pagamento/messaggio/recensione/avviso). Contratto retro-compatibile:
+      //  - solo `text`/`subject`/`ctaUrl` (altri chiamanti) → stessa shell curata, testo libero;
+      //  - in più `event`, `brand` {name, logoUrl, color, address}, `channelLabel`, `structureName`, `booking` → layout ricco (logo, badge evento, chip canale, importi, contatti).
+      // Niente PDF/allegati.
       if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
-      const subject = body.subject || "Notifica";
-      const accent = body.accent || "#4F46E5";
-      const cta = body.ctaUrl
-        ? `<div style="margin:22px 0 6px;">
-             <a href="${esc(body.ctaUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">${esc(body.ctaLabel || "Apri →")}</a>
-           </div>`
-        : "";
-      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`);
+      const brand = await resolveLogoUrl(inBrand ?? (str(body.structureName, 120) ? { name: str(body.structureName, 120) } : undefined));
+      const { html, subject } = notifyEmailHtml({
+        event: asMailEvent(body.event), brand, accent: body.accent || brand?.accent, channelLabel: str(body.channelLabel, 80) || undefined,
+        structureName: str(body.structureName, 120) || brand?.name, booking: sanitizeNotifyBooking(body.booking),
+        text: body.text, subject: body.subject ? String(body.subject) : undefined, ctaUrl: body.ctaUrl, ctaLabel: body.ctaLabel ? str(body.ctaLabel, 80) : undefined,
+      });
       const data = await send(body.to, subject, html, undefined, undefined, "Xenora");
       return NextResponse.json({ ok: true, id: data?.id });
     }
@@ -466,23 +269,25 @@ export async function POST(req: Request) {
       const to = body.to;
       if (!to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
       const s = body.subscription || {};
-      const subject = `Ricevuta abbonamento Xenora${s.planName || s.plan ? ` · ${s.planName || s.plan}` : ""}`.trim();
-      const data = await send(to, subject, subReceiptHtml(s), body.replyTo);
+      const subject = subReceiptSubject(s);
+      const fmt = (u?: number | null) => { if (!u) return ""; try { return fmtDMY(ymdRome(u * 1000)); } catch { return ""; } };
+      const data = await send(to, subject, subReceiptEmailHtml(s, fmt), body.replyTo);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     return NextResponse.json({ ok: false, error: "kind sconosciuto" }, { status: 400 });
   } catch (e) {
+    if (e instanceof MailInputError) return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Errore invio" }, { status: 502 });
   }
 }
 
 
-// Contatore in memoria (per istanza serverless): finestra di 60 secondi, massimo 8 notifiche per destinatario.
+// Contatore in memoria (per istanza serverless): finestra di 60 secondi, massimo 20 notifiche per destinatario.
 const NOTIFY_HITS = new Map<string, number[]>();
 function notifyThrottled(to: string): boolean {
   const now = Date.now();
   const list = (NOTIFY_HITS.get(to) ?? []).filter((t) => now - t < 60000);
-  if (list.length >= 8) { NOTIFY_HITS.set(to, list); return true; }
+  if (list.length >= 20) { NOTIFY_HITS.set(to, list); return true; }
   list.push(now); NOTIFY_HITS.set(to, list);
   return false;
 }

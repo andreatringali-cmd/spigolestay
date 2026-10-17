@@ -17,10 +17,12 @@ import { useLang } from "@/lib/i18n";
 import { inScope } from "@/lib/scope";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { shiftISO, nights, toISO, fmtDM, fmtDate } from "@/lib/dates";
+import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
+import { plural } from "@/lib/plural";
 import { fetchCityPulse, computeMarketSignal, revenueSuggestion, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 
-const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-const todayISO = () => toISO(new Date());
+const addDays = addDaysYmd; // aritmetica di calendario: immune al cambio dell'ora legale
+const todayISO = () => ymdRome(new Date());
 
 // Canali OTA per il confronto "parità": la commissione usata è quella REALE delle tue prenotazioni
 // (se registrata); altrimenti l'aliquota di listino del canale, dichiarata come stima.
@@ -276,13 +278,13 @@ export default function RevenuePage() {
 
       <ImpactPreview
         open={preview}
-        title={`Applica ${pending.length} giorni di suggerimenti`}
+        title={pending.length === 1 ? "Applica 1 giorno di suggerimenti" : `Applica ${pending.length} giorni di suggerimenti`}
         subtitle={activeStructureId !== "all" ? `Solo su ${structures.find((x) => x.id === activeStructureId)?.name ?? "questa struttura"}` : "Su tutte le strutture"}
         impact={impact}
         examples={pending.slice(0, 5).flatMap((x) => planDay(x.iso, x.pct).slice(0, 1).map(({ rt, iso, cur, next }) => ({ label: `${rt.name} · ${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`, from: cur, to: next })))}
         notes={["Rispetta il prezzo minimo di ogni tipologia (se impostato in Camere)."]}
-        confirmLabel={`Applica ${pending.length} giorni`}
-        onConfirm={() => { const n = applyDays(pending, `Revenue · ${pending.length} giorni`); setPreview(false); if (n) addActivity("rate", `Revenue: applicati ${pending.length} giorni di suggerimenti (${n} tariffe).`, activeStructureId === "all" ? undefined : activeStructureId); }}
+        confirmLabel={`Applica ${plural(pending.length, "giorno", "giorni")}`}
+        onConfirm={() => { const n = applyDays(pending, `Revenue · ${plural(pending.length, "giorno", "giorni")}`); setPreview(false); if (n) addActivity("rate", `Revenue: ${pending.length === 1 ? "applicato 1 giorno" : `applicati ${pending.length} giorni`} di suggerimenti (${plural(n, "tariffa", "tariffe")}).`, activeStructureId === "all" ? undefined : activeStructureId); }}
         onCancel={() => setPreview(false)}
       />
     </div>

@@ -5,6 +5,7 @@
 import { buildFatturaPaXml, fatturaPaFileName } from "./fatturapa";
 import { FIC_API_BASE } from "./fic-oauth";
 import { sdiPaymentCode } from "./payment-codes";
+import { eur } from "../format";
 
 export type ProviderName = "mock" | "openapi" | "fattureincloud";
 
@@ -365,7 +366,7 @@ export class FattureInCloudProvider implements EInvoiceProvider {
     if (due != null && Math.abs(due - ours) > 0.004) {
       const pl = data.payments_list as { amount: number }[];
       if (pl?.[0]) pl[0].amount = due;
-      totalNote = ` Attenzione: Fatture in Cloud calcola un totale di € ${due.toFixed(2).replace(".", ",")} invece di € ${ours.toFixed(2).replace(".", ",")} (Xenora): controlla bollo e voci sul documento.`;
+      totalNote = ` Attenzione: Fatture in Cloud calcola un totale di ${eur(due)} invece di ${eur(ours)} (Xenora): controlla bollo e voci sul documento.`;
     }
     const r = await this.req("POST", `/c/${this.company()}/issued_documents`, { data });
     if (!r.ok) throw new Error(`Fatture in Cloud ${r.status}: ${this.errMsg(r.json) || "creazione documento non riuscita"}`);

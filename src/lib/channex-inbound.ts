@@ -15,10 +15,12 @@ import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/channex-guestdata";
 import { splitCommission } from "@/lib/commission-split";
 import { channelFromOta } from "@/lib/channex-channel";
+import { ymdRome } from "@/lib/dates-rome";
 import { findOctorateTwins, twinFillPatch, duplicatePatch, usefulOctorateNote } from "@/lib/booking-heal";
 import { parsePaymentCharge } from "@/lib/payment-fee";
-import { fmtDMY } from "./dates";
-import { notifyBookingLines } from "./booking-notify";
+import { buildNotifyPayload } from "./mail/notify-payload";
+import { campoCambiato, modificaMeritaEmail } from "./notify-rules";
+import type { Structure } from "@/lib/types";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -118,7 +120,7 @@ export async function importBookings(admin: SupabaseClient, opts: { propertyId?:
   // Solo soggiorni CORRENTI/FUTURI: le prenotazioni già concluse (check-out < oggi) NON
   // vengono importate all'attivazione (così non entra lo storico). Le "scarichiamo" comunque
   // dal feed con l'ack, per non riprocessarle a ogni ciclo. Le cancellazioni passano sempre.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdRome(new Date());
   const pastAckIds: string[] = [];
   const certAckIds: string[] = []; // revision della property di test: solo ACK, nessun import
 
@@ -184,7 +186,7 @@ export async function importSingleRevision(admin: SupabaseClient, rev: ChxRevisi
 
   let ackIt = false;
   if (map) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = ymdRome(new Date());
     const dep = rev.departure_date || rev.arrival_date || "";
     if (rev.status !== "cancelled" && /^\d{4}-\d{2}-\d{2}$/.test(dep) && dep < today) {
       out.skipped++; ackIt = true; // soggiorno concluso: scarica comunque dal feed
@@ -259,26 +261,25 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     // (rispetta i toggle newBooking/cancel E "ota" di Impostazioni → Notifiche). Fire-and-forget,
     // non deve mai far fallire l'import — stesso principio di syncGcalServer.
     const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it";
-    const notifyOwnerServer = (ev: "newBooking" | "cancel", b: Booking) => {
+    // Email RICCA al titolare: logo/nome/colore della struttura, canale (chip), importi (commissione e netto marcati "stima" quando lo sono),
+    // contatti dell'ospite e link diretto alla scheda. Il corpo è costruito da buildNotifyPayload (lo stesso del gestionale).
+    const notifyOwnerServer = (ev: "newBooking" | "cancel" | "modified", b: Booking) => {
       if (!notifs[ev] || !notifs.ota) return;
       const st = structuresArr.find((s) => s.id === b.structureId);
       const to = st?.email?.trim();
       if (!to) return;
       const guest = guests.find((g) => g.id === b.guestId);
-      const guestName = guest?.fullName || "Ospite";
-      const code = typeof b.code === "string" ? b.code : "";
       const chLabel = CHANNELS[b.channel as Channel]?.label ?? String(b.channel ?? "");
-      const subject = ev === "newBooking" ? `Nuova prenotazione OTA · ${guestName}` : `Prenotazione OTA cancellata · ${guestName}`;
       const unit = units.find((u) => u.id === b.unitId);
       const roomType = roomTypesArr.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
       const roomLabel = [roomType?.name, (unit as { name?: string } | undefined)?.name].filter(Boolean).join(" · ");
-      const lines = notifyBookingLines({
+      const body = buildNotifyPayload({
         ev, booking: b, guest: guest ? { fullName: guest.fullName, phone: guest.phone as string | undefined, email: guest.email, country: guest.country as string | undefined } : undefined,
-        structureName: (st as { name?: string } | undefined)?.name, roomLabel, channelLabel: chLabel,
+        structure: st as unknown as Structure, roomLabel, channelLabel: chLabel, origin,
       });
       void internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n"), ctaUrl: `${origin}/prenotazioni`, ctaLabel: "Apri le prenotazioni →" }),
+        body: JSON.stringify({ ...body, to }),
       }).catch(() => {});
     };
 
@@ -320,7 +321,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // updatedAt DEVE avanzare: la fusione client/server è last-write-wins su questo campo
         // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
         // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
-        prevIdx.forEach((i) => { touchAvail(bookings[i]); bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); notifyOwnerServer("cancel", bookings[i]); });
+        prevIdx.forEach((i) => { const wasCancelled = bookings[i].status === "cancelled"; touchAvail(bookings[i]); bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); if (!wasCancelled) notifyOwnerServer("cancel", bookings[i]); });
         markTwinsDuplicate();
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
@@ -382,6 +383,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const twinPool = [...twinRows];
       const CARRY = ["paid", "cleaningFee", "cityTaxExempt", "cityTaxPaid", "cityTaxInPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature", "invoiceNo",
         "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt", "reviewRequestChannel", "bookedOn", "childAges", "cribs", "paymentMethod",
+        // Prova del consenso privacy del check-in online (quando e da chi): non va persa se Channex riscrive la riga.
+        "privacyConsentAt", "privacyConsentBy",
         // Commissione già nota (es. dal file Octorate): se Channex non la manda per questa prenotazione NON va persa. Se la manda, quella di Channex vince (più sotto).
         "commissionAmount", "commissionPct", "paymentFee"] as const;
       roomsArr.forEach((room, idx) => {
@@ -423,7 +426,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         const nightlyRates = nightlyRatesOf(room.days);
         bookings.push({
           id: uid(), groupId, structureId: map.structure_id, roomTypeId, unitId: prevUnit ?? (free ?? ofType[0])?.id ?? null,
-          guestId, channel, status: "confirmed", checkIn: ci, checkOut: co, bookedOn: new Date().toISOString().slice(0, 10),
+          guestId, channel, status: "confirmed", checkIn: ci, checkOut: co, bookedOn: ymdRome(new Date()),
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, ...(nightlyRates ? { nightlyRates } : {}), cleaningFee: 0, paid: 0, cityTaxPaid: false,
           ...keep,
@@ -447,6 +450,13 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         touchAvail(bookings[bookings.length - 1]);
         syncGcalServer(bookings[bookings.length - 1], "upsert");
         if (!isUpdate) notifyOwnerServer("newBooking", bookings[bookings.length - 1]);
+        else {
+          // Modifica dall'OTA: email solo se cambia qualcosa di sostanziale (date, ospiti, importo, canale). La stessa revisione consegnata due volte non cambia nulla → nessuna email.
+          const fresh = bookings[bookings.length - 1] as Record<string, unknown>;
+          const prev = (old ?? twin) as Record<string, unknown> | undefined;
+          const changed = prev ? (["checkIn", "checkOut", "adults", "children", "total", "channel", "roomTypeId"] as const).filter((k) => campoCambiato(prev[k], fresh[k])) : ["checkIn"];
+          if (modificaMeritaEmail(changed)) notifyOwnerServer("modified", bookings[bookings.length - 1]);
+        }
         added++;
       });
       if (added > 0) {

@@ -4,8 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { fmtDMY } from "@/lib/dates";
 
 // Campo data con calendario personalizzato che si apre SEMPRE verso il basso.
-const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
-const DOW = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"];
+// Testi del calendario nelle lingue dell'ospite (it · en · fr · de · es); `lang` assente = italiano, come prima.
+const CAL: Record<string, { months: string[]; dow: string[]; today: string; clear: string; prev: string; next: string }> = {
+  it: { months: ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"], dow: ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"], today: "Oggi", clear: "Cancella", prev: "Mese precedente", next: "Mese successivo" },
+  en: { months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], dow: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"], today: "Today", clear: "Clear", prev: "Previous month", next: "Next month" },
+  fr: { months: ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"], dow: ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"], today: "Aujourd'hui", clear: "Effacer", prev: "Mois précédent", next: "Mois suivant" },
+  de: { months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"], dow: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], today: "Heute", clear: "Löschen", prev: "Voriger Monat", next: "Nächster Monat" },
+  es: { months: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"], dow: ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"], today: "Hoy", clear: "Borrar", prev: "Mes anterior", next: "Mes siguiente" },
+};
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export default function DateField({
@@ -19,6 +25,7 @@ export default function DateField({
   disabled = false,
   id,
   required = false,
+  lang,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -30,7 +37,10 @@ export default function DateField({
   disabled?: boolean;
   id?: string;
   required?: boolean;
+  lang?: string; // it · en · fr · de · es: mesi, giorni e pulsanti del calendario nella lingua dell'ospite (assente = italiano)
 }) {
+  const cal = CAL[(lang || "it").slice(0, 2).toLowerCase()] ?? CAL.it;
+  const MONTHS = cal.months, DOW = cal.dow;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState(() => (value ? new Date(value + "T00:00") : new Date()));
@@ -67,9 +77,9 @@ export default function DateField({
       {open && (
         <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
           <div className="mb-1 flex items-center justify-between px-1">
-            <button type="button" onClick={() => setView(new Date(y, m - 1, 1))} aria-label="Mese precedente" className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">‹</button>
+            <button type="button" onClick={() => setView(new Date(y, m - 1, 1))} aria-label={cal.prev} className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">‹</button>
             <span className="text-sm font-semibold capitalize text-txt">{MONTHS[m]} {y}</span>
-            <button type="button" onClick={() => setView(new Date(y, m + 1, 1))} aria-label="Mese successivo" className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">›</button>
+            <button type="button" onClick={() => setView(new Date(y, m + 1, 1))} aria-label={cal.next} className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">›</button>
           </div>
           <div className="grid grid-cols-7 gap-0.5 text-center">
             {DOW.map((d) => <span key={d} className="py-1 text-[10px] font-semibold text-faint">{d}</span>)}
@@ -78,8 +88,8 @@ export default function DateField({
             ))}
           </div>
           <div className="mt-1 flex gap-1">
-            <button type="button" onClick={() => { onChange(todayIso); setOpen(false); }} className="flex-1 rounded-lg py-1 text-[11px] font-medium text-focus hover:bg-wash">Oggi</button>
-            {value && <button type="button" onClick={() => { onChange(""); setOpen(false); }} className="flex-1 rounded-lg py-1 text-[11px] text-dim hover:bg-wash">Cancella</button>}
+            <button type="button" disabled={(!!min && todayIso < min) || (!!max && todayIso > max)} onClick={() => { onChange(todayIso); setOpen(false); }} className="flex-1 rounded-lg py-1 text-[11px] font-medium text-focus hover:bg-wash disabled:opacity-40">{cal.today}</button>
+            {value && <button type="button" onClick={() => { onChange(""); setOpen(false); }} className="flex-1 rounded-lg py-1 text-[11px] text-dim hover:bg-wash">{cal.clear}</button>}
           </div>
         </div>
       )}

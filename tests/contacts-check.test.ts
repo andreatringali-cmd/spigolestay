@@ -116,3 +116,8 @@ test("ospiti in arrivo con contatto da correggere: solo prenotazioni vive, la pi
   assert.equal(out[0].urgent, true); assert.equal(out[0].days, 3);
   assert.equal(out[1].urgent, false);
 });
+
+test("numero USA senza prefisso (prefisso 312 = Chicago) non viene deviato sull'Italia", () => {
+  const r = checkPhone("(312) 555-0199", { country: "US" });
+  assert.notEqual(r.e164, "+393125550199");
+});

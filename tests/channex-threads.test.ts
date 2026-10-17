@@ -13,6 +13,16 @@ test("normalizeThread: campi, booking e property dalle relazioni", () => {
   assert.equal(t.lastMessage, "Is there any update?");
   assert.equal(t.lastAt, Date.parse("2026-10-16T08:00:00Z"));
 });
+test("normalizeThread: last_message come OGGETTO (forma reale Channex), allegato e orario UTC senza Z", () => {
+  const t = T.normalizeThread(row({ attributes: { title: "A", last_message: { message: "Ciao!", sender: "guest", inserted_at: "2026-10-16T08:00:00.000000" } } }))!;
+  assert.equal(t.lastMessage, "Ciao!"); assert.equal(t.lastSender, "guest"); assert.equal(t.lastAt, Date.parse("2026-10-16T08:00:00Z"));
+  const u = T.normalizeThread(row({ attributes: { last_message: { message: "", sender: "property", attachments: [{ url: "x" }] } } }))!;
+  assert.equal(u.lastMessage, "📎 Allegato"); assert.equal(u.lastSender, "property");
+});
+test("ms: orari con offset (+02:00) letti correttamente", () => {
+  const t = T.normalizeThread(row({ attributes: { title: "A", last_message_received_at: "2026-10-10T10:00:00+02:00" } }))!;
+  assert.equal(t.lastAt, Date.parse("2026-10-10T08:00:00Z"));
+});
 test("normalizeThread: senza prenotazione (richiesta di informazioni) e righe sporche", () => {
   const t = T.normalizeThread(row({ relationships: { property: { data: { id: "p1" } } } }))!;
   assert.equal(t.bookingId, "");

@@ -101,7 +101,7 @@ export async function setChannelPriceCorrection(channelId: string, steps: [strin
 // ── Webhook (ricezione automatica prenotazioni in tempo reale) ──
 // Channex chiama il callback_url a ogni nuova prenotazione/modifica/cancellazione.
 export async function listWebhooks(propertyId: string) {
-  return channex<{ data: { id: string; attributes?: { callback_url?: string; is_active?: boolean; headers?: Record<string, string> | null } }[] }>(`/webhooks?filter[property_id]=${encodeURIComponent(propertyId)}`);
+  return channex<{ data: { id: string; attributes?: { callback_url?: string; is_active?: boolean; event_mask?: string; headers?: Record<string, string> | null } }[] }>(`/webhooks?filter[property_id]=${encodeURIComponent(propertyId)}`);
 }
 export async function createWebhook(propertyId: string, callbackUrl: string, eventMask = "booking", headers?: Record<string, string>) {
   return channex<Created>("/webhooks", {
@@ -111,7 +111,7 @@ export async function createWebhook(propertyId: string, callbackUrl: string, eve
 }
 
 // Aggiorna un webhook esistente (usato per aggiungere/ruotare l'intestazione con il segreto condiviso).
-export async function updateWebhook(webhookId: string, patch: { headers?: Record<string, string> }) {
+export async function updateWebhook(webhookId: string, patch: { headers?: Record<string, string>; event_mask?: string }) {
   return channex<Created>(`/webhooks/${encodeURIComponent(webhookId)}`, {
     method: "PUT",
     body: JSON.stringify({ webhook: patch }),
@@ -366,13 +366,13 @@ export async function sendBookingAttachment(channexBookingId: string, file: { ba
 // Una conversazione per prenotazione/richiesta, con elenco, chiusura e "non è richiesta una risposta" (solo Booking.com). Stessa app "Messages" installata per property.
 // L'account Channex è condiviso tra tutti i clienti: la route che le usa controlla SEMPRE che la property del thread sia dell'utente (vedi channex-threads.ts / allowedChannexProperties).
 export async function listMessageThreadsFor(propertyId: string, page = 1, limit = 100) {
-  return channex<{ data?: unknown[]; meta?: { total?: number } }>(`/message_threads?filter[property_id]=${encodeURIComponent(propertyId)}&pagination[page]=${page}&pagination[limit]=${Math.max(1, Math.min(100, limit))}`);
+  return channex<{ data?: unknown[]; meta?: { total?: number; limit?: number } }>(`/message_threads?filter[property_id]=${encodeURIComponent(propertyId)}&pagination[page]=${page}&pagination[limit]=${Math.max(1, Math.min(100, limit))}`);
 }
 export async function getMessageThread(threadId: string) {
   return channex<{ data?: unknown }>(`/message_threads/${encodeURIComponent(threadId)}`);
 }
-export async function listThreadMessages(threadId: string, limit = 100) {
-  return channex<{ data?: unknown[] }>(`/message_threads/${encodeURIComponent(threadId)}/messages?pagination[limit]=${Math.max(1, Math.min(100, limit))}`);
+export async function listThreadMessages(threadId: string, limit = 100, page = 1) {
+  return channex<{ data?: unknown[]; meta?: { total?: number; limit?: number } }>(`/message_threads/${encodeURIComponent(threadId)}/messages?pagination[page]=${page}&pagination[limit]=${Math.max(1, Math.min(100, limit))}`);
 }
 export async function sendThreadMessage(threadId: string, text: string) {
   return channex<{ data?: unknown }>(`/message_threads/${encodeURIComponent(threadId)}/messages`, { method: "POST", body: JSON.stringify({ message: { message: text } }) });

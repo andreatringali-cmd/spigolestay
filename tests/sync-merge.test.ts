@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, stripVolatileUsers } from "../src/lib/sync-merge.ts";
+import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, mergeSentLog, stripVolatileUsers } from "../src/lib/sync-merge.ts";
 
 const noSkip = () => false;
 const PLAN = "spigolestay:plan";
@@ -170,4 +170,26 @@ test("utenti: lastLogin e sessions non cambiano la firma, i permessi si", () => 
   assert.equal(JSON.stringify(stripVolatileUsers(u)), JSON.stringify(stripVolatileUsers(u2)));
   assert.notEqual(JSON.stringify(stripVolatileUsers(u)), JSON.stringify(stripVolatileUsers(u3)));
   assert.equal(stripVolatileUsers("x"), "x");
+});
+
+// ── registro invii (msgsent): la voce scritta dal cron non sparisce ──────────
+test("msgsent: voce del cron + voce del client convivono (unione per key)", () => {
+  const base = JSON.stringify([{ key: "a", ts: 1 }]);
+  const local = JSON.stringify([{ key: "c-client", ts: 30 }, { key: "a", ts: 1 }]);
+  const server = JSON.stringify([{ key: "b-cron", ts: 20 }, { key: "a", ts: 1 }]);
+  const m = JSON.parse(mergeSentLog(base, local, server)!);
+  assert.deepEqual(m.map((e: { key: string }) => e.key), ["c-client", "b-cron", "a"]);
+});
+
+test("msgsent: voce tolta qui (Pulisci) non risorge; base vuota: si aggiunge tutto il server", () => {
+  const base = JSON.stringify([{ key: "a", ts: 1 }]);
+  assert.deepEqual(JSON.parse(mergeSentLog(base, "[]", JSON.stringify([{ key: "a", ts: 1 }]))!), []);
+  assert.equal(JSON.parse(mergeSentLog(undefined, "[]", JSON.stringify([{ key: "a", ts: 1 }]))!).length, 1);
+});
+
+test("msgsent: niente doppioni, tetto 200, locale non valido = null", () => {
+  const many = JSON.stringify(Array.from({ length: 250 }, (_, i) => ({ key: `k${i}`, ts: i })));
+  assert.equal(JSON.parse(mergeSentLog(undefined, many, many)!).length, 200);
+  assert.equal(mergeSentLog(undefined, "non json", "[]"), null);
+  assert.equal(JSON.parse(mergeSentLog(undefined, undefined, JSON.stringify([{ key: "x", ts: 5 }]))!).length, 1);
 });

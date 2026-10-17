@@ -709,6 +709,7 @@
     var html = '<div class="block-actions">';
     actions.forEach(function (a) {
       var href = fill(a.href);
+      if (/\{\w+\}/.test(href)) return; // dato non compilato dall'host (es. {taxiPhone}): niente pulsante con link rotto
       if (a.type === "tel") href = telHref(href);
       if (a.type === "wa") href = waHref(href, a.waText ? fill(a.waText) : "");
       if (a.type === "mail") href = "mailto:" + href;
@@ -744,6 +745,7 @@
   }
 
   function renderPhotoGallery(list, altBase, cls) {
+    if (!list || !list.length) return ""; // nessuna foto caricata dall'host: niente riquadro vuoto
     var html = '<div class="gallery' + (cls ? " " + cls : "") + '">';
     (list || []).forEach(function (src, i) {
       html += '<img src="' + esc(src) + '" alt="' + esc(altBase || "Foto") + " " + (i + 1) + '" loading="lazy">';

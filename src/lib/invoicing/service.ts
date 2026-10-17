@@ -94,7 +94,7 @@ function folioFromBooking(ctx: Ctx): { folio: FolioLine[]; advanceCents: number 
   const tax = cityTaxOfBooking(structure, b); // stessa cifra della prenotazione: paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti, quota di gruppo se presente
   if (tax) {
     const maxNights = structure?.cityTaxMaxNights ?? (structure?.cityTaxMode === "percent" ? 7 : 3); // stesso massimo notti di cityTaxOf
-    folio.push({ folioRef: "citytax", description: `Imposta di soggiorno (${cityTaxPayers(structure, b)} × ${Math.min(n, maxNights)} notti)`, qty: 1, unitCents: toCents(tax), vatRate: 0, outOfScope: true, sourceKind: "city_tax" });
+    folio.push({ folioRef: "citytax", description: `Imposta di soggiorno (${cityTaxPayers(structure, b)} × ${Math.min(n, maxNights) === 1 ? "1 notte" : `${Math.min(n, maxNights)} notti`})`, qty: 1, unitCents: toCents(tax), vatRate: 0, outOfScope: true, sourceKind: "city_tax" });
   }
   return { folio, advanceCents: toCents(b.paid) };
 }

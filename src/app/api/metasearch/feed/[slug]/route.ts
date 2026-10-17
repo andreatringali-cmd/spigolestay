@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { effectiveClosed, rateForDay, weekendPctFromRaw } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
+import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,8 +26,8 @@ const HORIZON_DAYS = 90;
 
 // Helper date: identici a quelli usati da /prenota, così il prezzo del feed
 // coincide con quello mostrato all'ospite (parità tariffaria).
-const toISO = (d: Date) => d.toISOString().slice(0, 10);
-const addDaysISO = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
+const toISO = (d: Date) => ymdRome(d); // "oggi" = giorno di calendario italiano, non quello UTC del server
+const addDaysISO = addDaysYmd; // aritmetica di calendario: non dipende dal fuso del server né dall'ora legale
 
 type Blob = {
   structures?: Array<Record<string, unknown> & { id: string; name?: string; currency?: string; city?: string }>;

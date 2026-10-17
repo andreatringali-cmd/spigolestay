@@ -1,6 +1,7 @@
 import { cityTaxOf } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
 import { fmtDMY } from "@/lib/dates";
+import { eur as fmtEur } from "@/lib/format";
 import { isTranslateLang, pickGuestLang, pickTranslatedGroup, type GuestLang, type TranslationItem } from "@/lib/concierge-i18n";
 
 // Base di conoscenza del Concierge (tabella concierge_entries).
@@ -110,8 +111,7 @@ function autoValue(src: AutoSource, lang: GuestLang, ctx: AutoCtx): string {
   if (src === "access_code") return ctx.accessCode || t.pending;
   if (src === "city_tax") {
     if (!st || !b) return t.taxPending;
-    const eur = cityTaxOf(st, b.adults ?? 1, nightsOf(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
-    return `€ ${eur}`;
+    return fmtEur(cityTaxOf(st, b.adults ?? 1, nightsOf(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt));
   }
   if (src === "checkin_time") {
     const fr = st?.checkInFrom, to = st?.checkInTo;

@@ -8,6 +8,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { DATA_KEY } from "@/lib/manage-booking";
 import { warnFallbackOnce } from "@/lib/warn-fallback";
+import { addDaysYmd, todayRome } from "@/lib/dates-rome";
+import { CHANNELS, type Channel } from "@/lib/types";
 
 export type FeedKind = "bookings" | "pulizie";
 
@@ -42,13 +44,20 @@ export interface IcsEvent { uid: string; startISO: string; endISO: string; summa
 
 const escText = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 // Piega le righe oltre 75 ottetti come richiesto dalla spec (continuazione con spazio iniziale).
-function foldLine(line: string): string {
-  if (line.length <= 75) return line;
+// Il limite è in OTTETTI (byte UTF-8), non in caratteri: si taglia per punti di codice interi, così non si spezzano
+// né le coppie surrogate (emoji) né le sequenze UTF-8 multibyte (lettere accentate, "🧹").
+export function foldLine(line: string): string {
+  const enc = new TextEncoder();
+  if (enc.encode(line).length <= 75) return line;
   const parts: string[] = [];
-  let rest = line;
-  parts.push(rest.slice(0, 75)); rest = rest.slice(75);
-  while (rest.length > 0) { parts.push(" " + rest.slice(0, 74)); rest = rest.slice(74); }
-  return parts.join("\r\n");
+  let cur = "", curBytes = 0, limit = 75; // la prima riga ha 75 ottetti; le continuazioni 74 + lo spazio iniziale
+  for (const ch of line) { // for…of itera per punti di codice: una coppia surrogata è un solo elemento
+    const b = enc.encode(ch).length;
+    if (curBytes + b > limit) { parts.push(cur); cur = ""; curBytes = 0; limit = 74; }
+    cur += ch; curBytes += b;
+  }
+  if (cur) parts.push(cur);
+  return parts.map((p, i) => (i === 0 ? p : " " + p)).join("\r\n");
 }
 const dstamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 const ymd = (iso: string) => iso.slice(0, 10).replace(/-/g, "");
@@ -94,13 +103,12 @@ export function bookingEvents(data: Json): IcsEvent[] {
   const structures = arr(data.structures);
   const guests = arr(data.guests);
   const units = arr(data.units);
-  const today = new Date().toISOString().slice(0, 10);
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
-  const cutoffISO = cutoff.toISOString().slice(0, 10);
+  const cutoffISO = addDaysYmd(todayRome(), -60); // giorno di calendario italiano, indipendente dal fuso del server
   const out: IcsEvent[] = [];
   for (const b of bookings) {
     const status = s(b.status);
     const checkIn = s(b.checkIn), checkOut = s(b.checkOut);
+    if (s(b.channel) === "blocked") continue; // un blocco camera non è un ospite: non va nel calendario
     if (status === "cancelled" || !isDate(checkIn) || !isDate(checkOut) || checkOut < cutoffISO) continue;
     const st = structures.find((x) => x.id === b.structureId);
     const guest = guests.find((x) => x.id === b.guestId);
@@ -109,21 +117,20 @@ export function bookingEvents(data: Json): IcsEvent[] {
     const structureName = s(st?.name) || "";
     const roomLabel = s(unit?.name) || "";
     const summary = [guestName, [structureName, roomLabel].filter(Boolean).join(" · ")].filter(Boolean).join(" — ");
-    const descParts = [s(b.code) && `Codice: ${s(b.code)}`, s(b.channel) && `Canale: ${s(b.channel)}`, `Ospiti: ${Number(b.adults) || 1}${Number(b.children) ? "+" + Number(b.children) : ""}`].filter(Boolean);
+    const descParts = [s(b.code) && `Codice: ${s(b.code)}`, s(b.channel) && `Canale: ${CHANNELS[s(b.channel) as Channel]?.label ?? s(b.channel)}`, `Ospiti: ${Number(b.adults) || 1}${Number(b.children) ? "+" + Number(b.children) : ""}`].filter(Boolean);
     out.push({ uid: `booking-${s(b.id)}@xenora.it`, startISO: checkIn, endISO: checkOut, summary, description: descParts.join(" · ") });
   }
-  void today;
   return out;
 }
 
 // Feed "Pulizie": un evento per (unità, giorno di check-out), segnalando se è anche
 // giorno di arrivo (turnover, priorità alta per la signora delle pulizie).
 export function pulizieEvents(data: Json): IcsEvent[] {
-  const bookings = arr(data.bookings).filter((b) => s(b.status) !== "cancelled" && isDate(s(b.checkIn)) && isDate(s(b.checkOut)));
+  // I blocchi camera (channel "blocked") non sono ospiti: niente turnover né pulizia per loro.
+  const bookings = arr(data.bookings).filter((b) => s(b.status) !== "cancelled" && s(b.channel) !== "blocked" && isDate(s(b.checkIn)) && isDate(s(b.checkOut)));
   const structures = arr(data.structures);
   const units = arr(data.units);
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
-  const cutoffISO = cutoff.toISOString().slice(0, 10);
+  const cutoffISO = addDaysYmd(todayRome(), -60);
 
   const byUnitDate = new Map<string, { unitId: string; date: string; departure: boolean; arrival: boolean }>();
   for (const b of bookings) {
@@ -149,11 +156,10 @@ export function pulizieEvents(data: Json): IcsEvent[] {
     const unitName = s(unit?.name) || "camera";
     const structureName = s(st?.name) || "";
     const kind = row.arrival ? "turnover (partenza + arrivo)" : "partenza";
-    const nextDay = new Date(row.date + "T00:00:00"); nextDay.setDate(nextDay.getDate() + 1);
     out.push({
       uid: `pulizie-${row.unitId}-${row.date}@xenora.it`,
       startISO: row.date,
-      endISO: nextDay.toISOString().slice(0, 10),
+      endISO: addDaysYmd(row.date, 1), // aritmetica di calendario: non dipende dal fuso del server né dall'ora legale
       summary: `🧹 Pulizia ${[structureName, unitName].filter(Boolean).join(" ")} — ${kind}`,
     });
   }

@@ -14,7 +14,8 @@ import { dateLocale } from "@/lib/guest-i18n";
 import DateTextField from "@/components/DateTextField";
 import { fmtDate } from "@/lib/dates";
 import { todayRome } from "@/lib/dates-rome";
-import { REQUIRE_DOC_PHOTOS, checkinStatus, needsMoreGuests, stepsWithMissing, type CheckinStep, type Miss } from "@/lib/checkin-flow";
+import { REQUIRE_DOC_PHOTOS, checkinStatus, docTypeFromText, needsMoreGuests, roomHeads, stepsWithMissing, type CheckinStep, type Miss } from "@/lib/checkin-flow";
+import { COUNTRY_OPTIONS } from "@/lib/alloggiati/countries";
 
 // Check-in online per l'OSPITE — pagina PUBBLICA e SERVER-backed.
 // Carica e salva tutto tramite /api/checkin (service role): funziona per l'ospite
@@ -35,6 +36,14 @@ const warnBox = { backgroundColor: "color-mix(in srgb, var(--warn) 14%, transpar
 const okBox = { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } as const;
 
 type T = (s: string, vars?: Record<string, string | number>) => string;
+
+// Guida dell'ospite DELLA STRUTTURA (stesso formato di lib/auto-guide-link.ts: p = struttura, lang, g = nome). Dominio fisso del sito, non quello della finestra.
+const GUIDE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it").replace(/[/]+$/, "");
+const guideHref = (structureId: string, lang: string, guestName?: string) => {
+  const q = new URLSearchParams({ p: structureId, lang });
+  if ((guestName || "").trim()) q.set("g", (guestName || "").trim());
+  return `${GUIDE_ORIGIN}/guida/index.html?${q.toString()}`;
+};
 
 interface DocData { firstName: string; lastName: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string }
 const emptyExtra = () => ({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "", photoFront: "", photoBack: "", room: "" });
@@ -74,13 +83,14 @@ function DocFace({ label, photo, onPick, onRemove, onReread, extracting, aiOff, 
 
 interface Info {
   aiEnabled?: boolean;
+  operator?: boolean; // il server riconosce chi guarda come operatore della struttura (vede i documenti e non deve firmare)
   returning?: boolean;
   group?: { b: string; code: string; roomType: string; unit: string; adults: number; children: number; webCheckin: boolean }[];
   booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxGroup?: number; groupBalance?: number; cityTaxExempt: boolean; cityTaxCollected?: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null; lang?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
-  structure: { name: string; color: string; logo?: string; phone: string; email: string; address: string; streetNumber: string; city: string; checkInFrom: string; checkOutBy: string; accessInfo: string; currency: string; stripeAccount: string; stripeChargesEnabled: boolean; extras: { id: string; name: string; desc: string; price: number; per: string }[] };
+  structure: { id?: string; name: string; color: string; logo?: string; phone: string; email: string; address: string; streetNumber: string; city: string; checkInFrom: string; checkOutBy: string; accessInfo: string; currency: string; stripeAccount: string; stripeChargesEnabled: boolean; extras: { id: string; name: string; desc: string; price: number; per: string }[] };
 }
 
 export default function CheckinPage() {
@@ -92,6 +102,7 @@ function Engine() {
   const [info, setInfo] = useState<Info | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState("");
+  const [inactive, setInactive] = useState(false); // prenotazione annullata/non più attiva: l'API risponde inactive:true
   // Lingua: scelta a mano > ?lang= > ricavata dalla prenotazione (scheda → Paese → prefisso del telefono) > browser > italiano.
   const { lang, setLang, t } = useGuestLang(info?.guest?.lang);
   const fmtD = (iso: string) => fmtDL(iso, dateLocale(lang));
@@ -108,7 +119,7 @@ function Engine() {
   // NON è obbligatoria. L'ospite anonimo (dal link) invece deve firmare.
   const [isOperator, setIsOperator] = useState(false);
   const [opChecked, setOpChecked] = useState(false);
-  useEffect(() => { let ok = true; (async () => { try { const { data } = await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } })); if (ok) setIsOperator(!!data.session); } catch {} if (ok) setOpChecked(true); })(); return () => { ok = false; }; }, []);
+  // L'operatore lo stabilisce il SERVER (GET → `operator`): una sessione Supabase di un altro account non basta, il POST richiede l'appartenenza alla struttura.
   const [consent, setConsent] = useState(false);
   const [inv, setInv] = useState({ wants: false, kind: "privato", name: "", vat: "", taxCode: "", address: "", city: "", cap: "", province: "", sdiCode: "", pec: "" });
   const setI = (k: string, v: string | boolean) => setInv((p) => ({ ...p, [k]: v }));
@@ -161,14 +172,17 @@ function Engine() {
   const extractDoc = (img: string) => runExtract(img, (f) => setDoc((p) => {
     const base = p ?? { firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "" };
     const merged = { ...base } as DocData;
-    (Object.keys(f) as (keyof DocData)[]).forEach((k) => { if (f[k] && !String(base[k] || "").trim()) merged[k] = String(f[k]); });
+    (Object.keys(f) as (keyof DocData)[]).forEach((k) => { if (k !== "docType" && f[k] && !String(base[k] || "").trim()) merged[k] = String(f[k]); });
+    // Il tipo documento ha sempre un valore di partenza (il primo del menu): quello riconosciuto dall'AI lo sostituisce (un passaporto non resta "Carta d'identità").
+    const dt = docTypeFromText(f.docType); if (dt && DOC_TYPES.includes(dt)) merged.docType = dt;
     return merged;
   }));
   // Co-ospite i-esimo: riempie solo i campi ancora vuoti di quell'ospite.
   const extractExtra = (img: string, i: number) => runExtract(img, (f) => setExtras((prev) => prev.map((e, j) => {
     if (j !== i) return e;
     const merged = { ...e } as Record<string, string>;
-    Object.keys(f).forEach((k) => { if (f[k] && !String(merged[k] || "").trim()) merged[k] = String(f[k]); });
+    Object.keys(f).forEach((k) => { if (k !== "docType" && f[k] && !String(merged[k] || "").trim()) merged[k] = String(f[k]); });
+    const dt = docTypeFromText(f.docType); if (dt && DOC_TYPES.includes(dt)) merged.docType = dt;
     return merged as typeof e;
   })));
   const onExtraPhoto = async (file: File | undefined, i: number) => {
@@ -199,14 +213,16 @@ function Engine() {
     try {
       const r = await fetch(`/api/checkin?b=${encodeURIComponent(params.b)}${params.slug ? `&slug=${encodeURIComponent(params.slug)}` : ""}`, { headers: await operatorAuthHeader() });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) { setLoadErr(j?.error === "not_found" ? "Prenotazione non trovata." : "Impossibile caricare la prenotazione."); setInfo(null); }
+      if (j?.inactive) { setInactive(true); setInfo(null); }
+      else if (!r.ok || !j?.ok) { setLoadErr(j?.error === "not_found" ? "Prenotazione non trovata." : "Impossibile caricare la prenotazione."); setInfo(null); }
       else {
         const d = j as Info;
         setInfo(d);
         const b = d.booking, g = d.guest;
         // Chi apre il link da ospite compila SEMPRE da capo (niente dati precompilati dal soggiorno precedente o dal check-in già inviato).
         // Solo l'operatore di Xenora, che compila per conto dell'ospite, vede i dati già salvati.
-        const operator = await (async () => { try { const { data: sd } = await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } })); return !!sd.session; } catch { return false; } })();
+        const operator = d.operator === true;
+        setIsOperator(operator); setOpChecked(true);
         setDoc({ firstName: g.firstName || "", lastName: g.lastName || "", sex: g.sex || "", birthDate: g.birthDate || "", birthPlace: g.birthPlace || "", citizenship: g.citizenship || "", docType: g.docType || DOC_TYPES[0], docNumber: g.docNumber || "", docPlace: g.docPlace || "" });
         setArrival(b.arrivalTime || "Non lo so");
         setGuestReq(b.guestRequests || "");
@@ -312,7 +328,17 @@ function Engine() {
   const expectedGuests = isGroup ? groupRooms.reduce((a, r) => a + Math.max(1, (r.adults || 1) + (r.children || 0)), 0) : Math.max(1, (b?.adults || 1) + (b?.children || 0));
   const roomsWithGuest = new Set<string>([primaryRoom || groupRooms[0]?.b || "", ...extras.filter(named).map((e) => e.room || groupRooms[0]?.b || "")]);
   const missingRooms = isGroup ? groupRooms.filter((r) => !roomsWithGuest.has(r.b)).map((r) => r.roomType || r.code) : [];
-  const status = checkinStatus({ doc, extras, photoFront, consent, signature, isOperator, expectedGuests, isGroup, missingRooms, requireDocPhotos: REQUIRE_DOC_PHOTOS });
+  const status = checkinStatus({ doc, extras, photoFront, consent, signature, isOperator, expectedGuests, isGroup, missingRooms, primaryRoom: primaryRoom || groupRooms[0]?.b, requireDocPhotos: REQUIRE_DOC_PHOTOS });
+  // Gruppi: indice (tra i co-ospiti) di chi fa da capocamera nelle camere diverse da quella di chi prenota: per lui/lei il documento è obbligatorio.
+  const headExtraIdx = (() => {
+    if (!isGroup) return new Set<number>();
+    const pr = primaryRoom || groupRooms[0]?.b || "";
+    const named2 = extras.map((e, i) => ({ e, i })).filter(({ e }) => named(e));
+    const heads = roomHeads([{ room: pr, birthDate: doc?.birthDate }, ...named2.map(({ e }) => ({ room: e.room || pr, birthDate: e.birthDate }))], pr);
+    const out = new Set<number>();
+    for (const [room, idx] of heads) if (room !== pr && idx > 0) out.add(named2[idx - 1].i);
+    return out;
+  })();
   const valid = status.valid;
   // Campi dei dati ospiti obbligatori (tutti quelli della checklist tranne consenso, firma, foto e camere del gruppo, controllati a parte).
   const DATA_CODES = ["firstName", "lastName", "sex", "birthDate", "birthPlace", "citizenship", "docNumber", "docPlace"];
@@ -335,8 +361,8 @@ function Engine() {
       case "birthDate": return t("Inserisci la data di nascita") + who(m);
       case "birthPlace": return t("Luogo di nascita") + who(m);
       case "citizenship": return t("Cittadinanza") + who(m);
-      case "docNumber": return t("Inserisci il numero del documento");
-      case "docPlace": return t("Luogo di rilascio");
+      case "docNumber": return t("Inserisci il numero del documento") + who(m);
+      case "docPlace": return t("Luogo di rilascio") + who(m);
       case "group": return t("Assegna almeno un ospite a ogni camera: {rooms}", { rooms: (m.rooms ?? []).join(", ") });
       case "docPhoto": return t("Carica la foto del documento di {name}", { name: personName(m.guest ?? 1) });
       case "consent": return t("Spunta il consenso al trattamento dei dati personali");
@@ -356,6 +382,15 @@ function Engine() {
   // Invio con dati ospite incompleti (anche dal pulsante rapido): non resta muto, evidenzia e porta al primo campo mancante.
   const missingToFirst = () => { setShowErr(true); const m = status.blocking.find((x) => DATA_CODES.includes(x.code)); if (m) goTo(m); };
 
+  // Messaggio per l'errore restituito dal server (codici di POST /api/checkin).
+  const submitErrOf = (code: string): { k: string } => {
+    if (code === "write_conflict") return { k: "Riprova tra un istante." };
+    if (code === "booking_inactive") return { k: "Questa prenotazione non è più attiva: contatta la struttura." };
+    if (code === "invalid_birth_date") return { k: "Una data di nascita non è valida: controllala e riprova." };
+    if (code === "signature_required" || code === "consent_required") return { k: "Firma e consenso sono obbligatori per inviare." };
+    return { k: "Invio non riuscito. Riprova." };
+  };
+
   // Invio di GRUPPO: distribuisce gli ospiti per camera e salva ogni camera.
   const submitGroup = async () => {
     const reqOk = !!doc && dataFieldsOk;
@@ -368,17 +403,20 @@ function Engine() {
     if (missing.length) { setSubmitErr({ k: "Assegna almeno un ospite a ogni camera: {rooms}", v: { rooms: missing.map((m) => m.roomType || m.code).join(", ") } }); return; }
     setSubmitting(true); setSubmitErr(null);
     try {
+      const authH = await operatorAuthHeader();
+      // Capocamera di ogni camera: chi prenota guida la sua camera, nelle altre la persona più grande (il suo documento finisce nella schedina come capofamiglia).
+      const heads = roomHeads(people.map((p) => ({ room: p.room, birthDate: p.d.birthDate })), people[0].room);
       for (const r of groupRooms) {
         const inRoom = people.filter((p) => p.room === r.b);
-        const primary = inRoom[0];
-        const others = inRoom.slice(1);
+        const primary = people[heads.get(r.b) ?? -1] ?? inRoom[0];
+        const others = inRoom.filter((p) => p !== primary);
         const isMain = r.b === params.b;
         // Foto e firma su Storage privato (uno per volta); il salvataggio riceve solo i riferimenti.
         const att = await uploadAll(r.b, [{ src: primary.pf, kind: "photo" }, { src: primary.pb, kind: "photo" }, { src: signature, kind: "signature" }, ...others.flatMap((o) => [{ src: o.pf, kind: "photo" as const }, { src: o.pb, kind: "photo" as const }])]);
         const resp = await fetch("/api/checkin", {
-          method: "POST", headers: { "content-type": "application/json" },
+          method: "POST", headers: { "content-type": "application/json", ...authH },
           body: JSON.stringify({
-            slug: params.slug, b: r.b,
+            slug: params.slug, b: r.b, consent: true,
             doc: { firstName: primary.d.firstName.trim(), lastName: primary.d.lastName.trim(), sex: primary.d.sex || undefined, birthDate: primary.d.birthDate, birthPlace: primary.d.birthPlace, citizenship: primary.d.citizenship, docType: primary.d.docType, docNumber: (primary.d.docNumber || "").trim(), docPlace: primary.d.docPlace },
             arrival, guestRequests: isMain ? (guestReq.trim() || undefined) : undefined,
             extraGuests: others.map((o, oi) => ({ firstName: o.d.firstName, lastName: o.d.lastName, sex: o.d.sex, birthDate: o.d.birthDate, birthPlace: o.d.birthPlace, citizenship: o.d.citizenship, docType: o.d.docType, docNumber: o.d.docNumber, docPlace: o.d.docPlace, docPhotoFront: att.refs[3 + 2 * oi], docPhotoBack: att.refs[4 + 2 * oi] })),
@@ -391,7 +429,7 @@ function Engine() {
         if (!resp.ok || !j?.ok) throw new Error(j?.error || "fail");
       }
       setDone(true); setEditing(false); window.scrollTo(0, 0); void refreshInfo();
-    } catch { setSubmitErr({ k: "Invio non riuscito. Riprova." }); }
+    } catch (e) { setSubmitErr(submitErrOf(e instanceof Error ? e.message : "")); }
     setSubmitting(false);
   };
 
@@ -413,9 +451,9 @@ function Engine() {
       const sendExtras = extras.filter((e) => e.firstName.trim() && e.lastName.trim());
       const att = await uploadAll(params.b, [{ src: photoFront, kind: "photo" }, { src: photoBack, kind: "photo" }, { src: signature, kind: "signature" }, ...sendExtras.flatMap((e) => [{ src: e.photoFront || undefined, kind: "photo" as const }, { src: e.photoBack || undefined, kind: "photo" as const }])]);
       const r = await fetch("/api/checkin", {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json", ...(await operatorAuthHeader()) },
         body: JSON.stringify({
-          slug: params.slug, b: params.b,
+          slug: params.slug, b: params.b, consent: true,
           doc: { firstName: doc.firstName.trim(), lastName: doc.lastName.trim(), sex: doc.sex || undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber.trim(), docPlace: doc.docPlace },
           arrival, guestRequests: guestReq.trim() || undefined,
           extraGuests: sendExtras.map((e, i) => ({ ...e, photoFront: undefined, photoBack: undefined, docPhotoFront: att.refs[3 + 2 * i], docPhotoBack: att.refs[4 + 2 * i] })),
@@ -426,7 +464,7 @@ function Engine() {
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j?.ok) { setDone(true); setEditing(false); window.scrollTo(0, 0); void refreshInfo(); }
-      else setSubmitErr({ k: j?.error === "write_conflict" ? "Riprova tra un istante." : "Invio non riuscito. Riprova." });
+      else setSubmitErr(submitErrOf(j?.error));
     } catch { setSubmitErr({ k: "Errore di rete. Riprova." }); }
     setSubmitting(false);
   };
@@ -450,8 +488,16 @@ function Engine() {
       const j = await r.json().catch(() => ({}));
       if (j.url) { window.location.href = j.url; return; }
       setPaying(false);
-      setPayErr(j?.message || j?.error || `Pagamento non disponibile (HTTP ${r.status}).`);
-    } catch (e) { setPaying(false); setPayErr(e instanceof Error ? e.message : "Errore di rete."); }
+      // Mai codici grezzi (stripe_error, invalid_return_url, HTTP 500…) né messaggi inglesi di Stripe all'ospite: testo nella sua lingua.
+      const code = String(j?.error || "");
+      setPayErr(
+        r.status === 503 || ["stripe_not_connected", "stripe_not_active", "stripe_not_configured", "no_stripe_account"].includes(code)
+          ? t("Il pagamento online non è disponibile per questa prenotazione. Contatta la struttura per saldare.")
+          : r.status === 429 || code === "troppe_richieste"
+            ? t("Troppi tentativi ravvicinati. Attendi un minuto e riprova.")
+            : t("Non è stato possibile avviare il pagamento. Nessun addebito è stato effettuato: riprova tra poco o contatta la struttura."),
+      );
+    } catch { setPaying(false); setPayErr(t("Errore di rete. Riprova.")); }
   };
 
   const accent = st?.color || "#4F46E5";
@@ -476,8 +522,8 @@ function Engine() {
       <div className="mx-auto max-w-md px-4 py-16">
         <div className={`${box} p-6 text-center`}>
           <div className="text-3xl">🔎</div>
-          <h1 className="mt-2 font-display text-lg font-bold text-txt">{loadErr ? t(loadErr) : t("Prenotazione non trovata")}</h1>
-          <p className="mt-1 text-sm text-dim">{t("Apri il check-in dal link ricevuto nell'email di conferma. Se il problema persiste, contatta la struttura.")}</p>
+          <h1 className="mt-2 font-display text-lg font-bold text-txt">{inactive ? t("Prenotazione non attiva") : loadErr ? t(loadErr) : t("Prenotazione non trovata")}</h1>
+          <p className="mt-1 text-sm text-dim">{inactive ? t("Questa prenotazione non è più attiva (annullata o scaduta), quindi il check-in online non è disponibile. Per informazioni contatta la struttura.") : t("Apri il check-in dal link ricevuto nell'email di conferma. Se il problema persiste, contatta la struttura.")}</p>
         </div>
       </div>
     </div>
@@ -485,7 +531,7 @@ function Engine() {
 
   // ── Indicatore di avanzamento ──
   // Il passo "Pagamento" compare solo se c'è un saldo da pagare online. Dopo l'invio i passi 1-3 sono completati.
-  const alreadySent = !!info.booking.webCheckin && opChecked && !isOperator && !editing && (isGroup || !needsMoreGuests(expectedGuests, info.booking.extraGuests?.length ?? 0));
+  const alreadySent = !!info.booking.webCheckin && opChecked && !isOperator && !editing && (isGroup ? groupRooms.every((r) => r.webCheckin) : !needsMoreGuests(expectedGuests, info.booking.extraGuests?.length ?? 0));
   const showDone = done || alreadySent;
   const showPayStep = canPay;
   const stepsList: { n: 1 | 2 | 3 | 4; label: string }[] = [
@@ -576,7 +622,7 @@ function Engine() {
             {st?.checkOutBy && <div className="flex gap-2"><span>🕙</span><span className="text-txt">{t("Check-out entro le {time}", { time: st.checkOutBy })}</span></div>}
             {st?.phone && <div className="flex gap-2"><span>📞</span><a href={`tel:${st.phone}`} className="text-focus hover:underline">{st.phone}</a></div>}
           </div>
-          <a href={`https://spigole-guest-guide.vercel.app${(st?.name ?? "").toLowerCase().includes("central perk") ? "/?p=centralperk&" : "/?"}lang=${lang}`} target="_blank" rel="noreferrer" className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Apri la guida dell'ospite →")}</a>
+          {st?.id && <a href={guideHref(st.id, lang, info.guest.firstName)} target="_blank" rel="noreferrer" className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Apri la guida dell'ospite →")}</a>}
           {walletState === "unavailable"
             ? <p className="mt-2 text-center text-xs text-faint">{t("Aggiungi a Google Wallet: disponibile a breve.")}</p>
             : <button type="button" onClick={addToWallet} disabled={walletState === "loading"} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90 disabled:opacity-50">{walletState === "loading" ? t("Preparo il pass…") : t("🔖 Aggiungi a Google Wallet")}</button>}
@@ -612,12 +658,14 @@ function Engine() {
   return (
     <div className="min-h-full bg-wash pb-16">{header}{stepper}
       <div className="mx-auto max-w-5xl px-4 py-6">
+        {/* Elenco degli Stati per l'autocompletamento della cittadinanza (il testo resta libero: il server riconosce anche i nomi inglesi) */}
+        <datalist id="checkin-countries">{COUNTRY_OPTIONS.map((c) => <option key={c.it} value={c.it} label={c.en} />)}</datalist>
         {/* Riepilogo prenotazione */}
         <div className={`${box} mb-4 p-4`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="font-display text-lg font-bold text-txt">{t("Ciao {name}, benvenuto!", { name: info.guest.firstName || doc?.firstName || "" })}</div>
-              <div className="text-sm text-dim">{info.roomType.name}{info.unit ? ` · ${info.unit.name}` : ""} · {info.booking.adults} {t("adulti")}{info.booking.children ? ` · ${info.booking.children} ${t("bambini")}` : ""}</div>
+              <div className="text-sm text-dim">{info.roomType.name}{info.unit ? ` · ${info.unit.name}` : ""} · {info.booking.adults} {info.booking.adults === 1 ? t("adulto") : t("adulti")}{info.booking.children ? ` · ${info.booking.children} ${info.booking.children === 1 ? t("bambino") : t("bambini")}` : ""}</div>
             </div>
             <div className="text-right text-sm"><div className="text-txt">{fmtD(info.booking.checkIn)}</div><div className="text-faint">→ {fmtD(info.booking.checkOut)}</div></div>
           </div>
@@ -663,7 +711,7 @@ function Engine() {
                 <label className={lbl}>{t("Sesso")} *<select id="f-sex" value={doc.sex} onChange={(e) => setD("sex", e.target.value)} className={`${fcls("f-sex")} mt-1`}><option value="">—</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select></label>
                 <label className={lbl}>{t("Data di nascita")} *<DateTextField id="f-birthDate" value={doc.birthDate} onChange={(v) => setD("birthDate", v)} max={maxBirth} className={`${fcls("f-birthDate")} mt-1`} /></label>
                 <label className={lbl}>{t("Luogo di nascita")} *<input id="f-birthPlace" value={doc.birthPlace} onChange={(e) => setD("birthPlace", e.target.value)} className={`${fcls("f-birthPlace")} mt-1`} placeholder={t("Comune o Stato")} /></label>
-                <label className={lbl}>{t("Cittadinanza")} *<input id="f-citizenship" value={doc.citizenship} onChange={(e) => setD("citizenship", e.target.value)} className={`${fcls("f-citizenship")} mt-1`} /></label>
+                <label className={lbl}>{t("Cittadinanza")} *<input id="f-citizenship" list="checkin-countries" value={doc.citizenship} onChange={(e) => setD("citizenship", e.target.value)} className={`${fcls("f-citizenship")} mt-1`} /></label>
                 <label className={lbl}>{t("Tipo documento")}<select value={doc.docType} onChange={(e) => setD("docType", e.target.value)} className={`${field} mt-1`}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select></label>
                 <label className={lbl}>{t("Numero documento")} *<input id="f-docNumber" value={doc.docNumber} onChange={(e) => setD("docNumber", e.target.value)} className={`${fcls("f-docNumber")} mt-1`} /></label>
                 <label className={`${lbl} sm:col-span-2`}>{t("Luogo di rilascio")} *<input id="f-docPlace" value={doc.docPlace} onChange={(e) => setD("docPlace", e.target.value)} className={`${fcls("f-docPlace")} mt-1`} /></label>
@@ -691,10 +739,11 @@ function Engine() {
                       <select id={`f-sex-${i + 2}`} value={e.sex ?? ""} onChange={(ev) => setExtra(i, "sex", ev.target.value)} className={fcls(`f-sex-${i + 2}`)}><option value="">{t("Sesso")}{named(e) ? " *" : ""}</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select>
                       <DateTextField id={`f-birthDate-${i + 2}`} value={e.birthDate} onChange={(v) => setExtra(i, "birthDate", v)} max={maxBirth} className={fcls(`f-birthDate-${i + 2}`)} aria-label={t("Data di nascita")} />
                       <input id={`f-birthPlace-${i + 2}`} value={e.birthPlace} onChange={(ev) => setExtra(i, "birthPlace", ev.target.value)} placeholder={t("Luogo di nascita") + (named(e) ? " *" : "")} className={fcls(`f-birthPlace-${i + 2}`)} />
-                      <input id={`f-citizenship-${i + 2}`} value={e.citizenship} onChange={(ev) => setExtra(i, "citizenship", ev.target.value)} placeholder={t("Cittadinanza") + (named(e) ? " *" : "")} className={fcls(`f-citizenship-${i + 2}`)} />
+                      <input id={`f-citizenship-${i + 2}`} list="checkin-countries" value={e.citizenship} onChange={(ev) => setExtra(i, "citizenship", ev.target.value)} placeholder={t("Cittadinanza") + (named(e) ? " *" : "")} className={fcls(`f-citizenship-${i + 2}`)} />
                       <select value={e.docType} onChange={(ev) => setExtra(i, "docType", ev.target.value)} className={field}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select>
-                      <input value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder={t("Numero documento")} className={field} />
-                      <input value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder={t("Luogo di rilascio")} className={`${field} sm:col-span-2`} />
+                      <input id={`f-docNumber-${i + 2}`} value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder={t("Numero documento") + (headExtraIdx.has(i) ? " *" : "")} className={headExtraIdx.has(i) ? fcls(`f-docNumber-${i + 2}`) : field} />
+                      <input id={`f-docPlace-${i + 2}`} value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder={t("Luogo di rilascio") + (headExtraIdx.has(i) ? " *" : "")} className={`${headExtraIdx.has(i) ? fcls(`f-docPlace-${i + 2}`) : field} sm:col-span-2`} />
+                      {headExtraIdx.has(i) && <p className="text-[11px] text-dim sm:col-span-2">{t("Capocamera: servono i dati del documento (la schedina della camera è a suo nome).")}</p>}
                     </div>
                   </div>
                 ))}
@@ -779,7 +828,7 @@ function Engine() {
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-txt">{e.name}</div>
                         {e.desc && <div className="text-[11px] text-faint">{e.desc}</div>}
-                        <div className="text-xs text-dim">{eur(extraUnit(e))}{e.per === "night" ? ` · ${nightsN} ${t("notti")}` : e.per === "person" ? ` · ${t("a persona")}` : ""}</div>
+                        <div className="text-xs text-dim">{eur(extraUnit(e))}{e.per === "night" ? ` · ${nightsN} ${nightsN === 1 ? t("notte") : t("notti")}` : e.per === "person" ? ` · ${t("a persona")}` : ""}</div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash">−</button>

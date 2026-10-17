@@ -123,7 +123,7 @@ export default function AssistentePage() {
     const nextArrival = active.filter((b) => b.checkIn > t).sort((a, b) => a.checkIn.localeCompare(b.checkIn))[0];
     return {
       arrivalsToday, departuresToday, noCheckin,
-      ricavo: { title: "Ricavo del mese", value: eur(ricavoMese), detail: `${monthArr.length} prenotazioni con arrivo questo mese.`, go: { label: "Statistiche", href: "/statistiche" } } as Ans,
+      ricavo: { title: "Ricavo del mese", value: eur(ricavoMese), detail: `${monthArr.length} ${monthArr.length === 1 ? "prenotazione con arrivo" : "prenotazioni con arrivo"} questo mese.`, go: { label: "Statistiche", href: "/statistiche" } } as Ans,
       incassato: { title: "Incassato del mese", value: eur(incassatoMese), detail: `Su ${eur(ricavoMese)} di ricavo previsto.`, go: { label: "Incassi", href: "/pagamenti" } } as Ans,
       prossimo: { title: "Prossimo arrivo", value: nextArrival ? fmtDate(nextArrival.checkIn) : "—", detail: nextArrival ? `${getGuest(nextArrival.guestId)?.fullName || "Ospite"} · ${getStructure(nextArrival.structureId)?.name ?? ""}` : "Nessun arrivo futuro.", go: { label: "Calendario", href: "/calendario" } } as Ans,
     };
@@ -167,7 +167,7 @@ export default function AssistentePage() {
     const unit = getUnit(b.unitId);
     const rt = roomTypes.find((r) => r.id === b.roomTypeId);
     const nN = nights(b.checkIn, b.checkOut);
-    const dOf = (iso: string) => `${new Date(iso).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(iso)}`;
+    const dOf = (iso: string) => `${new Date(iso.slice(0, 10) + "T00:00:00Z").toLocaleDateString("it-IT", { weekday: "long", timeZone: "UTC" })} ${fmtDM(iso)}`;
     const ch = CHANNELS[b.channel]?.label || b.channel;
     const total = b.total ?? 0, paid = b.paid ?? 0, resid = Math.max(0, total - paid);
     const people = `${b.adults} adult${b.adults === 1 ? "o" : "i"}${b.children ? ` e ${b.children} bambin${b.children === 1 ? "o" : "i"}` : ""}`;
@@ -252,7 +252,7 @@ export default function AssistentePage() {
       return { title: "Tassa di soggiorno", value: String(cityTaxDue), detail: intro, speech: intro, go: { label: "Tassa soggiorno", href: "/tassa-soggiorno" } };
     }
     if (/occupaz/.test(s)) {
-      const intro = `Oggi sei al ${occPct}% di occupazione: ${occToday} camere occupate su ${totUnits}.`;
+      const intro = `Oggi sei al ${occPct}% di occupazione: ${occToday} ${occToday === 1 ? "camera occupata" : "camere occupate"} su ${totUnits}.`;
       return { title: "Occupazione oggi", value: `${occPct}%`, detail: intro, speech: intro, go: { label: "Calendario", href: "/calendario" } };
     }
     if (/in casa|in struttura|presenti|chi c'?è ora/.test(s)) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { ymdRome } from "@/lib/dates-rome";
 import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 import { applyPatches, healDuplicates, healRoundedTotals, mergePatches, needsChannexCheck, reconcilePatches, type ReconcileResult } from "@/lib/booking-heal";
@@ -66,7 +67,7 @@ export default function BookingHealer() {
 
         // 2) Channex: commissioni e totali esatti, a blocchi.
         const checked = loadChecked();
-        const today = new Date().toISOString().slice(0, 10);
+        const today = ymdRome(new Date());
         const ids = needsChannexCheck(applyPatches(base, local), today, checked, Date.now(), Math.max(0, SESSION_MAX - sessionCount.current));
         let fails = 0;
         for (let i = 0; i < ids.length && alive; i += CHUNK) {

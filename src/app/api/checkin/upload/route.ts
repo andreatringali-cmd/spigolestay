@@ -5,6 +5,7 @@ import { clientIp } from "@/lib/server-booking-guard";
 import { rateLimited } from "@/lib/server-auth";
 import { MEDIA_MAX_BYTES, PRIVATE_BUCKET } from "@/lib/media";
 import { putMedia } from "@/lib/media-server";
+import { checkinInactiveReason } from "@/lib/checkin-sanitize";
 import { signUploadToken, storeMediaTarget, uploadSecret, validateCheckinFile, type AttachmentKind, type MediaTarget } from "@/lib/checkin-media";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 const err = (status: number, error: string, message: string) => NextResponse.json({ ok: false, error, message }, { status });
 
 // Piccola cache in memoria (per istanza) del "dove vive la prenotazione": evita di rifare la ricerca ad ogni foto dello stesso check-in.
-const targetCache = new Map<string, { t: MediaTarget; exp: number }>();
+const targetCache = new Map<string, { t: MediaTarget; exp: number; inactive: boolean }>();
 const TARGET_TTL_MS = 5 * 60 * 1000;
 
 export async function POST(req: Request) {
@@ -52,15 +53,19 @@ export async function POST(req: Request) {
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
     let target: MediaTarget | null = null;
     const cached = targetCache.get(bid);
-    if (cached && cached.exp > Date.now()) target = cached.t;
+    let inactive = false;
+    if (cached && cached.exp > Date.now()) { target = cached.t; inactive = cached.inactive; }
     else {
       let store = slug ? await findBookingStore(admin, slug, bid) : null;
       if (!store) store = await findBookingStoreById(admin, bid);
       if (!store) return err(404, "not_found", "Prenotazione non trovata.");
       target = storeMediaTarget(store);
-      targetCache.set(bid, { t: target, exp: Date.now() + TARGET_TTL_MS });
+      // Prenotazione annullata / no-show: niente nuovi documenti (il soggiorno concluso lo gestisce il POST, che lo ammette solo all operatore).
+      inactive = checkinInactiveReason(store.booking) === "cancelled";
+      targetCache.set(bid, { t: target, exp: Date.now() + TARGET_TTL_MS, inactive });
       if (targetCache.size > 500) for (const [k, v] of targetCache) if (v.exp < Date.now()) targetCache.delete(k);
     }
+    if (inactive) return err(409, "booking_inactive", "Prenotazione non più attiva.");
     const ref = await putMedia(admin, { bucket: PRIVATE_BUCKET, scope: target.scope, id: target.id, mime: check.mime, bytes });
     return NextResponse.json({ ok: true, ref, token: signUploadToken(secret, bid, ref) });
   } catch (e) { return err(500, "upload_failed", (e as Error)?.message ?? "Impossibile salvare il file."); }

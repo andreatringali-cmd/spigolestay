@@ -60,3 +60,24 @@ test("mesi: 5 prima, il corrente, 2 dopo, anche a cavallo d'anno", () => {
   assert.deepEqual([y[0].key, y[2].key], ["2025-11", "2026-01"]);
   assert.equal(y[2].to, "2026-02-01");
 });
+
+test("aggregato Altro: il nome del portale vale solo se TUTTE le prenotazioni sono dello stesso portale", () => {
+  const same = channelStats([
+    b("other", "2026-10-01", "2026-10-02", 100, { otaName: "bb.it" }),
+    b("other", "2026-10-03", "2026-10-04", 100, { otaName: "BB.IT" }),
+  ], { from: "2026-09-01", to: "2026-11-01" });
+  assert.equal(same.rows[0].name, "bb.it");
+  assert.equal(same.rows[0].mixed, undefined);
+  const mixed = channelStats([
+    b("other", "2026-10-01", "2026-10-02", 100, { otaName: "bb.it" }),
+    b("other", "2026-10-03", "2026-10-04", 100, { otaName: "HotelBeds" }),
+  ], { from: "2026-09-01", to: "2026-11-01" });
+  assert.equal(mixed.rows[0].name, undefined);
+  assert.equal(mixed.rows[0].mixed, true);
+  const partial = channelStats([
+    b("other", "2026-10-01", "2026-10-02", 100, { otaName: "bb.it" }),
+    b("other", "2026-10-03", "2026-10-04", 100),
+  ], { from: "2026-09-01", to: "2026-11-01" });
+  assert.equal(partial.rows[0].name, undefined, "una prenotazione senza nome rende il gruppo non attribuibile");
+  assert.equal(partial.rows[0].mixed, true);
+});

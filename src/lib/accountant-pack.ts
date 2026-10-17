@@ -9,6 +9,8 @@ import { bolloQuarters, type QuarterInfo } from "./invoicing/bollo";
 import { computeResidui } from "./invoicing/receivables";
 import { buildCsv, centsToCsv } from "./invoicing/csv";
 import { signedCents, type PDoc } from "./purchases";
+import { eur } from "./format";
+import { plural } from "./plural";
 
 // ---------------------------------------------------------------- periodo
 /** q = 0 → anno intero; 1..4 → trimestre. */
@@ -39,7 +41,8 @@ export function periodRange(p: PackPeriod): PackRange {
 export const inRange = (iso: string | null | undefined, r: PackRange): boolean => { const d = (iso ?? "").slice(0, 10); return d.length === 10 && d >= r.from && d < r.to; };
 export const dmy = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10).split("-").reverse().join(".") : "");
 export const slug = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-export const fmtEurCents = (c: number): string => `${c < 0 ? "−" : ""}${(Math.abs(c) / 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+// "€ 1.234,50" come in tutta l'app (€ davanti, migliaia sempre separate); il meno è il segno tipografico "−".
+export const fmtEurCents = (c: number): string => `${c < 0 && Math.round(c) !== 0 ? "−" : ""}${eur(Math.abs(c) / 100)}`;
 
 // ---------------------------------------------------------------- documenti emessi
 export interface PackDoc {
@@ -214,7 +217,6 @@ export function buildAccountantPack(inp: PackInput): AccountantPack {
   return { period: inp.period, range, structureLabel: inp.structureLabel, invoices, bollo, cityTax, incassi, unpaid, purchases, regimi, checklist };
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 /** Punti OGGETTIVI ricavati dai dati (conteggi e importi); nessun consiglio fiscale. */
 export function buildChecklist(p: Pick<AccountantPack, "invoices" | "bollo" | "cityTax" | "unpaid" | "purchases" | "regimi">): string[] {
   const out: string[] = [];

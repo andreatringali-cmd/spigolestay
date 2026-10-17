@@ -4,6 +4,7 @@
 // Per la schedina Alloggiati servono anche sesso, luogo di nascita e cittadinanza di ogni persona e, per l'ospite principale (capo),
 // il luogo di rilascio del documento: se mancano la schedina nascerebbe "da validare" e il gestore dovrebbe raccogliere i dati a mano.
 // Per i co-ospiti (compilati con nome e cognome) bastano data e luogo di nascita, sesso e cittadinanza.
+// Nei GRUPPI (più camere) il primo ospite di ogni camera è il "capocamera": per la sua schedina (ruolo 17) il documento è obbligatorio come per l'ospite principale.
 // La foto del documento NON è obbligatoria (REQUIRE_DOC_PHOTOS = false): se manca compare come consiglio, non come blocco.
 // I testi li compone la pagina (tradotti): qui solo codici, passo e id del campo da evidenziare.
 
@@ -19,7 +20,9 @@ export interface Advice { code: "fewGuests" | "partialGuest" | "docPhoto"; guest
 
 export interface FlowInput {
   doc: { firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docNumber?: string; docPlace?: string } | null;
-  extras: { firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; photoFront?: string }[];
+  extras: { firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docNumber?: string; docPlace?: string; photoFront?: string; room?: string }[];
+  /** Gruppi: camera dell'ospite principale (chi prenota). */
+  primaryRoom?: string;
   photoFront?: string;
   consent: boolean;
   signature?: string;
@@ -33,6 +36,25 @@ export interface FlowInput {
 }
 
 const has = (v?: string) => !!(v ?? "").trim();
+
+export interface RoomPerson { room: string; birthDate?: string; named?: boolean }
+/**
+ * Capocamera di ogni camera di un gruppo. `persons[0]` è l'ospite principale (chi prenota) e guida la sua camera; nelle altre camere guida la persona
+ * più grande (data di nascita più lontana; chi non ha la data viene dopo), così un minore non diventa mai titolare del documento se c'è un adulto.
+ * Ritorna camera → indice in `persons`. Le persone senza nome (named === false) non contano.
+ */
+export function roomHeads(persons: RoomPerson[], primaryRoom: string): Map<string, number> {
+  const heads = new Map<string, number>();
+  if (persons.length) heads.set(primaryRoom, 0);
+  persons.forEach((p, i) => {
+    if (i === 0 || p.named === false || !p.room || p.room === primaryRoom) return;
+    const cur = heads.get(p.room);
+    if (cur === undefined) { heads.set(p.room, i); return; }
+    const a = persons[cur].birthDate || "", b = p.birthDate || "";
+    if (b && (!a || b < a)) heads.set(p.room, i);
+  });
+  return heads;
+}
 export const fieldId = (code: MissCode, guest = 1) => (code === "docPhoto" ? `f-docPhoto-${guest}` : code === "group" ? "f-group" : guest > 1 ? `f-${code}-${guest}` : `f-${code}`);
 
 export function checkinStatus(i: FlowInput): { blocking: Miss[]; advice: Advice[]; entered: number; valid: boolean } {
@@ -57,6 +79,18 @@ export function checkinStatus(i: FlowInput): { blocking: Miss[]; advice: Advice[
     needX("birthPlace", has(e.birthPlace));
     needX("citizenship", has(e.citizenship));
   });
+  // Gruppi: il capocamera di ogni camera (diverso dall'ospite principale) deve avere il documento.
+  if (i.isGroup && i.primaryRoom) {
+    const named = i.extras.map((e, k) => ({ e, k })).filter(({ e }) => has(e.firstName) && has(e.lastName));
+    const heads = roomHeads([{ room: i.primaryRoom, birthDate: d?.birthDate }, ...named.map(({ e }) => ({ room: e.room || i.primaryRoom!, birthDate: e.birthDate }))], i.primaryRoom);
+    for (const [room, idx] of heads) {
+      if (room === i.primaryRoom || idx === 0) continue;
+      const { e, k } = named[idx - 1];
+      const g = k + 2;
+      if (!has(e.docNumber)) blocking.push({ code: "docNumber", step: 1, id: fieldId("docNumber", g), guest: g });
+      if (!has(e.docPlace)) blocking.push({ code: "docPlace", step: 1, id: fieldId("docPlace", g), guest: g });
+    }
+  }
   if (i.isGroup && i.missingRooms?.length) blocking.push({ code: "group", step: 1, id: fieldId("group"), rooms: i.missingRooms });
   if (i.requireDocPhotos) {
     if (!i.photoFront) blocking.push({ code: "docPhoto", step: 2, id: fieldId("docPhoto", 1), guest: 1 });
@@ -88,4 +122,18 @@ export function stepsWithMissing(blocking: Miss[]): Set<CheckinStep> {
  */
 export function needsMoreGuests(expectedGuests: number, savedExtraGuests: number): boolean {
   return savedExtraGuests + 1 < Math.max(1, expectedGuests);
+}
+
+/**
+ * Tipo documento letto dall'AI (testo libero) → una delle voci del menu (DOC_TYPES). undefined se non riconosciuto.
+ * Serve perché il modulo parte con "Carta d'identità": un passaporto fotografato non deve restare salvato come carta d'identità.
+ */
+export function docTypeFromText(v: unknown): string | undefined {
+  const n = String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (!n.trim()) return undefined;
+  if (/passaport|passport|reisepass|passeport|pasaporte/.test(n)) return "Passaporto";
+  if (/patent|licen[sc]e|fuhrerschein|permis de conduire/.test(n)) return "Patente di guida";
+  if (/permesso|residence permit|titre de sejour|aufenthalt/.test(n)) return "Permesso di soggiorno";
+  if (/identit|carta|identity|id card|personalausweis|carte nationale/.test(n)) return "Carta d'identità";
+  return undefined;
 }

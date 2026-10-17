@@ -47,7 +47,7 @@ export function healRoundedTotals(bookings: Booking[]): BookingPatch[] {
 export const TWIN_FILL_FIELDS = [
   "cleaningFee", "cityTaxExempt", "cityTaxPaid", "cityTaxInPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature",
   "invoiceNo", "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt",
-  "reviewRequestChannel", "childAges", "cribs", "paymentMethod", "paymentFee",
+  "reviewRequestChannel", "childAges", "cribs", "paymentMethod", "paymentFee", "privacyConsentAt", "privacyConsentBy",
 ] as const;
 
 const isEmpty = (v: unknown) => v === undefined || v === null || v === "" || v === false || v === 0 || (Array.isArray(v) && v.length === 0);

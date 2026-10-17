@@ -2,6 +2,8 @@
 // tutte le informazioni utili in un colpo solo (ospite e contatti, struttura e camera, date, persone, canale, codice, importi, richieste).
 // Puro e senza dipendenze dal browser, così lo usano sia il gestionale (prenotazioni inserite a mano) sia il server (prenotazioni dalle OTA).
 import { fmtDMY, nights } from "./dates";
+import { eur } from "./format";
+import { plural } from "./plural";
 
 export type NotifyEvent = "newBooking" | "modified" | "cancel" | "payment";
 
@@ -18,7 +20,6 @@ export interface NotifyInput {
   paymentAmount?: number;
 }
 
-const eur = (n: number) => `€ ${n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const clean = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
 
 export function notifyBookingLines(i: NotifyInput): string[] {
@@ -38,19 +39,24 @@ export function notifyBookingLines(i: NotifyInput): string[] {
   out.push(`Partenza: ${fmtDMY(b.checkOut)}`);
   const n = b.checkIn && b.checkOut ? nights(b.checkIn, b.checkOut) : 0;
   const adults = b.adults ?? 0, kids = b.children ?? 0;
-  const people = [adults ? `${adults} ${adults === 1 ? "adulto" : "adulti"}` : "", kids ? `${kids} ${kids === 1 ? "bambino" : "bambini"}` : ""].filter(Boolean).join(", ");
-  out.push(`Soggiorno: ${n} ${n === 1 ? "notte" : "notti"}${people ? ` · ${people}` : ""}`);
+  const people = [adults ? plural(adults, "adulto", "adulti") : "", kids ? plural(kids, "bambino", "bambini") : ""].filter(Boolean).join(", ");
+  out.push(`Soggiorno: ${plural(n, "notte", "notti")}${people ? ` · ${people}` : ""}`);
   add("Canale", i.channelLabel);
   add("Codice prenotazione", b.code);
 
   if (typeof b.total === "number") {
     out.push("");
-    out.push(`Totale: ${eur(b.total)}`);
-    if (b.cleaningFee && b.cleaningFee > 0) out.push(`Pulizia: ${eur(b.cleaningFee)}`);
+    // Il totale comprende la pulizia (come "Da incassare"): con la pulizia si mostrano le due righe e la somma.
+    const cleaning = b.cleaningFee && b.cleaningFee > 0 ? b.cleaningFee : 0;
+    if (cleaning > 0) {
+      out.push(`Alloggio: ${eur(b.total)}`);
+      out.push(`Pulizia: ${eur(cleaning)}`);
+    }
+    out.push(`Totale: ${eur(b.total + cleaning)}`);
     const paid = b.paid ?? 0;
     if (paid > 0) out.push(`Già incassato: ${eur(paid)}`);
-    const due = Math.max(0, b.total + (b.cleaningFee ?? 0) - paid);
-    out.push(`Da incassare: ${eur(due)}`);
+    const due = Math.max(0, b.total + cleaning - paid);
+    if (i.ev !== "cancel") out.push(`Da incassare: ${eur(due)}`); // su una cancellazione non c'è più nulla da incassare
   }
   if (i.ev === "payment" && i.paymentAmount) out.push(`Incasso registrato: ${eur(i.paymentAmount)}`);
 

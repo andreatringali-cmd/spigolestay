@@ -44,3 +44,23 @@ test("pagamento: mostra l'incasso registrato e l'importo residuo", () => {
   assert.match(t, /Da incassare: € 20,00/);
   assert.match(t, /Incasso registrato: € 10,00/);
 });
+
+test("pulizia: il Totale la include (alloggio + pulizia = totale) ed è coerente con 'Da incassare'", () => {
+  const t = notifyBookingLines({ ...base, booking: { ...base.booking, total: 1200, cleaningFee: 34.5, paid: 100 } }).join("\n");
+  assert.match(t, /Alloggio: € 1\.200,00/); // migliaia sempre separate
+  assert.match(t, /Pulizia: € 34,50/);
+  assert.match(t, /Totale: € 1\.234,50/);
+  assert.match(t, /Già incassato: € 100,00/);
+  assert.match(t, /Da incassare: € 1\.134,50/);
+});
+
+test("senza pulizia il Totale è l'alloggio e non compaiono righe a zero", () => {
+  const t = notifyBookingLines({ ...base, booking: { ...base.booking, total: 30, cleaningFee: 0 } }).join("\n");
+  assert.match(t, /Totale: € 30,00/);
+  assert.doesNotMatch(t, /Pulizia|Alloggio/);
+});
+
+test("persone al singolare: 1 adulto, 1 bambino", () => {
+  const t = notifyBookingLines({ ...base, booking: { ...base.booking, adults: 1, children: 1 } }).join("\n");
+  assert.match(t, /1 notte · 1 adulto, 1 bambino/);
+});

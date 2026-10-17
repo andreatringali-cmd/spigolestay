@@ -66,7 +66,8 @@ test("incasso anche a mano oltre ai pagamenti online: rimborsa il tracciato e se
   const sc = scenario({ paid: 350, paidOnline: 300, stripeExtraPayments: [{ pi: "pi_2", amount: 200 }] });
   const r = await cancel();
   assert.equal(r.status, 200); assert.equal(r.json.refunded, 300); assert.equal(r.json.unrefunded, 50);
-  assert.match(sc.state().bookings[0].note, /resto \(€50\) va gestito a mano/);
+  assert.match(sc.state().bookings[0].note, /resto \(€ 50,00\) va gestito a mano/); // importi con virgola e due decimali
+  assert.match(sc.state().bookings[0].note, /Annullata dall'ospite il \d{2}\.\d{2}\.\d{4}/); // data gg.mm.aaaa, non ISO
 });
 
 test("rimborso fallito: la prenotazione NON viene annullata e l'ospite riceve un errore chiaro", async () => {

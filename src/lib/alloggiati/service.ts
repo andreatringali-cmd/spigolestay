@@ -4,12 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { nights } from "@/lib/dates";
+import { plural } from "@/lib/plural";
 import { todayRome, ymdRome, addDaysYmd } from "@/lib/dates-rome";
 import { getAlloggiatiProvider, type AlloggiatiCreds, type SchedinaPayload } from "./provider";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred } from "@/lib/crypto-creds";
 import { generateToken, authenticationTest, testSchedine as wsTest, sendSchedine as wsSend, ricevuta as wsRicevuta } from "./soap";
-import { loadCodeMaps, resolveLuogo, resolveComuneFull, resolveDocumento, italyCode, syncTables, type CodeMaps } from "./codes";
+import { loadCodeMaps, resolveSchedinaCodes, syncTables, type CodeMaps } from "./codes";
 
 // Attiva l'integrazione REALE col portale (SOAP) quando l'env flag è impostato e le
 // credenziali sono complete; altrimenti resta il comportamento mock (nessuna rete).
@@ -29,21 +30,55 @@ export function roleFor(index: number, total: number, group: boolean): string {
   return index === 0 ? "17" : "19";
 }
 
+// ── Testo del tracciato ──────────────────────────────────────────────────────────────────────────
+// Nomi: senza accenti, solo A-Z, spazio e apostrofo (il portale rifiuta il resto), spazi compressi.
+const LATIN_EXTRA: Record<string, string> = { "Ø": "O", "Æ": "AE", "Œ": "OE", "Ł": "L", "Đ": "D", "Þ": "TH", "Ð": "D", "ß": "SS", "ı": "I" };
+export function cleanName(s: string | undefined | null): string {
+  return (s ?? "").toString()
+    .replace(/[ØÆŒŁĐÞÐßı]/gi, (c) => LATIN_EXTRA[c] ?? LATIN_EXTRA[c.toUpperCase()] ?? c)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[’‘`´]/g, "'")
+    .replace(/[^A-Z' ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+// Numero documento: solo lettere e cifre maiuscole (spazi e trattini tolti).
+export function cleanDocNumber(s: string | undefined | null): string {
+  return (s ?? "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+const isoOk = (d?: string): boolean => {
+  if (!d || !/^\d{4}-\d{2}-\d{2}/.test(d)) return false;
+  const [y, m, dd] = d.slice(0, 10).split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, dd));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === dd && y >= 1900;
+};
+
 // Validazione locale del tracciato (per evitare scarti). Ritorna elenco errori.
-export function validateSchedina(g: SchedinaGuest, ruolo: string): string[] {
+// Con le tabelle di codifica (`maps`) controlla anche che cittadinanza, luogo di nascita, tipo documento e luogo di rilascio
+// si traducano in un CODICE valido: altrimenti il tracciato avrebbe spazi al loro posto e il portale lo rifiuterebbe.
+export function validateSchedina(g: SchedinaGuest, ruolo: string, maps?: CodeMaps | null, today: string = todayRome(), arrival?: string): string[] {
   const e: string[] = [];
+  if (arrival !== undefined && !isoOk(arrival)) e.push("Data di arrivo non valida");
   if (!g.cognome?.trim()) e.push("Cognome mancante");
+  else if (!cleanName(g.cognome)) e.push("Cognome non valido (servono lettere)"); // oltre 50 caratteri NON è un errore: nel tracciato si tronca
   if (!g.nome?.trim()) e.push("Nome mancante");
+  else if (!cleanName(g.nome)) e.push("Nome non valido (servono lettere)"); // oltre 30 caratteri: troncato nel tracciato
   if (!g.sesso) e.push("Sesso mancante");
+  else if (g.sesso !== "M" && g.sesso !== "F") e.push("Sesso non valido (M o F)");
   if (!g.dataNascita) e.push("Data di nascita mancante");
+  else if (!isoOk(g.dataNascita)) e.push("Data di nascita non valida");
+  else if (g.dataNascita.slice(0, 10) > today) e.push("Data di nascita nel futuro");
   if (!g.comuneNascita?.trim() && !g.statoNascita?.trim()) e.push("Luogo di nascita mancante");
   if (!g.cittadinanza?.trim()) e.push("Cittadinanza mancante");
   // Documento obbligatorio per singolo/capofamiglia/capogruppo (16/17/18), non per i membri.
   if (["16", "17", "18"].includes(ruolo)) {
     if (!g.tipoDoc?.trim()) e.push("Tipo documento mancante");
     if (!g.numeroDoc?.trim()) e.push("Numero documento mancante");
+    else { const dn = cleanDocNumber(g.numeroDoc); if (!dn) e.push("Numero documento non valido"); else if (dn.length > 20) e.push(`Numero documento troppo lungo: ${dn.length} caratteri (massimo 20)`); }
     if (!g.luogoRilascio?.trim()) e.push("Luogo rilascio documento mancante");
   }
+  if (maps?.hasData) e.push(...resolveSchedinaCodes(g, isMember(ruolo), maps).issues);
   return e;
 }
 
@@ -56,44 +91,33 @@ export function validateSchedina(g: SchedinaGuest, ruolo: string): string[] {
 // tabelle di codifica; senza tabelle si scrive il testo grezzo (il Test del portale
 // segnalerà eventuali codici errati).
 const fix = (s: string | undefined, n: number) => (s ?? "").toString().toUpperCase().slice(0, n).padEnd(n, " ");
-const num2 = (n: number) => String(Math.max(0, Math.min(30, Math.round(n)))).padStart(2, "0");
-const ymd = (iso?: string) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "          ");
+const fixName = (s: string | undefined, n: number) => cleanName(s).slice(0, n).padEnd(n, " ");
+const num2 = (n: number) => String(Math.max(1, Math.min(30, Math.round(n) || 1))).padStart(2, "0"); // giorni di permanenza: almeno 1 (anche con arrivo e partenza lo stesso giorno)
+// Data nel tracciato: gg/mm/aaaa. Se non è una data ISO valida lascia 10 spazi (la validazione la segnala) invece di scrivere un valore a caso.
+const ymd = (iso?: string) => (isoOk(iso) ? (iso as string).slice(0, 10).split("-").reverse().join("/") : "          ");
 const isMember = (ruolo: string) => ruolo === "19" || ruolo === "20"; // familiare/membro: doc in blank
 
 // Builder base (senza risoluzione codici): usa i valori testuali così come sono.
 export function buildRecord(g: SchedinaGuest, ruolo: string, arrival: string, perm: number): string {
   const doc = isMember(ruolo);
   const rec = [
-    fix(ruolo, 2), ymd(arrival), num2(perm), fix(g.cognome, 50), fix(g.nome, 30),
+    fix(ruolo, 2), ymd(arrival), num2(perm), fixName(g.cognome, 50), fixName(g.nome, 30),
     fix(g.sesso === "F" ? "2" : "1", 1), ymd(g.dataNascita),
-    fix(g.comuneNascita, 9), fix((g as { provinciaNascita?: string }).provinciaNascita, 2), fix(g.statoNascita, 9), fix(g.cittadinanza, 9),
-    doc ? "".padEnd(5, " ") : fix(g.tipoDoc, 5), doc ? "".padEnd(20, " ") : fix(g.numeroDoc, 20), doc ? "".padEnd(9, " ") : fix(g.luogoRilascio, 9),
+    fixName(g.comuneNascita, 9), fix((g as { provinciaNascita?: string }).provinciaNascita, 2), fixName(g.statoNascita, 9), fixName(g.cittadinanza, 9),
+    doc ? "".padEnd(5, " ") : fix(g.tipoDoc, 5), doc ? "".padEnd(20, " ") : fix(cleanDocNumber(g.numeroDoc), 20), doc ? "".padEnd(9, " ") : fixName(g.luogoRilascio, 9),
   ].join("");
   return rec.slice(0, 168).padEnd(168, " ");
 }
 
 // Builder con risoluzione dei codici ufficiali dalle tabelle in cache.
 export function buildRecordResolved(g: SchedinaGuest, ruolo: string, arrival: string, perm: number, maps: CodeMaps): string {
-  const gp = g as { provinciaNascita?: string };
-  const comune = resolveComuneFull(maps, g.comuneNascita, gp.provinciaNascita);
-  const bornInItaly = !!comune?.provincia; // se ha una provincia è un comune italiano
-  let comuneCode = "", provCode = "", statoNascitaCode = "";
-  if (bornInItaly && comune) {
-    comuneCode = comune.code; provCode = (comune.provincia ?? "").toUpperCase();
-    statoNascitaCode = resolveLuogo(maps, g.statoNascita) || italyCode(maps) || "";
-  } else {
-    // Nato all'estero (o comune non riconosciuto): comune/provincia in blank, stato = paese.
-    statoNascitaCode = resolveLuogo(maps, g.statoNascita) || resolveLuogo(maps, g.comuneNascita) || "";
-  }
-  const cittadinanzaCode = resolveLuogo(maps, g.cittadinanza) || "";
-  const doc = isMember(ruolo);
-  const tipoDocCode = doc ? "" : (resolveDocumento(maps, g.tipoDoc) || "");
-  const luogoRilCode = doc ? "" : (resolveLuogo(maps, g.luogoRilascio) || "");
+  const member = isMember(ruolo);
+  const c = resolveSchedinaCodes(g, member, maps);
   const rec = [
-    fix(ruolo, 2), ymd(arrival), num2(perm), fix(g.cognome, 50), fix(g.nome, 30),
+    fix(ruolo, 2), ymd(arrival), num2(perm), fixName(g.cognome, 50), fixName(g.nome, 30),
     fix(g.sesso === "F" ? "2" : "1", 1), ymd(g.dataNascita),
-    fix(comuneCode, 9), fix(provCode, 2), fix(statoNascitaCode, 9), fix(cittadinanzaCode, 9),
-    fix(tipoDocCode, 5), doc ? "".padEnd(20, " ") : fix(g.numeroDoc, 20), fix(luogoRilCode, 9),
+    fix(c.comune, 9), fix(c.prov, 2), fix(c.statoNascita, 9), fix(c.cittadinanza, 9),
+    fix(c.tipoDoc, 5), member ? "".padEnd(20, " ") : fix(cleanDocNumber(g.numeroDoc), 20), fix(c.luogoRilascio, 9),
   ].join("");
   return rec.slice(0, 168).padEnd(168, " ");
 }
@@ -118,9 +142,41 @@ const toG = (src: Partial<Guest> & Record<string, unknown> | undefined): Schedin
   tipoDoc: src?.docType as string, numeroDoc: src?.docNumber as string, luogoRilascio: src?.docPlace as string,
 });
 
+// Le tabelle dei codici sono uguali per tutti i tenant e cambiano di rado: per la sincronizzazione delle schedine (chiamata a ogni check-in) si tengono in memoria 5 minuti
+// invece di rileggere ~9000 righe ogni volta. L'invio (sendReady) legge sempre fresco.
+let mapsCache: { at: number; maps: CodeMaps } | null = null;
+const MAPS_TTL_MS = 5 * 60 * 1000;
+export function resetCodeMapsCache(): void { mapsCache = null; }
+async function codeMapsForSync(admin: SupabaseClient): Promise<CodeMaps | null> {
+  if (mapsCache && Date.now() - mapsCache.at < MAPS_TTL_MS) return mapsCache.maps;
+  try { const m = await loadCodeMaps(admin); if (!m.hasData) return null; mapsCache = { at: Date.now(), maps: m }; return m; } catch { return null; }
+}
+
+/** Check-in compilato (come la UI: Adempimenti, Alloggiati Web, percorso della prenotazione): online completato, oppure ospite principale con cognome e documento. */
+export const hasCheckedIn = (b: { webCheckin?: boolean; primaryGuest?: { lastName?: string; docNumber?: string } }): boolean =>
+  b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
+
+/** JSON con chiavi ordinate: Postgres (jsonb) riordina le chiavi, quindi per confrontare due "guest" non basta JSON.stringify. */
+export function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return "[" + v.map(stableJson).join(",") + "]";
+  if (v && typeof v === "object") return "{" + Object.keys(v as object).sort().filter((k) => (v as Record<string, unknown>)[k] !== undefined).map((k) => JSON.stringify(k) + ":" + stableJson((v as Record<string, unknown>)[k])).join(",") + "}";
+  return JSON.stringify(v ?? null);
+}
+
+type PrevRow = { guest_ref: string | null; guest: unknown; arrival: string; errors: string[] | null };
+/** Gli errori che vengono dal PORTALE (non dai controlli locali) iniziano sempre con questo prefisso. */
+export const PORTAL_PREFIX = "Portale: ";
+export const isPortalRejection = (errors: string[] | null | undefined): boolean => !!errors?.length && errors[0].startsWith(PORTAL_PREFIX);
+/** Messaggi di una riga rifiutata dal portale (errorDes + errorDettaglio), pronti da salvare in `errors`. */
+export function portalErrors(d: { errorDes?: string; errorDettaglio?: string } | undefined): string[] {
+  const des = (d?.errorDes ?? "").trim(), det = (d?.errorDettaglio ?? "").trim();
+  return [PORTAL_PREFIX + (des || det || "schedina rifiutata"), ...(des && det && det !== des ? [det] : [])];
+}
+
 // Genera/aggiorna le schedine (stato da_validare/pronta) per gli arrivi del tenant.
 // Rigenera solo le NON inviate; conserva quelle già inviate.
-export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts: { structureId?: string; fromDays?: number } = {}): Promise<{ count: number }> {
+// `bookingId`: sincronizza SOLO quella prenotazione (usato dal check-in online: evita 2 query per ogni prenotazione della finestra, rischio timeout).
+export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts: { structureId?: string; fromDays?: number; bookingId?: string } = {}): Promise<{ count: number }> {
   const blob = await readBlob(admin, tenantId);
   const { data: settRows } = await admin.from("alloggiati_settings").select("structure_id, group_guests").eq("tenant_id", tenantId);
   const groupBy = new Map((settRows ?? []).map((s) => [s.structure_id as string, s.group_guests as boolean]));
@@ -129,7 +185,7 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
   const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const bookings = (blob.bookings ?? []).filter((b) =>
     !isInactive(b) &&
-    (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId));
+    (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId) && (!opts.bookingId || b.id === opts.bookingId));
 
   // Pulizia ORFANI: elimina le schedine NON inviate le cui prenotazioni sono state annullate/no-show
   // o non esistono più (es. camera rivenduta). Così un no-show non lascia schedine "da mandare".
@@ -137,48 +193,54 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
   {
     let q = admin.from("alloggiati_schedine").select("id, booking_id").eq("tenant_id", tenantId).neq("stato", "inviata");
     if (opts.structureId) q = q.eq("structure_id", opts.structureId);
+    if (opts.bookingId) q = q.eq("booking_id", opts.bookingId);
     const { data: existing } = await q;
     const orphanIds = ((existing ?? []) as { id: string; booking_id: string | null }[])
       .filter((r) => !r.booking_id || !activeIds.has(r.booking_id)).map((r) => r.id);
     if (orphanIds.length) await admin.from("alloggiati_schedine").delete().in("id", orphanIds);
   }
 
-  // Schedine GIÀ inviate di queste prenotazioni: non si ricreano mai (né la prenotazione intera né il singolo ospite), altrimenti la stessa schedina
-  // ripartirebbe alla Questura a ogni riapertura/ricalcolo. Si inseriscono solo i guest_ref che non hanno ancora una riga inviata.
-  const sentRefs = new Map<string, Set<string>>();
-  const bookingIds = bookings.map((b) => b.id);
-  for (let i = 0; i < bookingIds.length; i += 100) {
-    const { data: sentRows } = await admin.from("alloggiati_schedine").select("booking_id, guest_ref").eq("tenant_id", tenantId).eq("stato", "inviata").in("booking_id", bookingIds.slice(i, i + 100));
-    for (const s of (sentRows ?? []) as { booking_id: string | null; guest_ref: string | null }[]) {
-      if (!s.booking_id) continue;
-      const set = sentRefs.get(s.booking_id) ?? new Set<string>(); set.add(s.guest_ref ?? "primary"); sentRefs.set(s.booking_id, set);
-    }
-  }
+  // Tabelle di codifica (Luoghi, Tipi_Documento): servono per controllare che cittadinanza, luogo di nascita, tipo documento e luogo di rilascio
+  // si traducano in un codice. Se non sono ancora state scaricate (o la lettura fallisce) il controllo sui codici si salta.
+  const maps = await codeMapsForSync(admin);
 
   let count = 0;
   for (const b of bookings) {
+    // Righe già presenti di questa prenotazione, lette subito prima di rigenerarle (così un invio appena concluso da sendReady si vede):
+    // le NON inviate servono per ricordare i RIFIUTI del portale (vedi sotto); le INVIATE non si ricreano mai (né la prenotazione intera né il singolo ospite),
+    // altrimenti la stessa schedina ripartirebbe alla Questura a ogni riapertura/ricalcolo: si inseriscono solo i guest_ref che non hanno ancora una riga inviata.
+    const { data: existingRows } = await admin.from("alloggiati_schedine").select("guest_ref, guest, arrival, errors, stato").eq("tenant_id", tenantId).eq("booking_id", b.id);
+    const prevRows = ((existingRows ?? []) as (PrevRow & { stato?: string })[]).filter((r) => r.stato !== "inviata");
+    const alreadySent = new Set(((existingRows ?? []) as (PrevRow & { stato?: string })[]).filter((r) => r.stato === "inviata").map((r) => r.guest_ref ?? "primary"));
     // Non toccare le schedine già inviate per questa prenotazione.
     await admin.from("alloggiati_schedine").delete().eq("tenant_id", tenantId).eq("booking_id", b.id).neq("stato", "inviata");
+    // Senza check-in compilato non nasce nessuna schedina: i dati sulla scheda ospite possono essere vecchi (ospite di ritorno) e verrebbero inviati alla Questura.
+    if (!hasCheckedIn(b)) continue;
     const primary = b.primaryGuest ?? (blob.guests ?? []).find((g) => g.id === b.guestId);
     const people: SchedinaGuest[] = [toG(primary as Record<string, unknown>), ...((b.extraGuests ?? []).map((e) => toG(e as Record<string, unknown>)))];
     const group = groupBy.get(b.structureId) ?? true;
-    const perm = nights(b.checkIn, b.checkOut);
+    const perm = Math.max(1, nights(b.checkIn, b.checkOut)); // arrivo e partenza lo stesso giorno = 1 giorno di permanenza, mai 0
     // Check-in COMPLETO solo se le persone dichiarate coprono gli ospiti attesi: se ne mancano,
     // la prenotazione è "da completare" e NESSUNA sua schedina è "pronta" (resta "da_validare").
     const expectedPax = Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
     const incomplete = people.length < expectedPax;
-    const alreadySent = sentRefs.get(b.id);
     const rows = people.map((g, i) => {
       const ruolo = roleFor(i, people.length, group);
-      const errors = [...validateSchedina(g, ruolo)];
+      const guest = { ...g, perm };
+      const ref = i === 0 ? "primary" : `extra:${i - 1}`;
+      const errors = [...validateSchedina(g, ruolo, maps, todayRome(), b.checkIn)];
       if (incomplete) errors.push(`Ospiti incompleti: ${people.length}/${expectedPax}`);
+      // Rifiuto del portale su QUESTI stessi dati: la schedina resta da correggere finché i dati non cambiano (altrimenti verrebbe rimandata ogni sera).
+      const prev = prevRows.find((r) => r.guest_ref === ref);
+      const portalErrors = prev && prev.arrival === b.checkIn && isPortalRejection(prev.errors) && stableJson(prev.guest) === stableJson(guest) ? prev.errors : null;
+      const all = portalErrors ? [...(portalErrors as string[]), ...errors.filter((m) => !(portalErrors as string[]).includes(m))] : errors;
       return {
         tenant_id: tenantId, structure_id: b.structureId, booking_id: b.id,
-        guest_ref: i === 0 ? "primary" : `extra:${i - 1}`, arrival: b.checkIn, guest: { ...g, perm },
-        ruolo, stato: errors.length ? "da_validare" : "pronta", errors: errors.length ? errors : null,
+        guest_ref: ref, arrival: b.checkIn, guest,
+        ruolo, stato: all.length ? "da_validare" : "pronta", errors: all.length ? all : null,
       };
     });
-    const toInsert = alreadySent ? rows.filter((row) => !alreadySent.has(row.guest_ref)) : rows;
+    const toInsert = alreadySent.size ? rows.filter((row) => !alreadySent.has(row.guest_ref)) : rows;
     if (toInsert.length) { const { error } = await admin.from("alloggiati_schedine").insert(toInsert); if (!error) count += toInsert.length; }
   }
   return { count };
@@ -231,12 +293,47 @@ export async function syncCodeTables(admin: SupabaseClient, tenantId: string, st
   try {
     const token = await getToken(c);
     const r = await syncTables(admin, c.username!, token);
+    resetCodeMapsCache();
     return { ok: true, message: `Tabelle aggiornate: ${r.luoghi} luoghi, ${r.documenti} tipi documento.` };
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore aggiornamento tabelle." }; }
 }
 
+// ── Invio: regole pure (testabili senza rete) ─────────────────────────────────────────────────────
+
+/** Esito per riga di un Send: serve il via libera del servizio E quello della singola riga. Se il portale non ha restituito il dettaglio ci si fida dell'esito generale; dettaglio incompleto = righe mancanti NON confermate. */
+export function evalSend(resultEsito: boolean, dettaglio: { esito: boolean }[], n: number): boolean[] {
+  return Array.from({ length: n }, (_, i) => resultEsito && (dettaglio.length === 0 ? true : dettaglio[i] ? dettaglio[i].esito === true : false));
+}
+
+/**
+ * Righe che possono partire: una famiglia (= prenotazione) parte INTERA o per niente. Esclude le righe delle prenotazioni che hanno almeno
+ * una riga non pronta (`notReadyBookings`) o una riga da non inviare (`badRowIds`: dati da correggere, rifiuto del portale).
+ */
+export function sendableRows<T extends { id: string; booking_id: string | null }>(ready: T[], notReadyBookings: Iterable<string>, badRowIds: Iterable<string>): { send: T[]; held: T[] } {
+  const blocked = new Set<string>(notReadyBookings);
+  const bad = new Set<string>(badRowIds);
+  for (const r of ready) if (bad.has(r.id) && r.booking_id) blocked.add(r.booking_id);
+  const send: T[] = [], held: T[] = [];
+  for (const r of ready) (bad.has(r.id) || (r.booking_id && blocked.has(r.booking_id)) ? held : send).push(r);
+  return { send, held };
+}
+
+type SchedRowDb = { id: string; booking_id: string | null; arrival: string; guest: unknown; ruolo: string; guest_ref?: string | null };
+const permOf = (s: SchedRowDb) => Math.max(1, (s.guest as { perm?: number } | null)?.perm ?? 1);
+
+/**
+ * Ordine di invio: per arrivo, poi per prenotazione, e dentro la prenotazione il capofamiglia/capogruppo/singolo (16, 17, 18) PRIMA dei familiari/membri (19, 20),
+ * che devono seguirlo consecutivi: il portale lega i familiari al capofamiglia che li precede nel file. A parità, ordine dei co-ospiti (extra:0, extra:1…).
+ */
+export function sendOrder(a: { arrival: string; booking_id: string | null; ruolo: string; guest_ref?: string | null }, b: { arrival: string; booking_id: string | null; ruolo: string; guest_ref?: string | null }): number {
+  const rank = (r: string) => (r === "19" || r === "20" ? 1 : 0);
+  const idx = (g?: string | null) => { const m = /^extra:(\d+)$/.exec(g ?? ""); return m ? Number(m[1]) + 1 : 0; };
+  return a.arrival.localeCompare(b.arrival) || (a.booking_id ?? "").localeCompare(b.booking_id ?? "") || rank(a.ruolo) - rank(b.ruolo) || idx(a.guest_ref) - idx(b.guest_ref);
+}
+const recordOf = (s: SchedRowDb, maps: CodeMaps) => buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, permOf(s), maps);
+
 // Controllo preliminare (Test) delle schedine PRONTE senza inviarle. Aggiorna gli
-// eventuali errori riga-per-riga sulle schedine.
+// eventuali errori riga-per-riga sulle schedine (le rifiutate diventano "da_validare" con il messaggio del portale).
 export async function testReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string }> {
   const { c, live } = await creds(admin, tenantId, structureId);
   if (!live) return { ok: false, message: "Integrazione reale non attiva: usa mock (nessun controllo dal portale)." };
@@ -244,18 +341,18 @@ export async function testReady(admin: SupabaseClient, tenantId: string, structu
   // Si controllano solo gli arrivi GIÀ avvenuti: gli arrivi futuri (in preparazione) non si verificano.
   if (arrival) q = q.eq("arrival", arrival);
   else q = q.lte("arrival", todayRome());
-  const { data: sched } = await q;
-  const list = sched ?? [];
+  const { data: sched } = await q.order("arrival").order("booking_id");
+  const list = [...(sched ?? [])].sort(sendOrder);
   if (!list.length) return { ok: true, message: "Nessuna schedina da controllare." };
   try {
     const token = await getToken(c);
     const maps = await loadCodeMaps(admin);
-    const records = list.map((s) => buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1, maps));
+    const records = list.map((s) => recordOf(s as SchedRowDb, maps));
     const { result, elenco } = await wsTest(c.username!, token, records);
     // Riporta gli esiti sulle singole schedine.
     for (let i = 0; i < list.length; i++) {
       const d = elenco.dettaglio[i];
-      if (d && !d.esito) await admin.from("alloggiati_schedine").update({ errors: [d.errorDes, d.errorDettaglio].filter(Boolean) }).eq("id", list[i].id);
+      if (d && !d.esito) await admin.from("alloggiati_schedine").update({ errors: portalErrors(d), stato: "da_validare" }).eq("id", list[i].id);
       else await admin.from("alloggiati_schedine").update({ errors: null }).eq("id", list[i].id);
     }
     const invalid = elenco.dettaglio.filter((d) => !d.esito).length;
@@ -281,12 +378,17 @@ export async function buildTracciato(admin: SupabaseClient, tenantId: string, st
   const { data } = await admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta").lte("arrival", today);
   const list = data ?? [];
   if (!list.length) return { ok: false, message: "Nessuna schedina pronta (gli arrivi futuri si inviano dopo l'arrivo)." };
-  const { live } = await creds(admin, tenantId, structureId);
-  const maps: CodeMaps | null = live ? await loadCodeMaps(admin) : null;
-  const lines = list.map((s) => (maps
+  // Con le tabelle dei codici scaricate il tracciato porta i CODICI (anche con l'invio automatico spento): senza, il portale lo rifiuterebbe.
+  let maps: CodeMaps | null = null;
+  try { const m = await loadCodeMaps(admin); if (m.hasData) maps = m; } catch { maps = null; }
+  // Righe con dati da correggere: fuori dal file (il portale rifiuterebbe l'intero caricamento).
+  const okRows = list.filter((s) => validateSchedina(s.guest as SchedinaGuest, s.ruolo, maps).length === 0);
+  const skipped = list.length - okRows.length;
+  if (!okRows.length) return { ok: false, message: `Nessuna schedina valida per il tracciato: ${skipped} con dati da correggere (vedi dettaglio schedine).` };
+  const lines = okRows.map((s) => (maps
     ? buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1, maps)
     : buildRecord(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1)));
-  return { ok: true, message: `Tracciato con ${lines.length} schedine.`, text: lines.join("\r\n"), count: lines.length };
+  return { ok: true, message: `Tracciato con ${plural(lines.length, "schedina", "schedine")}.${skipped ? ` ${skipped} escluse perché da correggere.` : ""}`, text: lines.join("\r\n"), count: lines.length };
 }
 
 // Archivio invii: elenco degli invii effettuati (per riscaricare/stampare la ricevuta in qualsiasi momento).
@@ -319,13 +421,20 @@ export const ALLOGGIATI_SIMULATED_MSG = "Simulato (invio reale non attivo): null
 // Invia le schedine PRONTE (arrivo indicato o tutte) → submission + ricevuta.
 // `simulated`: true quando l'invio reale non è attivo (ALLOGGIATI_LIVE spento o credenziali incomplete):
 // in quel caso NON si segna nulla come inviato, non si scrive l'evento e non si cancellano le foto.
-export async function sendReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string; sent: number; simulated?: boolean }> {
+// Regole di sicurezza:
+//  - una famiglia (= prenotazione) parte INTERA o per niente: se una sua riga è da correggere/rifiutata, non parte nessuna riga di quella prenotazione;
+//  - prima dell'invio si ricontrollano i dati in locale (codici inclusi) e si fa il Test del portale: le righe rifiutate restano "da_validare" con il messaggio
+//    del portale (in `errors`), così una sola schedina sbagliata non blocca le altre e non si riprova alla cieca ogni sera;
+//  - "inviata" solo se sia l'esito generale sia quello della riga sono positivi.
+// `blocked` = righe pronte tenute indietro (dati da correggere o famiglia incompleta).
+export async function sendReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string; sent: number; simulated?: boolean; blocked?: number }> {
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
   // La schedina si invia DOPO l'arrivo: nell'invio massivo escludiamo gli arrivi futuri.
   if (arrival) q = q.eq("arrival", arrival);
   else q = q.lte("arrival", todayRome());
-  const { data: sched } = await q;
-  const list = sched ?? [];
+  // Il portale vuole il capofamiglia (17) prima dei familiari (19) consecutivi: ordine per arrivo e prenotazione, poi per ruolo.
+  const { data: sched } = await q.order("arrival").order("booking_id");
+  const list = ([...(sched ?? [])] as (SchedRowDb & { guest: SchedinaGuest })[]).sort(sendOrder);
   if (!list.length) return { ok: false, message: "Nessuna schedina pronta da inviare (gli arrivi futuri si inviano dopo l'arrivo).", sent: 0 };
 
   const { c, live } = await creds(admin, tenantId, structureId);
@@ -338,29 +447,93 @@ export async function sendReady(admin: SupabaseClient, tenantId: string, structu
     return { ok: false, message: ALLOGGIATI_SIMULATED_MSG, sent: 0, simulated: true };
   }
 
-  // Costruisce i record con i codici risolti (integrazione reale attiva).
   const maps: CodeMaps = await loadCodeMaps(admin);
-  const records = list.map((s) => buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1, maps));
-  const payload: SchedinaPayload[] = list.map((s, i) => ({ record: records[i], guest: s.guest }));
+  // Senza le tabelle dei codici il tracciato avrebbe i campi comune/Stato/documento vuoti: il portale lo rifiuterebbe (o, peggio, lo accetterebbe incompleto).
+  if (!maps.hasData) return { ok: false, message: "Scarica prima le tabelle codici (Luoghi e Tipi documento) dalle impostazioni Alloggiati Web: senza non si può inviare.", sent: 0 };
 
-  const { data: sub } = await admin.from("alloggiati_submissions").insert({ tenant_id: tenantId, structure_id: structureId, arrival: arrival ?? null, stato: "pending", count: list.length, payload }).select("id").single();
+  // 1) Famiglie spezzate: prenotazioni con righe non pronte (da correggere / ospiti mancanti) → nessuna delle loro righe parte.
+  const notReady = new Set<string>();
+  const bids = Array.from(new Set(list.map((s) => s.booking_id).filter(Boolean))) as string[];
+  for (let i = 0; i < bids.length; i += 100) {
+    const { data: nr } = await admin.from("alloggiati_schedine").select("booking_id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "da_validare").in("booking_id", bids.slice(i, i + 100));
+    for (const r of (nr ?? []) as { booking_id: string | null }[]) if (r.booking_id) notReady.add(r.booking_id);
+  }
 
-  let res: { ok: boolean; message: string; ricevuta?: string; perLine?: boolean[] };
+  // 2) Riconvalida in locale (le righe possono essere state generate prima delle tabelle dei codici o con regole più larghe).
+  const bad = new Set<string>();
+  for (const s of list) {
+    const errs = validateSchedina(s.guest, s.ruolo, maps, todayRome(), s.arrival);
+    if (errs.length) { bad.add(s.id); await admin.from("alloggiati_schedine").update({ errors: errs, stato: "da_validare" }).eq("id", s.id); }
+  }
+
+  let { send, held } = sendableRows(list, notReady, bad);
+  if (!send.length) return { ok: false, message: `${held.length === 1 ? "Schedina non inviata" : "Schedine non inviate"}: ${held.length} con dati da correggere o famiglia incompleta (vedi dettaglio schedine).`, sent: 0, blocked: held.length };
+
+  const payload: SchedinaPayload[] = send.map((s) => ({ record: recordOf(s, maps), guest: s.guest as unknown as Record<string, unknown> }));
+  const { data: sub } = await admin.from("alloggiati_submissions").insert({ tenant_id: tenantId, structure_id: structureId, arrival: arrival ?? null, stato: "pending", count: send.length, payload }).select("id").single();
+
+  let res: { ok: boolean; message: string; ricevuta?: string };
+  let accepted: SchedRowDb[] = [];
+  let sendCalled = false; // il Send vero è stato chiamato (ha senso conservare l'esito in archivio)
   try {
     const token = await getToken(c);
-    const { result, elenco } = await wsSend(c.username!, token, records);
-    const perLine = list.map((_, i) => elenco.dettaglio[i]?.esito ?? result.esito);
-    const invalid = perLine.filter((v) => !v).length;
-    const ric = `RIC-${todayRome()}`;
-    res = { ok: result.esito && invalid === 0, message: invalid ? `${elenco.schedineValide}/${list.length} acquisite, ${invalid} con errori.` : `Inviate ${elenco.schedineValide} schedine alla Questura.`, ricevuta: result.esito ? ric : undefined, perLine };
+
+    // 3) Test del portale: le righe rifiutate si tolgono (con il loro messaggio) e le altre famiglie partono lo stesso.
+    // Se il Test stesso non riesce (rete, errore del servizio) NON si invia alla cieca: nulla parte, si riprova al prossimo giro.
+    try {
+      const t = await wsTest(c.username!, token, send.map((s) => recordOf(s, maps)));
+      const det = t.elenco.dettaglio;
+      if (det.length === send.length) {
+        const rejected = new Set<string>();
+        for (let i = 0; i < send.length; i++) {
+          if (!det[i].esito) { rejected.add(send[i].id); await admin.from("alloggiati_schedine").update({ errors: portalErrors(det[i]), stato: "da_validare" }).eq("id", send[i].id); }
+        }
+        if (rejected.size) { const r = sendableRows(send, [], rejected); held = [...held, ...r.held]; send = r.send; }
+      }
+    } catch (e) { throw new Error(`Controllo preliminare del portale non riuscito, nessuna schedina inviata (${(e as Error)?.message ?? "errore"}). Riprova più tardi.`); }
+
+    if (!send.length) {
+      res = { ok: false, message: `${held.length === 1 ? "Schedina non inviata" : "Schedine non inviate"}: ${held.length} rifiutate dal controllo del portale o con famiglia incompleta (vedi dettaglio schedine).` };
+    } else {
+      sendCalled = true;
+      const { result, elenco } = await wsSend(c.username!, token, send.map((s) => recordOf(s, maps)));
+      const perLine = evalSend(result.esito, elenco.dettaglio, send.length);
+      accepted = send.filter((_, i) => perLine[i]);
+      // Righe rifiutate dal portale: il motivo resta sulla schedina.
+      for (let i = 0; i < send.length; i++) {
+        const d = elenco.dettaglio[i];
+        if (!perLine[i] && d && !d.esito) await admin.from("alloggiati_schedine").update({ errors: portalErrors(d), stato: "da_validare" }).eq("id", send[i].id);
+      }
+      const invalid = send.length - accepted.length;
+      const ric = `RIC-${todayRome()}`;
+      const tail = held.length ? ` ${held.length} non inviate (da correggere).` : "";
+      res = {
+        ok: result.esito && invalid === 0 && held.length === 0,
+        message: (invalid ? `${accepted.length}/${send.length} acquisite, ${invalid} con errori.` : `${accepted.length === 1 ? "Inviata 1 schedina" : `Inviate ${accepted.length} schedine`} alla Questura.`) + tail,
+        ricevuta: result.esito && accepted.length ? ric : undefined,
+      };
+    }
   } catch (e) { res = { ok: false, message: (e as Error)?.message ?? "Errore invio schedine." }; }
 
-  await admin.from("alloggiati_submissions").update({ stato: res.ok ? "sent" : "error", esito: res.message, ricevuta: res.ricevuta ?? null, tentativi: 1 }).eq("id", sub!.id);
-  // Segna come inviate le schedine effettivamente acquisite (per-riga se disponibile).
-  const sentIds = list.filter((_, i) => (res.perLine ? res.perLine[i] : res.ok)).map((s) => s.id);
+  if (sub?.id) {
+    if (!sendCalled && !accepted.length) {
+      // Nessun invio è partito (famiglie incomplete, righe rifiutate dal Test, errore prima del Send): niente riga "error" in archivio, altrimenti il cron ne crea una ogni sera.
+      await admin.from("alloggiati_submissions").delete().eq("id", sub.id);
+    } else {
+      // Invio parziale (alcune acquisite, altre tenute indietro o con errori) = "sent": le righe errate restano sulle schedine, non sono un invio fallito.
+      await admin.from("alloggiati_submissions").update({ stato: accepted.length ? "sent" : "error", esito: res.message, ricevuta: res.ricevuta ?? null, tentativi: 1, count: send.length }).eq("id", sub.id);
+    }
+  }
+  // Segna come inviate le schedine effettivamente acquisite. Si marca per (prenotazione, ospite) e non per id: se nel frattempo syncSchedine ha rigenerato la riga
+  // (id nuovo, ancora "pronta"), va segnata lei, altrimenti la schedina ripartirebbe alla Questura.
+  const sentIds = accepted.map((s) => s.id);
   if (sentIds.length) {
-    await admin.from("alloggiati_schedine").update({ stato: "inviata", submission_id: sub!.id, ricevuta: res.ricevuta ?? null }).in("id", sentIds);
-    const sentBookings = Array.from(new Set(list.filter((_, i) => (res.perLine ? res.perLine[i] : res.ok)).map((s) => s.booking_id).filter(Boolean))) as string[];
+    for (const s of accepted) {
+      const upd = { stato: "inviata", submission_id: sub?.id ?? null, ricevuta: res.ricevuta ?? null };
+      if (s.booking_id) await admin.from("alloggiati_schedine").update(upd).eq("tenant_id", tenantId).eq("booking_id", s.booking_id).eq("guest_ref", s.guest_ref ?? "primary").neq("stato", "inviata");
+      else await admin.from("alloggiati_schedine").update(upd).eq("id", s.id);
+    }
+    const sentBookings = Array.from(new Set(accepted.map((s) => s.booking_id).filter(Boolean))) as string[];
     for (const bid of sentBookings) {
       await logBookingEvent(admin, tenantId, bid, "schedina", "Schedina Alloggiati inviata alla Questura");
     }
@@ -371,5 +544,5 @@ export async function sendReady(admin: SupabaseClient, tenantId: string, structu
       await purgeDocPhotos(admin, tenantId, sentBookings);
     } catch { /* purga non critica */ }
   }
-  return { ok: res.ok, message: res.message, sent: sentIds.length };
+  return { ok: res.ok, message: res.message, sent: sentIds.length, blocked: held.length };
 }

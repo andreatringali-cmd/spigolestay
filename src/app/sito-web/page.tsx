@@ -12,12 +12,13 @@ import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import DateField from "@/components/DateField";
 import { fmtDate } from "@/lib/dates";
+import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
 import { amenityIcon } from "@/lib/amenities";
 import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw } from "@/lib/publicdata";
 import { inScope } from "@/lib/scope";
 
-const toISO = (d: Date) => d.toISOString().slice(0, 10);
-const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
+const toISO = (d: Date) => ymdRome(d); // giorno di calendario italiano (non UTC)
+const addDays = addDaysYmd; // aritmetica di calendario: dopo il cambio dell'ora legale "arrivo + 1" resta il giorno giusto
 
 // Lingue del sito pubblico
 const SITE_LANGS: [string, string][] = [["it", "🇮🇹 IT"], ["en", "🇬🇧 EN"], ["fr", "🇫🇷 FR"], ["de", "🇩🇪 DE"], ["es", "🇪🇸 ES"]];
@@ -56,6 +57,9 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "La tua recensione": { en: "Your review", fr: "Votre avis", de: "Ihre Bewertung", es: "Tu opinión" },
   "Racconta la tua esperienza…": { en: "Tell us about your experience…", fr: "Racontez votre expérience…", de: "Erzählen Sie von Ihrem Aufenthalt…", es: "Cuéntanos tu experiencia…" },
   "Invia recensione": { en: "Send review", fr: "Envoyer l'avis", de: "Bewertung senden", es: "Enviar opinión" },
+  "Controlla la valutazione e i dati inseriti, poi riprova.": { en: "Please check your rating and details, then try again.", fr: "Vérifiez votre note et vos informations, puis réessayez.", de: "Bitte prüfen Sie Ihre Bewertung und Angaben und versuchen Sie es erneut.", es: "Revisa tu valoración y tus datos e inténtalo de nuevo." },
+  "Hai inviato troppe recensioni di recente: riprova più tardi.": { en: "You have sent too many reviews recently: please try again later.", fr: "Vous avez envoyé trop d'avis récemment : réessayez plus tard.", de: "Sie haben kürzlich zu viele Bewertungen gesendet: bitte versuchen Sie es später erneut.", es: "Has enviado demasiadas opiniones recientemente: inténtalo más tarde." },
+  "Non siamo riusciti a salvare la recensione. Riprova tra qualche istante.": { en: "We could not save your review. Please try again in a moment.", fr: "Nous n'avons pas pu enregistrer votre avis. Réessayez dans un instant.", de: "Wir konnten Ihre Bewertung nicht speichern. Bitte versuchen Sie es gleich noch einmal.", es: "No hemos podido guardar tu opinión. Inténtalo de nuevo en unos instantes." },
   "Grazie per la tua recensione!": { en: "Thanks for your review!", fr: "Merci pour votre avis !", de: "Danke für Ihre Bewertung!", es: "¡Gracias por tu opinión!" },
   "La pubblicheremo a breve.": { en: "We'll publish it shortly.", fr: "Nous la publierons bientôt.", de: "Wir veröffentlichen sie in Kürze.", es: "La publicaremos en breve." },
   "Risposta della struttura": { en: "Response from the property", fr: "Réponse de l'établissement", de: "Antwort der Unterkunft", es: "Respuesta del alojamiento" },
@@ -204,7 +208,7 @@ export function Site() {
   }, [galItems.length]);
 
   // Offerte attive (modulo Promozioni).
-  const offers = useMemo(() => { try { const t = new Date().toISOString().slice(0, 10); return loadPromos().filter((p) => inScope(p.structureId, sid) && p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, [sid]);
+  const offers = useMemo(() => { try { const t = ymdRome(new Date()); return loadPromos().filter((p) => inScope(p.structureId, sid) && p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, [sid]);
 
   // Recensioni REALI soltanto: lette dallo store recensioni (spigolestay:sitereviews),
   // una lista scritta dal proprietario/importata. Nessun testo inventato: se non ci
@@ -251,7 +255,7 @@ export function Site() {
   const gAvg = gReviews?.rating ?? (gReviews?.items.length ? gReviews.items.reduce((a, r) => a + r.rating, 0) / gReviews.items.length : 0);
   const gTotal = gReviews?.total ?? gReviews?.items.length ?? 0;
   const gStars = (r10: number) => "★".repeat(Math.round(r10 / 2)) + "☆".repeat(5 - Math.round(r10 / 2));
-  const gDate = (iso?: string) => { if (!iso) return ""; try { return new Date(iso).toLocaleDateString(lang === "it" ? "it-IT" : lang, { month: "short", year: "numeric" }); } catch { return ""; } };
+  const gDate = (iso?: string) => { if (!iso) return ""; try { return new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00Z" : iso).toLocaleDateString(lang === "it" ? "it-IT" : lang, { month: "short", year: "numeric", timeZone: "UTC" }); } catch { return ""; } };
 
   // Recensioni DIRETTE già pubblicate (dallo snapshot pubblico): lasciate dagli ospiti
   // su questo mini-sito, con l'eventuale risposta del gestore. Sono dati NOSTRI.
@@ -278,16 +282,24 @@ export function Site() {
   const [revHover, setRevHover] = useState(0);
   const [revDone, setRevDone] = useState(false);
   const [revBusy, setRevBusy] = useState(false);
+  const [revErr, setRevErr] = useState("");
   const revValid = rev.rating >= 1 && rev.rating <= 5;
   const revSubmit = async () => {
     if (!revValid || revBusy) return;
-    setRevBusy(true);
+    setRevBusy(true); setRevErr("");
     try {
       if (isPublicMode() && publicSlug()) {
-        await fetch("/api/public-review", {
+        // Il ringraziamento compare SOLO se il server ha davvero registrato la recensione (prima l'esito veniva ignorato).
+        const r = await fetch("/api/public-review", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ slug: publicSlug(), structureId: sid, guest: rev.name.trim(), rating: rev.rating, text: rev.text.trim() }),
-        }).catch(() => {});
+        }).catch(() => null);
+        if (!r || !r.ok) {
+          setRevErr(r?.status === 400 ? "Controlla la valutazione e i dati inseriti, poi riprova."
+            : r?.status === 429 ? "Hai inviato troppe recensioni di recente: riprova più tardi."
+            : "Non siamo riusciti a salvare la recensione. Riprova tra qualche istante.");
+          return;
+        }
       }
       setRevDone(true); setRev({ name: "", rating: 5, text: "" });
     } finally { setRevBusy(false); }
@@ -328,7 +340,7 @@ export function Site() {
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</div>
+          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : name.slice(0, 2).toUpperCase()}</div>
           <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenosite</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
@@ -344,8 +356,8 @@ export function Site() {
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
             <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
-              <label className="block text-[11px] font-medium text-dim">Arrivo<DateField value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
-              <label className="block text-[11px] font-medium text-dim">Partenza<DateField value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-[11px] font-medium text-dim">Arrivo<DateField lang={lang} value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-[11px] font-medium text-dim">Partenza<DateField lang={lang} value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
               <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
               <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
               <button onClick={() => go()} className="mt-auto rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
@@ -701,6 +713,7 @@ export function Site() {
                   </label>
                   <input value={rev.name} onChange={(e) => setRev((f) => ({ ...f, name: e.target.value }))} placeholder={T("Il tuo nome")} className={field} />
                   <textarea value={rev.text} onChange={(e) => setRev((f) => ({ ...f, text: e.target.value }))} rows={3} placeholder={T("Racconta la tua esperienza…")} className={`${field} resize-y`} />
+                  {revErr && <div role="alert" className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-xs font-medium text-[color:var(--err)]">{T(revErr)}</div>}
                   <button onClick={revSubmit} disabled={!revValid || revBusy} className="rounded-lg py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Invia recensione")}</button>
                 </div>
               )}
@@ -721,7 +734,7 @@ export function Site() {
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-bold text-txt">
-              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</span>
+              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : name.slice(0, 2).toUpperCase()}</span>
               {name}
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">

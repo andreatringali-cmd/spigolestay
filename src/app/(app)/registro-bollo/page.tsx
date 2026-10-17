@@ -15,6 +15,7 @@ import { STATO, DOC_KIND_LABEL } from "@/lib/invoicing/client";
 import { bolloQuarters, quarterOf } from "@/lib/invoicing/bollo";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { todayLocalISO } from "@/lib/invoicing/receivables";
+import { friendlyError } from "@/lib/friendly-error";
 
 interface Row { id: string; number_label: string | null; issue_date: string | null; bollo_cents: number; counterpart: { name?: string; lastName?: string } | null; structure_id: string | null; stato: string; doc_kind: string; regime: string | null }
 const dmy = (iso: string) => fmtDate(iso);
@@ -32,7 +33,7 @@ export default function RegistroBolloPage() {
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
     supabase.from("documents").select("id, number_label, issue_date, bollo_cents, counterpart, structure_id, stato, doc_kind, regime").gt("bollo_cents", 0).neq("stato", "bozza").order("issue_date", { ascending: false })
-      .then(({ data, error }) => { if (error) setErr(error.message); setRows((data ?? []) as Row[]); setLoading(false); });
+      .then(({ data, error }) => { if (error) setErr(friendlyError(error)); setRows((data ?? []) as Row[]); setLoading(false); });
   }, []);
 
   const scoped = useMemo(() => rows.filter((r) => scope === "all" || scopeVisible(r.structure_id, scope)), [rows, scope]);

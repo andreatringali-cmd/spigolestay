@@ -1,6 +1,9 @@
 "use client";
 
 import { fmtDate } from "@/lib/dates";
+import { csvCell } from "@/lib/invoicing/csv";
+import { ymdRome } from "@/lib/dates-rome";
+import { friendlyError } from "@/lib/friendly-error";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -109,7 +112,7 @@ export default function ForniturePage() {
     const paid = u.searchParams.get("paid"); const order = u.searchParams.get("order"); const sid = u.searchParams.get("session_id");
     if (paid === "1" && order && sid) {
       apiPost("forniture/confirm", { order, session_id: sid }).then(() => { setMsg("Pagamento ricevuto ✓ ordine confermato"); clearCart(); loadOrders(); })
-        .catch((e) => setMsg(e instanceof Error ? e.message : "errore conferma"))
+        .catch((e) => setMsg(friendlyError(e)))
         .finally(() => window.history.replaceState({}, "", "/forniture"));
     } else if (u.searchParams.get("canceled") === "1") {
       setMsg("Pagamento annullato."); window.history.replaceState({}, "", "/forniture");
@@ -137,7 +140,7 @@ export default function ForniturePage() {
       const j = await apiPost<{ ok: boolean; url?: string; orderId?: string }>("forniture/order", { structureId: structId, items, pay });
       if (pay && j.url) { window.location.href = j.url; return; }
       setMsg("Ordine salvato in bozza ✓"); clearCart(); loadOrders();
-    } catch (e) { setMsg(e instanceof Error ? e.message : "errore"); }
+    } catch (e) { setMsg(friendlyError(e)); }
     finally { setBusy(false); }
   };
 
@@ -149,7 +152,7 @@ export default function ForniturePage() {
     setRules((prev) => ({ ...prev, [p.id]: { product_id: p.id, enabled, safety_stock: prev[p.id]?.safety_stock ?? 0, horizon_days: horizon } }));
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdRome(new Date());
   const fcBookings = useMemo(() => bookings.map((b) => ({ structureId: b.structureId, checkIn: b.checkIn, checkOut: b.checkOut, status: b.status, adults: b.adults, children: b.children })), [bookings]);
 
   // Scorte: giacenza contata + consumo stimato dalle prenotazioni dalla data del conteggio.
@@ -173,7 +176,7 @@ export default function ForniturePage() {
     const uid = (await supabase.auth.getUser()).data.user?.id;
     const nowIso = new Date().toISOString();
     const { error } = await supabase.from("supply_stock_levels").upsert({ tenant_id: uid, structure_id: structId, product_id: p.id, qty_on_hand: qty, updated_at: nowIso }, { onConflict: "structure_id,product_id" });
-    if (error) { setMsg(`Salvataggio scorta non riuscito: ${error.message}`); return; }
+    if (error) { setMsg(`Salvataggio scorta non riuscito: ${friendlyError(error)}`); return; }
     setStockRows((prev) => ({ ...prev, [p.id]: { qty, at: nowIso.slice(0, 10) } }));
   };
   const saveMin = async (p: Product, min: number) => {
@@ -182,7 +185,7 @@ export default function ForniturePage() {
     const cur = rules[p.id];
     const row = { tenant_id: uid, structure_id: structId, product_id: p.id, enabled: cur?.enabled ?? false, safety_stock: min, horizon_days: cur?.horizon_days ?? horizon };
     const { error } = await supabase.from("supply_reorder_rules").upsert(row, { onConflict: "structure_id,product_id" });
-    if (error) { setMsg(`Salvataggio soglia non riuscito: ${error.message}`); return; }
+    if (error) { setMsg(`Salvataggio soglia non riuscito: ${friendlyError(error)}`); return; }
     setRules((prev) => ({ ...prev, [p.id]: { product_id: p.id, enabled: row.enabled, safety_stock: min, horizon_days: row.horizon_days } }));
   };
   // Aggiunge al carrello i prodotti sotto soglia, con quantità che coprono l'orizzonte + soglia.
@@ -213,10 +216,10 @@ export default function ForniturePage() {
     setBusy(true); setMsg("");
     try {
       const items = reorderLines.map((l) => ({ productId: l.product_id, qty: l.qty }));
-      const month = new Date().toISOString().slice(0, 7);
+      const month = ymdRome(new Date()).slice(0, 7);
       await apiPost("forniture/order", { structureId: structId, items, suggestedFor: month });
       setMsg("Ordine suggerito creato in bozza ✓"); loadOrders(); setTab("ordini");
-    } catch (e) { setMsg(e instanceof Error ? e.message : "errore"); }
+    } catch (e) { setMsg(friendlyError(e)); }
     finally { setBusy(false); }
   };
 
@@ -257,7 +260,7 @@ export default function ForniturePage() {
     if (!(await ask({ message: "Eliminare questa bozza d'ordine?", danger: true, confirmLabel: "Elimina" }))) return;
     await supabase.from("supply_order_items").delete().eq("order_id", o.id);
     const { error } = await supabase.from("supply_orders").delete().eq("id", o.id).eq("status", "draft");
-    if (error) { setMsg(error.message); return; }
+    if (error) { setMsg(friendlyError(error)); return; }
     setMsg("Bozza eliminata."); loadOrders();
   };
   // Consegna: carica a magazzino le quantità dell'ordine sopra la giacenza stimata del momento
@@ -278,15 +281,15 @@ export default function ForniturePage() {
         const est = p ? estimateStock({ bookings: fcBookings, structureId: o.structure_id, product: p, counted: Number(r?.qty_on_hand) || 0, countedAtISO: r?.updated_at ? String(r.updated_at).slice(0, 10) : null, todayISO: today, horizonDays: horizon }).estimated : (Number(r?.qty_on_hand) || 0);
         return { tenant_id: uid, structure_id: o.structure_id, product_id: pid, qty_on_hand: est + q, updated_at: nowIso };
       });
-      if (rows.length) { const { error } = await supabase.from("supply_stock_levels").upsert(rows, { onConflict: "structure_id,product_id" }); if (error) throw new Error(error.message); }
+      if (rows.length) { const { error } = await supabase.from("supply_stock_levels").upsert(rows, { onConflict: "structure_id,product_id" }); if (error) throw new Error(friendlyError(error)); }
       const { error: e2 } = await supabase.from("supply_orders").update({ status: "delivered", delivery_date: today, updated_at: nowIso }).eq("id", o.id);
-      if (e2) throw new Error(e2.message);
+      if (e2) throw new Error(friendlyError(e2));
       setMsg("Ordine consegnato: scorte aggiornate."); await loadOrders();
       if (o.structure_id === structId) {
         const { data } = await supabase.from("supply_stock_levels").select("product_id, qty_on_hand, updated_at").eq("structure_id", structId);
         const ss: Record<string, StockRow> = {}; for (const s2 of (data ?? []) as Stock[]) ss[s2.product_id] = { qty: Number(s2.qty_on_hand) || 0, at: s2.updated_at ? String(s2.updated_at).slice(0, 10) : null }; setStockRows(ss);
       }
-    } catch (e) { setMsg(e instanceof Error ? e.message : "errore"); }
+    } catch (e) { setMsg(friendlyError(e)); }
     finally { setBusy(false); }
   };
   // Registra l'ordine pagato come documento in Fatture passive (una sola volta per ordine).
@@ -304,12 +307,12 @@ export default function ForniturePage() {
       tenant_id: uid, structure_id: o.structure_id, supplier_name: "Xenora Forniture", doc_number: docNum, doc_date: o.created_at.slice(0, 10), doc_type: "ricevuta", category: "Forniture",
       taxable_cents: taxable, vat_cents: vat, total_cents: o.total_cents, paid: true, paid_at: when, payment_method: "Carta", source: "forniture", notes: `Ordine Forniture ${o.id.slice(0, 8)} del ${fmtDate(new Date(o.created_at))}`,
     });
-    if (error) { setMsg(error.message); return; }
+    if (error) { setMsg(friendlyError(error)); return; }
     setInvoiced((p2) => ({ ...p2, [docNum]: true })); setMsg("Ordine registrato in Fatture passive (categoria Forniture).");
   };
   const exportOrdersCsv = () => {
     const head = ["Data", "Struttura", "Tipo", "Stato", "Imponibile", "IVA", "Totale", "Consegna"];
-    const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
+    const q = csvCell;
     const rows = shownOrders.map((o) => [fmtDate(new Date(o.created_at)), structOf(o.structure_id), o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale", STATUS_LABEL[o.status] ?? o.status, ((o.subtotal_cents ?? 0) / 100).toFixed(2), ((o.vat_cents ?? 0) / 100).toFixed(2), (o.total_cents / 100).toFixed(2), o.delivery_date ?? ""].map(q).join(","));
     const blob = new Blob(["﻿" + [head.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "ordini-forniture.csv"; a.click(); URL.revokeObjectURL(a.href);

@@ -1,10 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
+import { register } from "node:module";
+import type { ChatPayContext, ThreadMsg } from "../src/lib/chat-pay-core.ts";
+
+// chat-pay-core usa lib/format (import relativo senza estensione): serve l'alias-loader dei test.
+register("./helpers/alias-loader.mjs", import.meta.url);
+const {
   planChatPayment, maxChatPayCents, parseEurInput, applyChatPayment, appendPaymentNotice, paymentNoticeText,
-  chatPayGuestMessage, fmtEur, MIN_CHARGE_CENTS, type ChatPayContext, type ThreadMsg,
-} from "../src/lib/chat-pay-core.ts";
-import { signPayToken, verifyPayToken } from "../src/lib/chat-pay-token.ts";
+  chatPayGuestMessage, fmtEur, MIN_CHARGE_CENTS,
+} = await import("../src/lib/chat-pay-core.ts");
+const { signPayToken, verifyPayToken } = await import("../src/lib/chat-pay-token.ts");
 
 // Prenotazione tipo: totale 500 €, già pagati 200 € → residuo 300 €, di cui tassa 12 €.
 const ctx = (o: Partial<ChatPayContext> = {}): ChatPayContext => ({
@@ -182,7 +187,7 @@ test("messaggio all'ospite: importo e link in tutte le lingue", () => {
       assert.ok(t.includes("https://x.test/p?t=1"), `${lang}/${kind}`);
     }
   }
-  assert.equal(fmtEur(123456), "€ 1234,56"); // it-IT: niente separatore sotto le 5 cifre
+  assert.equal(fmtEur(123456), "€ 1.234,56"); // migliaia sempre separate (anche sotto le 5 cifre, a differenza di it-IT/ICU)
   assert.equal(fmtEur(1234567), "€ 12.345,67");
 });
 
@@ -219,4 +224,10 @@ test("token: scaduto o malformato", () => {
   const body = Buffer.from(JSON.stringify(["u", "b", "rimborso", 100, 2_000_000_000])).toString("base64url");
   const sigOk = signPayToken(payload, SECRET).split(".")[1];
   assert.equal(verifyPayToken(`${body}.${sigOk}`, SECRET, 1).ok, false);
+});
+
+test("messaggio all'ospite: in tedesco la tassa di soggiorno è 'Kurtaxe' e l'importo ha le migliaia separate", () => {
+  const de = chatPayGuestMessage("de", "tassa", 123456, "https://x.it/p");
+  assert.match(de, /Kurtaxe \(€ 1\.234,56\)/);
+  assert.doesNotMatch(de, /Ortstaxe/);
 });

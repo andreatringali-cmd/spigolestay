@@ -6,13 +6,16 @@ export type ThreadProvider = "BookingCom" | "Airbnb" | "Expedia" | string;
 export interface OtaThread {
   id: string; title: string; provider: ThreadProvider; closed: boolean; count: number;
   lastMessage: string; lastAt: number;            // ms; 0 se sconosciuto
+  lastSender: "guest" | "property" | "system" | "";   // chi ha scritto l ultimo messaggio (per il segno "da leggere")
   bookingId: string; propertyId: string;          // id Channex (booking può mancare: richieste di informazioni Airbnb)
 }
 export interface OtaMsg { id: string; text: string; sender: "guest" | "property" | "system"; ts: number; att: { url: string; name?: string }[] }
 
 type Row = { id?: unknown; attributes?: Record<string, unknown>; relationships?: Record<string, { data?: { id?: unknown } | null } | undefined> } & Record<string, unknown>;
 const str = (v: unknown): string => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
-const ms = (v: unknown): number => { const t = typeof v === "string" ? Date.parse(v) : NaN; return Number.isFinite(t) ? t : 0; };
+// Channex scrive gli orari senza fuso ("2021-07-28T04:25:15.000000") ma sono UTC: senza la Z si leggerebbero come ora locale.
+const ms = (v: unknown): number => { if (typeof v !== "string" || !v.trim()) return 0; const x = v.trim(); const t = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(x) ? x : `${x}Z`); return Number.isFinite(t) ? t : 0; };
+const senderOf = (v: unknown): "guest" | "property" | "system" | "" => (v === "guest" ? "guest" : v === "system" ? "system" : v === "property" ? "property" : "");
 const relId = (r: Row, key: string): string => { const d = r.relationships?.[key]?.data; return d && typeof d === "object" ? str((d as { id?: unknown }).id) : ""; };
 
 /** Riga della lista/dettaglio thread di Channex → thread normalizzato. null se manca l'id. */
@@ -23,9 +26,13 @@ export function normalizeThread(row: unknown): OtaThread | null {
   const id = str(r.id);
   if (!id) return null;
   const count = typeof a.message_count === "number" && Number.isFinite(a.message_count) ? a.message_count : 0;
+  // Nella risposta reale last_message è un OGGETTO {message, sender, inserted_at, attachments}; si accetta anche una stringa semplice.
+  const lm = a.last_message && typeof a.last_message === "object" ? (a.last_message as Record<string, unknown>) : null;
+  const lmText = lm ? (str(lm.message).trim() || (Array.isArray(lm.attachments) && lm.attachments.length ? "📎 Allegato" : "")) : str(a.last_message);
   return {
     id, title: str(a.title), provider: str(a.provider), closed: a.is_closed === true, count,
-    lastMessage: str(a.last_message), lastAt: ms(a.last_message_received_at) || ms(a.updated_at) || ms(a.inserted_at),
+    lastMessage: lmText, lastSender: lm ? senderOf(lm.sender) : "",
+    lastAt: ms(a.last_message_received_at) || (lm ? ms(lm.inserted_at) : 0) || ms(a.updated_at) || ms(a.inserted_at),
     bookingId: relId(r, "booking"), propertyId: relId(r, "property"),
   };
 }
@@ -43,8 +50,8 @@ export function normalizeMessage(row: unknown, toUrl: (raw: unknown) => { url: s
 
 /** Provider della conversazione → canale Xenora (per il logo). */
 export function providerChannel(provider: ThreadProvider): Channel {
-  const p = provider.toLowerCase();
-  if (p.includes("booking")) return "booking";
+  const p = provider.toLowerCase().replace(/[\s._-]+/g, "");
+  if (p === "booking" || p.startsWith("bookingcom")) return "booking"; // non "123booking", "Simplebooking", ...
   if (p.includes("airbnb")) return "airbnb";
   if (p.includes("expedia") || p.includes("vrbo")) return "expedia";
   return "other";

@@ -5,8 +5,12 @@
 // CODICI ufficiali richiesti dal tracciato a 168 caratteri.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { tabella } from "./soap";
+import { countryNames } from "./countries";
 
 // Normalizza per il matching: maiuscolo, senza accenti, spazi compattati.
+/** Un luogo è un comune italiano se ha una sigla di provincia diversa da "ES" (estero). */
+export const isComuneProv = (prov: string | null | undefined): boolean => !!prov && String(prov).trim().toUpperCase() !== "ES";
+
 export function norm(s: string | undefined | null): string {
   return (s ?? "")
     .toString()
@@ -51,7 +55,7 @@ export async function syncTables(admin: SupabaseClient, utente: string, token: s
       const code = (r[ci] ?? "").trim();
       const name = (r[ni] ?? "").trim();
       const prov = (r[pi] ?? "").trim();
-      return { kind: "luoghi", code, name, name_norm: norm(name), provincia: prov || null, is_comune: !!prov, synced_at: new Date().toISOString() };
+      return { kind: "luoghi", code, name, name_norm: norm(name), provincia: prov || null, is_comune: isComuneProv(prov), synced_at: new Date().toISOString() };
     }).filter((r) => r.code && r.name);
     for (let i = 0; i < recs.length; i += 500) {
       const { error } = await admin.from("alloggiati_codes").upsert(recs.slice(i, i + 500), { onConflict: "kind,code" });
@@ -83,6 +87,7 @@ export interface CodeMaps {
   hasData: boolean;
   codeSet: Set<string>;                 // tutti i codici validi (per riconoscere valori già in codice)
   byName: Map<string, { code: string; provincia: string | null; is_comune: boolean }[]>; // luoghi per nome norm
+  byCode?: Map<string, { provincia: string | null; is_comune: boolean }>; // luoghi per codice
   docByName: Map<string, string>;       // documenti per nome norm
 }
 
@@ -91,6 +96,7 @@ export async function loadCodeMaps(admin: SupabaseClient): Promise<CodeMaps> {
   const codeSet = new Set<string>();
   const byName = new Map<string, { code: string; provincia: string | null; is_comune: boolean }[]>();
   const docByName = new Map<string, string>();
+  const byCode = new Map<string, { provincia: string | null; is_comune: boolean }>();
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await admin.from("alloggiati_codes").select("kind, code, name_norm, provincia, is_comune").range(from, from + pageSize - 1);
@@ -98,29 +104,20 @@ export async function loadCodeMaps(admin: SupabaseClient): Promise<CodeMaps> {
     for (const r of data as { kind: string; code: string; name_norm: string; provincia: string | null; is_comune: boolean }[]) {
       codeSet.add(r.code);
       if (r.kind === "luoghi") {
+        // Nella tabella ufficiale gli STATI hanno provincia "ES" (estero) e codici 100000xxx: non sono comuni (le righe già salvate hanno is_comune=true).
+        const isCom = isComuneProv(r.provincia) && !r.code.startsWith("100000");
         const arr = byName.get(r.name_norm) ?? [];
-        arr.push({ code: r.code, provincia: r.provincia, is_comune: r.is_comune });
+        arr.push({ code: r.code, provincia: r.provincia, is_comune: isCom });
         byName.set(r.name_norm, arr);
+        byCode.set(r.code, { provincia: r.provincia, is_comune: isCom });
       } else if (r.kind === "documenti") {
         if (!docByName.has(r.name_norm)) docByName.set(r.name_norm, r.code);
       }
     }
     if (data.length < pageSize) break;
   }
-  return { hasData: codeSet.size > 0, codeSet, byName, docByName };
+  return { hasData: codeSet.size > 0, codeSet, byName, byCode, docByName };
 }
-
-// Sinonimi cittadinanza (aggettivo) → nome Stato ufficiale della tabella Luoghi.
-// La "Cittadinanza" del tracciato usa il codice Stato: gli ospiti spesso scrivono l'aggettivo.
-const NAT_ALIAS: Record<string, string> = {
-  ITALIANA: "ITALIA", ITALIANO: "ITALIA", "REPUBBLICA ITALIANA": "ITALIA", "ITALIA REPUBBLICA": "ITALIA",
-  FRANCESE: "FRANCIA", TEDESCA: "GERMANIA", TEDESCO: "GERMANIA",
-  SPAGNOLA: "SPAGNA", SPAGNOLO: "SPAGNA",
-  INGLESE: "REGNO UNITO", BRITANNICA: "REGNO UNITO", BRITANNICO: "REGNO UNITO",
-  SVIZZERA: "SVIZZERA", SVIZZERO: "SVIZZERA", AUSTRIACA: "AUSTRIA", AUSTRIACO: "AUSTRIA",
-  OLANDESE: "PAESI BASSI", BELGA: "BELGIO", PORTOGHESE: "PORTOGALLO",
-  POLACCA: "POLONIA", POLACCO: "POLONIA", RUMENA: "ROMANIA", RUMENO: "ROMANIA",
-};
 
 // Sigla provincia → comune capoluogo. Gli utenti (o l'AI dal documento) scrivono spesso
 // la SIGLA (es. "SR") nel "Luogo di rilascio", ma il tracciato vuole il COMUNE: qui la
@@ -141,61 +138,121 @@ const PROVINCE_CAPITAL: Record<string, string> = {
   UD: "UDINE", VA: "VARESE", VB: "VERBANIA", VC: "VERCELLI", VE: "VENEZIA", VI: "VICENZA", VR: "VERONA", VT: "VITERBO", VV: "VIBO VALENTIA",
 };
 
-// Se il valore è una sigla di provincia (es. "SR"), ritorna il codice del comune capoluogo.
-function fromSigla(maps: CodeMaps, nv: string): { code: string; provincia: string | null } | null {
+export interface PlaceHit { code: string; provincia: string | null; isComune: boolean; /** più luoghi omonimi in province diverse e nessuna provincia per scegliere: il codice è un'ipotesi */ ambiguous: boolean }
+type NameHit = { code: string; provincia: string | null; is_comune: boolean };
+
+// Se il valore è una sigla di provincia (es. "SR"), ritorna il comune capoluogo.
+function fromSigla(maps: CodeMaps, nv: string): PlaceHit | null {
   if (nv.length !== 2 || !PROVINCE_CAPITAL[nv]) return null;
   const cap = maps.byName.get(norm(PROVINCE_CAPITAL[nv]));
   if (!cap || !cap.length) return null;
   const c = cap.find((h) => h.is_comune && norm(h.provincia) === nv) ?? cap.find((h) => h.is_comune) ?? cap[0];
-  return { code: c.code, provincia: c.provincia };
+  return { code: c.code, provincia: c.provincia, isComune: c.is_comune, ambiguous: false };
 }
 
-// Risolve un luogo (comune o stato) in codice. Se `value` è già un codice valido lo
-// mantiene; altrimenti cerca per nome (eventualmente disambiguando per provincia),
-// prova la sigla provincia → capoluogo (es. "SR" → SIRACUSA), e come ultima spiaggia
-// un sinonimo di cittadinanza (es. "Italiana" → "Italia").
-export function resolveLuogo(maps: CodeMaps, value: string | undefined, provincia?: string): string | null {
+// Prefissi "burocratici" che gli ospiti (o i documenti) aggiungono al luogo: "Comune di Siracusa", "Questura di Siracusa"…
+const PLACE_PREFIX = /^(?:COMUNE|CITTA|MUNICIPIO|QUESTURA|PREFETTURA|MOTORIZZAZIONE CIVILE|MCTC|UFFICIO ANAGRAFE|ANAGRAFE|POLIZIA DI STATO|COMMISSARIATO|CITY|TOWN|MUNICIPALITY|COMMUNE|VILLE|STADT|GEMEINDE)(?: (?:DI|DEL|DELLA|DELLO|DEI|DEGLI|D|DE|DE LA|OF))? /;
+export function stripPlacePrefix(n: string): string {
+  let cur = n;
+  for (let i = 0; i < 2; i++) { const m = cur.match(PLACE_PREFIX); if (!m) break; cur = cur.slice(m[0].length).trim(); }
+  return cur;
+}
+
+/**
+ * Forme in cui può essere scritto un luogo, dalla più precisa: toglie "Comune di/Questura di…", la sigla di provincia tra parentesi
+ * o in coda ("Siracusa (SR)", "Siracusa SR", "Siracusa, SR") e separa "Berlin, Germany" nei suoi pezzi. La sigla serve da aiuto per gli omonimi.
+ */
+export function placeVariants(raw: string): { name: string; prov?: string }[] {
+  const out: { name: string; prov?: string }[] = [];
+  const push = (name: string, prov?: string) => { const n = name.trim(); if (n && !out.some((o) => o.name === n && o.prov === prov)) out.push({ name: n, prov }); };
+  let prov: string | undefined;
+  const par = raw.match(/\(([^)]*)\)/);
+  if (par) { const inner = norm(par[1]); if (/^[A-Z]{2}$/.test(inner)) prov = inner; }
+  const base = raw.replace(/\([^)]*\)/g, " ");
+  const pieces = base.split(/[,;/]|\s[-–]\s/).map(norm).filter(Boolean);
+  const cands = [norm(base), ...pieces];
+  for (const c of cands) {
+    push(c, prov);
+    const st = stripPlacePrefix(c);
+    if (st !== c) push(st, prov);
+    for (const x of st !== c ? [c, st] : [c]) {
+      const t = x.split(" ");
+      const last = t[t.length - 1];
+      if (t.length >= 2 && /^[A-Z]{2}$/.test(last) && PROVINCE_CAPITAL[last]) {
+        const nm = t.slice(0, -1).join(" ");
+        push(nm, prov ?? last);
+        const st2 = stripPlacePrefix(nm);
+        if (st2 !== nm) push(st2, prov ?? last);
+      }
+    }
+  }
+  push(norm(raw));
+  return out;
+}
+
+function pick(pool0: NameHit[], prov: string | undefined, mode: "comune" | "stato" | "any"): PlaceHit | null {
+  let pool = pool0;
+  if (mode === "comune") { const c = pool.filter((h) => h.is_comune); if (c.length) pool = c; }
+  else if (mode === "stato") { pool = pool.filter((h) => !h.is_comune); if (!pool.length) return null; }
+  const mk = (h: NameHit, ambiguous: boolean): PlaceHit => ({ code: h.code, provincia: h.provincia, isComune: h.is_comune, ambiguous });
+  if (pool.length === 1) return mk(pool[0], false);
+  if (prov) { const f = pool.find((h) => norm(h.provincia) === prov); if (f) return mk(f, false); }
+  const provs = new Set(pool.map((h) => norm(h.provincia)));
+  return mk(pool[0], provs.size > 1); // omonimi nella stessa provincia: stesso luogo, vale il primo
+}
+
+/**
+ * Risolve un luogo (comune o Stato) scritto liberamente in un codice della tabella.
+ * mode "comune": preferisce i comuni (nascita); "stato": SOLO Stati, ammette sinonimi inglesi, demonimi e codici ISO (cittadinanza);
+ * "any": comune o Stato (luogo di rilascio del documento).
+ */
+export function resolvePlace(maps: CodeMaps, value: string | undefined, opts: { provincia?: string; mode?: "comune" | "stato" | "any" } = {}): PlaceHit | null {
   const v = (value ?? "").trim();
   if (!v) return null;
-  if (maps.codeSet.has(v)) return v;
-  const nv = norm(v);
-  let hits = maps.byName.get(nv);
-  if ((!hits || !hits.length)) { const s = fromSigla(maps, nv); if (s) return s.code; }
-  if ((!hits || !hits.length) && NAT_ALIAS[nv]) hits = maps.byName.get(norm(NAT_ALIAS[nv]));
-  if (!hits || !hits.length) return null;
-  if (hits.length === 1) return hits[0].code;
-  const p = norm(provincia);
-  if (p) { const byProv = hits.find((h) => norm(h.provincia) === p); if (byProv) return byProv.code; }
-  return hits[0].code; // ambiguo: primo match (il portale segnala eventuali incongruenze in Test)
+  const mode = opts.mode ?? "any";
+  const hint = norm(opts.provincia) || undefined;
+  if (maps.codeSet.has(v)) { const bc = maps.byCode?.get(v); return { code: v, provincia: bc?.provincia ?? (opts.provincia?.trim() || null), isComune: bc ? bc.is_comune : !!opts.provincia?.trim(), ambiguous: false }; }
+  for (const variant of placeVariants(v)) {
+    const prov = variant.prov ?? hint;
+    const hits = maps.byName.get(variant.name);
+    if (hits && hits.length) { const r = pick(hits, prov, mode); if (r) return r; }
+    if (mode !== "stato") { const s = fromSigla(maps, variant.name); if (s) return s; }
+    if (mode !== "comune") {
+      const names = countryNames(variant.name, mode === "stato");
+      if (names) for (const nm of names) { const h = maps.byName.get(nm); if (h && h.length) { const r = pick(h, undefined, "stato"); if (r) return r; } }
+    }
+  }
+  return null;
+}
+
+// Risolve un luogo (comune o stato) in codice. Se `value` è già un codice valido lo mantiene.
+export function resolveLuogo(maps: CodeMaps, value: string | undefined, provincia?: string): string | null {
+  return resolvePlace(maps, value, { provincia, mode: "any" })?.code ?? null;
+}
+
+// Cittadinanza / Stato di nascita: SOLO uno Stato ("Germany", "Deutschland", "DE", "tedesca" → GERMANIA).
+export function resolveStato(maps: CodeMaps, value: string | undefined): string | null {
+  return resolvePlace(maps, value, { mode: "stato" })?.code ?? null;
 }
 
 // Come resolveLuogo ma privilegia i comuni e ritorna anche la sigla provincia.
-export function resolveComuneFull(maps: CodeMaps, value: string | undefined, provincia?: string): { code: string; provincia: string | null } | null {
-  const v = (value ?? "").trim();
-  if (!v) return null;
-  if (maps.codeSet.has(v)) return { code: v, provincia: provincia?.trim() || null };
-  const hits = maps.byName.get(norm(v));
-  if (!hits || !hits.length) { const s = fromSigla(maps, norm(v)); if (s) return s; return null; }
-  const comuni = hits.filter((h) => h.is_comune);
-  const pool = comuni.length ? comuni : hits;
-  if (pool.length === 1) return { code: pool[0].code, provincia: pool[0].provincia };
-  const p = norm(provincia);
-  if (p) { const byProv = pool.find((h) => norm(h.provincia) === p); if (byProv) return { code: byProv.code, provincia: byProv.provincia }; }
-  return { code: pool[0].code, provincia: pool[0].provincia };
+export function resolveComuneFull(maps: CodeMaps, value: string | undefined, provincia?: string): { code: string; provincia: string | null; ambiguous?: boolean } | null {
+  const r = resolvePlace(maps, value, { provincia, mode: "comune" });
+  return r ? { code: r.code, provincia: r.provincia, ambiguous: r.ambiguous } : null;
 }
 
 // Codice dello stato "Italia" (per la Stato Nascita degli ospiti nati in Italia).
 export function italyCode(maps: CodeMaps): string | null {
-  return resolveLuogo(maps, "ITALIA");
+  return resolveStato(maps, "ITALIA");
 }
 
 // Alias tipo documento: le diciture dell'app → codice ufficiale (la tabella scrive es.
 // "CARTA DI IDENTITA", mentre l'app usa "Carta d'identità" → norm "CARTA D IDENTITA").
 const DOC_ALIAS: Record<string, string> = {
-  "CARTA D IDENTITA": "IDENT", "CARTA DI IDENTITA": "IDENT", "CARTA IDENTITA": "IDENT",
+  "CARTA D IDENTITA": "IDENT", "CARTA DI IDENTITA": "IDENT", "CARTA IDENTITA": "IDENT", "IDENTITY CARD": "IDENT", "ID CARD": "IDENT",
   CIE: "IDELE", "CARTA D IDENTITA ELETTRONICA": "IDELE", "CARTA IDENTITA ELETTRONICA": "IDELE",
-  PASSAPORTO: "PASOR", "PASSAPORTO ORDINARIO": "PASOR",
-  PATENTE: "PATEN", "PATENTE DI GUIDA": "PATEN",
+  PASSAPORTO: "PASOR", "PASSAPORTO ORDINARIO": "PASOR", PASSPORT: "PASOR", PASSEPORT: "PASOR", REISEPASS: "PASOR", PASAPORTE: "PASOR",
+  PATENTE: "PATEN", "PATENTE DI GUIDA": "PATEN", "DRIVING LICENSE": "PATEN", "DRIVING LICENCE": "PATEN", "DRIVERS LICENSE": "PATEN",
 };
 
 export function resolveDocumento(maps: CodeMaps, value: string | undefined): string | null {
@@ -208,5 +265,84 @@ export function resolveDocumento(maps: CodeMaps, value: string | undefined): str
   // Alias diretto → codice, ma solo se quel codice esiste davvero nelle tabelle scaricate.
   const alias = DOC_ALIAS[n];
   if (alias && maps.codeSet.has(alias)) return alias;
+  // Nome contenuto in uno solo dei nomi della tabella (o viceversa), es. "Permesso di soggiorno".
+  if (n.length >= 6) {
+    const m = Array.from(maps.docByName.entries()).filter(([k]) => k.includes(n) || n.includes(k));
+    if (m.length === 1) return m[0][1];
+  }
   return null;
+}
+
+export interface GuestCodeInput {
+  comuneNascita?: string; provinciaNascita?: string; statoNascita?: string; cittadinanza?: string;
+  tipoDoc?: string; luogoRilascio?: string;
+}
+export interface ResolvedCodes {
+  comune: string; prov: string; statoNascita: string; cittadinanza: string; tipoDoc: string; luogoRilascio: string;
+  /** Campi compilati dall'ospite che NON si traducono in un codice valido (messaggi per l'operatore). */
+  issues: string[];
+}
+
+/**
+ * Il luogo di nascita scritto è in realtà ESTERO? Vero se lo Stato indicato a parte non è l'Italia, oppure se il testo ha più pezzi
+ * ("Santa Maria, Brazil") e uno di essi è uno Stato diverso dall'Italia. I pezzi di 2 lettere si ignorano (sigle di provincia: "GE", "CA", "PA" sono anche codici ISO).
+ */
+function bornAbroad(maps: CodeMaps, comuneNascita: string | undefined, statoNascita: string | undefined, italy: string): boolean {
+  if ((statoNascita ?? "").trim()) { const st = resolveStato(maps, statoNascita); if (st && st !== italy) return true; }
+  const pieces = (comuneNascita ?? "").replace(/\([^)]*\)/g, " ").split(/[,;/]|\s[-–]\s/).map(norm).filter(Boolean);
+  if (pieces.length < 2) return false;
+  return pieces.some((p) => { if (/^[A-Z]{2}$/.test(p)) return false; if (FOREIGN_REGIONS.has(p)) return true; const st = resolveStato(maps, p); return !!st && st !== italy; });
+}
+
+// Stati federati / province estere che si scrivono dopo la città ("Parma, Ohio", "Windsor, Ontario"): non sono Stati nella tabella ma indicano una nascita estera.
+const FOREIGN_REGIONS = new Set([
+  "ALABAMA", "ALASKA", "ARIZONA", "ARKANSAS", "CALIFORNIA", "COLORADO", "CONNECTICUT", "DELAWARE", "FLORIDA", "HAWAII", "IDAHO", "ILLINOIS", "INDIANA", "IOWA", "KANSAS", "KENTUCKY",
+  "LOUISIANA", "MAINE", "MARYLAND", "MASSACHUSETTS", "MICHIGAN", "MINNESOTA", "MISSISSIPPI", "MISSOURI", "MONTANA", "NEBRASKA", "NEVADA", "NEW HAMPSHIRE", "NEW JERSEY", "NEW MEXICO", "NEW YORK",
+  "NORTH CAROLINA", "NORTH DAKOTA", "OHIO", "OKLAHOMA", "OREGON", "PENNSYLVANIA", "RHODE ISLAND", "SOUTH CAROLINA", "SOUTH DAKOTA", "TENNESSEE", "TEXAS", "UTAH", "VERMONT", "VIRGINIA", "WASHINGTON",
+  "WEST VIRGINIA", "WISCONSIN", "WYOMING", "ONTARIO", "QUEBEC", "ALBERTA", "BRITISH COLUMBIA", "MANITOBA", "SASKATCHEWAN", "NOVA SCOTIA", "NEW BRUNSWICK",
+]);
+
+/**
+ * Traduce i dati liberi di una persona nei codici del tracciato e dice quali campi NON si risolvono.
+ * Senza i codici corretti il tracciato avrebbe spazi al loro posto e il portale lo rifiuterebbe.
+ * `member`: familiare/membro (ruolo 19/20): per loro non servono i dati del documento.
+ */
+export function resolveSchedinaCodes(g: GuestCodeInput, member: boolean, maps: CodeMaps): ResolvedCodes {
+  const issues: string[] = [];
+  const has = (s?: string) => !!(s ?? "").trim();
+  let comune = "", prov = "", statoNascita = "";
+  const it = italyCode(maps) ?? "";
+  let place = resolvePlace(maps, g.comuneNascita, { provincia: g.provinciaNascita, mode: "comune" });
+  // "Santa Maria, Brazil" / "Parma, Ohio": un pezzo si legge come comune italiano, ma un altro pezzo (o lo Stato indicato a parte) è uno Stato ESTERO → non è un comune italiano.
+  if (place && place.isComune && bornAbroad(maps, g.comuneNascita, g.statoNascita, it)) place = null;
+  if (place && place.isComune) {
+    comune = place.code; prov = (place.provincia ?? "").toUpperCase();
+    statoNascita = resolveStato(maps, g.statoNascita) || it;
+    if (place.ambiguous) issues.push(`Luogo di nascita «${(g.comuneNascita ?? "").trim()}» ambiguo (più comuni con lo stesso nome): aggiungi la provincia, es. «${(g.comuneNascita ?? "").trim()} (SR)»`);
+  } else {
+    // Nato all'estero (o comune non riconosciuto): comune/provincia vuoti, stato = paese.
+    statoNascita = resolveStato(maps, g.statoNascita) || resolveStato(maps, g.comuneNascita) || "";
+    if (!statoNascita && (has(g.comuneNascita) || has(g.statoNascita))) issues.push(`Luogo di nascita «${(g.comuneNascita || g.statoNascita || "").trim()}» non riconosciuto: indica il Comune italiano o lo Stato estero`);
+    // "Rome, Italy": lo Stato è l'Italia ma il Comune non si riconosce → senza Comune il portale rifiuta la schedina.
+    else if (statoNascita && statoNascita === it) issues.push(`Nato in Italia: indica il Comune di nascita («${(g.comuneNascita || g.statoNascita || "").trim()}» non è un Comune riconosciuto)`);
+  }
+  const cittadinanza = resolveStato(maps, g.cittadinanza) || "";
+  if (has(g.cittadinanza) && !cittadinanza) issues.push(`Cittadinanza «${(g.cittadinanza ?? "").trim()}» non riconosciuta: indica lo Stato (es. Italia, Germania)`);
+  let tipoDoc = "", luogoRilascio = "";
+  if (!member) {
+    tipoDoc = resolveDocumento(maps, g.tipoDoc) || "";
+    if (has(g.tipoDoc) && !tipoDoc) issues.push(`Tipo documento «${(g.tipoDoc ?? "").trim()}» non riconosciuto`);
+    const lr = resolvePlace(maps, g.luogoRilascio, { mode: "any" });
+    luogoRilascio = lr?.code ?? "";
+    if (lr?.ambiguous) issues.push(`Luogo di rilascio «${(g.luogoRilascio ?? "").trim()}» ambiguo: aggiungi la provincia, es. «${(g.luogoRilascio ?? "").trim()} (SR)»`);
+    // Documento estero: se il luogo di rilascio non è un comune/Stato noto, è lo Stato della cittadinanza.
+    // Passaporto: sempre. Carta d'identità / patente di un cittadino NON italiano ("Stadt Berlin", "Gemeente Amsterdam", "Prefecture de Paris"): idem (per un italiano il luogo resta da correggere).
+    if (!luogoRilascio && has(g.luogoRilascio) && cittadinanza) {
+      const isPassport = tipoDoc === "PASOR" || /PASSAPORT|PASSPORT/.test(norm(g.tipoDoc));
+      const isOtherId = ["IDENT", "IDELE", "PATEN"].includes(tipoDoc);
+      if (isPassport || (isOtherId && cittadinanza !== italyCode(maps))) luogoRilascio = cittadinanza;
+    }
+    if (has(g.luogoRilascio) && !luogoRilascio) issues.push(`Luogo di rilascio «${(g.luogoRilascio ?? "").trim()}» non riconosciuto: indica il Comune (es. Siracusa) o lo Stato`);
+  }
+  return { comune, prov, statoNascita, cittadinanza, tipoDoc, luogoRilascio, issues };
 }

@@ -57,6 +57,8 @@ export const EMAIL_DICT: GuestDict = {
   "Rimborso emesso: {amount}": ["Refund issued: {amount}", "Remboursement émis : {amount}", "Erstattung veranlasst: {amount}", "Reembolso emitido: {amount}"],
   "L'importo tornerà sul metodo di pagamento usato entro 5–10 giorni lavorativi (tempi della banca).": ["The amount will return to the payment method used within 5–10 working days (bank processing times).", "Le montant sera recrédité sur le moyen de paiement utilisé sous 5 à 10 jours ouvrés (délais bancaires).", "Der Betrag wird innerhalb von 5–10 Werktagen auf das verwendete Zahlungsmittel zurückgebucht (Bearbeitungszeit der Bank).", "El importe volverá al método de pago utilizado en 5–10 días laborables (plazos del banco)."],
   "Nessun rimborso previsto": ["No refund due", "Aucun remboursement prévu", "Keine Erstattung vorgesehen", "Sin reembolso previsto"],
+  "La struttura ti contatterà per il rimborso di {amount}": ["The property will contact you about the refund of {amount}", "L'établissement vous contactera au sujet du remboursement de {amount}", "Die Unterkunft wird sich wegen der Erstattung von {amount} bei Ihnen melden", "El alojamiento se pondrá en contacto contigo para el reembolso de {amount}"],
+  "La struttura ti contatterà per restituirti il residuo di {amount}": ["The property will contact you to return the remaining {amount}", "L'établissement vous contactera pour vous rendre le solde de {amount}", "Die Unterkunft wird sich bei Ihnen melden, um den Restbetrag von {amount} zu erstatten", "El alojamiento se pondrá en contacto contigo para devolverte el resto de {amount}"],
   "Secondo le condizioni della tariffa prenotata.": ["According to the terms of the rate booked.", "Selon les conditions du tarif réservé.", "Gemäß den Bedingungen des gebuchten Tarifs.", "Según las condiciones de la tarifa reservada."],
   "Ci dispiace vederti annullare. Sarai sempre il benvenuto in futuro.": ["We are sorry to see you cancel. You will always be welcome in the future.", "Nous sommes désolés de cette annulation. Vous serez toujours le bienvenu.", "Schade, dass Sie stornieren. Sie sind jederzeit wieder willkommen.", "Lamentamos que canceles. Serás siempre bienvenido."],
   // sollecito check-in
@@ -67,13 +69,36 @@ export const EMAIL_DICT: GuestDict = {
   "Compila i dati prima dell'arrivo: risparmi tempo al check-in.": ["Fill in your details before arriving: you save time at check-in.", "Remplissez vos données avant l'arrivée : vous gagnez du temps au check-in.", "Tragen Sie Ihre Daten vor der Ankunft ein: So sparen Sie Zeit beim Check-in.", "Rellena los datos antes de llegar: ahorras tiempo en el check-in."],
   // politiche (composte dal server a partire dai dati strutturati)
   "La prenotazione non è rimborsabile.": ["The booking is non-refundable.", "La réservation n'est pas remboursable.", "Die Buchung ist nicht erstattungsfähig.", "La reserva no es reembolsable."],
+  "Cancellazione gratuita fino a 1 giorno prima dell'arrivo. Oltre questo termine è dovuto l'intero importo della prenotazione.": ["Free cancellation up to 1 day before arrival. After that the full booking amount is due.", "Annulation gratuite jusqu'à 1 jour avant l'arrivée. Passé ce délai, le montant total de la réservation est dû.", "Kostenlose Stornierung bis 1 Tag vor Anreise. Danach ist der gesamte Buchungsbetrag fällig.", "Cancelación gratuita hasta 1 día antes de la llegada. Pasado ese plazo se debe el importe total de la reserva."],
   "Cancellazione gratuita fino a {days} giorni prima dell'arrivo. Oltre questo termine è dovuto l'intero importo della prenotazione.": ["Free cancellation up to {days} days before arrival. After that the full booking amount is due.", "Annulation gratuite jusqu'à {days} jours avant l'arrivée. Passé ce délai, le montant total de la réservation est dû.", "Kostenlose Stornierung bis {days} Tage vor Anreise. Danach ist der gesamte Buchungsbetrag fällig.", "Cancelación gratuita hasta {days} días antes de la llegada. Pasado ese plazo se debe el importe total de la reserva."],
   "Cancellazione gratuita fino al giorno di arrivo.": ["Free cancellation until the day of arrival.", "Annulation gratuite jusqu'au jour d'arrivée.", "Kostenlose Stornierung bis zum Anreisetag.", "Cancelación gratuita hasta el día de llegada."],
   "La tassa di soggiorno è pari al {pct}% della prenotazione.": ["The city tax is {pct}% of the booking.", "La taxe de séjour est de {pct} % de la réservation.", "Die Kurtaxe beträgt {pct} % der Buchung.", "La tasa turística es del {pct}% de la reserva."],
   "Massimo {cap} EUR a persona per notte.": ["Maximum {cap} EUR per person per night.", "Maximum {cap} EUR par personne et par nuit.", "Höchstens {cap} EUR pro Person und Nacht.", "Máximo {cap} EUR por persona y noche."],
   "La tassa di soggiorno è di {amount} EUR a persona per notte.": ["The city tax is {amount} EUR per person per night.", "La taxe de séjour est de {amount} EUR par personne et par nuit.", "Die Kurtaxe beträgt {amount} EUR pro Person und Nacht.", "La tasa turística es de {amount} EUR por persona y noche."],
   "Non si applica ai bambini con età inferiore a {age} anni.": ["It does not apply to children under {age}.", "Elle ne s'applique pas aux enfants de moins de {age} ans.", "Sie gilt nicht für Kinder unter {age} Jahren.", "No se aplica a los niños menores de {age} años."],
-  "La tassa di soggiorno non è inclusa nel totale e sarà pagata in base alle politiche di pagamento definite dalla struttura.": ["The city tax is not included in the total and will be paid according to the property's payment policy.", "La taxe de séjour n'est pas incluse dans le total et sera réglée selon la politique de paiement de l'établissement.", "Die Kurtaxe ist im Gesamtbetrag nicht enthalten und wird gemäß den Zahlungsbedingungen der Unterkunft bezahlt.", "La tasa turística no está incluida en el total y se pagará según la política de pago del alojamiento."],
+  "La tassa di soggiorno non è inclusa nel totale della prenotazione e sarà pagata in base alle politiche di pagamento definite dalla struttura.": ["The city tax is not included in the booking total and will be paid according to the property's payment policy.", "La taxe de séjour n'est pas incluse dans le total de la réservation et sera réglée selon la politique de paiement de l'établissement.", "Die Kurtaxe ist im Buchungsbetrag nicht enthalten und wird gemäß den Zahlungsbedingungen der Unterkunft bezahlt.", "La tasa turística no está incluida en el total de la reserva y se pagará según la política de pago del alojamiento."],
+  // shell, voucher, preventivo, PDF
+  "P.IVA": ["VAT no.", "N° TVA", "USt-IdNr.", "NIF/IVA"],
+  "Inviato con Xenora": ["Sent with Xenora", "Envoyé avec Xenora", "Gesendet mit Xenora", "Enviado con Xenora"],
+  "No-show": ["No-show", "No-show", "No-Show", "No-show"],
+  "Soggiorno": ["Stay", "Séjour", "Aufenthalt", "Estancia"],
+  "Camere": ["Rooms", "Chambres", "Zimmer", "Habitaciones"],
+  "Pulizia": ["Cleaning fee", "Frais de ménage", "Reinigungsgebühr", "Tarifa de limpieza"],
+  "Totale con tassa di soggiorno": ["Total incl. city tax", "Total taxe de séjour incluse", "Gesamt inkl. Kurtaxe", "Total con tasa turística"],
+  "Riepilogo prenotazione": ["Booking summary", "Récapitulatif de réservation", "Buchungsübersicht", "Resumen de la reserva"],
+  "la tua prenotazione presso <b>{structure}</b> è stata registrata ed è in attesa di conferma. Ecco il riepilogo.": ["your booking at <b>{structure}</b> has been registered and is awaiting confirmation. Here is the summary.", "votre réservation à <b>{structure}</b> a été enregistrée et est en attente de confirmation. Voici le récapitulatif.", "Ihre Buchung in <b>{structure}</b> wurde erfasst und wartet auf Bestätigung. Hier die Übersicht.", "tu reserva en <b>{structure}</b> ha sido registrada y está pendiente de confirmación. Aquí tienes el resumen."],
+  "ecco il riepilogo della tua prenotazione presso <b>{structure}</b>.": ["here is the summary of your booking at <b>{structure}</b>.", "voici le récapitulatif de votre réservation à <b>{structure}</b>.", "hier die Übersicht Ihrer Buchung in <b>{structure}</b>.", "este es el resumen de tu reserva en <b>{structure}</b>."],
+  "Preventivo": ["Quote", "Devis", "Angebot", "Presupuesto"],
+  "Conferma e paga online →": ["Confirm and pay online →", "Confirmer et payer en ligne →", "Bestätigen und online bezahlen →", "Confirmar y pagar online →"],
+  "Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.": ["Secure payment with Stripe · card, PayPal, Klarna and other methods.", "Paiement sécurisé avec Stripe · carte, PayPal, Klarna et autres moyens.", "Sichere Zahlung mit Stripe · Karte, PayPal, Klarna und weitere Methoden.", "Pago seguro con Stripe · tarjeta, PayPal, Klarna y otros métodos."],
+  "Messaggio da {name}": ["Message from {name}", "Message de {name}", "Nachricht von {name}", "Mensaje de {name}"],
+  "Messaggio": ["Message", "Message", "Nachricht", "Mensaje"],
+  "Conferma di prenotazione": ["Booking confirmation", "Confirmation de réservation", "Buchungsbestätigung", "Confirmación de reserva"],
+  "Ospite": ["Guest", "Client", "Gast", "Huésped"],
+  "Sistemazione": ["Accommodation", "Hébergement", "Unterkunft", "Alojamiento"],
+  "Totale soggiorno": ["Stay total", "Total du séjour", "Aufenthalt gesamt", "Total de la estancia"],
+  "Condizioni di cancellazione": ["Cancellation policy", "Conditions d'annulation", "Stornierungsbedingungen", "Condiciones de cancelación"],
+  "Documento non fiscale · Generato con Xenora": ["Non-fiscal document · Generated with Xenora", "Document non fiscal · Généré avec Xenora", "Kein Steuerbeleg · Erstellt mit Xenora", "Documento no fiscal · Generado con Xenora"],
 };
 
 export const et = (lang: GuestLang, s: string, vars?: Record<string, string | number>) => translate(EMAIL_DICT, lang, s, vars);
@@ -85,9 +110,11 @@ export function emailLang(b?: EmailLangInput | null): GuestLang {
   return asGuestLang(b?.lang) ?? guestLangOf({ language: b?.guestLanguage, country: b?.guestCountry, phone: b?.guestPhone });
 }
 
-/** Politica di cancellazione nella lingua dell'ospite, dai dati strutturati (stesse frasi di mailer.ts in italiano). */
+/** Politica di cancellazione nella lingua dell'ospite, dai dati strutturati (stesse frasi di mailer.ts in italiano). Se `refundable` non è noto restituisce "" (nessuna clausola). */
 export function cancelPolicyIn(lang: GuestLang, refundable?: boolean, cancelDays?: number): string {
+  if (refundable === undefined) return ""; // condizione sconosciuta: nessuna clausola (non si scrive "non rimborsabile" a caso)
   if (!refundable) return et(lang, "La prenotazione non è rimborsabile.");
+  if (cancelDays === 1) return et(lang, "Cancellazione gratuita fino a 1 giorno prima dell'arrivo. Oltre questo termine è dovuto l'intero importo della prenotazione."); // singolare: "1 giorni" è sbagliato
   if (cancelDays && cancelDays > 0) return et(lang, "Cancellazione gratuita fino a {days} giorni prima dell'arrivo. Oltre questo termine è dovuto l'intero importo della prenotazione.", { days: cancelDays });
   return et(lang, "Cancellazione gratuita fino al giorno di arrivo.");
 }
@@ -103,6 +130,6 @@ export function cityTaxRuleIn(lang: GuestLang, r: CityTaxRule): string {
     parts.push(et(lang, "La tassa di soggiorno è di {amount} EUR a persona per notte.", { amount: r.amount ?? 0 }));
   }
   if (r.childFreeUnder) parts.push(et(lang, "Non si applica ai bambini con età inferiore a {age} anni.", { age: r.childFreeUnder }));
-  parts.push(et(lang, "La tassa di soggiorno non è inclusa nel totale e sarà pagata in base alle politiche di pagamento definite dalla struttura."));
+  parts.push(et(lang, "La tassa di soggiorno non è inclusa nel totale della prenotazione e sarà pagata in base alle politiche di pagamento definite dalla struttura."));
   return parts.join(" ");
 }

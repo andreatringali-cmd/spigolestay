@@ -61,6 +61,6 @@ export function planDepositPct(p: RatePlan): number {
 export function cancelText(p: RatePlan, lang: "it" | "en" = "it"): string {
   if (!p.refundable) return lang === "en" ? "Non-refundable" : "Non rimborsabile";
   if (p.cancelDays && p.cancelDays > 0)
-    return lang === "en" ? `Free cancellation up to ${p.cancelDays} days before` : `Cancellazione gratuita fino a ${p.cancelDays} giorni prima`;
+    return lang === "en" ? `Free cancellation up to ${p.cancelDays} ${p.cancelDays === 1 ? "day" : "days"} before` : `Cancellazione gratuita fino a ${p.cancelDays} ${p.cancelDays === 1 ? "giorno" : "giorni"} prima`;
   return lang === "en" ? "Free cancellation" : "Cancellazione gratuita";
 }

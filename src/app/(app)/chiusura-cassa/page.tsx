@@ -16,6 +16,7 @@ import { exportExcel } from "@/lib/export";
 import { type Mov, type Rule, type CashScope, computeAuto, computeScheduled, scopeVisible, cashScopeOf, scopeIds, loadCash, loadConti, contiKeysInScope, contoDisplayLabel, isCashConto, closingBalance, OPENING_CAT, type ContoDef } from "@/lib/cassa";
 import { parseDecimalIT } from "@/lib/num-it";
 import { useTenantId } from "@/lib/tenant";
+import { friendlyError } from "@/lib/friendly-error";
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -110,7 +111,7 @@ export default function ChiusuraCassaPage() {
     if (!tenantId) { setMsg("Account di lavoro non ancora caricato: riprova tra qualche secondo."); return; }
     if (countedVal === null) { setMsg(countedBad ? "Importo contato non valido: scrivi un numero, per esempio 1234,56." : "Inserisci l'importo contato."); return; }
     const { error } = await supabase.from("cash_closures").insert({ tenant_id: tenantId, day, conto: conto || null, structure_id: typeof scope === "string" && scope !== "all" ? scope : null, expected_cents: Math.round(expected * 100), counted_cents: Math.round(countedVal * 100), diff_cents: Math.round(diff * 100), note: note || null });
-    setMsg(error ? "Errore: " + error.message : "Chiusura salvata ✓");
+    setMsg(error ? "Errore: " + friendlyError(error) : "Chiusura salvata ✓");
     if (!error) { setCounted(""); setNote(""); loadClosures(); }
   };
 
@@ -127,7 +128,7 @@ export default function ChiusuraCassaPage() {
   const printClose = () => {
     const w = window.open("", "_blank", "width=780,height=900"); if (!w) return;
     const rows = dayMovs.map((m) => `<tr><td>${m.kind === "in" ? "Entrata" : "Uscita"}</td><td>${esc(m.desc)}${m.auto ? " <i>(auto)</i>" : m.sched ? " <i>(prog.)</i>" : ""}</td><td style="text-align:right">${m.kind === "in" ? "" : "−"}${eur(m.amount)}</td></tr>`).join("");
-    const dd = `${new Date(day).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDate(day)}`;
+    const dd = `${new Date(day.slice(0, 10) + "T00:00:00Z").toLocaleDateString("it-IT", { weekday: "long", timeZone: "UTC" })} ${fmtDate(day)}`;
     w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Chiusura cassa ${fmtDate(day)}</title>
       <style>body{font-family:system-ui,Arial,sans-serif;color:#111;margin:32px;font-size:13px}h1{font-size:20px;margin:0 0 4px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5e5e5;padding:6px 8px;text-align:left}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#666}.tot{margin-top:16px;width:280px;margin-left:auto}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .big{font-weight:700;border-top:2px solid #111;padding-top:8px;font-size:15px}</style></head><body>
       <h1>Verbale di chiusura cassa</h1>

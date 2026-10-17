@@ -6,6 +6,9 @@
 // I dati arrivano da /api/admin/overview e /api/admin/payments (service_role lato server).
 
 import { fmtDate } from "@/lib/dates";
+import { csvCell } from "@/lib/invoicing/csv";
+import { ymdRome } from "@/lib/dates-rome";
+import { eur as fmtEur } from "@/lib/format";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,7 +51,7 @@ function PlanBadge({ plan }: { plan: string | null }) {
   return <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={has ? { backgroundColor: `color-mix(in srgb, ${c} 16%, transparent)`, color: c } : { backgroundColor: "var(--wash)", color: "var(--faint)" }}>{tierName(plan)}</span>;
 }
 const waLink = (phone: string | null) => { const d = (phone || "").replace(/[^\d]/g, ""); return d ? `https://wa.me/${d}` : ""; };
-const eur = (n: number | null | undefined, cur = "EUR") => n == null ? "—" : `${cur === "EUR" ? "€" : cur} ${n.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`;
+const eur = (n: number | null | undefined, cur = "EUR") => n == null ? "—" : fmtEur(n, cur === "EUR" ? "€" : cur);
 
 function alertsFor(r: Row): Alert[] {
   const out: Alert[] = [];
@@ -229,11 +232,11 @@ export default function AdminPage() {
 
   const exportCsv = () => {
     const head = ["Titolare", "Email", "Telefono", "Piano", "Stato", "Rinnovo", "Canone mensile", "Collaboratori", "Strutture", "Camere"];
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const esc = csvCell;
     const lines = (accounts || []).map((a) => [a.owner.name, a.owner.email, a.owner.phone, tierName(a.owner.plan), a.owner.subStatus || "—", dmy(a.owner.periodEnd), a.owner.monthlyAmount ?? "", a.members.length, a.owner.structures, a.owner.rooms].map(esc).join(","));
     const csv = [head.map(esc).join(","), ...lines].join("\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = `xenora-abbonati-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement("a"); a.href = url; a.download = `xenora-abbonati-${ymdRome(new Date())}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   if (err === "forbidden") return (<div><PageHeader title="Back-office" hideHelp /><Card><div className="py-6 text-center text-sm text-dim">🔒 Area riservata. Il tuo account non ha accesso al back-office.</div></Card></div>);

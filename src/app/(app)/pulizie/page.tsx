@@ -7,6 +7,7 @@ import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type Booking } from "@/lib/types";
 import { toISO, parseISO, addDays, nights, fmtDM } from "@/lib/dates";
 import { playSound } from "@/lib/sound";
+import { eur } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
@@ -226,7 +227,6 @@ export default function PuliziePage() {
   const structColorOf = (id: string) => structures.find((s) => s.id === id)?.photoColor || STRUCT_COLORS[Math.max(0, structures.findIndex((s) => s.id === id)) % STRUCT_COLORS.length];
   const structInitials = (id: string) => structNameOf(id).split(/\s+/).map((w) => w[0] || "").join("").slice(0, 3).toUpperCase();
   const structOrder = (id: string) => structures.findIndex((s) => s.id === id);
-  const eur = (n: number) => "€ " + (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
   const shopList = stockScoped.filter((p) => statusOf(p) !== "ok");
   const suppliers = [...new Set(shopList.map((p) => p.supplier || "").filter(Boolean))];
   const byName = (a: Prod, b: Prod) => a.name.localeCompare(b.name, "it", { sensitivity: "base" });
@@ -254,7 +254,7 @@ export default function PuliziePage() {
     if (wasDone) delete next[k]; else { next[k] = new Date().toISOString(); playSound("done"); }
     setDone(next);
     try { localStorage.setItem("spigolestay:pulizie:done", JSON.stringify(next)); } catch {}
-    if (!wasDone) { const left = toClean.filter((r) => !next[keyOf(r.unit.id)]).length; if (left === 0 && toClean.length > 0) notify("Pulizie completate ✓", `Tutte le ${toClean.length} camere sono pronte.`); }
+    if (!wasDone) { const left = toClean.filter((r) => !next[keyOf(r.unit.id)]).length; if (left === 0 && toClean.length > 0) notify("Pulizie completate ✓", toClean.length === 1 ? "La camera è pronta." : `Tutte le ${toClean.length} camere sono pronte.`); }
   };
   const setNote = (k: string, v: string) => setNotes((n) => { const next = { ...n, [k]: v }; try { localStorage.setItem("spigolestay:pulizie:notes", JSON.stringify(next)); } catch {} return next; });
   const doneTime = (k: string) => { const iso = done[k]; if (!iso) return ""; try { return new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };

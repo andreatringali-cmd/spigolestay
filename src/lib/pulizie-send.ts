@@ -47,7 +47,7 @@ export async function deliverPuliziePlan(a: {
     try {
       const resp = await internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text: emailText, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
+        body: JSON.stringify({ kind: "guest_message", lang: "it", to: cfg.emailTo, subject, text: emailText, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
       });
       const j = await resp.json().catch(() => ({}));
       r = resp.ok && j?.ok ? { channel: "email", ok: true, detail: cfg.emailTo } : { channel: "email", ok: false, detail: errText(j, resp.status) };
@@ -60,7 +60,7 @@ export async function deliverPuliziePlan(a: {
     let r: PulizieSendResult; let wamid: string | undefined;
     try {
       // Il planning parte senza che il destinatario abbia scritto: per Meta è un messaggio "a freddo" e VA mandato col modello approvato.
-      // Il testo libero viene accettato dall'API ma poi NON consegnato (errore 131047) se il destinatario non ha scritto negli ultimi 24 ore: per questo non è il primo tentativo.
+      // Il testo libero viene accettato dall'API ma poi NON consegnato (errore 131047) se il destinatario non ha scritto nelle ultime 24 ore: per questo non è il primo tentativo.
       // (corpo del modello con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga)
       // 1) modello "a righe" (una riga per tipo di lavoro; si crea su Meta con il nome qui sotto); 2) se non esiste o non è approvato, il vecchio modello a una riga.
       const V2 = process.env.WHATSAPP_PULIZIE_TEMPLATE_V2 || "planning_pulizie_righe";
@@ -70,7 +70,7 @@ export async function deliverPuliziePlan(a: {
       if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", text }); // ripiego: arriva solo se il destinatario ha scritto nelle ultime 24 ore
       wamid = w.id;
       r = w.ok
-        ? { channel: "whatsapp", ok: true, detail: tplErr ? `testo libero (il modello non è partito: ${tplErr}): consegnato solo se hai scritto negli ultimi 24 ore` : `modello a ${cfg.whatsappTo}` }
+        ? { channel: "whatsapp", ok: true, detail: tplErr ? `testo libero (il modello non è partito: ${tplErr}): consegnato solo se hai scritto nelle ultime 24 ore` : `modello a ${cfg.whatsappTo}` }
         : { channel: "whatsapp", ok: false, detail: `modello: ${tplErr} · testo libero: ${w.message}` };
     } catch (e) { r = { channel: "whatsapp", ok: false, detail: e instanceof Error ? e.message : "errore" }; }
     await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: r.ok, wamid, detail: r.detail });

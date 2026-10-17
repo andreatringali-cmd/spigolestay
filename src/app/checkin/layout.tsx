@@ -7,6 +7,7 @@ const THUMB = { url: "/og-checkin-v2.png", width: 256, height: 256, alt: "Check-
 export const metadata: Metadata = {
   title: "Check-in online",
   description: DESCRIPTION,
+  robots: { index: false, follow: false }, // pagina personale dell'ospite: mai nei motori di ricerca
   openGraph: { title: "Check-in online", description: DESCRIPTION, images: [THUMB] },
   twitter: { card: "summary", title: "Check-in online", description: DESCRIPTION, images: [THUMB.url] },
 };

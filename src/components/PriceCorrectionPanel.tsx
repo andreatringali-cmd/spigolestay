@@ -20,6 +20,7 @@ import { defaultCommissionInfo } from "@/lib/booking";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { forceFullSync } from "@/components/ChannexAutoSync";
 import type { PriceCorrectionsApi } from "@/lib/usePriceCorrections";
+import { eur } from "@/lib/format";
 import {
   breakevenCorrection, canRetry, canRollback, compareRows, correctionLabel, diffCorrections, parityAlerts,
   sameCorrection, signedPct, summarizeComparison, validateCorrectionInput,
@@ -33,8 +34,7 @@ export const channelLabelOf = (c: ChannelRef) => CHANNELS[c.channel as Channel]?
 export const commissionPctFor = (channel: string, sid: string) => defaultCommissionInfo(channel as Channel, sid).pct;
 const commissionIsEstimate = (channel: string, sid: string) => defaultCommissionInfo(channel as Channel, sid).source === "stima";
 
-const eur = (n: number) => n.toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
-const eurSigned = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2 })}`;
+const eurSigned = (n: number) => `${n > 0.004 ? "+" : n < -0.004 ? "−" : ""}${eur(Math.abs(n))}`;
 const pctSigned = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `b-${Date.now()}-${Math.floor(Math.random() * 1e6)}`);
 const dayLabel = (iso: string) => `${["dom", "lun", "mar", "mer", "gio", "ven", "sab"][new Date(iso + "T00:00:00").getDay()]} ${fmtDM(iso)}`;

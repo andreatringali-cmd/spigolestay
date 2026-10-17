@@ -9,6 +9,8 @@ import { adminFromEnv, recordChatPayment } from "@/lib/chat-pay-server";
 import { estimatedStripeFeeCents } from "@/lib/payments/fee";
 import type { Booking, Structure } from "@/lib/types";
 import { fmtDMY } from "@/lib/dates";
+import { guestLangOf } from "@/lib/guest-lang";
+import { payLabels } from "@/lib/pay-labels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,26 +58,28 @@ async function handleStart(url: URL) {
   // (se nel frattempo è stato incassato qualcosa, l'importo si riduce; non sale mai oltre il token).
   const plan = planChatPayment(await withLiveStripe(chatPayContext(bk, st, false, (Array.isArray(store.data.bookings) ? store.data.bookings : []) as unknown as Booking[])), kind as ChatPayKind, maxCents / 100, { clamp: true });
   if (!plan.ok) {
+    if (plan.error === "cancelled") return page("Prenotazione annullata", `<p>Questa prenotazione risulta annullata, quindi non è possibile pagare. Se pensi sia un errore, contatta la struttura.</p>`, 410);
     if (plan.error === "already_paid" || plan.error === "tax_already_paid") return page("Già saldato", `<p>Per questa prenotazione non risulta nulla da pagare. Grazie!</p>`);
     if (plan.error === "stripe_not_connected") return page("Pagamento non disponibile", `<p>Il pagamento online non è attivo per questa struttura. Contatta direttamente la struttura.</p>`, 503);
     return page("Pagamento non disponibile", `<p>Non è possibile pagare online questa prenotazione. Contatta la struttura.</p>`, 400);
   }
 
   const structName = String(st?.name || "Struttura");
-  const guest = (store.guest ?? {}) as { email?: string };
+  const guest = (store.guest ?? {}) as { email?: string; language?: string; lang?: string; country?: string; phone?: string };
+  const lang = guestLangOf({ language: guest.language, lang: guest.lang, country: guest.country, phone: guest.phone });
   const meta: Record<string, string> = {
     kind: "chatpay", bid: bookingId, uid: tenantId, pk: kind, sid: String(bk.structureId || ""),
     code: String((bk as { code?: string }).code || "").slice(0, 40),
   };
   const origin = (process.env.NEXT_PUBLIC_SITE_URL || url.origin).replace(/\/+$/, "");
-  const label = `${kind === "tassa" ? "Tassa di soggiorno" : "Saldo soggiorno"} · ${structName}`.slice(0, 250);
+  const label = `${kind === "tassa" ? payLabels(lang).cityTax : payLabels(lang).balance} · ${structName}`.slice(0, 250);
   const desc = `${fmtDMY(bk.checkIn)} → ${fmtDMY(bk.checkOut)}`;
   try {
     const stripe = new Stripe(key);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
-      locale: "auto",
+      locale: lang, // lingua dell'ospite (scheda → Paese → prefisso del telefono)
       line_items: [{ price_data: { currency: "eur", unit_amount: plan.cents, product_data: { name: label, description: desc } }, quantity: 1 }],
       customer_email: guest.email && guest.email.includes("@") ? guest.email : undefined,
       metadata: meta,

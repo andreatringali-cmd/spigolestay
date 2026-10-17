@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { nights, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { plural } from "@/lib/plural";
+import { csvSafe } from "@/lib/invoicing/csv";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { cityTaxForBooking, cityTaxRulesOf, DEFAULT_CITY_TAX_RULES } from "@/lib/citytax";
@@ -72,7 +74,7 @@ export default function TassaSoggiornoPage() {
 
   // Prenotazioni con arrivo nel periodo.
   const inPeriod = bookings.filter(
-    (b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn >= start && b.checkIn < end
+    (b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn >= start && b.checkIn < end
   );
 
   const rows = inPeriod.flatMap((b) => {
@@ -80,7 +82,7 @@ export default function TassaSoggiornoPage() {
     // Struttura selezionata: regole mostrate sotto (modificabili); "Tutte": regole della struttura della prenotazione.
     const rules = single ? { taxMode, amount, pct, cap, maxNights, childrenExempt, exemptAge } : cityTaxRulesOf(getStructure(b.structureId));
     if (!rules || (single && !taxOn)) return []; // struttura senza tassa di soggiorno attiva
-    const { persons, taxable, tax } = cityTaxForBooking(b, rules);
+    const { persons, taxable, tax } = cityTaxForBooking(b, rules, getStructure(b.structureId)); // stesso importo di check-in, fatture e "Elabora tutto" (quote di gruppo incluse)
     return [{ b, persons, taxable, tax }];
   });
   const total = rows.reduce((a, r) => a + r.tax, 0);
@@ -104,11 +106,14 @@ export default function TassaSoggiornoPage() {
   const stampaDichiarazione = () => {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
-    const money = (x: number) => "€ " + x.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const struttura = activeStructureId === "all" ? "Tutte le strutture" : getStructure(activeStructureId)?.name ?? "";
+    const money = eur;
+    // I nomi di struttura/comune li scrive l'utente: vanno resi innocui prima di entrare nell'HTML della stampa.
+    const esc = (s: unknown) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] || c));
+    const struttura = esc(activeStructureId === "all" ? "Tutte le strutture" : getStructure(activeStructureId)?.name ?? "");
+    const comuneH = esc(comune), labelH = esc(label);
     const totPax = rows.reduce((a, r) => a + r.persons, 0);
     const totNotti = rows.reduce((a, r) => a + r.taxable, 0);
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Dichiarazione imposta di soggiorno — ${label}</title>
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Dichiarazione imposta di soggiorno — ${labelH}</title>
     <style>
       *{box-sizing:border-box} body{font-family:Georgia,serif;color:#1f2127;margin:0;padding:48px 54px;font-size:14px;line-height:1.5}
       .head{border-bottom:3px solid #4f46e5;padding-bottom:16px;margin-bottom:24px}
@@ -120,9 +125,9 @@ export default function TassaSoggiornoPage() {
       tr.tot td{border-top:2px solid #1f2127;font-weight:700;font-size:16px}
       .meta{color:#5f6067;font-size:13px;margin:2px 0}
     </style></head><body>
-      <div class="head"><div class="brand">Xenora</div><div class="meta">${struttura}${comune ? " · " + comune : ""}</div></div>
+      <div class="head"><div class="brand">Xenora</div><div class="meta">${struttura}${comune ? " · " + comuneH : ""}</div></div>
       <h1>Dichiarazione imposta di soggiorno</h1>
-      <div class="meta">Periodo: <b>${label}</b>${comune ? " — Comune di " + comune : ""}</div>
+      <div class="meta">Periodo: <b>${labelH}</b>${comune ? " — Comune di " + comuneH : ""}</div>
       <table>
         <tr><th>Voce</th><th class="n">Valore</th></tr>
         <tr><td>Pernottamenti soggetti a imposta</td><td class="n">${totNotti}</td></tr>
@@ -130,7 +135,7 @@ export default function TassaSoggiornoPage() {
         <tr><td>Tariffa applicata</td><td class="n">${!single ? "secondo le regole di ciascuna struttura" : taxMode === "percentuale" ? `${pct}% del pernottamento${cap > 0 ? ` · max ${money(cap)}/persona/notte` : ""}` : `${money(amount)} / persona / notte`}</td></tr>
         <tr class="tot"><td>Totale imposta da versare</td><td class="n">${money(total)}</td></tr>
       </table>
-      <p class="meta" style="margin-top:28px">Regole applicate: ${single ? `max ${maxNights} notti per soggiorno${childrenExempt ? ", minori esenti" : ""}` : "quelle configurate per ciascuna struttura"}. Documento riepilogativo non ufficiale generato da Xenora.</p>
+      <p class="meta" style="margin-top:28px">Regole applicate: ${single ? `max ${plural(maxNights, "notte", "notti")} per soggiorno${childrenExempt ? ", minori esenti" : ""}` : "quelle configurate per ciascuna struttura"}. Documento riepilogativo non ufficiale generato da Xenora.</p>
       <script>window.onload=function(){window.print()}<\/script>
     </body></html>`);
     w.document.close();
@@ -138,7 +143,7 @@ export default function TassaSoggiornoPage() {
 
   // Export CSV (compatibile con fogli di calcolo e caricamenti).
   const downloadCsv = (name: string, header: string[], data: (string | number)[][]) => {
-    const cell = (v: string | number) => { const s = String(v); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const cell = (v: string | number) => { const s = csvSafe(v); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const csv = "﻿" + [header, ...data].map((r) => r.map(cell).join(";")).join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -148,7 +153,7 @@ export default function TassaSoggiornoPage() {
   const exportImpostaCsv = () => downloadCsv(
     `imposta-soggiorno_${label.replace(/\s+/g, "-")}.csv`,
     ["Ospite", "Provenienza", "Check-in", "Check-out", "Persone paganti", "Notti tassabili", "Imposta €"],
-    rows.map(({ b, persons, taxable, tax }) => [guestName(b.guestId), guestCountry(b.guestId), fmtDate(b.checkIn), fmtDate(b.checkOut), persons, taxable, tax.toFixed(2)]),
+    rows.map(({ b, persons, taxable, tax }) => [guestName(b.guestId), guestCountry(b.guestId), fmtDate(b.checkIn), fmtDate(b.checkOut), persons, taxable, tax.toFixed(2).replace(".", ",")]),
   );
   const exportIstatCsv = () => downloadCsv(
     `istat-movimento_${label.replace(/\s+/g, "-")}.csv`,

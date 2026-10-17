@@ -1,7 +1,8 @@
 // Script di embed per il widget di prenotazione (xenora.it/embed.js).
 //
 // Uso sul sito del gestore:
-//   <script src="https://xenora.it/embed.js" data-site="<slug>" data-min-height="640" data-accent="#RRGGBB"></script>
+//   <script src="https://xenora.it/embed.js" data-site="<slug>" data-min-height="640" data-accent="#RRGGBB" data-target="<id elemento, facoltativo>"></script>
+// (Questa route è la versione servita in produzione; il vecchio public/embed.js statico non veniva mai usato e non esiste più.)
 //
 // Cosa fa: crea al posto dello script un <iframe> verso /embed/<slug>, lo ridimensiona
 // da solo (ascolta i postMessage di altezza inviati dalla pagina embed) e inoltra alla
@@ -42,10 +43,18 @@ const JS = `(function () {
   iframe.style.minHeight = minH + "px";
   iframe.setAttribute("title", "Prenota");
   iframe.setAttribute("scrolling", "no");
+  iframe.setAttribute("loading", "lazy");
+  iframe.setAttribute("allow", "payment");
 
-  cur.parentNode.insertBefore(iframe, cur);
+  // data-target (facoltativo): id di un elemento in cui inserire il widget; altrimenti subito prima dello script.
+  var targetId = cur.getAttribute("data-target");
+  var target = targetId ? document.getElementById(targetId) : null;
+  if (target) target.appendChild(iframe);
+  else if (cur.parentNode) cur.parentNode.insertBefore(iframe, cur);
+  else document.body.appendChild(iframe);
 
   window.addEventListener("message", function (ev) {
+    if (ev.source !== iframe.contentWindow) return; // solo i messaggi del nostro iframe
     if (!ev.data || ev.data.xenoraEmbedSite !== site || typeof ev.data.xenoraEmbedHeight !== "number") return;
     iframe.style.height = Math.max(minH, ev.data.xenoraEmbedHeight) + "px";
   });

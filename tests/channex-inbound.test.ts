@@ -96,9 +96,23 @@ test("channelFromOta: assente o vuoto = diretta; diretta/CRS/sito = diretta; alt
   for (const n of ["GoogleHotel", "Google Hotel Search", "google"]) assert.equal(channelFromOta(n), "google", n); // Google Hotel (link gratuiti) è un canale a sé
 });
 
-test("channelFromOta: un nome come 'Direct Booking' dovrebbe essere diretta, non Booking.com", { todo: "BUG probabile: il controllo 'book' viene prima di 'direct'/'website' (channex-inbound.ts riga 59 vs 63)" }, () => {
+test("channelFromOta: 'Direct Booking' e simili sono diretta, non Booking.com", () => {
   assert.equal(channelFromOta("Direct Booking"), "direct");
   assert.equal(channelFromOta("Website booking engine"), "direct");
+  assert.equal(channelFromOta("Direct_Booking"), "direct");
+});
+
+test("channelFromOta: i portali con 'book' nel nome (catalogo OTA) NON sono Booking.com", () => {
+  for (const n of ["123booking", "Simplebooking", "Webbooking", "Bookingfor", "BookOn", "Bookvisit", "NeoBooking", "Sharebooking", "Vertical_Booking", "BookingExpert", "Natural Booking", "Instant World Booking"]) {
+    assert.equal(channelFromOta(n), "other", n);
+  }
+  assert.equal(channelFromOta("hotelsdirects"), "other"); // contiene "direct" ma non è la parola intera
+  assert.equal(channelFromOta("hotelsdirects - Koedia (HDA)"), "other");
+  assert.equal(channelFromOta("Bookingsomethingnew"), "other"); // sconosciuto: mai Booking.com a caso
+});
+
+test("channelFromOta: Booking.com resta Booking.com in tutte le grafie, con spazi o simboli", () => {
+  for (const n of ["Booking", "booking.com", "Booking.com", "BookingCom", "BOOKING_COM", "Booking com", " Booking.com "]) assert.equal(channelFromOta(n), "booking", n);
 });
 
 // ───────────────────────── nuova prenotazione ─────────────────────────
@@ -140,7 +154,14 @@ test("nuova prenotazione: riga completa, ospite creato, ACK, registro, email, ca
   assert.equal(calls("gcalUpsert")[0].endDateExclusive, "2099-06-13");
   assert.equal(calls("internalFetch").length, 1);
   assert.equal(calls("internalFetch")[0].body.to, "owner@example.com");
-  assert.equal(calls("internalFetch")[0].body.subject, "Nuova prenotazione OTA · Giulia Rossi");
+  assert.equal(calls("internalFetch")[0].body.subject, "Nuova prenotazione · Giulia Rossi · Booking.com · 10.06.2099 · Casa Ortigia");
+  // corpo ricco: evento, struttura (brand), canale, dati della prenotazione e link diretto alla scheda
+  const nb = calls("internalFetch")[0].body;
+  assert.equal(nb.kind, "notify"); assert.equal(nb.event, "newBooking");
+  assert.equal(nb.brand.name, "Casa Ortigia"); assert.equal(nb.channelLabel, "Booking.com");
+  assert.equal(nb.booking.guestName, "Giulia Rossi"); assert.equal(nb.booking.checkIn, "2099-06-10"); assert.equal(nb.booking.nights, 3);
+  assert.equal(nb.booking.total, 360); assert.equal(nb.booking.commissionEstimate, true); // Channex non ha mandato la cifra esatta → stima
+  assert.ok(String(nb.ctaUrl).includes("/prenotazioni?b=")); assert.ok(String(nb.ctaUrl).endsWith(nb.booking.bookingId));
   assert.deepEqual(calls("poolPush")[0].touched, [{ structureId: "st-1", roomTypeId: "rt-dbl" }]);
 });
 
@@ -200,7 +221,7 @@ test("property non collegata: saltata senza ACK (resta nel feed); la property di
 
 // ───────────────────────── modifica ─────────────────────────
 test("modifica: la riga viene sostituita (id nuovo), la vecchia lapidata, e si riportano incassi e dati del gestore (CARRY)", async () => {
-  const old = seedBooking({ paid: 120, cityTaxPaid: true, webCheckin: true, invoiceNo: "FT-2099/12", extras: [{ name: "Navetta", price: 30 }], color: "#ff0000", note: "Ospite VIP, arriva tardi", bookedOn: "2099-03-01", docPhotoFront: "doc.jpg" });
+  const old = seedBooking({ paid: 120, cityTaxPaid: true, webCheckin: true, privacyConsentAt: "2099-03-02T10:00:00.000Z", privacyConsentBy: "guest", invoiceNo: "FT-2099/12", extras: [{ name: "Navetta", price: 30 }], color: "#ff0000", note: "Ospite VIP, arriva tardi", bookedOn: "2099-03-01", docPhotoFront: "doc.jpg" });
   const sc = scenario(baseData({ guests: [{ id: "g-1", fullName: "Giulia Rossi", email: "giulia.rossi@example.com" }], bookings: [old] }));
   await withChannex({}, async (acks) => {
     const out = await importSingleRevision(sc.client, rev({ id: "rev-2", arrival_date: "2099-06-11", departure_date: "2099-06-14", amount: "420.00",
@@ -217,6 +238,7 @@ test("modifica: la riga viene sostituita (id nuovo), la vecchia lapidata, e si r
   assert.equal(b.paid, 120);
   assert.equal(b.cityTaxPaid, true);
   assert.equal(b.webCheckin, true);
+  assert.equal(b.privacyConsentAt, "2099-03-02T10:00:00.000Z"); assert.equal(b.privacyConsentBy, "guest"); // prova del consenso privacy riportata
   assert.equal(b.invoiceNo, "FT-2099/12");
   assert.deepEqual(b.extras, [{ name: "Navetta", price: 30 }]);
   assert.equal(b.color, "#ff0000");
@@ -226,8 +248,10 @@ test("modifica: la riga viene sostituita (id nuovo), la vecchia lapidata, e si r
   assert.equal(b.guestId, "g-1"); // ospite riusato per email
   assert.ok(b.updatedAt > 1000);
   assert.match(s.activities[0].text, /aggiornata/);
-  // una modifica non rimanda l'email di "nuova prenotazione" ma toglie dal calendario la vecchia riga
-  assert.equal(calls("internalFetch").length, 0);
+  // una modifica con date cambiate manda UNA email "Modificata" (mai "nuova prenotazione") e toglie dal calendario la vecchia riga
+  assert.equal(calls("internalFetch").length, 1);
+  assert.equal(calls("internalFetch")[0].body.event, "modified");
+  assert.ok(String(calls("internalFetch")[0].body.subject).startsWith("Modificata · Giulia Rossi · Booking.com · 11.06.2099"));
   assert.deepEqual(calls("gcalDelete").map((c) => c.ev), ["evold-1"]);
 });
 
@@ -336,7 +360,9 @@ test("cancellazione: tutte le righe si marcano cancelled con updatedAt avanzato,
   assert.ok(by("r1").updatedAt > 1000 && by("r2").updatedAt > 1000);
   assert.equal(by("estranea").status, "confirmed");
   assert.equal(calls("gcalDelete").length, 2);
-  assert.equal(calls("internalFetch")[0].body.subject, "Prenotazione OTA cancellata · Giulia Rossi");
+  assert.equal(calls("internalFetch")[0].body.subject, "Cancellata · Giulia Rossi · Booking.com · 10.06.2099 · Casa Ortigia");
+  assert.equal(calls("internalFetch")[0].body.event, "cancel");
+  assert.equal(calls("internalFetch").length, 2); // una per camera cancellata (come prima)
   assert.equal(s.activities[0].type, "cancel");
   assert.match(s.activities[0].text, /Cancellazione OTA — Giulia Rossi/);
   assert.deepEqual(calls("poolPush")[0].touched.map((t: any) => t.roomTypeId).sort(), ["rt-dbl", "rt-dbl"]);
@@ -694,4 +720,38 @@ test("doppione: se la revision non ha camere mappate non si tocca nulla (l'Octor
   await withChannex({}, async () => { await importSingleRevision(sc.client, rev({ status: "modified", rooms: [room({ room_type_id: "chx-sconosciuta" })] }) as never); });
   assert.equal(live(sc.state()).length, 2);
   assert.equal(sc.state().bookings.find((b: any) => b.id === "oct-1").status, "confirmed");
+});
+
+// ───────────────────────── email al titolare: duplicati e modifiche ─────────────────────────
+test("cancellazione già registrata (stessa revisione consegnata due volte): nessuna seconda email", async () => {
+  const sc = scenario(baseData({ guests: [{ id: "g-1", fullName: "Giulia Rossi" }], bookings: [seedBooking({ status: "cancelled" })] }));
+  await withChannex({}, async () => {
+    const out = await importSingleRevision(sc.client, rev({ id: "rev-9", status: "cancelled" }) as never);
+    assert.equal(out.cancelled, 1);
+  });
+  assert.equal(calls("internalFetch").length, 0);
+  // la prima consegna invece avvisa
+  const sc2 = scenario(baseData({ guests: [{ id: "g-1", fullName: "Giulia Rossi" }], bookings: [seedBooking()] }));
+  await withChannex({}, async () => { await importSingleRevision(sc2.client, rev({ id: "rev-9", status: "cancelled" }) as never); });
+  assert.equal(calls("internalFetch").length, 1);
+});
+
+test("modifica OTA: email 'Modificata' solo se cambia qualcosa di sostanziale; rispetta il toggle notifs.modified", async () => {
+  // revisione identica alla prenotazione già presente: nessuna email
+  const same = scenario(baseData({ guests: [{ id: "g-1", fullName: "Giulia Rossi", email: "giulia.rossi@example.com" }], bookings: [seedBooking()] }));
+  await withChannex({}, async () => { await importSingleRevision(same.client, rev({ id: "rev-2", status: "modified" }) as never); });
+  assert.equal(calls("internalFetch").length, 0);
+  // date cambiate: una email "modified"
+  const moved = scenario(baseData({ guests: [{ id: "g-1", fullName: "Giulia Rossi", email: "giulia.rossi@example.com" }], bookings: [seedBooking()] }));
+  await withChannex({}, async () => {
+    await importSingleRevision(moved.client, rev({ id: "rev-3", status: "modified", arrival_date: "2099-06-11", departure_date: "2099-06-14", rooms: [room({ checkin_date: "2099-06-11", checkout_date: "2099-06-14", days: { "2099-06-11": "120.00", "2099-06-12": "120.00", "2099-06-13": "120.00" } })] }) as never);
+  });
+  assert.equal(calls("internalFetch").length, 1);
+  assert.equal(calls("internalFetch")[0].body.event, "modified");
+  // toggle "Prenotazione modificata" spento: nessuna email
+  const off = scenario(baseData({ guests: [{ id: "g-1", fullName: "Giulia Rossi", email: "giulia.rossi@example.com" }], bookings: [seedBooking()] }), { blobExtra: { "spigolestay:notifs": JSON.stringify({ modified: false }) } });
+  await withChannex({}, async () => {
+    await importSingleRevision(off.client, rev({ id: "rev-3", status: "modified", arrival_date: "2099-06-11", departure_date: "2099-06-14", rooms: [room({ checkin_date: "2099-06-11", checkout_date: "2099-06-14", days: { "2099-06-11": "120.00", "2099-06-12": "120.00", "2099-06-13": "120.00" } })] }) as never);
+  });
+  assert.equal(calls("internalFetch").length, 0);
 });

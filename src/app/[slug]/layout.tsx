@@ -16,10 +16,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const where = [s.city, s.province].filter(Boolean).join(", ");
   const title = `${s.name}${where ? ` · ${where}` : ""}`;
   const description = (s.tagline || s.description || `${s.type || "Struttura"} a ${s.city || "Italia"}: prenota direttamente, senza commissioni.`).slice(0, 200);
+  // L'openGraph di questo layout SOSTITUISCE quello del layout principale (Next non li fonde): senza `images` l'anteprima WhatsApp/Facebook usciva senza immagine.
+  // Immagine: la scheda generata dal sito (/og) con nome e zona della struttura (il logo della struttura è un dato interno, non un URL pubblico).
+  const ogUrl = `${ORIGIN}/og?t=${encodeURIComponent(s.name.slice(0, 80))}&s=${encodeURIComponent((where || s.type || "Prenota direttamente").slice(0, 100))}`;
+  const image = { url: ogUrl, width: 1200, height: 630, alt: s.name };
   return {
     title, description,
     alternates: { canonical: `${ORIGIN}/${s.slug}` },
-    openGraph: { title, description, url: `${ORIGIN}/${s.slug}`, type: "website", siteName: s.name },
+    openGraph: { title, description, url: `${ORIGIN}/${s.slug}`, type: "website", siteName: s.name, images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [ogUrl] },
     robots: { index: true, follow: true },
   };
 }

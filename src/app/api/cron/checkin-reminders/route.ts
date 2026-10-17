@@ -4,9 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 import { logInvio, giaInviato } from "@/lib/invii-log";
 import { DATA_KEY } from "@/lib/manage-booking";
 import type { Booking, Structure, Guest } from "@/lib/types";
+import { autoMessageCoversToday, dedupeGroups, orgBlobFor } from "@/lib/auto-messages-core";
+import { slotDateOf, stepsOfTemplate, type AutoTpl } from "@/lib/auto-schedule";
+import { loadUserBlob, ownerOfOrg, recordAutoSent } from "@/lib/auto-trace";
+import { todayRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // scorre tutti gli account e manda una email per ospite: il tetto di default (10 s) non basta
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON: sollecito check-in online agli ospiti in arrivo DOMANI.
@@ -17,6 +22,10 @@ export const dynamic = "force-dynamic";
 //
 // Comportamento graceful: se mancano le env necessarie NON crasha, risponde 200 con lo
 // stato "skipped" così il build/deploy e le chiamate non generano errori.
+//
+// Regole: niente promemoria alle prenotazioni provvisorie (tentative); un solo promemoria per gruppo di camere; se oggi parte già un messaggio automatico
+// (modelli & automazioni, con AUTO_MESSAGES_LIVE=1) che contiene lo stesso link di check-in, il promemoria salta (niente doppia email a un'ora di distanza).
+// Gli esiti si scrivono nel registro del TITOLARE (anche per le strutture condivise), dove l'app li legge per l'avviso «invio non arrivato».
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Json = Record<string, unknown>;
@@ -83,12 +92,27 @@ export async function GET(req: Request) {
   const errors: string[] = [];
 
   let skippedDup = 0; // già sollecitate nelle ultime 20 ore (anti-doppioni)
+  let skippedAuto = 0; // coperte da un messaggio automatico con lo stesso link di check-in
+  const autoLive = process.env.AUTO_MESSAGES_LIVE === "1";
+  const today = todayRome();
 
   // Elabora una singola riga (blob) di org_state o app_state. `tenantId` = user_id / org_id della riga (serve al registro invii).
-  async function processBlob(tenantId: string, rowData: unknown) {
+  // Titolare dell'organizzazione (per le righe org_state) e suo blob personale: registro e modelli stanno lì.
+  async function processBlob(rowTenantId: string, rowData: unknown, orgId?: string) {
     const data = parseData(rowData);
     const bookings = arr<Booking>(data.bookings);
     if (!bookings.length) return;
+    let tenantId = rowTenantId; // a chi appartiene il registro invii
+    let blob = ((rowData ?? {}) as Record<string, string>) || {};
+    if (orgId) {
+      const owner = await ownerOfOrg(admin, orgId);
+      if (owner) { tenantId = owner; blob = orgBlobFor(blob, await loadUserBlob(admin, owner)); }
+    }
+    // Modelli automatici attivi con {link_checkin}: se uno parte OGGI per questa prenotazione porta già il link, il promemoria sarebbe un doppione.
+    let linkTpls: AutoTpl[] = [];
+    if (autoLive) { try { linkTpls = (JSON.parse(blob["spigolestay:msgtemplates"] || "[]") as AutoTpl[]).filter((t) => t && t.active && t.trigger !== "manual" && stepsOfTemplate(t).includes("checkin")); } catch { linkTpls = []; } }
+    const rows = bookings.filter((b) => b && String(b.checkIn || "") === tomorrow && b.status !== "cancelled" && b.status !== "no_show" && b.status !== "tentative" && b.channel !== "blocked");
+    const grp = dedupeGroups(rows.map((b) => ({ id: String(b.id), groupId: b.groupId ? String(b.groupId) : undefined, checkIn: String(b.checkIn) })));
     const structures = arr<Structure>(data.structures);
     const guests = arr<Guest>(data.guests);
     const structById = new Map(structures.map((s) => [String(s.id), s]));
@@ -97,15 +121,31 @@ export async function GET(req: Request) {
     for (const b of bookings) {
       try {
         if (!b || String(b.checkIn || "") !== tomorrow) continue;
-        if (b.status === "cancelled") continue;
+        if (b.status === "cancelled" || b.status === "no_show") continue;
+        if (b.status === "tentative") continue; // prenotazione non ancora ferma: nessun promemoria
         if (b.channel === "blocked") continue;
         if (b.webCheckin === true) continue;
+        if (grp.skippedIds.has(String(b.id))) continue; // camera di un gruppo: il promemoria parte una volta sola, dalla prima
 
         const guest = guestById.get(String(b.guestId || "")) || null;
         const guestEmail = guest?.email ? String(guest.email).trim() : "";
         if (!guestEmail) continue; // niente email → non possiamo sollecitare
 
         scanned++;
+
+        // Un messaggio automatico con {link_checkin} parte oggi per questa prenotazione (e per questa struttura)? Allora porta già il link: niente doppia email.
+        // Si salta solo se quel messaggio PARTE davvero (o è già partito oggi): se per la prenotazione e il modello c'è già una riga nel registro di un altro giorno
+        // (inviato prima, date spostate) il cron dei messaggi oggi non lo rimanda, e il promemoria resta l'unico invito al check-in.
+        let coveredByAuto = false;
+        for (const t of linkTpls) {
+          if (t.structureIds?.length && !t.structureIds.includes(String(b.structureId))) continue;
+          if (slotDateOf(t, String(b.checkIn), String(b.checkOut)) !== today) continue;
+          const ids = grp.membersOf.get(String(b.id)) ?? [String(b.id)];
+          const q = await admin.from("auto_message_log").select("slot_date").eq("tenant_id", rowTenantId).eq("template_id", t.id).in("booking_id", ids);
+          if (q.error) { errors.push(`auto_message_log ${b.id}: ${q.error.message}`); continue; } // registro illeggibile: meglio un doppione che un sollecito mancato
+          if (autoMessageCoversToday((q.data ?? []) as { slot_date?: string }[], today)) { coveredByAuto = true; break; }
+        }
+        if (coveredByAuto) { skippedAuto++; continue; }
 
         // Anti-doppioni: se per questa prenotazione c'è già un sollecito riuscito nelle ultime 20 ore non si rimanda.
         // Se il registro non si legge si invia comunque (meglio un doppione che un sollecito mancato) e si segnala.
@@ -144,7 +184,14 @@ export async function GET(req: Request) {
         });
         if (res.ok) {
           const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-          if (j.ok) { sent++; if (tenantId) await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: true, detail: `promemoria check-in → ${guestEmail}` }); }
+          if (j.ok) {
+            sent++;
+            if (tenantId) {
+              await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: true, detail: `promemoria check-in → ${guestEmail}` });
+              // Traccia nella chat dell'ospite (con prenotazione e tipo «checkin»): lo storico dei solleciti e il percorso della prenotazione lo mostrano.
+              await recordAutoSent(admin, { ownerId: tenantId, guestId: String(b.guestId || ""), bookingId: String(b.id), text: `Promemoria check-in online: ${checkinUrl}`, via: "Email", rems: ["checkin"], idKey: `checkin-${b.id}-${tomorrow}`, guestName: String(guest?.fullName || ""), tplName: "Promemoria check-in" });
+            }
+          }
           else { errors.push(`booking ${b.id}: ${j.error || "email_failed"}`); if (tenantId) await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: false, detail: `promemoria check-in → ${guestEmail}: ${j.error || "email_failed"}` }); }
         } else {
           errors.push(`booking ${b.id}: email HTTP ${res.status}`);
@@ -163,7 +210,7 @@ export async function GET(req: Request) {
     const { data: orgRows, error: orgErr } = await admin.from("org_state").select("org_id, data").limit(5000);
     if (orgErr) errors.push(`org_state: ${orgErr.message}`);
     for (const row of arr<{ org_id?: string; data?: unknown }>(orgRows)) {
-      await processBlob(String(row.org_id ?? ""), row.data);
+      await processBlob(String(row.org_id ?? ""), row.data, String(row.org_id ?? ""));
     }
 
     const { data: appRows, error: appErr } = await admin.from("app_state").select("user_id, data").limit(10000);
@@ -184,6 +231,7 @@ export async function GET(req: Request) {
     scanned,
     sent,
     skippedDup,
+    skippedAuto,
     ...(errors.length ? { errors: errors.slice(0, 50) } : {}),
   });
 }

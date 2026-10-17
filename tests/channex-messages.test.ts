@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isOffHours, otaAutoActive } from "../src/lib/aiConcierge.ts";
-import { parseChannexMessage, appendOtaMessage, otaLabel, messageHookSecret, bookingHookSecret, verifyMessageHook, verifyBookingHook, parseAttachments, parseChannexTime, pickMessageStore, hasSameOut, normText } from "../src/lib/channex-messages.ts";
+import { parseChannexMessage, appendOtaMessage, otaLabel, messageHookSecret, bookingHookSecret, verifyMessageHook, verifyBookingHook, parseAttachments, parseChannexTime, pickMessageStore, hasSameOut, echoStoredSince, normText } from "../src/lib/channex-messages.ts";
 
 const ev = (over: Record<string, unknown> = {}) => ({ event: "message", property_id: "P1", payload: { id: "m1", message: " Ciao ", sender: "guest", booking_id: "B1", property_id: "P1", ...over } });
 
@@ -184,4 +184,15 @@ test("verifyBookingHook: con CHANNEX_WEBHOOK_STRICT=1 serve il segreto", () => {
   assert.equal(verifyBookingHook("sbagliato", env).accept, false);
   assert.equal(verifyBookingHook(null, { CHANNEX_WEBHOOK_STRICT: "1" }).accept, false); // strict ma segreto non configurato
   assert.equal(verifyBookingHook(null, { CRON_SECRET: "abc", CHANNEX_WEBHOOK_STRICT: "0" }).accept, true);
+});
+
+test("echoStoredSince: solo l'eco arrivato dopo l'inizio dell'invio conta come già salvato", () => {
+  const t0 = 1_000_000;
+  // risposta uguale ma più vecchia (domanda ripetuta entro 10 minuti): NON è un doppione, va salvata comunque
+  assert.equal(echoStoredSince([{ id: "u1", dir: "out", text: "Check-in dalle 15", ts: t0 - 120_000 }], "Check-in dalle 15", t0), false);
+  assert.equal(echoStoredSince([{ id: "chx:old", dir: "out", text: "Check-in dalle 15", ts: t0 - 120_000 }], "Check-in dalle 15", t0), false);
+  // eco di Channex di questa risposta, arrivato prima della scrittura: già nello storico
+  assert.equal(echoStoredSince([{ id: "chx:new", dir: "out", text: " Check-in  dalle 15 ", ts: t0 + 2_000 }], "Check-in dalle 15", t0), true);
+  // testo diverso o messaggio in entrata: no
+  assert.equal(echoStoredSince([{ id: "chx:x", dir: "out", text: "Altro", ts: t0 + 1 }, { id: "chx:y", dir: "in", text: "Check-in dalle 15", ts: t0 + 1 }], "Check-in dalle 15", t0), false);
 });

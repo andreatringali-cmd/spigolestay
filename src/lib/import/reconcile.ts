@@ -93,7 +93,9 @@ const STATUS_LABEL: Record<OutcomeStatus, string> = { nuova: "importata", gia_pr
 
 /** CSV (separatore ;, con BOM per Excel) con una riga per ogni riga del file e il suo esito; con `missingKeys` marca le righe che non si trovano. */
 export function outcomesToCsv(outcomes: ImportOutcome[], missing?: Set<ImportOutcome>, elsewhere?: Map<ImportOutcome, string>): string {
-  const esc = (v: unknown) => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  // Protezione da formule (= + - @ in testa → apostrofo), come csvSafe di lib/invoicing/csv: copiata per tenere il file autonomo.
+  const safe = (v: unknown) => { const s = String(v ?? ""); return typeof v !== "number" && /^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+([.,]\d+)?$/.test(s) ? "'" + s : s; };
+  const esc = (v: unknown) => { const s = safe(v); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const head = ["riga", "ospite", "check-in", "check-out", "camera nel file", "codice", "importo", "esito", "motivo"];
   const lines = outcomes.map((o) => [
     o.row, o.guest, o.checkIn, o.checkOut, o.room, o.code, o.total ?? "",

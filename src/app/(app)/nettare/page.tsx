@@ -28,7 +28,7 @@ const PREVIEW = 90;
 const STRAT_KEY = "spigolestay:nettare:strategy";
 const MODS_KEY = "spigolestay:nettare:mods";
 
-const money2 = (n: number) => `${n >= 0 ? "+" : "−"} ${Math.abs(n).toFixed(2).replace(".", ",")} €`;
+const money2 = (n: number) => `${n >= 0 ? "+" : "−"} ${eur(Math.abs(n))}`;
 
 export default function NettarePage() {
   const { t } = useLang();

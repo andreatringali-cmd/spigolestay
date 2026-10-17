@@ -172,7 +172,7 @@ export default function OspiteSchedaPage() {
               <div><div className="font-mono text-xl font-bold text-txt">{stays.length}</div><div className="text-[11px] text-faint">{t("soggiorni")}</div></div>
               <div><div className="font-mono text-xl font-bold text-txt">{totalNights}</div><div className="text-[11px] text-faint">{t("notti")}</div></div>
               <div><div className="font-mono text-xl font-bold text-txt">{eur(totalSpend)}</div><div className="text-[11px] text-faint">{t("spesa")}</div></div>
-              <div><div className="font-mono text-sm font-bold text-txt">{lastStay ? new Date(lastStay).toLocaleDateString("it-IT", { month: "short", year: "2-digit" }) : "—"}</div><div className="text-[11px] text-faint">{t("ultimo")}</div></div>
+              <div><div className="font-mono text-sm font-bold text-txt">{lastStay ? new Date(lastStay.slice(0, 10) + "T00:00:00Z").toLocaleDateString("it-IT", { month: "short", year: "2-digit", timeZone: "UTC" }) : "—"}</div><div className="text-[11px] text-faint">{t("ultimo")}</div></div>
             </div>
           )}
         </div>

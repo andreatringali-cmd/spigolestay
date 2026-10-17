@@ -33,7 +33,7 @@ export function reminderText(r: ReminderInput): string {
   } else if (r.daysLate <= 30) {
     body = `dai nostri registri risulta ancora aperto ${what}, scaduto il ${dmy(r.dueDate)}, per un importo di ${amount}.\nSe ha già provveduto al pagamento, la preghiamo di ignorare questo messaggio; in caso contrario le saremmo grati se potesse saldarlo a breve.`;
   } else {
-    body = `a oggi risulta ancora insoluto ${what}, scaduto il ${dmy(r.dueDate)} (${r.daysLate} giorni fa), per un importo di ${amount}.\nLa preghiamo di provvedere al saldo il prima possibile o di contattarci per concordare le modalità.`;
+    body = `a oggi risulta ancora insoluto ${what}, scaduto il ${dmy(r.dueDate)} (${r.daysLate === 1 ? "1 giorno" : `${r.daysLate} giorni`} fa), per un importo di ${amount}.\nLa preghiamo di provvedere al saldo il prima possibile o di contattarci per concordare le modalità.`;
   }
   return `${hi}\n${body}${sign}`;
 }

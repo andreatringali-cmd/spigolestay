@@ -195,7 +195,7 @@ test("pacchetto completo: checklist oggettiva, CSV con separatore ; e decimali c
   assert.match(text, /1 documento emesso non ancora inviato allo SdI/);
   assert.match(text, /1 documento scartato dallo SdI/);
   assert.match(text, /1 bozza nel periodo/);
-  assert.match(text, /1 fattura con bollo calcolato, per 2,00 €/);
+  assert.match(text, /1 fattura con bollo calcolato, per € 2,00/);
   assert.match(text, /fuori campo IVA/);
   assert.match(text, /forfettario/);
   assert.doesNotMatch(text, /limite/i);

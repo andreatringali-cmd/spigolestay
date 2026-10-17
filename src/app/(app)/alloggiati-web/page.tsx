@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtDate } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 import DateField from "@/components/DateField";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -64,7 +65,7 @@ export default function AlloggiatiWebPage() {
     setBusy("tracciato"); setMsg("");
     try {
       const r = await apiPost<{ ok: boolean; message?: string; text?: string }>("alloggiati/tracciato", { structureId: sid });
-      if (r.text) { const blob = new Blob([r.text], { type: "text/plain" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `alloggiati_${new Date().toISOString().slice(0, 10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); setMsg(r.message || "Tracciato scaricato ✓"); }
+      if (r.text) { const blob = new Blob([r.text], { type: "text/plain" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `alloggiati_${ymdRome(new Date())}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); setMsg(r.message || "Tracciato scaricato ✓"); }
       else setMsg(r.message || "Nessuna schedina pronta.");
     } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
@@ -300,7 +301,7 @@ export default function AlloggiatiWebPage() {
         <ConfirmDialog
           title="Invio alla Questura"
           message={<>Stai per inviare <b className="text-txt">{readyCount}</b> {readyCount === 1 ? "schedina pronta" : "schedine pronte"} al Portale Alloggiati.</>}
-          warning={<>L&apos;invio è <b>definitivo</b>: una volta inviate non è possibile annullarle.{errCount > 0 ? ` Le ${errCount} schedine con errori/incomplete NON verranno inviate: correggile prima.` : ""}</>}
+          warning={<>L&apos;invio è <b>definitivo</b>: una volta inviate non è possibile annullarle.{errCount > 0 ? (errCount === 1 ? " La schedina con errori/incompleta NON verrà inviata: correggila prima." : ` Le ${errCount} schedine con errori/incomplete NON verranno inviate: correggile prima.`) : ""}</>}
           confirmLabel={`Invia ${readyCount} alla Questura`}
           busy={busy === "send"}
           onConfirm={async () => { await call("send", "send"); setConfirmSend(false); }}

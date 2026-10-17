@@ -9,13 +9,14 @@ import MediaImg from "@/components/MediaImg";
 import { eur } from "@/lib/format";
 import { effectiveClosed, rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { cityTaxOfBookingRaw } from "@/lib/booking";
-import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
+import { loadPlans, planApplies, planDepositPct, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import AdsConsent from "@/components/AdsConsent";
 import DateField from "@/components/DateField";
+import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { fmtDate, shiftISO, toISO } from "@/lib/dates";
 import { trackBookingConversion, resolveAdsConfig } from "@/lib/ads";
 import { loadPublicSite, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
@@ -32,6 +33,19 @@ const randomBookingCode = (len: number): string => {
 const addDays = shiftISO;
 const nightsBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
 
+// Prefisso del codice prenotazione dalla struttura (prime lettere del nome o dello slug): ogni struttura ha il suo, non uno fisso.
+const codePrefixOf = (name?: string, slug?: string): string => {
+  const letters = (name || slug || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3);
+  return letters.length >= 2 ? letters : "BKG";
+};
+// Email: controllo di forma (il server rifà i suoi controlli).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Riepilogo mostrato nella conferma; dopo il ritorno da Stripe può essere parziale (vedi la risposta di /api/stripe/book/confirm).
+type DoneSummary = { code?: string; structureName?: string; roomName?: string; ci?: string; co?: string; total?: number; cityTax?: number; deposit?: number; guestFirst?: string; guestLast?: string; adults?: number; children?: number; email?: string };
+const numOr = (v: unknown): number | undefined => (typeof v === "number" && isFinite(v) ? v : undefined);
+const strOr = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 type Plan = RatePlan;
 const DEFAULT_PLANS: Plan[] = [
   { id: "flex", name: "Flessibile", adjPct: 0, refundable: true, board: "Colazione", minStay: 1, cancelDays: 3, deposit: "none" },
@@ -40,7 +54,7 @@ const DEFAULT_PLANS: Plan[] = [
 ];
 
 const box = "rounded-xl border border-line bg-surface";
-const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-base text-txt outline-none focus:border-focus sm:text-sm";
 
 // Slug del sito pubblico (?site=<slug>) della pagina aperta.
 const siteFromUrl = (): string => { try { return (new URLSearchParams(window.location.search).get("site") || "").trim(); } catch { return ""; } };
@@ -78,6 +92,12 @@ export default function PrenotaPage() {
 // (niente header/footer, sfondo trasparente, comunica l'altezza al parent).
 export function Engine({ embed = false }: { embed?: boolean }) {
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, getStructure } = useData();
+  // Lingua della pagina: scelta a mano > ?lang= > lingua del browser > italiano.
+  const { lang, setLang, t } = useGuestLang();
+  const adultsTxt = (n: number) => `${n} ${n === 1 ? t("adulto") : t("adulti")}`;
+  const childrenTxt = (n: number) => `${n} ${n === 1 ? t("bambino") : t("bambini")}`;
+  const nightsTxt = (n: number) => `${n} ${n === 1 ? t("notte") : t("notti")}`;
+  const cancelLabel = (p: { refundable?: boolean; cancelDays?: number }) => !p.refundable ? t("Non rimborsabile") : p.cancelDays === 1 ? t("Cancellazione gratuita fino a 1 giorno prima") : p.cancelDays && p.cancelDays > 0 ? t("Cancellazione gratuita fino a {n} giorni prima", { n: p.cancelDays }) : t("Cancellazione gratuita");
 
   // Config salvata (piani, weekend) — fallback ai default.
   const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
@@ -117,7 +137,10 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const [bookError, setBookError] = useState<string | null>(null); // esito negativo dell'invio: la conferma NON va mostrata
   // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
   // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
-  const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; cityTax?: number; deposit: number; guestFirst?: string; guestLast?: string; adults?: number; children?: number; email?: string }>(null);
+  const [doneSummary, setDoneSummary] = useState<null | DoneSummary>(null);
+  // Ritorno da Stripe: "checking" = sto verificando il pagamento col server, "error" = la verifica non è riuscita (mai la conferma senza esito positivo).
+  const [ret, setRet] = useState<null | { phase: "checking" } | { phase: "error"; ref: string; err: string }>(null);
+  const [canceledNotice, setCanceledNotice] = useState(false);
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => {
@@ -134,7 +157,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const [sel, setSel] = useState<{ rtId: string; planId: string } | null>(null);
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
   const [guest, setGuest] = useState({ firstName: "", lastName: "", email: "", phone: "", address: "", city: "", country: "Italia", arrival: "Non lo so", requests: "" });
-  const [pay, setPay] = useState<"card" | "transfer" | "paypal">("card");
+  const [countryTouched, setCountryTouched] = useState(false); // il Paese "Italia" è solo il valore iniziale: se l'ospite non lo tocca non dice nulla sulla sua lingua
   const [privacy, setPrivacy] = useState(false);
   const [code, setCode] = useState("");
   // Codice sconto / promo
@@ -146,10 +169,10 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     setPromoErr("");
     if (!c) { setAppliedPromo(null); return; }
     const p = promos.find((x) => (x.code || "").toUpperCase() === c && !!x.discountPct);
-    if (!p) { setAppliedPromo(null); setPromoErr("Codice non valido."); return; }
-    if (p.validUntil && today > p.validUntil) { setAppliedPromo(null); setPromoErr("Offerta scaduta."); return; }
-    if (p.validFrom && checkIn < p.validFrom) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni dal ${fmtDate(p.validFrom)}.`); return; }
-    if (p.validTo && checkIn > p.validTo) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni fino al ${fmtDate(p.validTo)}.`); return; }
+    if (!p) { setAppliedPromo(null); setPromoErr(t("Codice non valido.")); return; }
+    if (p.validUntil && today > p.validUntil) { setAppliedPromo(null); setPromoErr(t("Offerta scaduta.")); return; }
+    if (p.validFrom && checkIn < p.validFrom) { setAppliedPromo(null); setPromoErr(t("Valida per soggiorni dal {date}.", { date: fmtDate(p.validFrom) })); return; }
+    if (p.validTo && checkIn > p.validTo) { setAppliedPromo(null); setPromoErr(t("Valida per soggiorni fino al {date}.", { date: fmtDate(p.validTo) })); return; }
     setAppliedPromo({ name: p.name, code: (p.code || "").toUpperCase(), pct: p.discountPct! });
   };
   // Applica automaticamente il codice arrivato dall'offerta (?promo=).
@@ -241,9 +264,15 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const discount = appliedPromo ? Math.round(accommodation * appliedPromo.pct / 100) : 0;
   const total = accommodation + extrasTotal + cityTax - discount;
   const depositPct = selPlan ? planDepositPct(selPlan) : 0; // acconto secondo la politica di incasso del piano
-  const deposit = Math.round(total * depositPct / 100);
+  // "Da pagare adesso" = % del piano su (soggiorno al netto dello sconto + extra), ai CENTESIMI. La tassa di soggiorno NON si addebita online: si paga in struttura
+  // (e' dentro "Totale" ma fuori da questa cifra). E' la stessa regola con cui /api/stripe/book calcola l'addebito, cosi' pagina e carta coincidono.
+  const payBase = Math.max(0, accommodation - discount) + extrasTotal;
+  const deposit = Math.round(payBase * depositPct) / 100;
 
-  const guestValid = guest.firstName.trim() && guest.lastName.trim() && guest.email.trim() && guest.phone.trim() && privacy;
+  const privacyHref = (() => { const u = (structure as { privacyUrl?: string } | undefined)?.privacyUrl; return u && /^https?:\/\//i.test(u) ? u : "/privacy"; })();
+  const emailOk = EMAIL_RE.test(guest.email.trim());
+  const phoneOk = guest.phone.replace(/\D/g, "").length >= 6;
+  const guestValid = !!(guest.firstName.trim() && guest.lastName.trim() && emailOk && phoneOk && privacy);
 
   // Stripe Checkout non si apre dentro un iframe: nella versione incorporata si naviga la finestra principale.
   const goToCheckout = (url: string) => {
@@ -275,24 +304,29 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     }
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
     const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", wantsCot ? "🍼 Culla richiesta" : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
-    const bkCode = `SPG-${new Date().getFullYear()}-${randomBookingCode(8)}`; // casuale: la vecchia somma dei caratteri produceva molte collisioni
+    const bkCode = `${codePrefixOf(structure?.name, publicSlug() || undefined)}-${new Date().getFullYear()}-${randomBookingCode(8)}`; // prefisso dalla struttura; parte casuale: la vecchia somma dei caratteri produceva molte collisioni
     // Sito PUBBLICO: prima si tenta il PAGAMENTO online (Stripe della struttura); la
     // prenotazione si registra solo dopo l'incasso. Se Stripe non è collegato o non è
     // previsto un importo, si registra direttamente ("paga in struttura").
     if (isPublicMode() && publicSlug()) {
       const token = (globalThis.crypto?.randomUUID?.() ?? String(Date.now()));
-      const guestBody = { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country };
+      // Lingua delle email: quella della pagina. Se il Paese è ancora il valore iniziale "Italia" e l'ospite usa un'altra lingua, non lo mando (direbbe "italiano").
+      const guestBody = { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: !countryTouched && lang !== "it" ? "" : guest.country.trim(), language: lang };
+      // Dati dell'ordine: il server ricalcola i prezzi e verifica extra (id/quantità sul listino del proprietario) e codice promo; qui passo solo ciò che l'ospite ha scelto.
+      const orderExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => ({ id: x.id, name: x.name, qty: extraQty[x.id] ?? 0, unitPrice: extraPrice(x), price: (extraQty[x.id] ?? 0) * extraPrice(x) }));
+      const order = { accommodation, discount, promoCode: appliedPromo?.code, extras: orderExtras, cityTax, grandTotal: total };
+      const stayTotal = Math.max(0, accommodation - discount); // soggiorno al netto dello sconto (extra e tassa viaggiano a parte)
       try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, cityTax, deposit, guestFirst: guest.firstName.trim(), guestLast: guest.lastName.trim(), adults, children, email: guest.email.trim() })); } catch {}
       setProcessing(true);
       let failure: string | null = null;
       try {
         const policy = { planName: selPlan?.name, refundable: !!selPlan?.refundable, cancelDays: selPlan?.cancelDays ?? 0 };
-        const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, token, guest: guestBody, ...policy }) });
+        const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges: children > 0 ? childAges : [], total: stayTotal, deposit, note, code: bkCode, token, guest: guestBody, lang, ...order, ...policy }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || j?.ok === false) failure = bookingErrorMessage(r.status, j?.error);
         else if (j?.payment && j?.url) { goToCheckout(j.url as string); return; } // → Stripe
         else {
-          const r2 = await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody, ...policy }) });
+          const r2 = await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges: children > 0 ? childAges : [], total: stayTotal, deposit, note, code: bkCode, guest: guestBody, lang, ...order, ...policy }) });
           const j2 = await r2.json().catch(() => ({}));
           if (!r2.ok || j2?.ok === false) failure = bookingErrorMessage(r2.status, j2?.error);
           else setNoOnlinePayment(true); // registrata senza incasso online: la conferma non deve dire "acconto pagato"
@@ -313,16 +347,59 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     window.scrollTo(0, 0);
   };
 
-  // Ritorno dal pagamento Stripe: verifica l'incasso, registra la prenotazione e mostra la conferma.
+  // Ritorno dal pagamento Stripe: la conferma compare SOLO dopo l'esito positivo di /api/stripe/book/confirm
+  // (che verifica l'incasso e registra la prenotazione). Riepilogo e codice arrivano dalla risposta del server; il sessionStorage è solo un ripiego.
+  const confirmReturn = async (sessId: string, slug: string) => {
+    setRet({ phase: "checking" });
+    let err = "";
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const r = await fetch("/api/stripe/book/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: sessId, slug }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.ok === true) {
+          let saved: DoneSummary = {};
+          try { const x = JSON.parse(sessionStorage.getItem("xn-lastbooking") || "null"); if (x && typeof x === "object") saved = x as DoneSummary; } catch {}
+          const bk = (j.booking && typeof j.booking === "object" ? j.booking : {}) as Record<string, unknown>;
+          const srvCode = strOr(bk.code) ?? strOr(j.code);
+          if (srvCode && saved.code && saved.code !== srvCode) saved = {}; // il riepilogo salvato è di un altro tentativo
+          const merged: DoneSummary = {
+            code: srvCode ?? saved.code,
+            structureName: strOr(bk.structureName) ?? saved.structureName,
+            roomName: strOr(bk.roomName) ?? saved.roomName,
+            ci: strOr(bk.ci) ?? strOr(bk.checkIn) ?? saved.ci,
+            co: strOr(bk.co) ?? strOr(bk.checkOut) ?? saved.co,
+            total: numOr(bk.grandTotal) ?? saved.total ?? numOr(bk.total),
+            cityTax: numOr(bk.cityTax) ?? saved.cityTax,
+            deposit: numOr(bk.paid) ?? numOr(bk.deposit) ?? saved.deposit,
+            guestFirst: strOr(bk.guestFirst) ?? saved.guestFirst,
+            guestLast: strOr(bk.guestLast) ?? saved.guestLast,
+            adults: numOr(bk.adults) ?? saved.adults,
+            children: numOr(bk.children) ?? saved.children,
+            email: strOr(bk.email) ?? saved.email,
+          };
+          setDoneSummary(merged);
+          if (merged.code) setCode(merged.code);
+          setRet(null); setStep("done"); window.scrollTo(0, 0);
+          try { sessionStorage.removeItem("xn-lastbooking"); } catch {}
+          try { window.history.replaceState({}, "", `/prenota?site=${encodeURIComponent(slug)}`); } catch {}
+          return;
+        }
+        err = String(j?.error || r.status);
+        if (j?.error === "not_paid" && attempt < 3) { await sleep(2500); continue; } // l'incasso può arrivare qualche secondo dopo il ritorno
+        if (!r.ok && (r.status >= 500 || r.status === 409) && attempt < 3) { await sleep(2000); continue; } // guasto transitorio (5xx, 409 write_conflict): si ritenta
+        break;
+      } catch {
+        err = "network";
+        if (attempt < 3) { await sleep(2000); continue; }
+      }
+    }
+    setRet({ phase: "error", ref: sessId.slice(-8), err });
+  };
   useEffect(() => {
     const u = new URL(window.location.href);
+    if (u.searchParams.get("canceled") === "1") setCanceledNotice(true);
     if (u.searchParams.get("paid") === "1" && u.searchParams.get("session_id")) {
-      const sessId = u.searchParams.get("session_id") as string;
-      const slug = u.searchParams.get("site") || publicSlug() || "";
-      try { const s = JSON.parse(sessionStorage.getItem("xn-lastbooking") || "null"); if (s && s.code) { setDoneSummary(s); setCode(s.code); } } catch {}
-      setStep("done"); window.scrollTo(0, 0);
-      fetch("/api/stripe/book/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: sessId, slug }) })
-        .finally(() => { try { window.history.replaceState({}, "", `/prenota?site=${encodeURIComponent(slug)}`); } catch {} });
+      void confirmReturn(u.searchParams.get("session_id") as string, u.searchParams.get("site") || publicSlug() || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -364,47 +441,49 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     return () => { ro?.disconnect(); timers.forEach((t) => window.clearTimeout(t)); window.removeEventListener("resize", send); };
   }, [embed]);
 
-  // Riepilogo prenotazione (per email e PDF).
-  // Dopo il ritorno da Stripe il modulo è perso: i valori vengono dal riepilogo salvato (doneSummary), come nella schermata finale.
+  // Riepilogo prenotazione (per PDF).
+  // Dopo il ritorno da Stripe il modulo è perso: i valori vengono SOLO dal riepilogo (risposta del server), come nella schermata finale.
   const bookingLines = () => {
     const ds = doneSummary;
-    const bCode = ds?.code || code;
-    const bTotal = ds?.total ?? total;
-    const bDeposit = noOnlinePayment ? 0 : (ds?.deposit ?? deposit);
-    const bAdults = ds?.adults ?? adults, bChildren = ds?.children ?? children;
+    const bCode = ds ? ds.code : code;
+    const bTotal = ds ? ds.total ?? 0 : total;
+    const bDeposit = noOnlinePayment ? 0 : (ds ? ds.deposit ?? 0 : deposit);
+    const bPayable = Math.max(0, bTotal - (ds ? ds.cityTax ?? 0 : cityTax)); // quanto si puo' pagare online: la tassa di soggiorno si salda in struttura
+    const bAdults = ds ? ds.adults ?? adults : adults, bChildren = ds ? ds.children ?? 0 : children;
     const bGuest = ds ? `${ds.guestFirst ?? ""} ${ds.guestLast ?? ""}`.trim() : `${guest.firstName} ${guest.lastName}`.trim();
     return ([
-      ["Codice prenotazione", bCode],
-      ["Struttura", ds?.structureName || structure?.name || ""],
-      ["Camera", ds?.roomName || `${selRt?.name ?? ""}${selPlan ? " · " + selPlan.name : ""}`],
-      ["Ospite", bGuest],
-      ["Check-in", fmtDate(ds?.ci || checkIn)],
-      ["Check-out", fmtDate(ds?.co || checkOut)],
-      ["Ospiti", `${bAdults} adulti${bChildren ? ` · ${bChildren} bambini` : ""}`],
-      ["Totale", eur(bTotal)],
-      ...((bDeposit > 0 && bDeposit < bTotal
-        ? [["Acconto versato", eur(bDeposit)], ["Saldo in struttura", eur(bTotal - bDeposit)]]
-        : bDeposit >= bTotal && bDeposit > 0
-          ? [["Importo pagato", eur(bDeposit)]]
-          : [["Saldo in struttura", eur(bTotal)]]) as [string, string][]),
+      [t("Codice prenotazione"), bCode ?? ""],
+      [t("Struttura"), (ds ? ds.structureName : undefined) || structure?.name || ""],
+      [t("Camera"), ds ? ds.roomName || "" : `${selRt?.name ?? ""}${selPlan ? " · " + selPlan.name : ""}`],
+      [t("Ospite"), bGuest],
+      [t("Check-in"), fmtDate(ds ? ds.ci : checkIn)],
+      [t("Check-out"), fmtDate(ds ? ds.co : checkOut)],
+      [t("Ospiti"), `${adultsTxt(bAdults)}${bChildren ? ` · ${childrenTxt(bChildren)}` : ""}`],
+      [t("Totale"), eur(bTotal)],
+      ...((bDeposit > 0 && bDeposit < bPayable
+        ? [[t("Acconto versato"), eur(bDeposit)], [t("Saldo in struttura"), eur(bTotal - bDeposit)]]
+        : bDeposit > 0
+          ? [[t("Importo pagato"), eur(bDeposit)], ...(bTotal - bDeposit > 0.005 ? [[t("Saldo in struttura"), eur(bTotal - bDeposit)]] : [])]
+          : [[t("Saldo in struttura"), eur(bTotal)]]) as [string, string][]),
     ] as [string, string][]);
   };
 
   const printPdf = () => {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
-    const rows = bookingLines().map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`).join("");
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Prenotazione ${doneSummary?.code || code}</title>
+    const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+    const rows = bookingLines().map(([k, v]) => `<tr><td class="k">${esc(k)}</td><td class="v">${esc(v)}</td></tr>`).join("");
+    w.document.write(`<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(t("Prenotazione"))} ${esc(doneSummary ? doneSummary.code : code)}</title>
       <style>*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:48px 54px;font-size:14px;line-height:1.55}
       .brand{font-size:24px;font-weight:700;color:#4f46e5;border-bottom:3px solid #4f46e5;padding-bottom:14px;margin-bottom:24px}
       h1{font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#5c6479;margin:0 0 16px}
       table{width:100%;border-collapse:collapse}td{padding:10px 4px;border-bottom:1px solid #e3e6ef}td.k{color:#5c6479}td.v{text-align:right;font-weight:600}
       .note{margin-top:28px;font-size:11px;color:#9aa2b6;border-top:1px solid #e3e6ef;padding-top:14px}
       @media print{body{padding:24px 30px}}</style></head><body>
-      <div class="brand">${structure?.name ?? "Xenora"}</div>
-      <h1>Conferma di prenotazione</h1>
+      <div class="brand">${esc((doneSummary ? doneSummary.structureName : undefined) || structure?.name || "Xenora")}</div>
+      <h1>${esc(t("Conferma di prenotazione"))}</h1>
       <table>${rows}</table>
-      <div class="note">Documento di riepilogo prenotazione. Prenotazione diretta · Xenora.</div>
+      <div class="note">${esc(t("Documento di riepilogo prenotazione. Prenotazione diretta · Xenora."))}</div>
       <script>window.onload=function(){window.print()}<\/script></body></html>`);
     w.document.close();
   };
@@ -421,16 +500,16 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const header = (
     <div className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-        <a href={homeHref} className="flex items-center gap-2 rounded-lg transition hover:opacity-80" title="Torna alla home">
-          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
-          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">← Torna alla home</div></div>
+        <a href={homeHref} className="flex items-center gap-2 rounded-lg transition hover:opacity-80" title={t("Torna alla home")}>
+          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
+          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">← {t("Torna alla home")}</div></div>
         </a>
         {structures.length > 1 && step === "rooms" && (
           <select value={structureId} onChange={(e) => { setStructureId(e.target.value); setSel(null); }} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
-        <div className="ml-auto flex items-center gap-2 rounded-full bg-wash px-3 py-1.5 text-sm"><span className="text-dim">Totale</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
+        <div className="ml-auto flex items-center gap-2 rounded-full bg-wash px-3 py-1.5 text-sm"><span className="text-dim">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
       </div>
     </div>
   );
@@ -441,7 +520,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
       <div className="mx-auto max-w-7xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <a href={homeHref} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
-            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
             {structure?.name ?? "Xenora"}
           </a>
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
@@ -456,8 +535,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
-          <span>© {new Date().getFullYear()} {structure?.name ?? "Xenora"}. Tutti i diritti riservati.</span>
-          <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
+          <span>{t("© {year} {name}. Tutti i diritti riservati.", { year: new Date().getFullYear(), name: structure?.name ?? "Xenora" })}</span>
+          <span>{t("Sito creato dal gruppo")} <b className="text-dim">Xenora</b> · {t("Prenotazione online sicura")}</span>
         </div>
       </div>
     </footer>
@@ -467,59 +546,104 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const searchBar = (
     <div className={`${box} mb-4 p-3`}>
       <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
-        <label className="block text-xs font-medium text-dim">Arrivo<DateField value={checkIn} min={today} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(addDays(v, 1)); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
-        <label className="block text-xs font-medium text-dim">Partenza<DateField value={checkOut} min={addDays(checkIn, 1)} onChange={(v) => { setCheckOut(v); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
-        <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
-        <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
-        <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg bg-focus px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Verifica disponibilità</button>
+        <label className="block text-xs font-medium text-dim">{t("Arrivo")}<DateField lang={lang} value={checkIn} min={today} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(addDays(v, 1)); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
+        <label className="block text-xs font-medium text-dim">{t("Partenza")}<DateField lang={lang} value={checkOut} min={addDays(checkIn, 1)} onChange={(v) => { setCheckOut(v); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
+        <label className="block text-xs font-medium text-dim">{t("Adulti")}<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
+        <label className="block text-xs font-medium text-dim">{t("Bambini")}<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
+        <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg bg-focus px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">{t("Verifica disponibilità")}</button>
       </div>
       {children > 0 && (
         <div className="mt-2">
-          <div className="mb-1 text-[11px] font-medium text-dim">Età dei bambini <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></div>
+          <div className="mb-1 text-[11px] font-medium text-dim">{t("Età dei bambini")} <span className="text-faint">{t("(per la tassa di soggiorno e la sistemazione)")}</span></div>
           <div className="flex flex-wrap gap-2">
             {childAges.map((age, i) => (
-              <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">Bimbo {i + 1}
-                <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+              <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">{t("Bimbo {n}", { n: i + 1 })}
+                <input type="number" inputMode="numeric" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-base text-txt outline-none focus:border-focus sm:text-sm" />
               </label>
             ))}
           </div>
           <label className="mt-2 flex w-fit items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-medium text-txt">
-            <input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Culla per il bimbo <span className="font-normal text-faint">(gratuita, su richiesta)</span>
+            <input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Culla per il bimbo")} <span className="font-normal text-faint">{t("(gratuita, su richiesta)")}</span>
           </label>
         </div>
       )}
-      <div className="mt-2 text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>
+      <div className="mt-2 text-xs text-dim">{nightsTxt(nights)} · {adultsTxt(adults)}{children ? ` · ${childrenTxt(children)}` : ""}</div>
     </div>
   );
 
-  if (step === "done") {
-    const dCode = doneSummary?.code || code;
-    const dStruct = doneSummary?.structureName || structure?.name;
-    const dRoom = doneSummary?.roomName || selRt?.name;
-    const dCi = doneSummary?.ci || checkIn, dCo = doneSummary?.co || checkOut;
-    const dTotal = doneSummary?.total ?? total, dDeposit = noOnlinePayment ? 0 : (doneSummary?.deposit ?? deposit);
-    const dFirst = doneSummary?.guestFirst || guest.firstName, dEmail = doneSummary?.email || guest.email;
+  // Ritorno da Stripe: finché il server non conferma l'incasso NON si mostra "Prenotazione confermata".
+  if (ret) {
     return (
       <div className={embed ? "flex flex-col" : "flex min-h-dvh flex-col bg-wash"}>
         {!embed && header}
         <div className={`mx-auto w-full max-w-2xl flex-1 ${embed ? "px-3 py-5" : "px-4 py-10"}`}>
+          <div className="mb-3 flex justify-end"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
+          {ret.phase === "checking" ? (
+            <div className={`${box} p-8 text-center`} role="status">
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--line)] border-t-[color:var(--focus)]" aria-hidden />
+              <h1 className="font-display text-xl font-bold text-txt">{t("Stiamo verificando il pagamento…")}</h1>
+              <p className="mt-1 text-sm text-dim">{t("Ci vuole qualche secondo: non chiudere questa pagina.")}</p>
+            </div>
+          ) : (
+            <div className={`${box} p-8 text-center`} role="alert">
+              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full text-2xl font-bold text-white" style={{ backgroundColor: "var(--warn)" }}>!</div>
+              <h1 className="font-display text-xl font-bold text-txt">{t("Non riusciamo ancora a confermare la prenotazione")}</h1>
+              <p className="mt-2 text-sm text-dim">{t("Il pagamento potrebbe essere andato a buon fine, ma non abbiamo ancora potuto registrare la prenotazione. Non pagare di nuovo: riprova tra un istante oppure contatta la struttura indicando questo riferimento.")}</p>
+              <p className="mt-2 font-mono text-sm font-bold text-txt">{ret.ref}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button onClick={() => { const u = new URL(window.location.href); const sid = u.searchParams.get("session_id"); if (sid) void confirmReturn(sid, u.searchParams.get("site") || publicSlug() || ""); }} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Riprova")}</button>
+                {structure?.phone && <a href={`tel:${structure.phone}`} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt">{structure.phone}</a>}
+                {structure?.email && <a href={`mailto:${structure.email}`} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt">{structure.email}</a>}
+              </div>
+            </div>
+          )}
+        </div>
+        {!embed && footer}
+      </div>
+    );
+  }
+
+  if (step === "done") {
+    // Dopo Stripe contano SOLO i dati del riepilogo (risposta del server / sessionStorage): lo stato del form è perso e non va mai mostrato come se fosse la prenotazione.
+    const ds = doneSummary;
+    const dCode = ds ? ds.code : code;
+    const dStruct = (ds ? ds.structureName : undefined) || structure?.name;
+    const dRoom = ds ? ds.roomName : selRt?.name;
+    const dCi = ds ? ds.ci : checkIn, dCo = ds ? ds.co : checkOut;
+    const dTotal = ds ? ds.total ?? 0 : total;
+    const dDeposit = noOnlinePayment ? 0 : (ds ? ds.deposit ?? 0 : deposit);
+    const dPayable = Math.max(0, dTotal - (ds ? ds.cityTax ?? 0 : cityTax)); // tassa di soggiorno esclusa: si salda in struttura
+    const dFirst = ((ds ? ds.guestFirst : guest.firstName) || "").trim();
+    const dEmail = (ds ? ds.email : guest.email) || "";
+    const hasDetails = !!(dCode && dCi && dCo && dTotal > 0);
+    return (
+      <div className={embed ? "flex flex-col" : "flex min-h-dvh flex-col bg-wash"}>
+        {!embed && header}
+        <div className={`mx-auto w-full max-w-2xl flex-1 ${embed ? "px-3 py-5" : "px-4 py-10"}`}>
+          <div className="mb-3 flex justify-end"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
           <div className={`${box} p-8 text-center`}>
             <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full text-white" style={{ backgroundColor: "var(--ok)" }}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg></div>
-            <h1 className="font-display text-2xl font-bold text-txt">Prenotazione confermata!</h1>
-            <p className="mt-1 text-sm text-dim">Grazie {dFirst}. Ti abbiamo inviato la conferma a <b className="text-txt">{dEmail}</b>.</p>
-            <div className="mx-auto mt-5 max-w-sm rounded-xl border border-line bg-wash p-4 text-left text-sm">
-              <div className="flex justify-between"><span className="text-dim">Codice</span><span className="font-mono font-bold text-txt">{dCode}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Struttura</span><span className="text-txt">{dStruct}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Camera</span><span className="text-txt">{dRoom}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{fmtDate(dCi)} → {fmtDate(dCo)}</span></div>
-              <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(dTotal)}</span></div>
-              {dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">{dDeposit < dTotal ? "Acconto pagato" : "Importo pagato"}</span><span className="font-mono text-txt">{eur(dDeposit)}</span></div>}
-              {dTotal - dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(dTotal - dDeposit)}</span></div>}
-            </div>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <button onClick={printPdf} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> Scarica PDF</button>
-            </div>
-            <p className="mt-4 text-xs text-faint">Conferma inviata via email in automatico. Puoi scaricare il PDF con tutti i dettagli. La prenotazione è entrata nel gestionale della struttura (calendario, cassa e registro attività).</p>
+            <h1 className="font-display text-2xl font-bold text-txt">{hasDetails ? t("Prenotazione confermata!") : t("Pagamento ricevuto")}</h1>
+            <p className="mt-1 text-sm text-dim">{hasDetails && dFirst && dEmail
+              ? <>{t("Grazie {name}. Ti abbiamo inviato la conferma a", { name: dFirst })} <b className="text-txt">{dEmail}</b>.</>
+              : t("Grazie! Ti abbiamo inviato la conferma via email. Se non la trovi, controlla la posta indesiderata o contatta la struttura.")}</p>
+            {hasDetails && (
+              <div className="mx-auto mt-5 max-w-sm rounded-xl border border-line bg-wash p-4 text-left text-sm">
+                <div className="flex justify-between gap-3"><span className="text-dim">{t("Codice")}</span><span className="font-mono font-bold text-txt">{dCode}</span></div>
+                {dStruct && <div className="mt-1 flex justify-between gap-3"><span className="text-dim">{t("Struttura")}</span><span className="text-right text-txt">{dStruct}</span></div>}
+                {dRoom && <div className="mt-1 flex justify-between gap-3"><span className="text-dim">{t("Camera")}</span><span className="text-right text-txt">{dRoom}</span></div>}
+                <div className="mt-1 flex justify-between gap-3"><span className="text-dim">{t("Soggiorno")}</span><span className="text-txt">{fmtDate(dCi)} → {fmtDate(dCo)}</span></div>
+                <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(dTotal)}</span></div>
+                {dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">{dDeposit < dPayable ? t("Acconto pagato") : t("Importo pagato")}</span><span className="font-mono text-txt">{eur(dDeposit)}</span></div>}
+                {dTotal - dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">{t("Saldo in struttura")}</span><span className="font-mono text-txt">{eur(dTotal - dDeposit)}</span></div>}
+              </div>
+            )}
+            {hasDetails && (
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <button onClick={printPdf} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> {t("Scarica PDF")}</button>
+              </div>
+            )}
+            <p className="mt-4 text-xs text-faint">{hasDetails ? t("Conferma inviata via email. Puoi scaricare il PDF con tutti i dettagli della prenotazione.") : t("Per qualsiasi dubbio contatta la struttura.")}</p>
           </div>
         </div>
         {!embed && footer}
@@ -533,19 +657,21 @@ export function Engine({ embed = false }: { embed?: boolean }) {
       <div className={`mx-auto w-full max-w-7xl flex-1 ${embed ? "px-3 py-4" : "px-4 py-6"}`}>
         {step === "rooms" && (
           <>
-            <h1 className="mb-3 font-display text-xl font-bold text-txt">Verifica disponibilità</h1>
+            <div className="mb-3 flex justify-end"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
+            {canceledNotice && <div role="status" className="mb-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>{t("Pagamento annullato: la prenotazione non è stata registrata e non è stato addebitato nulla.")}</div>}
+            <h1 className="mb-3 font-display text-xl font-bold text-txt">{t("Verifica disponibilità")}</h1>
             {searchBar}
             {!searched && (
               <div className={`${box} p-8 text-center`}>
-                <p className="text-sm text-dim">Seleziona date e ospiti, poi premi <b className="text-txt">Verifica disponibilità</b> per vedere le camere.</p>
+                <p className="text-sm text-dim">{t("Seleziona date e ospiti, poi premi")} <b className="text-txt">{t("Verifica disponibilità")}</b> {t("per vedere le camere.")}</p>
               </div>
             )}
             {searched && (
             <div className={`${box} mb-3 flex flex-wrap items-center gap-2 p-3`}>
-              <span className="text-sm font-medium text-dim">Hai un codice sconto?</span>
-              <input value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoErr(""); }} placeholder="CODICE" className="w-40 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm uppercase text-txt outline-none focus:border-focus" />
-              <button onClick={() => applyPromoCode()} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus hover:bg-wash">Applica</button>
-              {appliedPromo && <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ok)" }}>✓ {appliedPromo.name || appliedPromo.code} · −{appliedPromo.pct}%<button onClick={() => { setAppliedPromo(null); setPromoInput(""); }} className="text-xs font-normal text-faint hover:text-[color:var(--err)]">rimuovi</button></span>}
+              <span className="text-sm font-medium text-dim">{t("Hai un codice sconto?")}</span>
+              <input value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoErr(""); }} placeholder={t("CODICE")} className="w-40 rounded-lg border border-line bg-paper px-3 py-1.5 text-base uppercase text-txt outline-none focus:border-focus sm:text-sm" />
+              <button onClick={() => applyPromoCode()} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus hover:bg-wash">{t("Applica")}</button>
+              {appliedPromo && <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ok)" }}>✓ {appliedPromo.name || appliedPromo.code} · −{appliedPromo.pct}%<button onClick={() => { setAppliedPromo(null); setPromoInput(""); }} className="text-xs font-normal text-faint hover:text-[color:var(--err)]">{t("rimuovi")}</button></span>}
               {promoErr && <span className="text-sm text-[color:var(--err)]">{promoErr}</span>}
             </div>
             )}
@@ -565,13 +691,13 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="font-display text-lg font-bold text-txt">{rt.name}</div>
-                            <div className="text-xs text-dim">{rt.beds} letti · fino a {rt.maxOccupancy ?? rt.beds} ospiti{rt.size ? ` · ${rt.size} m²` : ""}</div>
+                            <div className="text-xs text-dim">{rt.beds} {rt.beds === 1 ? t("letto") : t("letti")} · {t("fino a")} {rt.maxOccupancy ?? rt.beds} {(rt.maxOccupancy ?? rt.beds) === 1 ? t("ospite") : t("ospiti")}{rt.size ? ` · ${rt.size} m²` : ""}</div>
                             {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap items-center gap-2 text-dim">{(rt.amenities ?? []).slice(0, 8).map((a) => <span key={a} title={a} aria-label={a}>{amenityIcon(a)}</span>)}</div>}
                           </div>
                           <div className="text-right">
-                            <div className="text-[11px] text-faint">da</div>
+                            <div className="text-[11px] text-faint">{t("da")}</div>
                             <div className="font-mono text-xl font-bold text-txt">{Number.isFinite(cheapest) ? eur(cheapest) : "—"}</div>
-                            <div className="text-[11px] text-faint">{nights} {nights === 1 ? "notte" : "notti"}</div>
+                            <div className="text-[11px] text-faint">{nightsTxt(nights)}</div>
                           </div>
                         </div>
                         {/* Opzioni: varianti (madre + derivate) × piani */}
@@ -581,17 +707,17 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                               <div key={v.id} className="overflow-hidden rounded-lg border border-line">
                                 {hasDeriv && (
                                   <div className="flex items-center justify-between gap-2 bg-wash px-3 py-1.5">
-                                    <span className="text-xs font-semibold text-txt">{v.deriveFrom ? v.name : "Standard"} <span className="font-normal text-faint">· fino a {v.maxOccupancy ?? v.beds} ospiti</span></span>
-                                    {v.deriveFrom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>variante</span>}
+                                    <span className="text-xs font-semibold text-txt">{v.deriveFrom ? v.name : "Standard"} <span className="font-normal text-faint">· {t("fino a")} {v.maxOccupancy ?? v.beds} {(v.maxOccupancy ?? v.beds) === 1 ? t("ospite") : t("ospiti")}</span></span>
+                                    {v.deriveFrom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("variante")}</span>}
                                   </div>
                                 )}
                                 <div className="flex flex-col divide-y divide-[color:var(--line)]">
                                   {offers.map(({ p, price }) => (
                                     <div key={p.id} className="flex items-center justify-between px-3 py-2">
-                                      <div><span className="text-sm font-medium text-txt">{p.name}</span> <span className="text-[11px] text-faint">· {p.board} · {cancelText(p)}{planDepositPct(p) === 0 ? " · nessun anticipo" : planDepositPct(p) === 100 ? " · prepagato" : ` · acconto ${planDepositPct(p)}%`}</span></div>
+                                      <div><span className="text-sm font-medium text-txt">{t(p.name)}</span> <span className="text-[11px] text-faint">· {t(p.board)} · {cancelLabel(p)}{planDepositPct(p) === 0 ? ` · ${t("nessun anticipo")}` : planDepositPct(p) === 100 ? ` · ${t("prepagato")}` : ` · ${t("acconto {pct}%", { pct: planDepositPct(p) })}`}</span></div>
                                       <div className="flex items-center gap-3">
                                         <span className="font-mono text-sm font-bold text-txt">{eur(price)}</span>
-                                        <button onClick={() => { setSel({ rtId: v.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Scegli</button>
+                                        <button onClick={() => { setSel({ rtId: v.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Scegli")}</button>
                                       </div>
                                     </div>
                                   ))}
@@ -600,22 +726,22 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                             ))}
                           </div>
                         ) : (
-                          <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">{tooSmall ? "Capienza insufficiente per il numero di ospiti." : noRate ? "Tariffa non ancora disponibile per queste date." : "Non disponibile per le date scelte."}</div>
+                          <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">{tooSmall ? t("Capienza insufficiente per il numero di ospiti.") : noRate ? t("Tariffa non ancora disponibile per queste date.") : t("Non disponibile per le date scelte.")}</div>
                         )}
                       </div>
                     </div>
                   </div>
                 );
               })}
-              {types.length === 0 && <div className={`${box} p-6 text-center text-sm text-faint`}>Nessuna camera configurata per questa struttura.</div>}
+              {types.length === 0 && <div className={`${box} p-6 text-center text-sm text-faint`}>{t("Nessuna camera configurata per questa struttura.")}</div>}
               {allSoldOut && sibling && (
                 <div className={`${box} overflow-hidden`} style={{ borderColor: "var(--focus)", borderWidth: 2 }}>
                   <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
                     <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>🏠</div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-txt">{structure?.name ?? "Questa struttura"} è al completo per queste date</div>
+                      <div className="text-sm font-semibold text-txt">{t("{name} è al completo per queste date", { name: structure?.name ?? t("Questa struttura") })}</div>
                       <div className="mt-0.5 text-sm text-dim">
-                        Ma <b className="text-txt">{sibling.name}</b>{sibling.zone ? ` (${sibling.zone})` : sibling.city ? ` (${sibling.city})` : ""}, un&apos;altra struttura dello stesso gestore, ha disponibilità per le stesse date.
+                        {t("Ma")} <b className="text-txt">{sibling.name}</b>{sibling.zone ? ` (${sibling.zone})` : sibling.city ? ` (${sibling.city})` : ""}, {t("un'altra struttura dello stesso gestore, ha disponibilità per le stesse date.")}
                       </div>
                     </div>
                     <a
@@ -624,7 +750,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                       rel={embed ? "noreferrer" : undefined}
                       className="shrink-0 rounded-lg bg-focus px-4 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
                     >
-                      Vedi disponibilità →
+                      {t("Vedi disponibilità →")}
                     </a>
                   </div>
                 </div>
@@ -634,8 +760,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                   <div className="flex items-start gap-3 p-4">
                     <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>🏠</div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-txt">{structure?.name ?? "Questa struttura"} è al completo per queste date</div>
-                      <div className="mt-0.5 text-sm text-dim">Altre strutture su Xenora hanno disponibilità per le stesse date:</div>
+                      <div className="text-sm font-semibold text-txt">{t("{name} è al completo per queste date", { name: structure?.name ?? t("Questa struttura") })}</div>
+                      <div className="mt-0.5 text-sm text-dim">{t("Altre strutture su Xenora hanno disponibilità per le stesse date:")}</div>
                       <div className="mt-3 flex flex-col gap-2">
                         {networkAlts.map((alt) => (
                           <div key={alt.slug} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-wash px-3 py-2">
@@ -646,7 +772,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                               rel={embed ? "noreferrer" : undefined}
                               className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-center text-xs font-semibold text-white hover:opacity-90"
                             >
-                              Vedi disponibilità →
+                              {t("Vedi disponibilità →")}
                             </a>
                           </div>
                         ))}
@@ -661,36 +787,37 @@ export function Engine({ embed = false }: { embed?: boolean }) {
 
         {step === "checkout" && selRt && selPlan && (
           <div>
-            <button onClick={() => setStep("rooms")} className="mb-3 text-sm font-medium text-focus hover:underline">← Cambia camera</button>
+            <button onClick={() => setStep("rooms")} className="mb-3 text-sm font-medium text-focus hover:underline">← {t("Cambia camera")}</button>
             <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
             <div className="flex flex-col gap-4">
 
               {/* Dati ospite */}
               <div className={`${box} p-4`}>
-                <h2 className="mb-3 font-display text-lg font-bold text-txt">Dettagli ospite</h2>
+                <div className="mb-3 flex justify-end"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
+                <h2 className="mb-3 font-display text-lg font-bold text-txt">{t("Dettagli ospite")}</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-dim">Nome *<input value={guest.firstName} onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Cognome *<input value={guest.lastName} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Telefono *<input value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} className={`${field} mt-1`} placeholder="+39…" /></label>
-                  <label className="block text-xs font-medium text-dim">Email *<input value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Città<input value={guest.city} onChange={(e) => setGuest({ ...guest, city: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Nazione<input value={guest.country} onChange={(e) => setGuest({ ...guest, country: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">{t("Nome")} *<input value={guest.firstName} maxLength={60} autoComplete="given-name" onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">{t("Cognome")} *<input value={guest.lastName} maxLength={60} autoComplete="family-name" onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">{t("Telefono")} *<input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} className={`${field} mt-1`} placeholder="+39…" />{guest.phone.trim() && !phoneOk && <span className="mt-1 block text-[11px]" style={{ color: "var(--err)" }}>{t("Inserisci un numero di telefono valido.")}</span>}</label>
+                  <label className="block text-xs font-medium text-dim">Email *<input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" maxLength={120} value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} className={`${field} mt-1`} />{guest.email.trim() && !emailOk && <span className="mt-1 block text-[11px]" style={{ color: "var(--err)" }}>{t("Inserisci un indirizzo email valido.")}</span>}</label>
+                  <label className="block text-xs font-medium text-dim">{t("Città")}<input value={guest.city} maxLength={60} autoComplete="address-level2" onChange={(e) => setGuest({ ...guest, city: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">{t("Nazione")}<input value={guest.country} maxLength={60} autoComplete="country-name" onChange={(e) => { setCountryTouched(true); setGuest({ ...guest, country: e.target.value }); }} className={`${field} mt-1`} /></label>
                 </div>
-                <label className="mt-3 block text-xs font-medium text-dim">Orario di arrivo previsto<select value={guest.arrival} onChange={(e) => setGuest({ ...guest, arrival: e.target.value })} className={`${field} mt-1`}>{["Non lo so", "12:00-14:00", "14:00-16:00", "16:00-18:00", "18:00-20:00", "dopo le 20:00"].map((o) => <option key={o} value={o}>{o}</option>)}</select></label>
-                <label className="mt-3 block text-xs font-medium text-dim">Richieste speciali<textarea value={guest.requests} onChange={(e) => setGuest({ ...guest, requests: e.target.value })} rows={2} className={`${field} mt-1 resize-y`} placeholder="Le richieste non sono garantite ma faremo il possibile." /></label>
+                <label className="mt-3 block text-xs font-medium text-dim">{t("Orario di arrivo previsto")}<select value={guest.arrival} onChange={(e) => setGuest({ ...guest, arrival: e.target.value })} className={`${field} mt-1`}>{["Non lo so", "12:00-14:00", "14:00-16:00", "16:00-18:00", "18:00-20:00", "dopo le 20:00"].map((o) => <option key={o} value={o}>{o === "Non lo so" ? t("Non lo so") : o === "dopo le 20:00" ? t("dopo le 20:00") : o}</option>)}</select></label>
+                <label className="mt-3 block text-xs font-medium text-dim">{t("Richieste speciali")}<textarea value={guest.requests} maxLength={500} onChange={(e) => setGuest({ ...guest, requests: e.target.value })} rows={2} className={`${field} mt-1 resize-y`} placeholder={t("Le richieste non sono garantite ma faremo il possibile.")} /></label>
               </div>
 
               {/* Servizi extra */}
               <div className={`${box} p-4`}>
-                <h2 className="mb-1 font-display text-lg font-bold text-txt">Servizi extra</h2>
-                <p className="mb-3 text-xs text-dim">Migliora il soggiorno aggiungendo i nostri servizi.</p>
+                <h2 className="mb-1 font-display text-lg font-bold text-txt">{t("Servizi extra")}</h2>
+                <p className="mb-3 text-xs text-dim">{t("Migliora il soggiorno aggiungendo i nostri servizi.")}</p>
                 <div className="flex flex-col divide-y divide-[color:var(--line)]">
                   {extras.map((x) => (
                     <div key={x.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-txt">{x.name}</div>
                         {x.desc && <div className="text-[11px] text-faint">{x.desc}</div>}
-                        <div className="mt-0.5 text-xs text-dim">{eur(x.price)} {x.per === "night" ? "a notte" : x.per === "person" ? "a persona" : x.per === "day" ? "a giornata" : "a soggiorno"}</div>
+                        <div className="mt-0.5 text-xs text-dim">{eur(x.price)} {x.per === "night" ? t("a notte") : x.per === "person" ? t("a persona") : x.per === "day" ? t("a giornata") : t("a soggiorno")}</div>
                       </div>
                       <Stepper value={extraQty[x.id] ?? 0} min={0} compact onChange={(v) => setExtraQty((q) => ({ ...q, [x.id]: v }))} />
                     </div>
@@ -700,27 +827,22 @@ export function Engine({ embed = false }: { embed?: boolean }) {
 
               {/* Pagamento */}
               <div className={`${box} p-4`}>
-                <h2 className="mb-3 font-display text-lg font-bold text-txt">Modalità di pagamento</h2>
-                <div className="grid grid-cols-3 gap-2">
-                  {([["card", "Carta di credito"], ["transfer", "Bonifico"], ["paypal", "PayPal"]] as const).map(([k, label]) => (
-                    <button key={k} onClick={() => setPay(k)} className={`rounded-lg border p-3 text-center text-sm font-medium transition ${pay === k ? "border-focus ring-1 ring-[color:var(--focus)] text-txt" : "border-line text-dim hover:bg-wash"}`}>{label}</button>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs text-dim">{deposit <= 0
-                  ? <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>
+                <h2 className="mb-3 font-display text-lg font-bold text-txt">{t("Pagamento")}</h2>
+                <p className="text-xs text-dim">{deposit <= 0
+                  ? t("Nessun acconto richiesto: l'intero importo si salda in struttura.")
                   : deposit < total
-                    ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>. Il saldo di <b className="text-txt">{eur(total - deposit)}</b> si versa in struttura.</>
-                    : <>Per confermare è richiesto il pagamento dell&apos;intero importo di <b className="text-txt">{eur(total)}</b>{selPlan.refundable ? "" : " (tariffa non rimborsabile)"}.</>
-                } Il pagamento è gestito in modo sicuro da Stripe.</p>
+                    ? t("Per confermare è richiesto un acconto di {amount}. Il saldo di {balance} si versa in struttura.", { amount: eur(deposit), balance: eur(total - deposit) })
+                    : `${t("Per confermare è richiesto il pagamento dell'intero importo di {amount}.", { amount: eur(total) })}${selPlan.refundable ? "" : ` (${t("tariffa non rimborsabile")})`}`
+                } {t("Il pagamento è gestito in modo sicuro da Stripe.")}</p>
                 {deposit > 0 && (
                   <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim"><span>💳 Carta</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span><span>Klarna</span></div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim"><span>💳 {t("Carta")}</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span><span>Klarna</span></div>
                     <div className="mt-1.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
-                      <span>🛍️</span><span>Con <b>Klarna</b> puoi pagare in <b>3 rate senza interessi</b></span><span className="font-normal text-faint">(dove disponibile)</span>
+                      <span>🛍️</span><span>{t("Con Klarna puoi pagare in 3 rate senza interessi")}</span><span className="font-normal text-faint">{t("(dove disponibile)")}</span>
                     </div>
                   </div>
                 )}
-                <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /> Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.</label>
+                <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /> <span>{t("Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.")} <a href={privacyHref} target="_blank" rel="noreferrer" className="font-medium text-focus underline">{t("Leggi l'informativa privacy")}</a></span></label>
               </div>
             </div>
 
@@ -728,19 +850,20 @@ export function Engine({ embed = false }: { embed?: boolean }) {
             <div className="lg:sticky lg:top-20 lg:self-start">
               <div className={`${box} p-4`}>
                 <div className="mb-2 text-sm font-semibold text-txt">{fmtDate(checkIn)} → {fmtDate(checkOut)}</div>
-                <div className="text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>
+                <div className="text-xs text-dim">{nightsTxt(nights)} · {adultsTxt(adults)}{children ? ` · ${childrenTxt(children)}` : ""}</div>
                 <div className="my-3 border-t border-line" />
-                <Line label={`${selRt.name} · ${selPlan.name}`} value={eur(accommodation)} />
+                <Line label={`${selRt.name} · ${t(selPlan.name)}`} value={eur(accommodation)} />
                 {extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => <Line key={x.id} label={`${extraQty[x.id]}× ${x.name}`} value={eur((extraQty[x.id] ?? 0) * extraPrice(x))} sub />)}
-                {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `Tassa di soggiorno (${structure.cityTaxPercent ?? 0}%)` : `Tassa di soggiorno`} value={eur(cityTax)} sub />}
-                {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs" style={{ color: "var(--ok)" }}><span className="min-w-0">Sconto{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
+                {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `${t("Tassa di soggiorno")} (${structure.cityTaxPercent ?? 0}%)` : t("Tassa di soggiorno")} value={eur(cityTax)} sub />}
+                {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs" style={{ color: "var(--ok)" }}><span className="min-w-0">{t("Sconto")}{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
                 <div className="my-2 border-t border-line" />
-                <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
-                {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">{deposit < total ? "Acconto adesso" : "Da pagare adesso"}</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
-                <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{cancelText(selPlan)}</div>
-                {bookError && <div role="alert" className="mt-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>{bookError}</div>}
-                <button onClick={confirm} disabled={!guestValid || processing} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{processing ? "Invio in corso…" : "Conferma prenotazione"}</button>
-                {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, telefono, email e accetta la privacy.</div>}
+                <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">{t("Totale")}</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
+                {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">{deposit < payBase ? t("Acconto adesso") : t("Da pagare adesso")}</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
+                {cityTax > 0 && deposit > 0 && <div className="mt-1 text-[11px] text-dim">{t("La tassa di soggiorno ({amount}) non si paga adesso: si salda in struttura.", { amount: eur(cityTax) })}</div>}
+                <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{cancelLabel(selPlan)}</div>
+                {bookError && <div role="alert" className="mt-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>{t(bookError)}</div>}
+                <button onClick={confirm} disabled={!guestValid || processing} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{processing ? t("Invio in corso…") : t("Conferma prenotazione")}</button>
+                {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">{t("Compila nome, cognome, telefono, email e accetta la privacy.")}</div>}
               </div>
             </div>
           </div>

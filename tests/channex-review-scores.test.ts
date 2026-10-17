@@ -103,6 +103,9 @@ test("channelOfOta", () => {
   assert.equal(channelOfOta("Expedia"), "expedia");
   assert.equal(channelOfOta("Tripadvisor"), null);
   assert.equal(channelOfOta(undefined), null);
+  assert.equal(channelOfOta("Booking.com"), "booking");
+  // un portale con "book" nel nome non è Booking.com (le sue recensioni non vanno sul punteggio Booking)
+  for (const n of ["123booking", "Simplebooking", "Bookingfor", "BookingExpert"]) assert.equal(channelOfOta(n), null, n);
 });
 
 test("mergeSummaries: media pesata sui count (più property Channex per struttura)", () => {

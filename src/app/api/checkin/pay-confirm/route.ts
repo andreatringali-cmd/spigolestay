@@ -1,26 +1,17 @@
 import Stripe from "stripe";
 import { siteOrigin } from "@/lib/server-auth";
-import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimited } from "@/lib/server-auth";
 import { clientIp } from "@/lib/server-booking-guard";
-import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
-import { onlinePaymentPatch } from "@/lib/online-pay";
-import { groupRowBalances } from "@/lib/booking";
-import type { Structure } from "@/lib/types";
-import { fmtDMY } from "@/lib/dates";
+import { findBookingStore, findBookingStoreById } from "@/lib/manage-booking";
+import { recordCheckinPayment } from "@/lib/checkin-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Json = Record<string, unknown>;
-const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
-const s = (v: unknown) => (typeof v === "string" ? v : "");
-const n = (v: unknown) => (typeof v === "number" ? v : 0);
-
 // Registra sul SERVER il pagamento del saldo fatto dall'ospite al check-in.
-// Verifica la sessione Stripe (sul conto connesso della struttura) e somma l'incassato.
+// Verifica la sessione Stripe e registra l'incasso con la stessa logica (idempotente) del webhook Stripe: vedi lib/checkin-pay.ts.
 export async function POST(req: Request) {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -43,78 +34,10 @@ export async function POST(req: Request) {
     // Destination charge: la sessione è sull'account PIATTAFORMA (niente stripeAccount header).
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] });
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid" }, { status: 402 });
-    // (kind e bookingId della sessione si controllano più sotto.) bookingId e acct li sceglie il chiamante in /api/stripe/quote: se la struttura ha un conto collegato, il pagamento deve essere arrivato proprio a quel conto.
-    const wantedAcct = s((store.structure as Json | null)?.stripeAccount);
-    if (wantedAcct) {
-      const pi = session.payment_intent;
-      const dest = typeof pi === "object" && pi ? (pi as Stripe.PaymentIntent).transfer_data?.destination : undefined;
-      const destId = typeof dest === "string" ? dest : (dest as { id?: string } | null | undefined)?.id || "";
-      if (destId !== wantedAcct) return NextResponse.json({ ok: false, error: "session_account_mismatch" }, { status: 400 });
-    }
-    const amount = Math.round(session.amount_total ?? 0) / 100; // ai centesimi (prima era arrotondato all'euro: 3,37 € risultavano 3 €)
-    // La sessione deve essere un pagamento di saldo di QUESTA prenotazione: non l'acconto già contato alla prenotazione (stripeSessionId / extId) né una sessione di un'altra prenotazione.
-    const realBooking = store.booking as Json;
-    if (session.metadata?.kind !== "quote" || s(session.metadata?.bookingId) !== s(realBooking.id)) return NextResponse.json({ ok: false, error: "session_mismatch" }, { status: 409 });
-    if (s(realBooking.stripeSessionId) === session.id || s(realBooking.extId) === "stripe:" + session.id) return NextResponse.json({ ok: false, error: "session_already_counted" }, { status: 409 });
-    // Idempotenza: non risommare se questa sessione è già stata registrata.
-    const already = arr((store.booking as Json).paidSessions).some((x) => s(x) === session.id);
-    if (already) return NextResponse.json({ ok: true, already: true });
 
-    // Payment intent di questa sessione: serve a rimborsare (solo questa quota) se l'ospite annulla. Il PI iniziale resta in stripePaymentIntent.
-    const piId = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent as { id?: string } | null)?.id ?? "";
-    const extraPay = (x: Json, a: number): Json => (piId && a > 0 ? { stripeExtraPayments: [...arr(x.stripeExtraPayments), { pi: piId, amount: a }] } : {});
-    const wrote = await mutateStore(admin, store, (data, idx) => {
-      const bookings = arr(data.bookings);
-      if (idx < 0 || idx >= bookings.length) return false;
-      const bk = bookings[idx] as Json;
-      const sessions = arr(bk.paidSessions).map(String);
-      if (sessions.includes(session.id)) return false; // già registrata
-      // Pagamento di GRUPPO (più camere prenotate insieme): l'importo si ripartisce sui residui di ogni camera (con la sua quota di tassa del gruppo), questa camera per prima; l'eventuale eccedenza resta su questa.
-      const gid = s(bk.groupId);
-      if (session.metadata?.group === "1" && gid) {
-        const st = arr(data.structures).find((x) => s(x.id) === s(bk.structureId)) as unknown as Structure | undefined;
-        const idxs = bookings.map((x, i) => ({ x: x as Json, i })).filter(({ x }) => s(x.groupId) === gid && s(x.status) !== "cancelled" && s(x.status) !== "no_show" && s(x.channel) !== "blocked");
-        if (idxs.some(({ x }) => arr(x.paidSessions).map(String).includes(session.id))) return false; // già ripartita su una camera del gruppo
-        const bals = groupRowBalances(st, idxs.map(({ x }) => ({ id: s(x.id), adults: n(x.adults), children: n(x.children), childAges: (Array.isArray(x.childAges) ? (x.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(x.checkIn), checkOut: s(x.checkOut), total: n(x.total), cityTaxExempt: x.cityTaxExempt === true, cleaningFee: n(x.cleaningFee), extras: arr(x.extras) as { price?: number }[], paid: n(x.paid), cityTaxPaid: x.cityTaxPaid === true, cityTaxInPaid: x.cityTaxInPaid === true })));
-        const order = idxs.slice().sort((a, b) => (s(a.x.id) === s(bk.id) ? -1 : s(b.x.id) === s(bk.id) ? 1 : 0));
-        let left = Math.round(amount * 100);
-        const give = new Map<string, number>();
-        for (const { x } of order) { const bal = Math.round((bals.find((r) => r.id === s(x.id))?.balance ?? 0) * 100); const g = Math.min(left, bal); if (g > 0) { give.set(s(x.id), g); left -= g; } }
-        if (left > 0) give.set(s(bk.id), (give.get(s(bk.id)) ?? 0) + left);
-        for (const { x, i } of order) {
-          const g = give.get(s(x.id)); if (!g) { if (s(x.id) === s(bk.id)) bookings[i] = { ...x, paidSessions: [...arr(x.paidSessions).map(String), session.id], updatedAt: Date.now() }; continue; } // la sessione resta segnata anche su questa camera (idempotenza)
-          const part = g / 100;
-          const rowSessions = arr(x.paidSessions).map(String);
-          const bal = bals.find((r) => r.id === s(x.id));
-          const settled = !!bal && g >= Math.round(bal.balance * 100) && bal.tax > 0 && x.cityTaxPaid !== true; // se la tassa era già incassata a parte non è dentro paid: i flag restano come sono
-          bookings[i] = { ...x, paid: Math.round((n(x.paid) + part) * 100) / 100, paidSessions: [...rowSessions, session.id], updatedAt: Date.now(), ...(settled ? { cityTaxPaid: true, cityTaxInPaid: true } : {}), ...onlinePaymentPatch(x as never, part, Date.now()), ...extraPay(x, part) };
-        }
-        data.bookings = bookings;
-        return true;
-      }
-      bookings[idx] = { ...bk, paid: Math.round((n(bk.paid) + amount) * 100) / 100, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()), ...extraPay(bk, amount) };
-      data.bookings = bookings;
-      return true;
-    });
-    // Notifica al GESTORE: pagamento ricevuto (best-effort, come per check-in/modifica/cancellazione).
-    if (wrote) {
-      try {
-        const st = (store.structure ?? {}) as Json;
-        const b = store.booking as Json;
-        const g = (store.guest ?? {}) as Json;
-        const hostEmail = s(st.email);
-        if (hostEmail) {
-          const origin = siteOrigin(req);
-          const code = s(b.code) || s(b.id).slice(0, 8).toUpperCase();
-          const guestName = s(g.fullName) || `${s(g.firstName)} ${s(g.lastName)}`.trim();
-          await internalFetch(`${origin}/api/email`, {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ kind: "quote", to: hostEmail, subject: `Pagamento ricevuto ${code} · ${s(st.name)}`, text: `Hai ricevuto un pagamento di € ${amount.toLocaleString("it-IT")} per la prenotazione ${code}${guestName ? ` di ${guestName}` : ""} (${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}).`, booking: { structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor) } }),
-          });
-        }
-      } catch { /* notifica non critica */ }
-    }
-    return NextResponse.json({ ok: wrote, amount });
+    const r = await recordCheckinPayment(admin, store, session as never, { origin: siteOrigin(req) });
+    if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
+    return NextResponse.json({ ok: true, amount: r.amount, ...(r.already ? { already: true } : {}), ...(r.refundedCents ? { refunded: r.refundedCents / 100 } : {}) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });
   }

@@ -14,6 +14,7 @@ import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
+import { balanceDue } from "@/lib/incassi";
 import { DOC_KIND_LABEL, invPost } from "@/lib/invoicing/client";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, daysOverdue, todayLocalISO, agingBucket, AGING_LABEL, type AgingKey } from "@/lib/invoicing/receivables";
@@ -21,6 +22,7 @@ import { reminderText, reminderSubject, waReminderLink, mailReminderLink, waDigi
 import { useTenantId } from "@/lib/tenant";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { fmtDate } from "@/lib/dates";
+import { friendlyError } from "@/lib/friendly-error";
 
 interface Doc {
   id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number;
@@ -61,7 +63,7 @@ export default function ScadenzarioIncassiPage() {
       supabase.from("document_payments").select("document_id, amount_cents"),
       supabase.from("document_events").select("document_id, ts").eq("kind", "reminder"),
     ]);
-    if (d.error) setErr(d.error.message);
+    if (d.error) setErr(friendlyError(d.error));
     setDocs((d.data ?? []) as Doc[]);
     const m: Record<string, number> = {}; for (const x of (p.data ?? []) as { document_id: string; amount_cents: number }[]) m[x.document_id] = (m[x.document_id] ?? 0) + x.amount_cents;
     setPaid(m);
@@ -125,17 +127,18 @@ export default function ScadenzarioIncassiPage() {
     if (!(await ask({ title: "Segna come incassato", message: `Registrare l'incasso di ${eur(cents(r.residuo))} per ${r.number_label ?? "il documento"}?`, confirmLabel: "Registra incasso" }))) return;
     setBusy(r.id); setErr("");
     const { error } = await supabase.from("document_payments").insert({ document_id: r.id, tenant_id: tenantId, amount_cents: r.residuo, method: "manuale" });
-    if (error) { setErr("Errore incasso: " + error.message); setBusy(""); return; }
+    if (error) { setErr("Errore incasso: " + friendlyError(error)); setBusy(""); return; }
     // Fonte di verità incassi = prenotazione (come nella scheda documento).
     const b = r.booking_code ? bookings.find((x) => x.code === r.booking_code) : undefined;
-    if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(r.residuo) / 100) });
+    // Si aggiunge al massimo il residuo VERO della prenotazione: se l'ospite aveva gia' pagato online (booking.paid include gia' quei soldi) il documento si chiude senza raddoppiare l'incassato.
+    if (b) { const due = Math.round(r.residuo) / 100; const add = (b.total ?? 0) > 0 ? Math.min(due, balanceDue(b, getStructure(b.structureId))) : due; if (add > 0) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + add) }); }
     // Segna il pagamento anche su Fatture in Cloud (in background: non blocca né fa fallire l'incasso).
     if (r.provider_ref?.startsWith("fic:")) {
       const lbl = r.number_label ?? "documento";
       setFicNote(null);
       invPost<{ ok?: boolean; skipped?: boolean; message?: string }>("fic/payments", { documentId: r.id, paid: true })
         .then((x) => { if (x.skipped && x.ok) return; setFicNote({ ok: !!x.ok, text: x.ok ? `${lbl}: ${x.message ?? ""}` : `Incasso di ${lbl} registrato; su Fatture in Cloud non aggiornato: ${x.message ?? "motivo sconosciuto"}` }); })
-        .catch((e) => setFicNote({ ok: false, text: `Incasso di ${lbl} registrato; su Fatture in Cloud non aggiornato: ${e instanceof Error ? e.message : "errore"}` }));
+        .catch((e) => setFicNote({ ok: false, text: `Incasso di ${lbl} registrato; su Fatture in Cloud non aggiornato: ${friendlyError(e)}` }));
     }
     await load(); setBusy("");
   };

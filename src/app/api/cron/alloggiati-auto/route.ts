@@ -76,6 +76,9 @@ export async function GET(req: Request) {
         sent += s.sent ?? 0;
         if (!s.ok && s.sent === 0 && s.message && !/Nessuna schedina/i.test(s.message)) {
           errors.push(`send ${r.structure_id}: ${s.simulated ? "[simulato] " : ""}${s.message}`);
+        } else if ((s.blocked ?? 0) > 0) {
+          // Inviate le famiglie complete, ma alcune schedine restano ferme (dati da correggere / rifiutate dal portale): lo si segnala nel rapporto.
+          errors.push(`send ${r.structure_id}: ${s.blocked} schedine non inviate (da correggere)`);
         }
       } catch (e) { errors.push(`send ${r.structure_id}: ${e instanceof Error ? e.message : "error"}`); }
     }

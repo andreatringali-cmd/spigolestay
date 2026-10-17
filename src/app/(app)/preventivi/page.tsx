@@ -18,6 +18,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { waDigits } from "@/lib/contacts-check";
+import { et as etMail } from "@/lib/email-i18n";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
 const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]];
@@ -54,17 +55,18 @@ type QuoteRoom = { roomTypeId: string; qty: number; price: number; manual?: bool
 
 // Condizioni di cancellazione del piano tariffario scelto, nelle 5 lingue del preventivo (frase che segue "Cancellazione:").
 // Senza piano scelto resta il testo predefinito di QL (rimborsabile fino a 7 giorni prima).
-const CANC_TXT: Record<Lang, { non: string; days: string; free: string }> = {
-  it: { non: "tariffa non rimborsabile.", days: "cancellazione gratuita fino a {n} giorni prima del check-in.", free: "cancellazione gratuita." },
-  en: { non: "non-refundable rate.", days: "free cancellation up to {n} days before check-in.", free: "free cancellation." },
-  fr: { non: "tarif non remboursable.", days: "annulation gratuite jusqu'à {n} jours avant l'arrivée.", free: "annulation gratuite." },
-  de: { non: "nicht erstattbare Rate.", days: "kostenlose Stornierung bis {n} Tage vor Anreise.", free: "kostenlose Stornierung." },
-  es: { non: "tarifa no reembolsable.", days: "cancelación gratuita hasta {n} días antes de la entrada.", free: "cancelación gratuita." },
+const CANC_TXT: Record<Lang, { non: string; days: string; one: string; free: string }> = {
+  it: { non: "tariffa non rimborsabile.", days: "cancellazione gratuita fino a {n} giorni prima del check-in.", one: "cancellazione gratuita fino a 1 giorno prima del check-in.", free: "cancellazione gratuita." },
+  en: { non: "non-refundable rate.", days: "free cancellation up to {n} days before check-in.", one: "free cancellation up to 1 day before check-in.", free: "free cancellation." },
+  fr: { non: "tarif non remboursable.", days: "annulation gratuite jusqu'à {n} jours avant l'arrivée.", one: "annulation gratuite jusqu'à 1 jour avant l'arrivée.", free: "annulation gratuite." },
+  de: { non: "nicht erstattbare Rate.", days: "kostenlose Stornierung bis {n} Tage vor Anreise.", one: "kostenlose Stornierung bis 1 Tag vor Anreise.", free: "kostenlose Stornierung." },
+  es: { non: "tarifa no reembolsable.", days: "cancelación gratuita hasta {n} días antes de la entrada.", one: "cancelación gratuita hasta 1 día antes de la entrada.", free: "cancelación gratuita." },
 };
 function cancTextFor(plan: RatePlan | undefined, lang: Lang, fallback: string): string {
   if (!plan) return fallback;
   const c = CANC_TXT[lang];
   if (!plan.refundable) return c.non;
+  if (plan.cancelDays === 1) return c.one;
   return plan.cancelDays && plan.cancelDays > 0 ? c.days.replace("{n}", String(plan.cancelDays)) : c.free;
 }
 interface Preventivo {
@@ -430,7 +432,12 @@ export default function PreventiviPage() {
   // Link pubblico "Conferma e paga": l'ospite apre, vede l'importo del preventivo e paga (Stripe).
   // "extras": i servizi extra PROPONIBILI (attivi sulla struttura) — sulla pagina pubblica l'ospite
   // può aggiungerli alla prenotazione; non sono ancora una scelta, solo il catalogo disponibile.
-  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: roomLines.map((l) => ({ name: roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera", amount: Math.round((l as { amount?: number; price?: number }).amount ?? ((l as { price?: number }).price ?? 0) * n) })), tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "", uid: user?.id ?? "", logo: structure?.logo ?? "", accent: structure?.photoColor ?? "", extras: structExtras.map((e) => ({ id: e.id, name: e.name, desc: e.desc, price: e.price, per: e.per })) };
+  // Politica di cancellazione del piano scelto (la stessa del testo "Cancellazione" del PDF): il server la usa per rendere rimborsabile la prenotazione pagata online.
+  // Senza piano vale il testo predefinito del preventivo (rimborsabile fino a 7 giorni prima).
+  const payRefundable = activePlan ? !!activePlan.refundable : true;
+  const payCancelDays = activePlan ? (activePlan.refundable ? Math.max(0, Math.round(activePlan.cancelDays ?? 0)) : 0) : 7;
+  // validUntil: il preventivo non ha ancora una data di scadenza propria (solo una nota libera), quindi non si salva.
+  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: mergedLines.map((l) => ({ name: `${l.qty > 1 ? l.qty + " × " : ""}${roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera"}`, rt: l.roomTypeId, qty: l.qty, amount: Math.round(l.price * n * l.qty * 100) / 100 })), lines: mergedLines.map((l) => ({ rt: l.roomTypeId, qty: l.qty, price: l.price })), refundable: payRefundable, cancelDays: payCancelDays, lang, tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "", uid: user?.id ?? "", logo: structure?.logo ?? "", accent: structure?.photoColor ?? "", extras: structExtras.map((e) => ({ id: e.id, name: e.name, desc: e.desc, price: e.price, per: e.per })) };
   const payUrl = (() => { try { return `${typeof window !== "undefined" ? window.location.origin : ""}/preventivo?q=${btoa(encodeURIComponent(JSON.stringify(payData)))}`; } catch { return ""; } })();
   // Accorcia il link (Supabase short_links → /g/<code>) per non mandare URL lunghissimi.
   const payShortRef = useRef<Record<string, string>>({});
@@ -527,7 +534,7 @@ export default function PreventiviPage() {
         console.error("sendQuoteEmail: cattura PDF anteprima fallita, invio senza allegato:", e instanceof Error ? e.message : e);
       }
       // Dati strutturati per il PDF allegato (riuso payData/variabili già calcolate, niente doppia logica).
-      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, ctaUrl: payLink, ctaLabel: "Conferma e paga online →", accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat }, guestName: payData.gn, checkIn: payData.ci, checkOut: payData.co, nights: n, adults: payData.ad, children: payData.ch, rooms: payData.rooms, total: payData.tot, deposit: payData.dep, ref: payData.ref, extras: extrasPage ? payData.extras : undefined, pdfBase64, pdfFilename }) });
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", lang, to: email.trim(), subject: `${etMail(lang, "Preventivo")} ${structureName}`, text: outMsg, ctaUrl: payLink, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat }, guestName: payData.gn, checkIn: payData.ci, checkOut: payData.co, nights: n, adults: payData.ad, children: payData.ch, rooms: payData.rooms, total: payData.tot, deposit: payData.dep, ref: payData.ref, extras: extrasPage ? payData.extras : undefined, pdfBase64, pdfFilename }) });
       const j = await r.json().catch(() => ({}));
       setMailState({ sending: false, ok: r.ok && j?.ok, msg: (r.ok && j?.ok) ? `Inviato a ${email.trim()}` : (j?.error || `Errore ${r.status}`) });
     } catch (e) { setMailState({ sending: false, ok: false, msg: e instanceof Error ? e.message : "Rete non disponibile" }); }
@@ -1011,6 +1018,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         const deposit = Math.round(q.total * pct / 100);
         const balance = q.total - deposit;
         const confMsg = buildConfirm(q, pct);
+        const confStructure = structures.find((s) => s.id === q.structureId); // logo, nome e contatti della struttura DEL preventivo (non quella attiva)
         const digits = waDigits(q.phone); // con il prefisso del Paese (default Italia) anche se scritto senza o come 0039…
         const wa = digits ? `https://wa.me/${digits}?text=${encodeURIComponent(confMsg)}` : "#";
         const mail = `mailto:${q.email ?? ""}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`;
@@ -1049,7 +1057,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                   if (!q.email) { setConfMail({ ok: false, msg: t("Email destinatario mancante") }); return; }
                   setConfMail({ sending: true, msg: t("Invio…") });
                   try {
-                    const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: q.email, subject: "Conferma prenotazione — " + q.structure, text: confMsg }) });
+                    const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: q.lang, to: q.email, subject: etMail(q.lang, "Conferma prenotazione") + " — " + q.structure, text: confMsg, accent: confStructure?.photoColor, replyTo: confStructure?.email, brand: confStructure ? { name: confStructure.name, logo: confStructure.logo, address: [confStructure.address, confStructure.streetNumber, confStructure.city].filter(Boolean).join(" "), phone: confStructure.phone, email: confStructure.email, website: confStructure.website, accent: confStructure.photoColor, cin: confStructure.cin, vat: confStructure.vat } : { name: q.structure } }) });
                     const j = await r.json().catch(() => ({}));
                     if (r.ok && j?.ok) setConfMail({ ok: true, msg: t("Email inviata a") + " " + q.email });
                     else { setConfMail({ ok: false, msg: j?.error || t("Invio non riuscito") }); window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank"); }

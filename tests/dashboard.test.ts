@@ -106,6 +106,22 @@ test("ricavi del mese per notte: maturati, da vivere, canali", () => {
   assert.equal(cum[0], 50);
 });
 
+test("monthStats: l'aggregato Altro mostra il portale solo se è lo stesso per tutte le prenotazioni", () => {
+  const rate1 = () => 100;
+  const one = monthStats([
+    bk({ checkIn: "2026-10-05", checkOut: "2026-10-06", channel: "other", otaName: "bb.it" }),
+    bk({ checkIn: "2026-10-07", checkOut: "2026-10-08", channel: "other", otaName: "bb.it" }),
+  ], "2026-10-01", "2026-11-01", T, rate1);
+  assert.equal(one.byChannel[0].name, "bb.it");
+  assert.equal(one.byChannel[0].mixed, undefined);
+  const many = monthStats([
+    bk({ checkIn: "2026-10-05", checkOut: "2026-10-06", channel: "other", otaName: "bb.it" }),
+    bk({ checkIn: "2026-10-07", checkOut: "2026-10-08", channel: "other", otaName: "HotelBeds" }),
+  ], "2026-10-01", "2026-11-01", T, rate1);
+  assert.equal(many.byChannel[0].name, undefined);
+  assert.equal(many.byChannel[0].mixed, true);
+});
+
 const steps = (o: Record<string, "done" | "todo" | "late" | "na">) => Object.entries(o).map(([key, state]) => ({ key, state }));
 const base = () => ({
   today: T, journeyFor: () => null as ReturnType<typeof steps> | null, schedinaOf: () => "inviata" as const, istatPending: () => false,

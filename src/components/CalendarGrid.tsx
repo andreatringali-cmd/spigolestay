@@ -980,7 +980,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div
                 key={b.id}
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
-                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
+                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ${pax === 1 ? "ospite" : "ospiti"}${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
                 style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), ...(holdId === b.id ? { outline: "2px solid var(--focus)", outlineOffset: 1, transform: "scale(1.03)", zIndex: 5 } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "pan-x pan-y" }}
               >
@@ -1220,7 +1220,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <span className="grid h-[22px] w-[22px] shrink-0 place-items-center overflow-hidden rounded-full bg-wash text-dim">
             {siteStruct ? (
               siteStruct.logo
-                ? <img src={siteStruct.logo} alt="" className="h-full w-full object-cover" />
+                ? <img src={siteStruct.logo} alt="" className="h-full w-full bg-white object-contain" />
                 : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>
             ) : <Icon name="globe" size={13} />}
           </span>
