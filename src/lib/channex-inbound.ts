@@ -321,7 +321,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // updatedAt DEVE avanzare: la fusione client/server è last-write-wins su questo campo
         // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
         // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
-        prevIdx.forEach((i) => { const wasCancelled = bookings[i].status === "cancelled"; touchAvail(bookings[i]); bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); if (!wasCancelled) notifyOwnerServer("cancel", bookings[i]); });
+        prevIdx.forEach((i) => { const wasCancelled = bookings[i].status === "cancelled"; touchAvail(bookings[i]); bookings[i].status = "cancelled"; bookings[i].otaRevision = { status: "cancelled", at: Date.now() }; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); if (!wasCancelled) notifyOwnerServer("cancel", bookings[i]); });
         markTwinsDuplicate();
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
@@ -343,7 +343,12 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       let guestId = email ? guests.find((g) => (g.email || "").toLowerCase() === email.toLowerCase())?.id ?? "" : "";
       // Channex manda il paese dell'ospite in customer.country (codice tipo "NL", "GB") — campo
       // diverso dalla "Cittadinanza" del self check-in (quella è per la schedina Alloggiati Web).
-      if (!guestId) { guestId = uid(); guests.push({ id: guestId, firstName: c.name || undefined, lastName: c.surname || undefined, fullName, email: email || undefined, phone: c.phone || undefined, country: c.country || undefined } as Json & { id: string }); }
+      if (!guestId) { guestId = uid(); guests.push({ id: guestId, firstName: c.name || undefined, lastName: c.surname || undefined, fullName, email: email || undefined, phone: c.phone || undefined, country: c.country || undefined, city: c.city || undefined, zip: c.zip || undefined, address: c.address || undefined } as Json & { id: string }); }
+      else {
+        // Ospite già presente (stessa email): si completano SOLO i campi ancora vuoti (mai si sovrascrive ciò che è stato scritto a mano).
+        const eg = guests.find((x) => x.id === guestId) as (Json & { city?: string; zip?: string; address?: string; updatedAt?: number }) | undefined;
+        if (eg) { let ch = false; if (!eg.city && c.city) { eg.city = c.city; ch = true; } if (!eg.zip && c.zip) { eg.zip = c.zip; ch = true; } if (!eg.address && c.address) { eg.address = c.address; ch = true; } if (ch) eg.updatedAt = Date.now(); }
+      }
 
       const channel = channelFromOta(r.ota_name);
       const groupId = uid();
@@ -435,6 +440,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...(commShares[idx] != null ? { commissionAmount: commShares[idx] } : {}),
           ...(netPayout ? { netTotal: true } : {}),
           ...(r.ota_name ? { otaName: String(r.ota_name).slice(0, 60) } : {}),
+          otaRevision: { status: r.status === "modified" || r.status === "new" ? r.status : (isUpdate ? "modified" : "new"), at: Date.now() },
           ...(deductShares[idx] != null ? { otaDeductions: deductShares[idx] } : {}),
           ...(feeShares[idx] != null ? { paymentFee: feeShares[idx] } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),

@@ -216,7 +216,7 @@ export interface ChxRevision {
   // Dati ospite documentati da Channex: note del cliente, orario di arrivo "HH:MM" (nullable),
   // chi incassa ("property" | "ota" | null) e modalità ("credit_card" | "bank_transfer" | null).
   notes?: string | null; arrival_hour?: string | null; payment_collect?: string | null; payment_type?: string | null;
-  customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string; country?: string };
+  customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string; country?: string; city?: string; address?: string; zip?: string; language?: string };
   rooms?: ChxRoom[];
 }
 // Normalizza una riga JSON:API (id + attributes) in ChxRevision piatta.

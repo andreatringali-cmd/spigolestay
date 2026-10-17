@@ -4,20 +4,18 @@
 // (sezioni con righe etichetta/valore) con i dati REALI della prenotazione. SOLA LETTURA: le azioni stanno in "Gestione".
 // Calcoli economici SOLO dalle funzioni dell'app (lib/booking.ts); formattazione/liste in lib/booking-info.ts (pura, testata).
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
-import { CHANNELS, type Booking, type BookingStatus } from "@/lib/types";
+import { CHANNELS, type Booking, type BookingStatus, type Guest } from "@/lib/types";
 import { bookingCode } from "@/lib/bookingCode";
 import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import { effectivePayMethod, otaPayDetail, PAY_METHOD_LABEL } from "@/lib/pay-method";
 import { isRelayEmail } from "@/lib/contacts-check";
 import { eur } from "@/lib/format";
 import { fmtDate, nights } from "@/lib/dates";
-import {
-  cityTaxOfBooking, commissionBaseOf, commissionIsEstimate, commissionOf, commissionShareOf, COMMISSION_ESTIMATE_HINT,
-  isNetPayout, lordoOf, nettoOf, nightlyRevenue, otaAdjustmentOf, paymentFeeOf,
-} from "@/lib/booking";
+import { lordoOf, nightlyRevenue } from "@/lib/booking";
 import {
   cancelPenaltyLines, channelDisplay, channexIdOf, countryName, detectGenius, directCancelText, fmtDateWd, groupRooms,
   guestNames, languageName, notesBlocks, nightRows, occupancyLabel, safeMailtoHref, safeTelHref,
@@ -77,11 +75,39 @@ const nightsTxt = (n: number, t: (s: string) => string) => `${n} ${n === 1 ? t("
 const SubTitle = ({ children }: { children: ReactNode }) => <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{children}</div>;
 
 export default function BookingInfoTab({ booking }: { booking: Booking }) {
-  const { bookings, getGuest, getUnit, getRoomType, getStructure } = useData();
+  const { bookings, getGuest, getUnit, getRoomType, getStructure, updateGuest, patchBookingsSilently } = useData();
   const { t } = useLang();
 
   const structure = getStructure(booking.structureId);
   const guest = getGuest(booking.guestId);
+  // Città, CAP e indirizzo arrivano con la revisione Channex ma le prenotazioni già importate non li hanno: alla prima apertura si legge la revisione
+  // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
+  const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
+  const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
+  const needRevision = !!chxId && !booking.otaRevision;
+  useEffect(() => {
+    if ((!needCustomer && !needRevision) || !guest) return;
+    const key = `xn:chx-cust:${guest.id}:${booking.id}`;
+    try { const t0 = Number(localStorage.getItem(key) || 0); if (t0 && Date.now() - t0 < 7 * 86400000) return; } catch { /* storage non disponibile */ }
+    let alive = true;
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+      .then((r) => {
+        if (!alive) return;
+        try { localStorage.setItem(key, String(Date.now())); } catch { /* storage non disponibile */ }
+        const rev0 = r.revisions?.[0];
+        if (rev0 && !booking.otaRevision && (rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled")) patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: rev0.kind, at: rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now() } } }]); // senza avvisi né registro attività
+        const c = rev0?.customer;
+        if (!c) return;
+        const patch: Partial<Guest> = {};
+        if (c.city) patch.city = c.city;
+        if (c.zip) patch.zip = c.zip;
+        if (c.address && !guest.address) patch.address = c.address;
+        if (Object.keys(patch).length) updateGuest(guest.id, patch);
+      })
+      .catch(() => { /* senza accesso o senza rete: si riprova alla prossima apertura */ });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needCustomer, needRevision, guest?.id, booking.id, chxId]);
   const ch = CHANNELS[booking.channel];
   const st = STATUS[booking.status] ?? STATUS.confirmed;
   const isOta = booking.channel !== "direct" && booking.channel !== "blocked";
@@ -110,25 +136,19 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // ── Spese di prenotazione (stesse funzioni del resto dell'app) ──
   const lordo = lordoOf(booking);
   const noPrice = !booking.total;
-  const taxV = cityTaxOfBooking(structure, booking);
   const pm = effectivePayMethod(booking);
   const pmDetail = pm.method === "ota" ? otaPayDetail(booking) : undefined;
   const payTypeTxt = info?.paymentType === "credit_card" ? t("carta di credito") : info?.paymentType === "bank_transfer" ? t("bonifico") : undefined;
   const pmTxt = pm.method ? `${t(PAY_METHOD_LABEL[pm.method])}${pmDetail ? ` · ${t(pmDetail)}` : ""}${pm.auto ? ` · ${t("automatico")}` : ""}` : payTypeTxt;
-  const collectTxt = info?.paymentCollect === "ota" ? t("L'OTA incassa dall'ospite") : info?.paymentCollect === "property" ? t("Da incassare dalla struttura") : undefined;
-  const netPayout = isNetPayout(booking);
-  const commBase = commissionBaseOf(booking);
-  const payFee = paymentFeeOf(booking);
-  const adj = otaAdjustmentOf(booking);
-  const commTot = commissionOf(booking);
-  const showComm = isOta && !noPrice;
-  const extrasList = (booking.extras ?? []).filter((e) => (e.price || 0) !== 0);
 
   return (
     <div className="flex flex-col">
       {/* 1 · Dati principali */}
       <Section title={t("Prenotazione")}>
-        <Line label={t("Stato")}><Pill color={st.color}>{t(st.label)}</Pill></Line>
+        <Line label={t("Stato")}>
+          <Pill color={st.color}>{t(st.label)}</Pill>
+          {booking.otaRevision && <> <Pill color={booking.otaRevision.status === "modified" ? "var(--warn)" : booking.otaRevision.status === "cancelled" ? "var(--err)" : "var(--ok)"} title={t("Stato dell'ultima revisione ricevuta dal portale (come su Channex)")}>{booking.otaRevision.status === "modified" ? t("Modificata") : booking.otaRevision.status === "cancelled" ? t("Cancellata dal portale") : t("Nuova")}</Pill></>}
+        </Line>
         <Line label={t("Fonte")}>{sourceTxt}</Line>
         {channelTxt !== sourceTxt && <Line label={t("Canale")}>{channelTxt}</Line>}
         <Line label={hasOtaCode ? t("ID prenotazione OTA") : t("ID della prenotazione")} mono>{code}<CopyBtn text={code} /></Line>
@@ -163,6 +183,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         </Line>
         <Line label={t("Lingua")}>{languageName(guest?.language) || "—"}</Line>
         <Line label={t("Paese")}>{countryName(guest?.country) || "—"}</Line>
+        <Line label={t("Città")}>{guest?.city || "—"}</Line>
+        <Line label={t("CAP")}>{guest?.zip || "—"}</Line>
         <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
       </Section>
 
@@ -274,38 +296,9 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         <SubTitle>{t("Importo")}</SubTitle>
         <Line label={t("Importo totale")} mono>{noPrice ? <span className="font-sans text-dim">{t("Prezzo mancante")}</span> : <b>{eur(lordo)}</b>}</Line>
         {rooms.length > 1 && <p className="text-[11px] text-faint">{t("Camera di un gruppo: importi di questa sola camera.")}</p>}
-        {(booking.cleaningFee ?? 0) > 0 && <Line label={t("di cui pulizia")} mono>{eur(booking.cleaningFee)}</Line>}
-        {extrasList.map((e, i) => <Line key={i} label={e.name || t("Extra")} mono>{eur(e.price)}</Line>)}
         {pmTxt && <Line label={t("Metodo di pagamento")}>{pmTxt}</Line>}
-        {collectTxt && <Line label={t("Chi incassa")}>{collectTxt}</Line>}
-        {taxV > 0 && <Line label={t("Tassa di soggiorno")}><span className="font-mono tabular-nums">{eur(taxV)}</span> <span className="text-[11px] text-faint">· {t("non inclusa nel totale")}</span></Line>}
-        {booking.cityTaxExempt && <Line label={t("Tassa di soggiorno")}>{t("Esente")}</Line>}
         {(booking.paidOnline ?? 0) > 0 && (
           <Line label={t("Acconti")} mono>{eur(booking.paidOnline)}<span className="font-sans text-[11px] text-faint"> · {t("pagamento online")}{booking.paidAt ? ` ${fmtDate(booking.paidAt)}` : ""}</span></Line>
-        )}
-
-        {showComm && (
-          <>
-            <SubTitle>{t("Commissioni")}</SubTitle>
-            {netPayout ? (
-              <Line label={t("Commissione OTA")}>{t("già dedotta: il totale è il netto pagato dall'OTA")}</Line>
-            ) : (
-              <>
-                {(commBase > 0 || commissionIsEstimate(booking)) && (
-                  <Line label={t("Commissione OTA")} mono>
-                    {eur(commBase)}{commissionIsEstimate(booking) && <span className="font-sans text-[11px] text-faint" title={COMMISSION_ESTIMATE_HINT}> ({t("stima")})</span>}
-                  </Line>
-                )}
-                {payFee > 0 && <Line label={t("Costo d'incasso")} mono>{eur(payFee)}</Line>}
-                {adj > 0 && <Line label={t("Sconti OTA (carta virtuale)")} mono>{eur(adj)}</Line>}
-                {commTot > 0 && [commBase > 0, payFee > 0, adj > 0].filter(Boolean).length > 1 && (
-                  <Line label={`${t("Totale commissioni")} (${String(commissionShareOf(booking)).replace(".", ",")}%)`} mono>{eur(commTot)}</Line>
-                )}
-              </>
-            )}
-            {(booking.otaDeductions ?? 0) > 0 && <Line label={t("Trattenute dichiarate dall'OTA")} mono>{eur(booking.otaDeductions)}</Line>}
-            <Line label={t("Netto per la struttura")} mono><b>{eur(nettoOf(booking))}</b></Line>
-          </>
         )}
       </Section>
     </div>

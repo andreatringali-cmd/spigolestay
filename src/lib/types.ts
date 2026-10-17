@@ -282,6 +282,8 @@ export interface Guest {
   address?: string;     // residenza (via/indirizzo)
   streetNumber?: string; // numero civico
   province?: string;    // provincia (es. SR)
+  city?: string;        // città (dall'OTA via Channex o inserita a mano)
+  zip?: string;         // CAP
   // CRM
   vip?: boolean;
   marketingConsent?: boolean;
@@ -358,6 +360,7 @@ export interface Booking {
   paymentFee?: number; // € costo d'incasso trattenuto dall'OTA (es. "Payment charge" di Booking.com): si toglie dal netto, separato dalla commissione
   commissionAmount?: number; // € commissione esatta (con centesimi), es. da un'OTA — se presente ha priorità sul calcolo via %
   netTotal?: boolean; // il totale è GIÀ quanto incassa la struttura (pagamento netto dell'OTA, es. Expedia): nessuna commissione da sottrarre. Solo una cifra impostata a mano (commissionAmount) la rimette.
+  otaRevision?: { status: "new" | "modified" | "cancelled"; at: number }; // stato dell'ULTIMA revisione ricevuta dal portale (è lo "Stato" che mostra Channex: Nuovo / Modificata / Cancellata), diverso dallo stato della prenotazione (una prenotazione modificata resta confermata)
   otaName?: string; // nome del portale come lo manda Channex (es. "BedAndBreakfast"): serve a riconoscere i portali che arrivano come "Altro / OTA" (logo e nome giusti)
   otaDeductions?: number; // € trattenute dichiarate dall'OTA (solo informativo: sono già comprese nel totale netto, non si sottraggono)
   // Carta virtuale OTA (VCC): SOLO METADATI, MAI il numero carta o il CVV. Il numero completo

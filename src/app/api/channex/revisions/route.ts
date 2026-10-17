@@ -67,10 +67,11 @@ type Row = { revision_id: string; booking_id: string | null; tenant_id: string |
 export async function POST(req: Request) {
   const auth = await authTenant(req);
   if (isResponse(auth)) return auth;
-  const body = await req.json().catch(() => ({})) as { bookingId?: unknown; channexBookingId?: unknown; more?: unknown; rawFor?: unknown };
+  const body = await req.json().catch(() => ({})) as { bookingId?: unknown; channexBookingId?: unknown; more?: unknown; rawFor?: unknown; latest?: unknown };
   const xenoraId = typeof body.bookingId === "string" ? body.bookingId.trim().slice(0, 120) : "";
   const given = typeof body.channexBookingId === "string" ? body.channexBookingId.trim().slice(0, 200) : "";
   const more = body.more === true;
+  const latest = body.latest === true; // solo la revisione più recente (1 chiamata): per completare i dati del cliente
   const rawFor = typeof body.rawFor === "string" ? body.rawFor.trim().slice(0, 200) : "";
 
   // 1) id Channex della prenotazione: dal body (il client lo passa sempre) o, in mancanza, da booking.extId nello store a cui l'utente ha accesso.
@@ -120,8 +121,8 @@ export async function POST(req: Request) {
 
   // `truncated`: ci sono più di MAX_REVISIONS revisioni; `hasMore`: ce ne sono altre oltre alle prime INITIAL_REVISIONS e non sono state richieste.
   const truncated = rows.length > MAX_REVISIONS;
-  const limit = more ? MAX_REVISIONS : INITIAL_REVISIONS;
-  const hasMore = !more && rows.length > INITIAL_REVISIONS;
+  const limit = latest ? 1 : more ? MAX_REVISIONS : INITIAL_REVISIONS;
+  const hasMore = !more && !latest && rows.length > INITIAL_REVISIONS;
   rows = rows.slice(0, limit);
 
   // 4) lettura in sequenza (la coda interna limita a 20 richieste/min): prima la cache (revisioni 10 minuti, errori 30 s),

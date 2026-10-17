@@ -29,7 +29,7 @@ export interface RevisionRoomView {
   nightly: RevisionNight[];
   charges: RevisionCharge[];
 }
-export interface RevisionCustomer { name: string; email?: string; phone?: string; country?: string; city?: string; language?: string }
+export interface RevisionCustomer { name: string; email?: string; phone?: string; country?: string; city?: string; address?: string; zip?: string; language?: string }
 
 export interface RevisionView {
   revisionId: string;
@@ -240,6 +240,8 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     ...(str(c.phone) ? { phone: str(c.phone) } : {}),
     ...(str(c.country) ? { country: str(c.country) } : {}),
     ...(str(c.city) ? { city: str(c.city) } : {}),
+    ...(str(c.address) ? { address: str(c.address) } : {}),
+    ...(str(c.zip) || str(c.postal_code) ? { zip: str(c.zip) ?? str(c.postal_code) } : {}),
     ...(str(c.language) ? { language: str(c.language) } : {}),
   };
 

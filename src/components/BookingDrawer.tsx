@@ -103,7 +103,7 @@ export default function BookingDrawer() {
   const booking = bookings.find((b) => b.id === selectedBookingId) ?? null;
 
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const [tab, setTab] = useState<PanelTab>("manage"); // scheda del pannello: all'apertura si parte da Gestione (la vista di lavoro)
+  const [tab, setTab] = useState<PanelTab>("info"); // scheda del pannello: al clic su una riga si apre Informazioni
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
   const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
@@ -152,7 +152,7 @@ export default function BookingDrawer() {
   // All'apertura di una prenotazione: torna in vista e ricarica i dati.
   useEffect(() => {
     setMode("view");
-    setTab("manage");
+    setTab("info");
     setExpanded(false);
     setQa(null);
     setIncassoAmt(null); // importo/messaggi di un'altra prenotazione non devono restare nei campi della nuova
