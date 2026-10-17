@@ -11,6 +11,7 @@ import { forceFullSync } from "@/components/ChannexAutoSync";
 import type { MappedExtraPlan } from "@/lib/rate-model";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
+import { isBedAndBreakfastIt, shortChannelTitle } from "@/lib/channel-name";
 import ChannelBars from "@/components/ChannelBars";
 import LineChart from "@/components/LineChart";
 import { usePriceCorrections } from "@/lib/usePriceCorrections";
@@ -394,7 +395,7 @@ export default function CanaliPage() {
                       <tbody>
                         {list.map((c, i) => {
                           const chKey = c.channel as Channel;
-                          const label = chKey === "other" && c.title ? c.title : (CHANNELS[chKey]?.label ?? c.title);
+                          const label = chKey === "other" && c.title ? (isBedAndBreakfastIt(c.title) ? "bb.it" : shortChannelTitle(c.title)) : (CHANNELS[chKey]?.label ?? c.title);
                           const corr = c.id ? corrText(c.id) : "—";
                           const commInfo = defaultCommissionInfo(chKey, g.sid);
                           const commPct = Math.round(commInfo.pct * 10) / 10;
@@ -494,7 +495,7 @@ export default function CanaliPage() {
       {channelDetail && (() => {
         const { c } = channelDetail;
         const chKey = c.channel as Channel;
-        const label = chKey === "other" && c.title ? c.title : (CHANNELS[chKey]?.label ?? c.title);
+        const label = chKey === "other" && c.title ? (isBedAndBreakfastIt(c.title) ? "bb.it" : shortChannelTitle(c.title)) : (CHANNELS[chKey]?.label ?? c.title);
         const savedColor = loadChannelColor(chKey);
         const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
         const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");

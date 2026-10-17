@@ -32,6 +32,7 @@ import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo, { isBedAndBreakfastIt } from "@/components/ChannelLogo";
+import { shortChannelTitle } from "@/lib/channel-name";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { ArrowScroller } from "@/components/ScrollStrip";
 import DateField from "@/components/DateField";
@@ -1236,7 +1237,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           const active = realChannels[c];
           const chxTitle = realTitles[c];
           const isBb = c === "other" && isBedAndBreakfastIt(chxTitle);
-          const label = isBb ? "bb.it" : (c === "other" && chxTitle ? chxTitle : (CHANNELS[c]?.label ?? c));
+          const label = isBb ? "bb.it" : (c === "other" && chxTitle ? shortChannelTitle(chxTitle) : (CHANNELS[c]?.label ?? c));
           return (
             <span key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
               <ChannelLogo channel={c} size={22} title={label} name={chxTitle} />

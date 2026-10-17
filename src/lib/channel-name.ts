@@ -10,8 +10,16 @@ export function isBedAndBreakfastIt(name?: string): boolean {
   if (BBIT_RE.test(n)) return true;
   // Channex manda il nome del portale senza punti/spazi ("BedAndBreakfast", "Bed and Breakfast", "Bed & Breakfast Italia"):
   // confronto sul nome "schiacciato" (solo lettere/cifre/punti). Restano esclusi "B&B Hotels" e i domini .com/.eu/.nl.
-  const sq = n.toLowerCase().replace(/[^a-z0-9.]/g, "");
-  return sq === "bedandbreakfast" || sq === "bedandbreakfastit" || sq === "bedbreakfastit" || sq === "bedandbreakfastitalia" || sq === "bedbreakfastitalia";
+  // Su Channex il canale si chiama "<portale> - <struttura>" ("BedAndBreakfastItaly - Central Perk - Antioco"): conta solo il portale, prima del primo " - ".
+  const sq = shortChannelTitle(n).toLowerCase().replace(/[^a-z0-9.]/g, "");
+  return sq === "bedandbreakfast" || sq === "bedandbreakfastit" || sq === "bedbreakfastit" || sq === "bedandbreakfastitalia" || sq === "bedbreakfastitalia" || sq === "bedandbreakfastitaly" || sq === "bedbreakfastitaly";
+}
+
+/** Nome breve di un canale: Channex lo chiama "<portale> - <struttura>"; si tiene solo il portale (la struttura si sa già dal selettore in alto). */
+export function shortChannelTitle(title: string | null | undefined): string {
+  const t = String(title ?? "").trim();
+  const head = t.split(/\s+[-–—]\s+/)[0].trim();
+  return head || t;
 }
 
 /** Etichetta usata quando il gruppo "Altro" raccoglie più portali diversi (nessun logo/nome del primo). */

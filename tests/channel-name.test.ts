@@ -23,3 +23,14 @@ test("otaGroupName: nome comune solo se tutte le prenotazioni coincidono", () =>
   assert.deepEqual(otaGroupName([undefined, undefined]), { name: undefined, mixed: false });
   assert.deepEqual(otaGroupName([]), { name: undefined, mixed: false });
 });
+
+test("Channex: 'BedAndBreakfastItaly - Central Perk - Antioco' è bb.it, e il nome breve è solo il portale", async () => {
+  const m = await import("../src/lib/channel-name.ts");
+  assert.equal(m.isBedAndBreakfastIt("BedAndBreakfastItaly - Central Perk - Antioco"), true);
+  assert.equal(m.isBedAndBreakfastIt("BedAndBreakfastItaly"), true);
+  assert.equal(m.isBedAndBreakfastIt("B&B Hotels - Roma"), false);
+  assert.equal(m.shortChannelTitle("BedAndBreakfastItaly - Central Perk - Antioco"), "BedAndBreakfastItaly");
+  assert.equal(m.shortChannelTitle("Agoda"), "Agoda");
+  assert.equal(m.shortChannelTitle("Hotel-Beds"), "Hotel-Beds"); // un trattino senza spazi non è un separatore
+  assert.equal(m.shortChannelTitle(""), "");
+});
