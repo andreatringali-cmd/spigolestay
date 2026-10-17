@@ -153,3 +153,19 @@ test("helper di formato", () => {
   assert.equal(romeDateTime("2026-01-15T23:30:00Z", false).label, "16.01.2026 00:30");
   assert.equal(romeDateTime("non-una-data").iso, null);
 });
+
+test("normalizeRevision: RUID, politiche dell'OTA e depositi", () => {
+  const v = normalizeRevision({
+    ...base, ruid: "UmFuZG9tSVYkc2Rl", unique_id: "BDC-123456",
+    deposits: [{ amount: "50.00", currency: "EUR" }],
+    rooms: [{ ...base.rooms[0], meta: { ...base.rooms[0].meta, policies: "Deposito: il cliente paga nei 3 giorni prima dell'arrivo." } }],
+  });
+  assert.equal(v.ruid, "UmFuZG9tSVYkc2Rl");
+  assert.equal(v.uniqueId, "BDC-123456");
+  assert.equal(v.policiesText, "Deposito: il cliente paga nei 3 giorni prima dell'arrivo.");
+  assert.equal(v.deposits, "50,00 EUR");
+  const w = normalizeRevision(base);
+  assert.equal(w.ruid, undefined);
+  assert.equal(w.policiesText, undefined);
+  assert.equal(w.deposits, undefined);
+});

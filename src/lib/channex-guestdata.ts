@@ -30,6 +30,7 @@ export interface OtaInfo {
   paymentType?: "credit_card" | "bank_transfer"; // revision.payment_type
   paymentInstruction?: string;            // room.meta.payment_instruction (Expedia)
   cancelPenalties?: OtaCancelPenalty[];   // room.meta.cancel_penalties (Booking.com): penale che scatta da "from"
+  policies?: string;                      // room.meta.policies (Booking.com): testo delle politiche (bambini, deposito, cancellazione)
   mealPlan?: string;                      // room.meta.meal_plan
   bedPreferences?: string;                // room.meta.bed_preferences (Expedia)
   smokingPreferences?: string;            // room.meta.smoking_preferences
@@ -126,6 +127,7 @@ export function readRevisionGuestData(rev: Json, room: Json | undefined, isFirst
     ...(pc === "property" || pc === "ota" ? { paymentCollect: pc } : {}),
     ...(pt === "credit_card" || pt === "bank_transfer" ? { paymentType: pt } : {}),
     ...(str(meta.payment_instruction) ? { paymentInstruction: str(meta.payment_instruction) } : {}),
+    ...(str(meta.policies) ? { policies: str(meta.policies) } : {}),
     ...(parsePenalties(meta.cancel_penalties) ? { cancelPenalties: parsePenalties(meta.cancel_penalties) } : {}),
     ...(str(meta.meal_plan) ? { mealPlan: str(meta.meal_plan) } : {}),
     ...(str(meta.bed_preferences) ? { bedPreferences: str(meta.bed_preferences) } : {}),

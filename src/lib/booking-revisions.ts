@@ -44,6 +44,9 @@ export interface RevisionView {
   channel?: string;              // nome dell'OTA
   otaCode?: string;
   uniqueId?: string;
+  ruid?: string;                 // RUID di Channex (identificativo univoco della revisione presso l'OTA)
+  policiesText?: string;         // «Politiche» come le scrive l'OTA (Booking.com: room.meta.policies)
+  deposits?: string;             // depositi della prenotazione ("50,00 EUR"), vuoto se non ce ne sono
   currency: string;
   checkIn: string; checkOut: string; nights: number;
   arrivalHour?: string;
@@ -257,6 +260,13 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     if (info?.smokingPreferences) addPolicy(`Fumatori: ${info.smokingPreferences}`);
   });
 
+  const policiesText = [...new Set(roomsRaw.map((room) => (isObj(room.meta) ? str(room.meta.policies) : undefined)).filter((x): x is string => !!x))].join("\n\n");
+  const depList = Array.isArray(rev.deposits) ? rev.deposits : rev.deposit != null ? [rev.deposit] : [];
+  const deposits = depList.map((d) => {
+    if (isObj(d)) { const a = numOrNull(d.amount ?? d.value); const cur = str(d.currency) ?? str(rev.currency) ?? "EUR"; return a != null ? `${a.toFixed(2).replace(".", ",")} ${cur.toUpperCase()}` : undefined; }
+    const a = numOrNull(d); return a != null ? `${a.toFixed(2).replace(".", ",")} ${(str(rev.currency) ?? "EUR").toUpperCase()}` : undefined;
+  }).filter((x): x is string => !!x).join(", ");
+
   const charges = [
     ...arr(rev.services).map((s) => chargeOf(s, "servizio")),
     ...rooms.flatMap((x) => x.charges),
@@ -274,6 +284,9 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     ...(str(rev.ota_name) ? { channel: str(rev.ota_name) } : {}),
     ...(str(rev.ota_reservation_code) ? { otaCode: str(rev.ota_reservation_code) } : {}),
     ...(str(rev.unique_id) ? { uniqueId: str(rev.unique_id) } : {}),
+    ...(str(rev.ruid) ? { ruid: str(rev.ruid) } : {}),
+    ...(policiesText ? { policiesText } : {}),
+    ...(deposits ? { deposits } : {}),
     currency: (str(rev.currency) ?? "EUR").toUpperCase(),
     checkIn: arrival, checkOut: departure, nights: nightsBetween(arrival, departure),
     ...(str(rev.arrival_hour) ? { arrivalHour: str(rev.arrival_hour)!.slice(0, 5) } : {}),

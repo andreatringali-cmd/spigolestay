@@ -84,20 +84,23 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
-  const needRevision = !!chxId && !booking.otaRevision?.ruid;
+  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string } | null>(null);
+  const fx = fetched && fetched.forId === booking.id ? fetched : null;
   useEffect(() => {
-    if ((!needCustomer && !needRevision) || !guest) return;
-    const key = `xn:chx-cust:${guest.id}:${booking.id}`;
-    try { const t0 = Number(localStorage.getItem(key) || 0); if (t0 && Date.now() - t0 < 7 * 86400000) return; } catch { /* storage non disponibile */ }
+    if (!chxId) return;
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; uniqueId?: string; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
-        try { localStorage.setItem(key, String(Date.now())); } catch { /* storage non disponibile */ }
         const rev0 = r.revisions?.[0];
-        if (rev0 && (rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled") && !booking.otaRevision?.ruid) patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: booking.otaRevision?.status ?? rev0.kind, at: booking.otaRevision?.at ?? (rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now()), ...(rev0.revisionId ? { id: rev0.revisionId } : booking.otaRevision?.id ? { id: booking.otaRevision.id } : {}), ...(rev0.uniqueId ? { ruid: rev0.uniqueId } : {}) } } }]); // senza avvisi né registro attività
-        const c = rev0?.customer;
-        if (!c) return;
+        if (!rev0) return;
+        setFetched({ forId: booking.id, revisionId: rev0.revisionId, ruid: rev0.ruid, policiesText: rev0.policiesText, deposits: rev0.deposits });
+        // salva lo stato dell'ultima revisione (senza avvisi né registro attività)
+        if ((rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled") && (!booking.otaRevision || !booking.otaRevision.id)) {
+          patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: booking.otaRevision?.status ?? rev0.kind, at: booking.otaRevision?.at ?? (rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now()), ...(rev0.revisionId ? { id: rev0.revisionId } : {}) } } }]);
+        }
+        const c = rev0.customer;
+        if (!c || !needCustomer || !guest) return;
         const patch: Partial<Guest> = {};
         if (c.city) patch.city = c.city;
         if (c.zip) patch.zip = c.zip;
@@ -107,7 +110,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
       .catch(() => { /* senza accesso o senza rete: si riprova alla prossima apertura */ });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needCustomer, needRevision, guest?.id, booking.id, chxId]);
+  }, [booking.id, chxId]);
   const ch = CHANNELS[booking.channel];
   const st = STATUS[booking.status] ?? STATUS.confirmed;
   const isOta = booking.channel !== "direct" && booking.channel !== "blocked";
@@ -154,11 +157,11 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         {channelTxt !== sourceTxt && <Line label={t("Canale")}>{channelTxt}</Line>}
         <Line label={t("ID della prenotazione")} mono>{hasOtaCode ? channexCodeOf(booking.channel, code) : code}<CopyBtn text={hasOtaCode ? channexCodeOf(booking.channel, code) : code} /></Line>
         {channexId && <Line label={t("ID prenotazione")} mono>{channexId}<CopyBtn text={channexId} /></Line>}
-        {booking.otaRevision?.id && <Line label={t("Identificativo della revisione")} mono>{booking.otaRevision.id}<CopyBtn text={booking.otaRevision.id} /></Line>}
+        {(fx?.revisionId || booking.otaRevision?.id) && <Line label={t("Identificativo della revisione")} mono>{fx?.revisionId || booking.otaRevision?.id}<CopyBtn text={(fx?.revisionId || booking.otaRevision?.id) as string} /></Line>}
         {hasOtaCode && <Line label={t("ID prenotazione OTA")} mono>{code}<CopyBtn text={code} /></Line>}
         {booking.bookedOn && <Line label={t("Prenotato il")}>{fmtDateWd(booking.bookedOn)}</Line>}
         <Line label={t("Proprietà")}>{structure?.name ?? "—"}</Line>
-        {booking.otaRevision?.ruid && <Line label="RUID" mono>{booking.otaRevision.ruid}<CopyBtn text={booking.otaRevision.ruid} /></Line>}
+        {fx?.ruid && <Line label="RUID" mono>{fx.ruid}<CopyBtn text={fx.ruid} /></Line>}
       </Section>
 
       {/* 2 · Check-in */}
@@ -193,7 +196,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
 
       {/* 4 · Camere */}
       <Section title={rooms.length > 1 ? `${t("Camere")} (${rooms.length})` : t("Camere")}>
-        {rooms.map((r) => {
+        {rooms.map((r, rIdx) => {
           const rt = getRoomType(r.roomTypeId);
           const un = getUnit(r.unitId);
           const rg = getGuest(r.guestId);
@@ -249,7 +252,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                 {rInfo?.mealPlan && <Line label={t("Piano pasto")}>{rInfo.mealPlan}</Line>}
                 {rInfo?.smokingPreferences && <Line label={t("Preferenze fumatori")}>{rInfo.smokingPreferences}</Line>}
                 {rInfo?.bedPreferences && <Line label={t("Preferenze letti")}>{rInfo.bedPreferences}</Line>}
-                {rInfo?.paymentInstruction && <Line label={t("Politiche")}><span className="whitespace-pre-wrap">{rInfo.paymentInstruction}</span></Line>}
+                {(rInfo?.policies || rInfo?.paymentInstruction || (rIdx === 0 && fx?.policiesText)) && <Line label={t("Politiche")}><span className="whitespace-pre-wrap">{rInfo?.policies || rInfo?.paymentInstruction || fx?.policiesText}</span></Line>}
                 {lines.length > 0 && (
                   <Line label={t("Politica di cancellazione")}>
                     <div className="flex flex-col gap-0.5">
@@ -300,6 +303,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         <Line label={t("Importo totale")} mono>{noPrice ? <span className="font-sans text-dim">{t("Prezzo mancante")}</span> : <b>{eur(lordo)}</b>}</Line>
         {rooms.length > 1 && <p className="text-[11px] text-faint">{t("Camera di un gruppo: importi di questa sola camera.")}</p>}
         {pmTxt && <Line label={t("Metodo di pagamento")}>{pmTxt}</Line>}
+        {chxId && <Line label={t("Depositi")}>{fx?.deposits || "—"}</Line>}
         {(booking.paidOnline ?? 0) > 0 && (
           <Line label={t("Acconti")} mono>{eur(booking.paidOnline)}<span className="font-sans text-[11px] text-faint"> · {t("pagamento online")}{booking.paidAt ? ` ${fmtDate(booking.paidAt)}` : ""}</span></Line>
         )}
