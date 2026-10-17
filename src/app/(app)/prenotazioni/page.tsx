@@ -229,6 +229,8 @@ export default function PrenotazioniPage() {
   // Annullate e no-show restano nell'elenco con il loro stato, ma non entrano in KPI, totali, grafici ed export.
   const isCounted = (b: { status: BookingStatus }) => b.status !== "cancelled" && b.status !== "no_show";
   // Cancellata: la riga è sbiadita e al posto della camera si legge "Cancellata" in rosso, non sbiadito (la trasparenza si applica alle celle, non alla parola).
+  // Percentuale delle commissioni: più piccola dell'importo, con la virgola; "~" davanti quando è una stima (stesso segno usato in Canali e nel pannello prezzi).
+  const pctIt = (n: number) => String(n).replace(".", ",");
   const CancTag = () => <span className="font-semibold text-[color:var(--err)]">{t("Cancellata")}</span>;
   const rowDim = (b: { status: BookingStatus }) => isCounted(b) ? "" : b.status === "cancelled" ? "[&>td:not([data-room])]:opacity-50" : "opacity-50";
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => (isCounted(b) ? a + f(b) : a), 0);
@@ -254,7 +256,7 @@ export default function PrenotazioniPage() {
           {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
         </span>
       </td>
-      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint" title={commissionIsEstimate(b) ? COMMISSION_ESTIMATE_HINT : "Commissioni ÷ lordo"}>({commissionShareOf(b)}%{commissionIsEstimate(b) ? " · stima" : ""})</span></> : "—"}</td>
+      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-[0.82em] text-faint" title={commissionIsEstimate(b) ? COMMISSION_ESTIMATE_HINT : "Commissioni ÷ lordo"}>({commissionIsEstimate(b) ? "~" : ""}{pctIt(commissionShareOf(b))}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
       <td className="px-3 py-2.5"><StatoCell b={b} /></td>
     </>);
@@ -603,7 +605,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => grand(x)))}</td>
-                    <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => commissionOf(x)) ? <>{eur(gSum(members, (x) => commissionOf(x)))} <span className="text-faint" title="Commissioni ÷ lordo">({gSum(members, (x) => grand(x)) > 0 ? Math.round((gSum(members, (x) => commissionOf(x)) / gSum(members, (x) => grand(x))) * 1000) / 10 : 0}%)</span></> : "—"}</td>
+                    <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => commissionOf(x)) ? <>{eur(gSum(members, (x) => commissionOf(x)))} <span className="text-[0.82em] text-faint" title="Commissioni ÷ lordo">({pctIt(gSum(members, (x) => grand(x)) > 0 ? Math.round((gSum(members, (x) => commissionOf(x)) / gSum(members, (x) => grand(x))) * 1000) / 10 : 0)}%)</span></> : "—"}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
@@ -626,7 +628,7 @@ export default function PrenotazioniPage() {
                 <td className="px-3 py-2.5" colSpan={2}></td>
                 <td className="px-3 py-2.5 font-mono">{nightsTot}</td>
                 <td className="px-3 py-2.5 font-mono">{eur(grandTot)}</td>
-                <td className="px-3 py-2.5 font-mono">{eur(commissionTot)} {commissionTot > 0 && <span className="text-faint">({commissionPctTot}%)</span>}</td>
+                <td className="px-3 py-2.5 font-mono">{eur(commissionTot)} {commissionTot > 0 && <span className="text-[0.82em] text-faint">({pctIt(commissionPctTot)}%)</span>}</td>
                 <td className="px-3 py-2.5 font-mono text-[color:var(--ok)]">{eur(nettoTot)}</td>
                 <td className="px-3 py-2.5"></td>
               </tr>
