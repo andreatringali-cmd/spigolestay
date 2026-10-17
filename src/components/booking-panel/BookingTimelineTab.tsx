@@ -16,7 +16,6 @@ const THREADS_KEY = "spigolestay:threads:v1";
 const SENT_KEY = "spigolestay:msgsent";
 const TPL_KEY = "spigolestay:msgtemplates";
 const EMPTY_SERVER: ServerEvent[] = [];
-const ORDER_KEY = "spigolestay:timeline:newest-first";
 
 const TONE: Record<TimelineTone, string> = { ok: "var(--ok)", info: "var(--focus)", warn: "var(--warn)", err: "var(--err)", muted: "var(--faint)" };
 
@@ -49,11 +48,8 @@ export default function BookingTimelineTab({ booking }: { booking: Booking }) {
   const { t } = useLang();
   const browser = useBrowserSources();
 
-  // Risposta del server per una prenotazione: finché `forId` non è l'id corrente (o dopo "Aggiorna") si sta caricando.
+  // Risposta del server per una prenotazione: finché `forId` non è l'id corrente si sta caricando.
   const [res, setRes] = useState<{ forId: string; server: ServerEvent[]; partial: string[]; error: string } | null>(null);
-  const [reload, setReload] = useState(0);
-  const [newestFirst, setNewestFirst] = useState<boolean>(() => { try { return localStorage.getItem(ORDER_KEY) === "1"; } catch { return false; } });
-  const toggleOrder = () => setNewestFirst((v) => { const n = !v; try { localStorage.setItem(ORDER_KEY, n ? "1" : "0"); } catch { /* preferenza non salvata */ } return n; });
 
   useEffect(() => {
     let alive = true;
@@ -61,12 +57,11 @@ export default function BookingTimelineTab({ booking }: { booking: Booking }) {
       .then((r) => { if (alive) setRes({ forId: booking.id, server: Array.isArray(r.events) ? r.events : [], partial: Array.isArray(r.partial) ? r.partial : [], error: "" }); })
       .catch((e) => { if (alive) setRes({ forId: booking.id, server: [], partial: [], error: e instanceof Error && e.message ? e.message : "Non riesco a leggere la cronologia." }); });
     return () => { alive = false; };
-  }, [booking.id, reload]);
+  }, [booking.id]);
   const loading = !res || res.forId !== booking.id;
   const server = res && res.forId === booking.id ? res.server : EMPTY_SERVER;
   const partial = res && res.forId === booking.id ? res.partial : [];
   const error = res && res.forId === booking.id ? res.error : "";
-  const refresh = () => { setRes(null); setReload((n) => n + 1); };
 
   const guest = getGuest(booking.guestId);
   const structure = getStructure(booking.structureId);
@@ -77,22 +72,14 @@ export default function BookingTimelineTab({ booking }: { booking: Booking }) {
     const guestHasOtherBookings = bookings.some((b) => b.id !== booking.id && b.guestId === booking.guestId && b.channel !== "blocked" && b.status !== "cancelled" && !(booking.groupId && b.groupId === booking.groupId));
     const client: TimelineClient = { activities, threads: browser.threads, msgsent: browser.msgsent, templateNames: browser.templateNames, guestHasOtherBookings, bookingIds: groupIds };
     const list = buildTimeline({ booking, guest, structure, server, client });
-    return newestFirst ? [...list].reverse() : list;
-  }, [booking, bookings, activities, browser, guest, structure, server, newestFirst]);
+    return list;
+  }, [booking, bookings, activities, browser, guest, structure, server]);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-faint">
           {t("Cronologia")}{events.length > 0 && <span className="ml-1.5 font-normal normal-case tracking-normal">· {events.length}</span>}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button type="button" onClick={toggleOrder} className="h-7 rounded-lg border border-line px-2 text-[11px] font-semibold text-dim hover:bg-wash hover:text-txt">
-            {newestFirst ? t("Dalla più recente") : t("Dalla più vecchia")}
-          </button>
-          <button type="button" onClick={refresh} disabled={loading} className="h-7 rounded-lg border border-line px-2 text-[11px] font-semibold text-dim hover:bg-wash hover:text-txt disabled:opacity-50">
-            {loading ? t("Carico…") : t("Aggiorna")}
-          </button>
         </div>
       </div>
 

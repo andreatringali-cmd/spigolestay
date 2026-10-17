@@ -251,10 +251,9 @@ export default function BookingRevisionsTab({ booking }: { booking: Booking }) {
     <div className="flex flex-col gap-2 p-2 sm:p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-dim">{revs.length} {revs.length === 1 ? t("revisione") : t("revisioni")}</p>
-        <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium text-dim">
-          <input type="checkbox" checked={showDiff} onChange={(e) => setShowDiff(e.target.checked)} className="h-3.5 w-3.5 accent-[color:var(--focus)]" />
+        <button type="button" onClick={() => setShowDiff((v) => !v)} aria-pressed={showDiff} className={`text-xs font-medium hover:text-txt hover:underline ${showDiff ? "text-txt underline" : "text-dim"}`}>
           {t("Mostra differenze")}
-        </label>
+        </button>
       </div>
 
       <ul className="flex flex-col gap-2">

@@ -168,6 +168,12 @@ export function channexIdOf(extId?: string | null): string | undefined {
   return id || undefined;
 }
 
+/** Codice prenotazione come lo scrive Channex: sigla del portale + codice OTA ("BDC-6088543047", "EXP-…", "ABB-…"). Per gli altri canali il codice com'è. */
+export function channexCodeOf(channel: string | undefined, code: string): string {
+  const p = channel === "booking" ? "BDC-" : channel === "expedia" ? "EXP-" : channel === "airbnb" ? "ABB-" : "";
+  return p && !code.toUpperCase().startsWith(p) ? p + code : code;
+}
+
 /** Etichetta del canale come su Channex ("<portale> - <struttura>") per le prenotazioni arrivate da Channex; altrimenti il nome del canale. */
 export function channelDisplay(o: { extId?: string | null; otaName?: string; channelLabel: string; structureName?: string }): string {
   const portal = (o.otaName ?? "").trim() || o.channelLabel;

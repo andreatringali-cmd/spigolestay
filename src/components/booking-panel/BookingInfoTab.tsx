@@ -17,7 +17,7 @@ import { eur } from "@/lib/format";
 import { fmtDate, nights } from "@/lib/dates";
 import { lordoOf, nightlyRevenue } from "@/lib/booking";
 import {
-  cancelPenaltyLines, channelDisplay, channexIdOf, countryName, detectGenius, directCancelText, fmtDateWd, groupRooms,
+  cancelPenaltyLines, channelDisplay, channexCodeOf, channexIdOf, countryName, detectGenius, directCancelText, fmtDateWd, groupRooms,
   guestNames, languageName, notesBlocks, nightRows, occupancyLabel, safeMailtoHref, safeTelHref,
 } from "@/lib/booking-info";
 
@@ -84,18 +84,18 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
-  const needRevision = !!chxId && !booking.otaRevision;
+  const needRevision = !!chxId && !booking.otaRevision?.ruid;
   useEffect(() => {
     if ((!needCustomer && !needRevision) || !guest) return;
     const key = `xn:chx-cust:${guest.id}:${booking.id}`;
     try { const t0 = Number(localStorage.getItem(key) || 0); if (t0 && Date.now() - t0 < 7 * 86400000) return; } catch { /* storage non disponibile */ }
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; uniqueId?: string; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
         try { localStorage.setItem(key, String(Date.now())); } catch { /* storage non disponibile */ }
         const rev0 = r.revisions?.[0];
-        if (rev0 && !booking.otaRevision && (rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled")) patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: rev0.kind, at: rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now() } } }]); // senza avvisi né registro attività
+        if (rev0 && (rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled") && !booking.otaRevision?.ruid) patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: booking.otaRevision?.status ?? rev0.kind, at: booking.otaRevision?.at ?? (rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now()), ...(rev0.revisionId ? { id: rev0.revisionId } : booking.otaRevision?.id ? { id: booking.otaRevision.id } : {}), ...(rev0.uniqueId ? { ruid: rev0.uniqueId } : {}) } } }]); // senza avvisi né registro attività
         const c = rev0?.customer;
         if (!c) return;
         const patch: Partial<Guest> = {};
@@ -146,16 +146,19 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
       {/* 1 · Dati principali */}
       <Section title={t("Prenotazione")}>
         <Line label={t("Stato")}>
-          <Pill color={st.color}>{t(st.label)}</Pill>
-          {booking.otaRevision && <> <Pill color={booking.otaRevision.status === "modified" ? "var(--warn)" : booking.otaRevision.status === "cancelled" ? "var(--err)" : "var(--ok)"} title={t("Stato dell'ultima revisione ricevuta dal portale (come su Channex)")}>{booking.otaRevision.status === "modified" ? t("Modificata") : booking.otaRevision.status === "cancelled" ? t("Cancellata dal portale") : t("Nuova")}</Pill></>}
+          {booking.otaRevision && (booking.status === "confirmed" || booking.status === "cancelled")
+            ? <Pill color={booking.otaRevision.status === "modified" ? "var(--warn)" : booking.otaRevision.status === "cancelled" ? "var(--err)" : "var(--ok)"} title={t("Stato dell'ultima revisione ricevuta dal portale (come su Channex)")}>{booking.otaRevision.status === "modified" ? t("Modificata") : booking.otaRevision.status === "cancelled" ? t("Cancellata") : t("Nuovo")}</Pill>
+            : <Pill color={st.color}>{t(st.label)}</Pill>}
         </Line>
-        <Line label={t("Fonte")}>{sourceTxt}</Line>
+        <Line label={t("Fonte/OTA")}>{sourceTxt}</Line>
         {channelTxt !== sourceTxt && <Line label={t("Canale")}>{channelTxt}</Line>}
-        <Line label={hasOtaCode ? t("ID prenotazione OTA") : t("ID della prenotazione")} mono>{code}<CopyBtn text={code} /></Line>
-        <Line label={t("ID prenotazione interno")} mono>{booking.id}<CopyBtn text={booking.id} /></Line>
-        {channexId && <Line label={t("ID Channex")} mono>{channexId}<CopyBtn text={channexId} /></Line>}
+        <Line label={t("ID della prenotazione")} mono>{hasOtaCode ? channexCodeOf(booking.channel, code) : code}<CopyBtn text={hasOtaCode ? channexCodeOf(booking.channel, code) : code} /></Line>
+        {channexId && <Line label={t("ID prenotazione")} mono>{channexId}<CopyBtn text={channexId} /></Line>}
+        {booking.otaRevision?.id && <Line label={t("Identificativo della revisione")} mono>{booking.otaRevision.id}<CopyBtn text={booking.otaRevision.id} /></Line>}
+        {hasOtaCode && <Line label={t("ID prenotazione OTA")} mono>{code}<CopyBtn text={code} /></Line>}
         {booking.bookedOn && <Line label={t("Prenotato il")}>{fmtDateWd(booking.bookedOn)}</Line>}
         <Line label={t("Proprietà")}>{structure?.name ?? "—"}</Line>
+        {booking.otaRevision?.ruid && <Line label="RUID" mono>{booking.otaRevision.ruid}<CopyBtn text={booking.otaRevision.ruid} /></Line>}
       </Section>
 
       {/* 2 · Check-in */}
@@ -183,9 +186,9 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         </Line>
         <Line label={t("Lingua")}>{languageName(guest?.language) || "—"}</Line>
         <Line label={t("Paese")}>{countryName(guest?.country) || "—"}</Line>
+        <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
         <Line label={t("Città")}>{guest?.city || "—"}</Line>
         <Line label={t("CAP")}>{guest?.zip || "—"}</Line>
-        <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
       </Section>
 
       {/* 4 · Camere */}

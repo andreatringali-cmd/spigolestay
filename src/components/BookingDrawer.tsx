@@ -46,7 +46,7 @@ import BookingRevisionsTab from "@/components/booking-panel/BookingRevisionsTab"
 import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
 import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
 import { recordOutgoing, markReminder } from "@/lib/guest-messages";
-import { safeMailtoHref, safeTelHref } from "@/lib/booking-info";
+import { channexCodeOf, safeMailtoHref, safeTelHref } from "@/lib/booking-info";
 
 const fmtDate = (iso: string) => fmtDateIt(iso);
 
@@ -979,7 +979,7 @@ export default function BookingDrawer() {
         {/* Titolo del pannello */}
         <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
           <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-txt">{t("Prenotazione")} {bookingCode(booking)}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-txt">{t("Prenotazione")} {booking.code && booking.channel !== "direct" && booking.channel !== "blocked" ? channexCodeOf(booking.channel, bookingCode(booking)) : bookingCode(booking)}</h1>
           <button onClick={printReceipt} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("Stampa")}</button>
         </div>
         {/* Intestazione: chi, quando, dove (sempre visibile) */}
@@ -1005,7 +1005,6 @@ export default function BookingDrawer() {
               : structure?.name
                 ? <div className="grid h-9 w-9 place-items-center rounded-lg text-xs font-bold text-white" title={structure?.name} style={{ backgroundColor: structure?.photoColor || "#285f92" }}>{structure.name.slice(0, 2).toUpperCase()}</div>
                 : null}
-            {contactIcons}
           </div>
         </div>
 

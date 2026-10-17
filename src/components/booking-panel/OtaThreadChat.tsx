@@ -165,7 +165,7 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
           {actions}
           {closed
             ? <span className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-faint">{t("Conversazione chiusa")}</span>
-            : <button type="button" onClick={() => void closeThread()} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Chiudi conversazione")}</button>}
+            : compact ? null /* nella scheda prenotazione non c'è il pulsante: si chiude da Messaggi OTA */ : <button type="button" onClick={() => void closeThread()} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Chiudi conversazione")}</button>}
         </div>
       </div>
 

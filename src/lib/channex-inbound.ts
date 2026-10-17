@@ -440,7 +440,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...(commShares[idx] != null ? { commissionAmount: commShares[idx] } : {}),
           ...(netPayout ? { netTotal: true } : {}),
           ...(r.ota_name ? { otaName: String(r.ota_name).slice(0, 60) } : {}),
-          otaRevision: { status: r.status === "modified" || r.status === "new" ? r.status : (isUpdate ? "modified" : "new"), at: Date.now() },
+          otaRevision: { status: r.status === "modified" || r.status === "new" ? r.status : (isUpdate ? "modified" : "new"), at: Date.now(), ...(r.id ? { id: r.id } : {}) },
           ...(deductShares[idx] != null ? { otaDeductions: deductShares[idx] } : {}),
           ...(feeShares[idx] != null ? { paymentFee: feeShares[idx] } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
