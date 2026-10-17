@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { nights, toISO, shiftISO, fmtDate } from "@/lib/dates";
@@ -190,6 +191,10 @@ export default function PreventiviPage() {
   // Reso SEMPRE (non solo quando si invia) così i ref sono già pronti al click su "Invia via email".
   const pdfPage1Ref = useRef<HTMLDivElement>(null);
   const pdfPage2Ref = useRef<HTMLDivElement>(null);
+  // Il contenitore fuori schermo del PDF va montato direttamente nel body: dentro una <Card> (che ha un'animazione d'entrata con transform)
+  // il position:fixed si ancora alla scheda e allunga la pagina oltre il footer.
+  const [pdfHostReady, setPdfHostReady] = useState(false);
+  useEffect(() => { setPdfHostReady(true); }, []);
   // Dati di pagamento (salvati nel browser, si inseriscono una volta).
   // Forma salvata: { holder, iban, extra } = default storico per tutte le strutture; { byStructure: { [id]: {holder,iban,extra} } } =
   // dati propri di una struttura (un IBAN inserito per una struttura non finisce sul preventivo di un'altra).
@@ -936,14 +941,17 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
              stesse identiche props dell'anteprima sopra (quoteDocProps), a piena risoluzione (scale=1),
              usato solo al momento dell'invio email per generare il vero PDF allegato (vedi
              buildQuotePdfBlob in sendQuoteEmail). Sempre montato così i ref sono già pronti al click. */}
-          <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794, zIndex: -1, pointerEvents: "none" }}>
-            <div ref={pdfPage1Ref} style={{ width: 794 }}>
-              <QuoteDoc {...quoteDocProps} scale={1} page={0} />
-            </div>
-            <div ref={pdfPage2Ref} style={{ width: 794 }}>
-              <QuoteDoc {...quoteDocProps} scale={1} page={1} />
-            </div>
-          </div>
+          {pdfHostReady && createPortal(
+            <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794, zIndex: -1, pointerEvents: "none" }}>
+              <div ref={pdfPage1Ref} style={{ width: 794 }}>
+                <QuoteDoc {...quoteDocProps} scale={1} page={0} />
+              </div>
+              <div ref={pdfPage2Ref} style={{ width: 794 }}>
+                <QuoteDoc {...quoteDocProps} scale={1} page={1} />
+              </div>
+            </div>,
+            document.body,
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> {t("Salva")}</button>
             <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
