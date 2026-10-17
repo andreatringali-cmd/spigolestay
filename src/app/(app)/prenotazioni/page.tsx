@@ -33,7 +33,6 @@ import BookingChannelLogo, { BookingChannelWordmark } from "@/components/Booking
 import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
-import PrenotazioniDettaglio from "./_dettaglio";
 import { StatoProvider, StatoCell } from "./_stato";
 
 const fmt = (iso: string) => fmtDate(iso);
@@ -112,10 +111,6 @@ export default function PrenotazioniPage() {
   const [chartOrder, setChartOrder] = useState<string[]>([]);
   const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:prenchartorder", JSON.stringify(o)); } catch {} };
   const [chartMenu, setChartMenu] = useState(false);
-  // Vista: "compact" (tabella con importi) oppure "detail" (righe alte con i passaggi da fare). Si ricorda l'ultima scelta.
-  const [view, setView] = useState<"compact" | "detail">("compact");
-  const pickView = (v: "compact" | "detail") => { setView(v); try { localStorage.setItem("spigolestay:pren:view", v); } catch {} };
-  useEffect(() => { try { if (localStorage.getItem("spigolestay:pren:view") === "detail") setView("detail"); } catch {} }, []);
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   useEffect(() => { try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
@@ -467,11 +462,6 @@ export default function PrenotazioniPage() {
         </Select>
         </div>
         <div className="flex items-center gap-2 max-sm:w-full sm:contents">
-        {/* Vista compatta / dettagliata */}
-        <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold max-sm:h-9 max-sm:min-w-0 max-sm:flex-1" role="group" aria-label={t("Vista")}>
-          <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition max-sm:flex-1 max-sm:px-1 ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
-          <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition max-sm:flex-1 max-sm:px-1 ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
-        </div>
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:flex-wrap">
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
@@ -491,8 +481,7 @@ export default function PrenotazioniPage() {
       )}
 
       {/* Telefono: lista a schede (la tabella qui sotto è nascosta) */}
-      {view === "detail" && <PrenotazioniDettaglio bookings={filtered} guestName={guestName} unitLabel={unitLabel} showStructure={activeStructureId === "all"} />}
-      <div className="flex flex-col gap-2 md:hidden" style={view === "detail" ? { display: "none" } : undefined}>
+      <div className="flex flex-col gap-2 md:hidden">
         {shownList.map((item) => {
           if (item.kind === "group") {
             const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
@@ -555,8 +544,8 @@ export default function PrenotazioniPage() {
       </div>
 
       {/* Tabella (tablet/desktop) */}
-      <StatoGate on={view === "compact"} ids={visibleIds}>
-      <div className="hidden max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block print:block print:max-h-none print:overflow-visible" style={view === "detail" ? { display: "none" } : undefined}>
+      <StatoGate on ids={visibleIds}>
+      <div className="hidden max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block print:block print:max-h-none print:overflow-visible">
         <table className="w-max min-w-full whitespace-nowrap text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="text-left text-xs uppercase tracking-wide text-faint">
