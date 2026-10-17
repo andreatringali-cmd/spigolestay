@@ -88,7 +88,6 @@ export default function PrenotazioniPage() {
 
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState<string>("all");
-  const [loc, setLoc] = useState<string>("all"); // "all" | "str:<id>" | "unit:<id>"
   // Default: oggi e futuro. Si vede chi è in casa oggi, chi parte oggi e tutto ciò che arriva (lo storico si apre cambiando le date).
   const [from, setFrom] = useState(() => toISO(new Date()));
   const [to, setTo] = useState("");
@@ -117,8 +116,6 @@ export default function PrenotazioniPage() {
   const [view, setView] = useState<"compact" | "detail">("compact");
   const pickView = (v: "compact" | "detail") => { setView(v); try { localStorage.setItem("spigolestay:pren:view", v); } catch {} };
   useEffect(() => { try { if (localStorage.getItem("spigolestay:pren:view") === "detail") setView("detail"); } catch {} }, []);
-  // Cambiando struttura attiva il filtro locale struttura/camera non ha più senso: si azzera.
-  useEffect(() => { setLoc("all"); }, [activeStructureId]);
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   useEffect(() => { try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
@@ -127,7 +124,7 @@ export default function PrenotazioniPage() {
   const todayISO = toISO(now);
   const pastActive = dateField === "tutte" || !!(from && from < todayISO); // stiamo guardando lo storico
 
-  const filtered = useMemo(() => {
+  const baseFiltered = useMemo(() => {
     const term = q.trim().toLowerCase();
     const qTokens = normName(q).split(" ").filter(Boolean);
     return bookings.filter((b) => {
@@ -139,9 +136,6 @@ export default function PrenotazioniPage() {
       // Filtro globale struttura (selettore in alto a destra)
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) return false;
       if (term && !(() => { const h = normName(guestName(b)); return qTokens.length > 0 && qTokens.every((tk) => h.includes(tk)); })() && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
-      if (channel !== "all" && b.channel !== channel) return false;
-      if (loc.startsWith("str:") && b.structureId !== loc.slice(4)) return false;
-      if (loc.startsWith("unit:") && b.unitId !== loc.slice(5)) return false;
       // "In casa": la prenotazione occupa la camera in una qualunque data dell'intervallo
       // [from,to] (arrivata prima e non ancora partita), non un confronto su una singola data —
       // è la stessa logica di "chi occupa quel giorno" usata nel Registro di Statistiche, così le
@@ -165,10 +159,18 @@ export default function PrenotazioniPage() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, q, channel, activeStructureId, loc, from, to, dateField, todayISO]);
+  }, [bookings, q, activeStructureId, from, to, dateField, todayISO]);
+  const filtered = useMemo(() => (channel === "all" ? baseFiltered : baseFiltered.filter((b) => b.channel === channel)), [baseFiltered, channel]);
+  // Canali realmente presenti nel registro (con gli altri filtri attivi): il menu mostra solo questi, con il numero di prenotazioni.
+  // Il canale già scelto resta in elenco anche se ora non ha righe, così si può tornare a "Tutti".
+  const channelOptions = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const b of baseFiltered) n.set(b.channel, (n.get(b.channel) ?? 0) + 1);
+    if (channel !== "all" && !n.has(channel)) n.set(channel, 0);
+    return (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked" && n.has(c)).map((c) => ({ key: c, label: CHANNELS[c].label, count: n.get(c) ?? 0 })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }, [baseFiltered, channel]);
 
-  const structuresToShow = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId);
-  const clearFilters = () => { setQ(""); setChannel("all"); setLoc("all"); setDateField("attive"); setFrom(toISO(new Date())); setTo(""); }; // torna a "oggi e futuro"
+  const clearFilters = () => { setQ(""); setChannel("all"); setDateField("attive"); setFrom(toISO(new Date())); setTo(""); }; // torna a "oggi e futuro"
 
   // Ordinamento tabella
   const sortVal = (b: (typeof filtered)[number], key: string): string | number => {
@@ -222,7 +224,7 @@ export default function PrenotazioniPage() {
   }, [sorted]);
   const PAGE = 150;
   const [limit, setLimit] = useState(PAGE);
-  useEffect(() => { setLimit(PAGE); }, [q, channel, loc, from, to, dateField, activeStructureId]); // cambia filtro: si riparte dalla prima pagina
+  useEffect(() => { setLimit(PAGE); }, [q, channel, from, to, dateField, activeStructureId]); // cambia filtro: si riparte dalla prima pagina
   const shownList = displayList.slice(0, limit);
   // Righe per cui la colonna Stato calcola il percorso: solo quelle visibili (singole + camere dei gruppi aperti).
   const visibleIds = shownList.flatMap((it) => (it.kind === "single" ? [it.b.id] : groupOpen.has(it.gid) ? it.members.map((m) => m.id) : []));
@@ -467,10 +469,9 @@ export default function PrenotazioniPage() {
           <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:w-full max-sm:justify-between" /></div>
         </div>
         <div className="flex items-center gap-2 max-sm:w-full sm:contents">
-        <div className="max-sm:min-w-0 max-sm:flex-1 max-sm:[&>div]:w-full max-sm:[&>div>button]:w-full max-sm:[&>div>button]:justify-between"><StructureFilter value={loc} onChange={setLoc} structures={structuresToShow} units={units} roomTypes={roomTypes} single={activeStructureId !== "all"} /></div>
         <Select className="max-sm:min-w-0 max-sm:flex-1" value={channel} onChange={setChannel} label={t("Canale")}>
           <option value="all">{t("Tutti i canali")}</option>
-          {(Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}
+          {channelOptions.map((o) => (<option key={o.key} value={o.key}>{o.label} ({o.count})</option>))}
         </Select>
         </div>
         <div className="flex items-center gap-2 max-sm:w-full sm:contents">
@@ -674,77 +675,6 @@ function Th({ children, k, sort, onSort }: { children: React.ReactNode; k?: stri
   );
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function StructureFilter({ value, onChange, structures, units, roomTypes, single }: { value: string; onChange: (v: string) => void; structures: any[]; units: any[]; roomTypes: any[]; single?: boolean }) {
-  const { t } = useLang();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("pointerdown", h);
-    return () => document.removeEventListener("pointerdown", h);
-  }, []);
-  const allLabel = single ? t("Tutte le camere") : t("Tutte le strutture e camere");
-  const label =
-    value === "all" ? allLabel
-    : value.startsWith("str:") ? (structures.find((s) => s.id === value.slice(4))?.name ?? t("Struttura"))
-    : (units.find((u) => u.id === value.slice(5))?.name ?? t("Camera"));
-  const pick = (v: string) => { onChange(v); setOpen(false); };
-  // Raggruppa le camere di una struttura per tipologia (room type).
-  const groupsFor = (sid: string) => {
-    const us = units.filter((u) => u.structureId === sid);
-    const map = new Map<string, { name: string; list: any[] }>();
-    for (const u of us) {
-      const rt = roomTypes.find((r) => r.id === u.roomTypeId);
-      const k = u.roomTypeId ?? "—";
-      if (!map.has(k)) map.set(k, { name: rt?.name ?? t("Camera"), list: [] });
-      map.get(k)!.list.push(u);
-    }
-    return [...map.values()];
-  };
-  return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt hover:bg-wash">
-        <span className="max-w-[190px] truncate">{label}</span>
-        <Icon name="chevron" size={14} />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-64 overflow-auto rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
-          <Opt active={value === "all"} onClick={() => pick("all")}>{allLabel}</Opt>
-          {single ? (
-            // Una sola struttura selezionata: solo camere, divise per tipologia.
-            groupsFor(structures[0]?.id).map((g, i) => (
-              <div key={i}>
-                <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{g.name}</div>
-                {g.list.map((u) => (
-                  <Opt key={u.id} active={value === `unit:${u.id}`} onClick={() => pick(`unit:${u.id}`)}>{u.name}</Opt>
-                ))}
-              </div>
-            ))
-          ) : (
-            structures.map((s) => (
-              <div key={s.id}>
-                <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{s.name}</div>
-                <Opt active={value === `str:${s.id}`} onClick={() => pick(`str:${s.id}`)}>— {t("Tutta la struttura")}</Opt>
-                {groupsFor(s.id).map((g, i) => (
-                  <div key={i}>
-                    <div className="px-3 pb-0.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-faint">{g.name}</div>
-                    {g.list.map((u) => (
-                      <Opt key={u.id} active={value === `unit:${u.id}`} onClick={() => pick(`unit:${u.id}`)}>{u.name}</Opt>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-function Opt({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`block w-full truncate rounded-md px-2 py-1.5 text-left text-sm ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{children}</button>;
-}
 function Select({ value, onChange, label, children, className = "" }: { value: string; onChange: (v: string) => void; label: string; children: React.ReactNode; className?: string }) {
   return (
     <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={`rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus ${className}`}>
