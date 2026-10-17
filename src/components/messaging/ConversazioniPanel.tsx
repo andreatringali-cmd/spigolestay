@@ -2,7 +2,7 @@
 
 import { fmtDate, fmtDM } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useData } from "@/lib/store";
 import { buildGuestLink, buildGroupGuestLink, shortenLink } from "@/lib/guestlink";
 import { playSound } from "@/lib/sound";
@@ -167,6 +167,20 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const persist = (key: string, v: unknown) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
 
   const [sel, setSel] = useState<string | null>(null);
+  // /messaggi?guest=<id> (dalla scheda prenotazione) apre subito la chat di quell'ospite, anche se si è già su /messaggi (il parametro è letto a ogni cambio).
+  // L'id si valida contro gli ospiti; una volta applicato il parametro si toglie dall'indirizzo, così lo stesso link funziona di nuovo la volta dopo.
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const guestParam = searchParams?.get("guest") ?? "";
+  useEffect(() => {
+    if (!guestParam) return;
+    if (!guests.some((g) => g.id === guestParam)) return; // ospiti non ancora caricati, o id sconosciuto: nessuna chat aperta
+    setSel(guestParam);
+    const rest = new URLSearchParams(searchParams?.toString() ?? ""); rest.delete("guest");
+    const qs = rest.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guestParam, guests]);
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   // Su telefono/tablet (tastiera a schermo) «Invio» va a capo e si invia con il pulsante; su computer Invio invia e Shift+Invio va a capo.

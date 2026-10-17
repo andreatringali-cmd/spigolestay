@@ -84,3 +84,17 @@ export function ago(ts: number, now = Date.now()): string {
   const d = Math.round(h / 24); if (d < 30) return `${d} ${d === 1 ? "giorno" : "giorni"} fa`;
   const mo = Math.round(d / 30); return `${mo} ${mo === 1 ? "mese" : "mesi"} fa`;
 }
+
+/** Conversazioni di UNA prenotazione (id prenotazione Channex), solo quelle di property consentite all'utente. */
+export function threadsOfBooking(threads: OtaThread[], bookingId: string, allowed: Set<string>): OtaThread[] {
+  const id = bookingId.trim();
+  if (!id) return [];
+  return threads.filter((t) => t.bookingId === id && threadAllowed(t, allowed));
+}
+
+/** Conversazione da mostrare nella scheda prenotazione: la più recente tra quelle aperte, altrimenti l'ultima (chiusa). null se non ce ne sono. */
+export function pickBookingThread(threads: OtaThread[]): OtaThread | null {
+  if (!threads.length) return null;
+  const byRecent = [...threads].sort((a, b) => b.lastAt - a.lastAt);
+  return byRecent.find((t) => !t.closed) ?? byRecent[0];
+}

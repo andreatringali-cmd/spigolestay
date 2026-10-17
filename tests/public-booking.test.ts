@@ -15,7 +15,11 @@ const { POST } = await import("../src/app/api/public-booking/route.ts");
 const DATA_KEY = "spigolestay:data:v1";
 const POOL_KEY = "spigolestay:inventorypool";
 const calls = (k: string) => G.__stubs.calls[k] ?? [];
-const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+// Il server ragiona in giorni di Roma: "oggi" va preso a Roma, non in UTC (tra le 00:00 e le 02:00 italiane i due giorni differiscono).
+const day = (offset: number) => {
+  const [y, m, d] = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date()).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + offset)).toISOString().slice(0, 10);
+};
 
 const baseData = (over: Record<string, unknown> = {}) => ({
   structures: [{ id: "st-1", name: "Casa Ortigia", email: "info@casa.example", currency: "€" }],

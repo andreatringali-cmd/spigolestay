@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   // Autorizzazione (come /api/channex/messages): la prenotazione deve risultare importata per
   // questo tenant, o per un'org condivisa di cui è membro, in channex_bookings.
-  const { data: cb } = await auth.admin.from("channex_bookings").select("channex_property_id, tenant_id").eq("booking_id", bookingId).maybeSingle();
+  const { data: cb } = await auth.admin.from("channex_bookings").select("channex_property_id, tenant_id").eq("booking_id", bookingId).order("imported_at", { ascending: false }).limit(1).maybeSingle(); // più revisioni per prenotazione: maybeSingle() da solo darebbe errore e un falso "non trovata"
   if (!cb) return NextResponse.json({ error: "prenotazione_non_trovata" }, { status: 404 });
   let ok = cb.tenant_id === auth.tenantId;
   if (!ok && cb.channex_property_id) {

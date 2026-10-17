@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
@@ -13,11 +14,19 @@ type Tab = "conversazioni" | "modelli" | "concierge";
 
 // Area Messaggi unificata: chat + invii programmati, modelli & automazioni, e concierge AI — a tab.
 export default function MessaggiPage() {
+  // useSearchParams (usato qui e in ConversazioniPanel) richiede un confine Suspense.
+  return <Suspense fallback={null}><MessaggiInner /></Suspense>;
+}
+
+function MessaggiInner() {
   const { t } = useLang();
   const { bookings, activeStructureId } = useData();
   const [tab, setTab] = useState<Tab>(() => {
     try { const p = new URLSearchParams(window.location.search).get("tab"); return (p === "modelli" || p === "concierge") ? p : "conversazioni"; } catch { return "conversazioni"; }
   });
+  // «Apri in Messaggi» dalla scheda prenotazione (?guest=…) porta alle Conversazioni anche se si era su un'altra scheda di questa pagina.
+  const hasGuestParam = !!useSearchParams()?.get("guest");
+  useEffect(() => { if (hasGuestParam) setTab("conversazioni"); }, [hasGuestParam]);
 
   // Conversazioni "da leggere" della struttura attiva: stesso conteggio del filtro "Da leggere" nell'elenco (messaggio dell'ospite non ancora letto, oppure segnata a mano).
   // Prima contava tutte le strutture e anche le già lette, per questo il numero non tornava con l'elenco.

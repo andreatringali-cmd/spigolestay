@@ -1,13 +1,21 @@
 // Controlli di PROPRIETÀ per le route Channex: si tocca solo ciò che è di un proprio immobile (o di una struttura condivisa di cui si è soci).
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Id delle organizzazioni di cui l'utente è socio ATTIVO (un socio disattivato non deve più leggere né scrivere nulla). */
+export function activeOrgIds(rows: unknown): string[] {
+  return ((rows ?? []) as { org_id?: string; active?: boolean | null }[])
+    .filter((m) => m.active !== false)
+    .map((m) => m.org_id)
+    .filter((x): x is string => !!x);
+}
+
 /** Id delle property Channex collegate a questo utente (direttamente o tramite una struttura condivisa). */
 export async function allowedChannexProperties(admin: SupabaseClient, userId: string): Promise<Set<string>> {
   const out = new Set<string>();
   const { data: own } = await admin.from("channex_map").select("channex_property_id").eq("tenant_id", userId);
   for (const r of (own ?? []) as { channex_property_id?: string }[]) if (r.channex_property_id) out.add(r.channex_property_id);
-  const { data: mem } = await admin.from("memberships").select("org_id").eq("user_id", userId);
-  const orgIds = ((mem ?? []) as { org_id?: string }[]).map((m) => m.org_id).filter((x): x is string => !!x);
+  const { data: mem } = await admin.from("memberships").select("org_id, active").eq("user_id", userId);
+  const orgIds = activeOrgIds(mem);
   if (orgIds.length) {
     const { data: byOrg } = await admin.from("channex_map").select("channex_property_id").in("org_id", orgIds);
     for (const r of (byOrg ?? []) as { channex_property_id?: string }[]) if (r.channex_property_id) out.add(r.channex_property_id);
@@ -34,8 +42,8 @@ export async function allowedChannexMapRows(admin: SupabaseClient, userId: strin
   };
   const { data: own } = await admin.from("channex_map").select("channex_property_id, rooms").eq("tenant_id", userId);
   push(own);
-  const { data: mem } = await admin.from("memberships").select("org_id").eq("user_id", userId);
-  const orgIds = ((mem ?? []) as { org_id?: string }[]).map((m) => m.org_id).filter((x): x is string => !!x);
+  const { data: mem } = await admin.from("memberships").select("org_id, active").eq("user_id", userId);
+  const orgIds = activeOrgIds(mem);
   if (orgIds.length) {
     const { data: byOrg } = await admin.from("channex_map").select("channex_property_id, rooms").in("org_id", orgIds);
     push(byOrg);

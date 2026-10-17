@@ -54,3 +54,15 @@ test("mergeThreads: senza doppioni, dalla più recente; ago in italiano", () => 
   const now = Date.parse("2026-10-17T12:00:00Z");
   assert.equal(T.ago(now - 13 * 3600e3, now), "13 ore fa"); assert.equal(T.ago(now - 3 * 86400e3, now), "3 giorni fa"); assert.equal(T.ago(now - 5e3, now), "adesso"); assert.equal(T.ago(0, now), "");
 });
+test("threadsOfBooking/pickBookingThread: solo la prenotazione e le property consentite; aperta più recente, altrimenti l'ultima", () => {
+  const base = T.normalizeThread(row())!;
+  const mk = (o: Record<string, unknown>) => ({ ...base, ...o });
+  const all = [mk({ id: "a", bookingId: "b1", propertyId: "p1", lastAt: 100, closed: true }), mk({ id: "b", bookingId: "b1", propertyId: "p1", lastAt: 50, closed: false }), mk({ id: "c", bookingId: "b1", propertyId: "p9", lastAt: 999 }), mk({ id: "d", bookingId: "b2", propertyId: "p1", lastAt: 500 })];
+  const mine = T.threadsOfBooking(all, "b1", new Set(["p1"]));
+  assert.deepEqual(mine.map((t: { id: string }) => t.id), ["a", "b"]);              // c è di un'altra property, d di un'altra prenotazione
+  assert.equal(T.pickBookingThread(mine)!.id, "b");                                   // l'aperta batte la chiusa più recente
+  assert.equal(T.pickBookingThread(mine.filter((t: { closed: boolean }) => t.closed))!.id, "a");
+  assert.equal(T.pickBookingThread([]), null);
+  assert.deepEqual(T.threadsOfBooking(all, "", new Set(["p1"])), []);
+  assert.deepEqual(T.threadsOfBooking(all, "b1", new Set()), []);
+});

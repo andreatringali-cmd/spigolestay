@@ -41,6 +41,12 @@ import Icon from "@/components/Icon";
 import MediaImg from "@/components/MediaImg";
 import MediaLink from "@/components/MediaLink";
 import QRCode from "qrcode";
+import BookingInfoTab from "@/components/booking-panel/BookingInfoTab";
+import BookingRevisionsTab from "@/components/booking-panel/BookingRevisionsTab";
+import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
+import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
+import { recordOutgoing, markReminder } from "@/lib/guest-messages";
+import { safeMailtoHref, safeTelHref } from "@/lib/booking-info";
 
 const fmtDate = (iso: string) => fmtDateIt(iso);
 
@@ -120,7 +126,7 @@ export default function BookingDrawer() {
   const tabsRef = useRef<HTMLDivElement>(null);
   // Su telefono le schede scorrono: la scheda attiva si porta in vista (altrimenti "Gestione" resta fuori schermo).
   useEffect(() => { (tabsRef.current?.querySelector('[aria-selected="true"]') as HTMLElement | null)?.scrollIntoView({ inline: "center", block: "nearest" }); }, [tab, selectedBookingId]);
-  const voucherPdfRef = useRef<HTMLDivElement>(null);
+  const voucherPdfRef = useRef<HTMLDivElement>(null); const lastSendRef = useRef<Record<string, number>>({}); const sendOnce = (k: string) => { const n = Date.now(); if (n - (lastSendRef.current[k] ?? 0) < 3000) return false; lastSendRef.current[k] = n; return true; }; // anti-doppio-clic (3 s): evita invii/registrazioni duplicate, un nuovo invio dopo 3 s resta possibile
 
   const loadForm = () => {
     if (!booking) { setForm(null); return; }
@@ -308,6 +314,7 @@ export default function BookingDrawer() {
   const sendVoucherNow = async () => {
     if (!booking) return;
     if (!guest?.email) { setVoucher({ ok: false, msg: t("L'ospite non ha un'email.") }); return; }
+    if (!sendOnce(`voucher:${booking.id}`)) return;
     setVoucher({ sending: true });
     // Cattura l'anteprima reale del voucher (VoucherDoc, fuori schermo) come vero PDF allegato —
     // stessa tecnica dei preventivi (fotocopia html2canvas), invece del disegno pdf-lib a parte.
@@ -321,6 +328,7 @@ export default function BookingDrawer() {
       }
     } catch (e) { console.error("sendVoucherNow: cattura PDF anteprima fallita, invio con fallback server:", e instanceof Error ? e.message : e); }
     const r = await sendVoucher(booking, { getStructure, getGuest, getRoomType, getUnit }, pdf);
+    if (r.ok) recordOutgoing(guest.id, `Voucher di conferma inviato a ${guest.email}`, "Email", undefined, { bid: booking.id, rem: "voucher" }); // resta traccia nella Timeline e in Messaggi
     setVoucher({ sending: false, ok: r.ok, msg: r.ok ? t("Voucher inviato a") + " " + guest.email : r.error });
   };
 
@@ -355,8 +363,8 @@ export default function BookingDrawer() {
   const contactIcons = (
     <div className="flex shrink-0 gap-1.5">
       <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
-      <a href={guest?.phone ? `tel:${guest.phone}` : undefined} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
-      <a href={`mailto:${guest?.email ?? ""}`} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
+      <a href={safeTelHref(guest?.phone)} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
+      <a href={safeMailtoHref(guest?.email) ?? "mailto:"} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
     </div>
   );
 
@@ -438,8 +446,8 @@ export default function BookingDrawer() {
               <>
                 <p className="mb-2 text-[13px] text-dim">{t("Ospite in partenza: chiedi ora una recensione, aumenta il ranking.")}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  <a href={rwa || undefined} target="_blank" rel="noopener noreferrer" className={`flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
-                  <a href={guest?.email ? `mailto:${guest.email}?subject=${encodeURIComponent("Grazie del soggiorno!")}&body=${encodeURIComponent(rmsg)}` : undefined} className={`flex h-8 items-center rounded-lg border border-line px-3 text-sm font-medium text-txt hover:bg-wash ${guest?.email ? "" : "pointer-events-none opacity-40"}`}>Email</a>
+                  <a href={rwa || undefined} target="_blank" rel="noopener noreferrer" onClick={() => { if (!booking.reviewRequestedAt) updateBooking(booking.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "whatsapp" }); }} className={`flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                  <a href={safeMailtoHref(guest?.email) ? `${safeMailtoHref(guest?.email)}?subject=${encodeURIComponent("Grazie del soggiorno!")}&body=${encodeURIComponent(rmsg)}` : undefined} onClick={() => { if (!booking.reviewRequestedAt) updateBooking(booking.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "email" }); }} className={`flex h-8 items-center rounded-lg border border-line px-3 text-sm font-medium text-txt hover:bg-wash ${guest?.email ? "" : "pointer-events-none opacity-40"}`}>Email</a>
                   <button onClick={() => navigator.clipboard?.writeText(rmsg)} className="flex h-8 items-center rounded-lg border border-line px-3 text-sm font-medium text-txt hover:bg-wash">{t("Copia")}</button>
                 </div>
               </>
@@ -637,7 +645,7 @@ export default function BookingDrawer() {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
           const ciMsg = (u: string) => `Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${u}`;
-          const sendCiWa = async () => { const s = await shortenLink(link); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciMsg(s))}`, "_blank", "noopener,noreferrer"); };
+          const sendCiWa = async () => { if (!sendOnce(`ci:${booking.id}`)) return; const s = await shortenLink(link); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciMsg(s))}`, "_blank", "noopener,noreferrer"); if (guest) { recordOutgoing(guest.id, ciMsg(s), "WhatsApp (link)", undefined, { bid: booking.id, rem: "checkin" }); markReminder(booking.id, "checkin"); } };
           const copyCi = async () => { const s = await shortenLink(link); try { await navigator.clipboard.writeText(s); } catch {} };
           if (!moduleOn("checkin")) return (
             <div className="flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
@@ -664,18 +672,21 @@ export default function BookingDrawer() {
           const gmailGuide = (msg: string) => guest?.email ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(guest.email)}&su=${encodeURIComponent(guideSubject)}&body=${encodeURIComponent(msg)}` : "";
           const guideMsgWith = (link: string) => guideMessage(booking.structureId, { name: guest?.fullName || "", link, structureName: structure?.name || "" });
           const sendGuideWa = async () => {
+            if (!sendOnce(`guidewa:${booking.id}`)) return;
             const short = await shortenGuideLink(gLink);
             window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(guideMsgWith(short))}`, "_blank", "noopener,noreferrer");
+            if (guest) { recordOutgoing(guest.id, guideMsgWith(short), "WhatsApp (link)", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); }
           };
           const sendGuideEmail = async () => {
             if (!guest?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
+            if (!sendOnce(`guideemail:${booking.id}`)) return;
             const to = guest.email;
             const short = await shortenGuideLink(gLink);
             const msg = guideMsgWith(short);
             try {
               const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: guestLangOf(guest), to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
               const j = await r.json().catch(() => ({}));
-              if (r.ok && j?.ok) window.alert(`${t("Guida inviata a")} ${to}`);
+              if (r.ok && j?.ok) { if (guest) { recordOutgoing(guest.id, msg, "Email", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); } window.alert(`${t("Guida inviata a")} ${to}`); }
               else window.open(gmailGuide(msg), "_blank");
             } catch { window.open(gmailGuide(msg), "_blank"); }
           };
@@ -838,8 +849,8 @@ export default function BookingDrawer() {
         <Field label={t("Email")}><input className={inputCls} value={form.email} onChange={(e) => set({ email: e.target.value })} placeholder="nome@email.it" /></Field>
         <div className="flex gap-2 pt-0.5">
           <ContactBtn href={form.phone.replace(/[^\d]/g, "") ? `https://wa.me/${form.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Buongiorno${form.firstName ? " " + form.firstName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(form.checkIn)}.`)}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={form.phone ? `tel:${form.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={`mailto:${form.email ?? ""}`} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={safeTelHref(form.phone)} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={safeMailtoHref(form.email) ?? "mailto:"} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
         </div>
       </Section>
 
@@ -1034,7 +1045,10 @@ export default function BookingDrawer() {
         <div className="flex-1 overflow-y-auto">
           {tab === "manage"
             ? (mode === "edit" ? editBody : (expanded ? viewBody : previewBody))
-            : <div className="grid h-full min-h-[240px] place-items-center px-6 py-10 text-center text-sm text-dim">{t("Scheda in preparazione.")}</div>}
+            : tab === "info" ? <BookingInfoTab booking={booking} />
+            : tab === "rev" ? <BookingRevisionsTab booking={booking} />
+            : tab === "timeline" ? <BookingTimelineTab booking={booking} />
+            : <BookingMessagesTab booking={booking} />}
         </div>
 
         {/* Barra azioni (solo nella scheda Gestione) */}
