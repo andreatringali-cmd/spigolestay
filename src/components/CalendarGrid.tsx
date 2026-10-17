@@ -44,7 +44,6 @@ import { useToast } from "@/components/ToastProvider";
 // Scheda camera: opzioni frequenza servizio e giorni della settimana.
 const FREQ_OPTS = ["Ogni partenza", "1 Giorno", "2 Giorni", "3 Giorni", "4 Giorni", "5 Giorni", "7 Giorni"];
 const WEEK_DAYS = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"];
-const freqDays = (label?: string) => { const m = /^(\d+)/.exec(label ?? ""); return m ? parseInt(m[1], 10) : 0; }; // 0 = solo alla partenza
 
 // Card "Insights" del calendario (selettore mostra/nascondi).
 const INSIGHT_CARDS = [
@@ -129,6 +128,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       if (r) {
         const p = JSON.parse(r);
         if (p.span !== 7 && p.span !== "month") p.span = "month";
+        p.group = "struct"; // la vista è sempre "esplosa" (struttura → tipologia): niente più scelta Compatta/Esplosa
         setVw((v) => ({ ...v, ...p }));
         // "Inizia da ieri" persistito: ricalcola subito il giorno di partenza (altrimenti al
         // refresh l'impostazione resta salvata ma il calendario riparte comunque da oggi/mese).
@@ -184,8 +184,6 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
   // Icone di stato camera (arrivo/partenza, pulizia, lenzuola) nell'etichetta riga: nascoste di
   // default (si vede solo il nome/numero), mostrabili con un interruttore. Preferenza per-dispositivo.
-  const [showRoomIcons, setShowRoomIcons] = useState(() => { try { return localStorage.getItem("spigolestay:cal:roomicons") === "1"; } catch { return false; } });
-  const toggleRoomIcons = () => setShowRoomIcons((v) => { const n = !v; try { localStorage.setItem("spigolestay:cal:roomicons", n ? "1" : "0"); } catch {} return n; });
   // Ultimo aggiornamento + stato connessione dei canali OTA (per legenda e spunte).
   const [lastRun, setLastRun] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
@@ -869,40 +867,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const { laneOf, lanes } = assignLanes(laneSource.filter((b) => b.checkOut > periodFrom && b.checkIn < periodTo));
     const hasConflict = lanes > 1;
     const unitRowH = rowH * lanes;
-    // Movimenti di OGGI (monocromatico): arrivo, partenza, turnover, occupata, libera, fuori servizio.
-    const todayIso = toISO(new Date());
-    const nc = (b: (typeof uBookings)[number]) => b.status !== "cancelled";
-    const arrToday = uBookings.some((b) => nc(b) && b.checkIn === todayIso);
-    const depToday = uBookings.some((b) => nc(b) && b.checkOut === todayIso);
-    const stayNow = uBookings.find((b) => nc(b) && b.checkIn <= todayIso && todayIso < b.checkOut);
-    const arrowP = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-    // Sempre entrambe le icone: entrata verde se arrivo oggi, uscita rossa se partenza oggi; grigie se assenti.
-    const inArrow = <span className="shrink-0" style={{ color: arrToday ? "var(--ok)" : "var(--faint)" }} title={arrToday ? "Arrivo oggi" : "Nessun arrivo oggi"}><svg {...arrowP}><path d="M20 4v16" /><path d="M4 12h12" /><path d="M12 8l4 4-4 4" /></svg></span>;
-    const outArrow = <span className="shrink-0" style={{ color: depToday ? "var(--err)" : "var(--faint)" }} title={depToday ? "Partenza oggi" : "Nessuna partenza oggi"}><svg {...arrowP}><path d="M4 4v16" /><path d="M8 12h12" /><path d="M16 8l4 4-4 4" /></svg></span>;
-    const statusEl = unit.outOfService
-      ? <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] font-bold leading-none text-dim" style={{ borderColor: "var(--dim)" }} title="Fuori servizio">!</span>
-      : <span className="flex shrink-0 items-center gap-0.5">{inArrow}{outArrow}</span>;
-    // Pulizia: ALLINEATA alla pagina Pulizie (fonte di verità) → serve se c'è arrivo, partenza
-    // o un soggiorno in corso (riassetto). Niente più logica separata su giorni-di-servizio,
-    // che creava incongruenze tra Calendario e Pulizie.
-    const daysIn = stayNow ? Math.round((Date.parse(todayIso) - Date.parse(stayNow.checkIn)) / 86400000) : 0;
-    const needsClean = !unit.outOfService && (arrToday || depToday || !!stayNow);
-    const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
-    const broom = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4L9.5 14.5" /><path d="M13 8l3 3" /><path d="M9.5 14.5l-4.5 1 -1 4.5 4.5 -1 4.5 -1 -3.5 -3.5z" /><path d="M6 16l2 2" /></svg>;
-    const cleanColor = !needsClean ? "var(--faint)" : cleanedToday ? "var(--ok)" : "var(--warn)";
-    const cleanTitle = !needsClean ? "Nessuna pulizia oggi" : cleanedToday ? "Camera pulita oggi" : "Camera da pulire";
-    const cleanEl = <span className="shrink-0" style={{ color: cleanColor }} title={cleanTitle}>{broom}</span>;
-    // Icona cambio lenzuola: dovuto ad arrivo/partenza o ogni N giorni (Frequenza cambio lenzuola).
-    const linenN = freqDays(unit.linenFreq);
-    const linenDue = !unit.outOfService && (arrToday || depToday || (!!stayNow && linenN > 0 && daysIn > 0 && daysIn % linenN === 0));
-    const linenDoneToday = !!linenDone[`${unit.id}:${todayIso}`];
-    const linenColor = !linenDue ? "var(--faint)" : linenDoneToday ? "var(--ok)" : "var(--focus)";
-    const linenTitle = !linenDue ? "Nessun cambio lenzuola oggi" : linenDoneToday ? "Lenzuola cambiate oggi" : "Lenzuola da cambiare";
-    const linenEl = <span className="shrink-0" style={{ color: linenColor }} title={linenTitle}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8v10" /><path d="M3 14h18" /><path d="M21 18v-5a3 3 0 0 0-3-3H9v4" /><path d="M6 11.5h.01" /></svg></span>;
     return (
       <div key={unit.id} className="flex border-b border-line" style={hasConflict ? { backgroundColor: "color-mix(in srgb, var(--warn) 7%, transparent)" } : undefined}>
         <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: unitRowH, boxShadow: "6px 0 8px -6px rgba(0,0,0,.14)", backgroundColor: hasConflict ? "color-mix(in srgb, var(--warn) 7%, var(--surface))" : undefined }}>
-          {showRoomIcons && <>{statusEl}{cleanEl}{linenEl}</>}
           <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-semibold tracking-[-0.01em] hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
           {hasConflict && <span title="Sovrapposizione: due prenotazioni sulla stessa camera" className="shrink-0 text-[11px] leading-none" style={{ color: "var(--warn)" }}>⚠</span>}
           {vw.group === "type" && <span className="shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
@@ -1173,13 +1140,6 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             </button>
             {vizOpen && (
               <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
-                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Vista</div>
-                <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
-                  {([["type", "Compatta"], ["struct", "Esplosa"]] as ["type" | "struct", string][]).map(([v, lab]) => (
-                    <button key={v} onClick={() => patchView({ group: v })} title={v === "type" ? "Raggruppa per tipologia (tipologie uguali unite)" : "Dividi per struttura, poi per tipologia"} className={`rounded-md py-1 text-xs font-semibold transition ${vw.group === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
-                  ))}
-                </div>
-                <div className="my-1 border-t border-line" />
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Finestra</div>
                 <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
                   {([[7, "7 giorni"], ["month", "Mensile"]] as [Span, string][]).map(([v, lab]) => (
@@ -1198,9 +1158,6 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                   <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
                   <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
                 </div>
-                <div className="my-1 border-t border-line" />
-                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichette camera</div>
-                <MenuToggle label="Icone (arrivo/partenza, pulizia, lenzuola)" on={showRoomIcons} onClick={toggleRoomIcons} />
               </div>
             )}
           </div>
