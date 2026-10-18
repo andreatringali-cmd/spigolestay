@@ -189,8 +189,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         </Line>
         <Line label={t("Lingua")}>{languageName(guest?.language) || "—"}</Line>
         <Line label={t("Paese")}>{countryName(guest?.country) || "—"}</Line>
-        <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
         <Line label={t("Città")}>{guest?.city || "—"}</Line>
+        <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
         <Line label={t("CAP")}>{guest?.zip || "—"}</Line>
       </Section>
 
