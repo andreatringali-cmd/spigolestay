@@ -34,10 +34,10 @@ const CARD_TYPES: Record<string, string> = { VI: "Visa", MC: "MasterCard", CA: "
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const money = (n: number, cur?: string) => eur(n, !cur || cur.toUpperCase() === "EUR" ? "€" : cur.toUpperCase());
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <div className="px-5 pb-3 pt-4">
-      <div className="mb-3 border-b border-line pb-1.5 text-[15px] font-medium text-dim">{title}</div>
+      {title && <div className="mb-3 border-b border-line pb-1.5 text-[15px] font-medium text-dim">{title}</div>}
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
@@ -166,7 +166,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   return (
     <div className="flex flex-col">
       {/* 1 · Dati principali */}
-      <Section title={t("Prenotazione")}>
+      <Section>
         <Line label={t("Stato")}>
           {booking.otaRevision && (booking.status === "confirmed" || booking.status === "cancelled")
             ? <Pill color={booking.otaRevision.status === "modified" ? "var(--warn)" : booking.otaRevision.status === "cancelled" ? "var(--err)" : "var(--ok)"} title={t("Stato dell'ultima revisione ricevuta dal portale (come su Channex)")}>{booking.otaRevision.status === "modified" ? t("Modificata") : booking.otaRevision.status === "cancelled" ? t("Cancellata") : t("Nuovo")}</Pill>
