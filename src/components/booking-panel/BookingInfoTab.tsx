@@ -78,7 +78,7 @@ const nightsTxt = (n: number, t: (s: string) => string) => `${n} ${n === 1 ? t("
 const SubTitle = ({ children }: { children: ReactNode }) => <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{children}</div>;
 
 export default function BookingInfoTab({ booking }: { booking: Booking }) {
-  const { bookings, getGuest, getUnit, getRoomType, getStructure, updateGuest, patchBookingsSilently } = useData();
+  const { bookings, getGuest, getRoomType, getStructure, updateGuest, patchBookingsSilently } = useData();
   const { t } = useLang();
 
   const structure = getStructure(booking.structureId);
@@ -87,14 +87,14 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
-  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; includes: string[] }[] } | null>(null);
+  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; rooms?: { promotion?: string; includes: string[] }[] } | null>(null);
   const [closedRooms, setClosedRooms] = useState<Record<string, boolean>>({});
   const fx = fetched && fetched.forId === booking.id ? fetched : null;
   const gar = fx?.guarantee;
   useEffect(() => {
     if (!chxId) return;
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; rooms?: { promotion?: string; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
         const rev0 = r.revisions?.[0];
@@ -104,7 +104,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           // Una revisione di modifica può non riportare garanzia/politiche/codice promo: si prendono dalla più recente che li ha.
           const pickFrom = <K extends keyof RevRow>(k: K): RevRow[K] | undefined => x[k] ?? from?.find((y) => y[k])?.[k];
           return {
-            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"),
+            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), shape: x.shape,
             rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
           };
         };
@@ -217,7 +217,6 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
       <Section title={rooms.length > 1 ? `${t("Camere")} (${rooms.length})` : t("Camere")}>
         {rooms.map((r, rIdx) => {
           const rt = getRoomType(r.roomTypeId);
-          const un = getUnit(r.unitId);
           const rInfo = r.otaInfo;
           const rNights = nights(r.checkIn, r.checkOut);
           const bd = nightRows(r, (iso) => nightlyRevenue(r, iso));
@@ -291,7 +290,6 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                   </Line>
                 )}
                 {directCancel && <Line label={t("Politica di cancellazione")}>{t(directCancel)}</Line>}
-                <Line label={t("Camera assegnata")}>{un?.name ?? t("Da assegnare")}</Line>
               </div>}
             </div>
           );
@@ -325,6 +323,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         ) : (
           <p className="text-sm italic text-dim">{t("Con questa prenotazione non viene fornita alcuna carta di credito")}</p>
         )}
+        {fx?.shape && <p className="break-all text-[10px] text-faint">Dati ricevuti da Channex: {fx.shape}</p>}
       </Section>
 
       {/* 6 · Appunti */}

@@ -62,6 +62,7 @@ export interface RevisionView {
   policies: string[];            // politiche di cancellazione, pasti, pagamento...
   // Garanzia: SOLO dati non sensibili. Numero (se già mascherato dall'OTA), scadenza e titolare solo per le carte VIRTUALI delle OTA; mai il CVV (solo se c'è).
   guarantee?: { cardType?: string; isVirtual?: boolean; cardNumber?: string; expiry?: string; holder?: string; cvv?: boolean; vccActivation?: string; vccBalance?: number; vccCurrency?: string };
+  shape?: string;                // SOLO nomi dei campi ricevuti (mai valori): serve a capire cosa manda Channex quando manca qualcosa
   raw?: Json;                    // attributi originali senza dati di carta/token (solo su richiesta: la route lo toglie con stripRaw)
 }
 
@@ -147,9 +148,17 @@ export function guestsLabel(adults: number, children = 0, infants = 0): string {
 /** Codice promozionale di una camera (Channex: room.meta.promotion, a volte un oggetto con il nome). */
 function roomPromotion(room: Json): string | undefined {
   const m = isObj(room.meta) ? room.meta : null;
-  if (!m) return undefined;
-  const p = m.promotion ?? m.promotion_name ?? m.promo_code;
-  return isObj(p) ? str(p.name) ?? str(p.title) ?? str(p.code) : str(p);
+  const text = (p: unknown): string | undefined => (isObj(p) ? str(p.name) ?? str(p.title) ?? str(p.description) ?? str(p.code) : str(p));
+  const found: string[] = [];
+  for (const src of [m, room]) {
+    if (!src) continue;
+    for (const k of Object.keys(src)) {
+      if (!/promo/i.test(k)) continue;
+      const v = src[k];
+      for (const x of Array.isArray(v) ? v : [v]) { const t = text(x); if (t && !found.includes(t)) found.push(t); }
+    }
+  }
+  return found.length ? found.join(", ") : undefined;
 }
 
 /** Numero carta SOLO se già mascherato dall'OTA (primi 6 e ultimi 4); un numero intero viene ridotto a 6+4, mai mostrato per esteso. */
@@ -203,6 +212,15 @@ export function redactRaw(row: Json): Json {
   const out: Json = JSON.parse(JSON.stringify(row ?? {}));
   scrubSensitive(out);
   return out;
+}
+
+/** Solo i NOMI dei campi che Channex ha mandato (nessun valore): per capire perché manca la garanzia o il codice promozionale. */
+function shapeOf(rev: Json): string {
+  const g = rev.guarantee;
+  const gs = isObj(g) ? `{${Object.keys(g).join(",")}${isObj(g.meta) ? ` meta:{${Object.keys(g.meta).join(",")}}` : ""}}` : g === null ? "null" : g === undefined ? "assente" : typeof g;
+  const r0 = arr(rev.rooms).filter(isObj)[0];
+  const rm = r0 && isObj(r0.meta) ? Object.keys(r0.meta).join(",") : "—";
+  return `guarantee=${gs}; room.meta=[${rm}]; campi=[${Object.keys(rev).join(",")}]`;
 }
 
 function guaranteeView(g: Json, rev: Json): NonNullable<RevisionView["guarantee"]> {
@@ -340,6 +358,7 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     ...(notes ? { notes } : {}),
     customer, rooms, charges, policies,
     ...(g ? { guarantee: guaranteeView(g, rev) } : {}),
+    shape: shapeOf(rev),
     raw: redactRaw(r),
   };
 }
