@@ -386,6 +386,9 @@ export default function BookingDrawer() {
   const payRule = collectRuleOf(structure, booking.channel);
   const pmView = effectivePayMethod(booking, payRule);
   const pmDetail = pmView.method === "ota" ? otaPayDetail(booking, payRule) : undefined;
+  // «Da incassare» per la struttura: sulle OTA è il NETTO (quello che ti arriva), non il totale che paga l'ospite. Fa eccezione l'OTA che dichiara/imposta «incassa la struttura»: lì l'ospite ti consegna il totale.
+  const ownCollectV = booking.otaInfo?.paymentCollect === "property" || payRule?.collect === "property";
+  const dueV = (booking.channel !== "direct" && booking.channel !== "blocked") && !ownCollectV && !noPrice ? Math.max(0, roundCents(nettoV - paidV - otaPaidV)) : balanceV;
   const isOtaChannelV = booking.channel !== "direct" && booking.channel !== "blocked";
   const payMethodRow = (
     <div className="flex items-center justify-between gap-3">
@@ -462,7 +465,7 @@ export default function BookingDrawer() {
         <div className="mt-2 border-t border-line pt-1.5" />
         {otaPaidV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Pagato al portale")}</span><span className="font-mono text-sm font-semibold tabular-nums text-dim">{eur(otaPaidV)}</span></div>}
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.min(paidV, totalV))}</span></div>
-        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
+        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : dueV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : dueV > 0 ? eur(dueV) : t("Saldato ✓")}</span></div>
         {extrasV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("di cui extra")}</span><span className="font-mono text-sm tabular-nums text-dim">{eur(extrasV)}</span></div>}
         <div className="mt-1.5">{payMethodRow}</div>
         {booking.nightlyRates && (
@@ -479,12 +482,12 @@ export default function BookingDrawer() {
           </details>
         )}
       </div>
-      {balanceV > 0 && (
+      {dueV > 0 && (
         qa === "incasso"
           ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
               <span className="text-xs text-dim">{t("Importo")} €</span>
               <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
-              <button onClick={() => setIncassoAmt(balanceV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>
+              <button onClick={() => setIncassoAmt(dueV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(dueV)}</button>
               <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
               <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
             <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
@@ -546,7 +549,7 @@ export default function BookingDrawer() {
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
             <span className="text-xs text-dim">{t("Importo")} €</span>
             <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
-            {balanceV > 0 && <button onClick={() => setIncassoAmt(balanceV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>}
+            {dueV > 0 && <button onClick={() => setIncassoAmt(dueV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(dueV)}</button>}
             <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
           </div>
         )}
@@ -607,7 +610,7 @@ export default function BookingDrawer() {
           </div>
           <div className="mt-1 flex items-baseline justify-between gap-4">
             <span className="text-sm text-dim">{t("Saldo dovuto")}</span>
-            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span>
+            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : dueV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : dueV > 0 ? eur(dueV) : t("Saldato ✓")}</span>
           </div>
         </div>
         {payMethodRow}
