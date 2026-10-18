@@ -74,10 +74,16 @@ function NotOta({ booking }: { booking: Booking }) {
   const { t } = useLang();
   const router = useRouter();
   const { closeBooking } = useData();
+  const fromPortal = booking.channel !== "direct" && booking.channel !== "blocked";
+  const portalName = (booking.otaName ?? "").trim() || CHANNELS[booking.channel]?.label || "";
   const openChat = () => { closeBooking(); router.push(`/messaggi?guest=${encodeURIComponent(booking.guestId)}`); };
   return (
     <div className="flex flex-col items-start gap-3 px-5 py-5">
-      <p className="text-sm text-dim">{t("Questa scheda mostra la chat con l'ospite sui portali (Booking.com, Airbnb, Expedia). Questa prenotazione non arriva da un portale: i messaggi su WhatsApp ed email sono in Messaggi.")}</p>
+      <p className="text-sm text-dim">
+        {fromPortal
+          ? `${t("Questa scheda mostra la chat con l'ospite di Booking.com, Airbnb ed Expedia.")} ${t("Per questa prenotazione")}${portalName ? ` (${portalName})` : ""} ${t("la chat del portale non è disponibile in Xenora: rispondi dall'extranet del portale. I messaggi su WhatsApp ed email sono in Messaggi.")}`
+          : t("Questa scheda mostra la chat con l'ospite sui portali (Booking.com, Airbnb, Expedia). Questa prenotazione non arriva da un portale: i messaggi su WhatsApp ed email sono in Messaggi.")}
+      </p>
       <button type="button" onClick={openChat} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash">{t("Apri in Messaggi")} →</button>
     </div>
   );
