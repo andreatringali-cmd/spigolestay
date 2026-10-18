@@ -982,7 +982,15 @@ export default function BookingDrawer() {
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-txt">{t("Prenotazione")} {booking.code && booking.channel !== "direct" && booking.channel !== "blocked" ? channexCodeOf(booking.channel, bookingCode(booking)) : bookingCode(booking)}</h1>
           <button onClick={printReceipt} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("Stampa")}</button>
         </div>
-        {/* Intestazione: chi, quando, dove (sempre visibile) */}
+        {/* Schede */}
+        <div ref={tabsRef} role="tablist" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-3 [scrollbar-width:none]">
+          {PANEL_TABS.map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${tab === k ? "border-focus text-focus" : "border-transparent text-dim hover:text-txt"}`}>{t(label)}</button>
+          ))}
+        </div>
+
+        {/* Intestazione: chi, quando, dove — solo nella scheda Gestione (le altre schede, come su Channex, partono direttamente dal contenuto) */}
+        {tab === "manage" && (
         <div className="flex items-start gap-3 border-b border-line px-5 py-3 max-sm:flex-wrap">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: `var(${ch.cssVar})` }}>{(guest?.fullName ?? "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}</div>
           <div className="min-w-0 flex-1">
@@ -1007,13 +1015,7 @@ export default function BookingDrawer() {
                 : null}
           </div>
         </div>
-
-        {/* Schede */}
-        <div ref={tabsRef} role="tablist" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-3 [scrollbar-width:none]">
-          {PANEL_TABS.map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${tab === k ? "border-focus text-focus" : "border-transparent text-dim hover:text-txt"}`}>{t(label)}</button>
-          ))}
-        </div>
+        )}
 
         {/* Avanzamento prenotazione (ispirato a Octorate, senza ripetizioni) */}
         {tab === "manage" && mode === "view" && (() => {
