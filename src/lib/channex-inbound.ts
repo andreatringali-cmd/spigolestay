@@ -346,8 +346,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       if (!guestId) { guestId = uid(); guests.push({ id: guestId, firstName: c.name || undefined, lastName: c.surname || undefined, fullName, email: email || undefined, phone: c.phone || undefined, country: c.country || undefined, city: c.city || undefined, zip: c.zip || undefined, address: c.address || undefined, language: c.language || undefined } as Json & { id: string }); }
       else {
         // Ospite già presente (stessa email): si completano SOLO i campi ancora vuoti (mai si sovrascrive ciò che è stato scritto a mano).
-        const eg = guests.find((x) => x.id === guestId) as (Json & { city?: string; zip?: string; address?: string; language?: string; updatedAt?: number }) | undefined;
-        if (eg) { let ch = false; if (!eg.language && c.language) { eg.language = c.language; ch = true; } if (!eg.city && c.city) { eg.city = c.city; ch = true; } if (!eg.zip && c.zip) { eg.zip = c.zip; ch = true; } if (!eg.address && c.address) { eg.address = c.address; ch = true; } if (ch) eg.updatedAt = Date.now(); }
+        const eg = guests.find((x) => x.id === guestId) as (Json & { city?: string; zip?: string; address?: string; language?: string; phone?: string; country?: string; updatedAt?: number }) | undefined;
+        if (eg) { let ch = false; if (!eg.language && c.language) { eg.language = c.language; ch = true; } if (!eg.phone && c.phone) { eg.phone = c.phone; ch = true; } if (!eg.country && c.country) { eg.country = c.country; ch = true; } if (!eg.city && c.city) { eg.city = c.city; ch = true; } if (!eg.zip && c.zip) { eg.zip = c.zip; ch = true; } if (!eg.address && c.address) { eg.address = c.address; ch = true; } if (ch) eg.updatedAt = Date.now(); }
       }
 
       const channel = channelFromOta(r.ota_name);

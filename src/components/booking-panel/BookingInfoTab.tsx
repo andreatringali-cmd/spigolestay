@@ -14,7 +14,7 @@ import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import { effectivePayMethod, otaPayDetail, PAY_METHOD_LABEL } from "@/lib/pay-method";
 import { isRelayEmail } from "@/lib/contacts-check";
 import { eur } from "@/lib/format";
-import type { RevisionView } from "@/lib/booking-revisions";
+import type { RevisionCustomer, RevisionView } from "@/lib/booking-revisions";
 import { fmtDate, nights } from "@/lib/dates";
 import { lordoOf, nightlyRevenue } from "@/lib/booking";
 import {
@@ -86,15 +86,15 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // Città, CAP e indirizzo arrivano con la revisione Channex ma le prenotazioni già importate non li hanno: alla prima apertura si legge la revisione
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
-  const needCustomer = !!chxId && !!guest && (!guest.language || (!guest.city && !guest.zip && !guest.address));
-  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; genius?: boolean; language?: string; rooms?: { promotion?: string; guests: string[]; includes: string[] }[] } | null>(null);
+  const needCustomer = !!chxId && !!guest && (!guest.language || !guest.phone || !guest.country || (!guest.city && !guest.zip && !guest.address));
+  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; genius?: boolean; language?: string; customer?: RevisionCustomer; rooms?: { promotion?: string; guests: string[]; includes: string[] }[] } | null>(null);
   const [closedRooms, setClosedRooms] = useState<Record<string, boolean>>({});
   const fx = fetched && fetched.forId === booking.id ? fetched : null;
   const gar = fx?.guarantee;
   useEffect(() => {
     if (!chxId) return;
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; guests?: string[]; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string; language?: string; genius?: boolean } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; guests?: string[]; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: RevisionCustomer }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
         const rev0 = r.revisions?.[0];
@@ -104,7 +104,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           // Una revisione di modifica può non riportare garanzia/politiche/codice promo: si prendono dalla più recente che li ha.
           const pickFrom = <K extends keyof RevRow>(k: K): RevRow[K] | undefined => x[k] ?? from?.find((y) => y[k])?.[k];
           return {
-            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), genius: x.customer?.genius === true, language: x.customer?.language,
+            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), genius: x.customer?.genius === true, language: x.customer?.language, customer: x.customer,
             rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, guests: rm.guests ?? from?.find((y) => y.rooms?.[ri]?.guests?.length)?.rooms?.[ri]?.guests ?? [], includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
           };
         };
@@ -124,6 +124,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         if (c.city) patch.city = c.city;
         if (c.zip) patch.zip = c.zip;
         if (c.language && !guest.language) patch.language = c.language;
+        if (c.phone && !guest.phone) patch.phone = c.phone;
+        if (c.country && !guest.country) patch.country = c.country;
         if (c.address && !guest.address) patch.address = c.address;
         if (Object.keys(patch).length) updateGuest(guest.id, patch);
       })
@@ -149,10 +151,12 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   const genius = booking.channel === "booking" ? detectGenius([info?.notes, info?.paymentInstruction, booking.note, booking.guestRequests]) : undefined;
   const names = guestNames(booking, guest);
   const arrival = booking.arrivalTime || info?.arrivalHour;
-  const email = guest?.email?.trim();
-  const phone = guest?.phone?.trim();
+  // Informazioni mostra ciò che dice l'OTA nell'ULTIMA revisione (come Channex); finché non è arrivata, o se non è una prenotazione OTA, l'anagrafica di Xenora.
+  const cu = fx?.customer && (fx.customer.name || fx.customer.email) ? fx.customer : null;
+  const email = (cu ? cu.email : guest?.email)?.trim();
+  const phone = (cu ? cu.phone : guest?.phone)?.trim();
   const phoneDigits = (phone ?? "").replace(/[^\d]/g, "");
-  const addressTxt = [[guest?.address, guest?.streetNumber].filter(Boolean).join(" "), guest?.province ? `(${guest.province})` : ""].filter(Boolean).join(" ");
+  const addressTxt = cu ? (cu.address ?? "") : [[guest?.address, guest?.streetNumber].filter(Boolean).join(" "), guest?.province ? `(${guest.province})` : ""].filter(Boolean).join(" ");
   const notes = notesBlocks(booking);
   const noteLabel = { ota: "", note: t("Note interne"), guest: t("Richieste dell'ospite") };
 
@@ -196,22 +200,22 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
 
       {/* 3 · Cliente */}
       <Section title={t("Cliente")}>
-        <Line label={t("Nome")}>{names[0] || guest?.fullName || "—"}{genius && <> <Pill color="var(--focus)">{genius}</Pill></>}</Line>
+        <Line label={t("Nome")}>{cu ? (cu.name || "N/D") : (names[0] || guest?.fullName || "—")}{genius && <> <Pill color="var(--focus)">{genius}</Pill></>}</Line>
         <Line label={t("E-mail")}>
           {email
             ? <><a href={safeMailtoHref(email)} className="text-focus hover:underline">{email}</a>{isRelayEmail(email) && <> <Pill color="var(--dim)" title={t("Indirizzo di inoltro del canale: i messaggi passano dall'OTA fino all'ospite")}>{t("email OTA")}</Pill></>}</>
-            : "—"}
+            : (cu ? "N/D" : "—")}
         </Line>
         <Line label={t("Telefono")} mono={!phone}>
           {phone
             ? <><a href={safeTelHref(phone)} className="font-mono tabular-nums text-focus hover:underline">{phone}</a>{phoneDigits && <> <a href={`https://wa.me/${phoneDigits}`} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold text-focus hover:underline">WhatsApp</a></>}</>
-            : "—"}
+            : (cu ? "N/D" : "—")}
         </Line>
-        <Line label={t("Lingua")}>{languageName(guest?.language || fx?.language) || "—"}</Line>
-        <Line label={t("Paese")}>{countryName(guest?.country) || "—"}</Line>
-        <Line label={t("Città")}>{guest?.city || "—"}</Line>
-        <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
-        <Line label={t("CAP")}>{guest?.zip || "—"}</Line>
+        <Line label={t("Lingua")}>{cu ? (languageName(cu.language) || "N/D") : (languageName(guest?.language) || "—")}</Line>
+        <Line label={t("Paese")}>{cu ? (countryName(cu.country) || "N/D") : (countryName(guest?.country) || "—")}</Line>
+        <Line label={t("Città")}>{cu ? (cu.city || "N/D") : (guest?.city || "—")}</Line>
+        <Line label={t("Indirizzo")}>{addressTxt || (cu ? "N/D" : "—")}</Line>
+        <Line label={t("CAP")}>{cu ? (cu.zip || "N/D") : (guest?.zip || "—")}</Line>
         {fx?.genius && !genius && <div><Pill color="var(--warn)" title={t("Ospite Genius di Booking.com")}>🏷 Genius Booker</Pill></div>}
       </Section>
 
