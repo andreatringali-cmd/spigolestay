@@ -154,7 +154,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   const phoneDigits = (phone ?? "").replace(/[^\d]/g, "");
   const addressTxt = [[guest?.address, guest?.streetNumber].filter(Boolean).join(" "), guest?.province ? `(${guest.province})` : ""].filter(Boolean).join(" ");
   const notes = notesBlocks(booking);
-  const noteLabel = { ota: t("Richieste del cliente (dal canale)"), note: t("Note interne"), guest: t("Richieste dell'ospite") };
+  const noteLabel = { ota: "", note: t("Note interne"), guest: t("Richieste dell'ospite") };
 
   // ── Spese di prenotazione (stesse funzioni del resto dell'app) ──
   const lordo = lordoOf(booking);
@@ -338,7 +338,9 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
       {notes.length > 0 && (
         <Section title={t("Appunti")}>
           {notes.map((n) => (
-            <Line key={n.key} label={noteLabel[n.key]}><span className="whitespace-pre-wrap">{n.text}</span></Line>
+            n.key === "ota"
+              ? <div key={n.key} className="whitespace-pre-wrap break-words text-sm text-txt">{n.text}</div> // come su Channex: il testo del canale, senza etichetta
+              : <Line key={n.key} label={noteLabel[n.key]}><span className="whitespace-pre-wrap">{n.text}</span></Line>
           ))}
         </Section>
       )}
