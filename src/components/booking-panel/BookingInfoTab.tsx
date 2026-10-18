@@ -188,10 +188,10 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
       <Section title={t("Dettagli del check-in")}>
         <Line label={t("Data di check-in")}>{fmtDateWd(booking.checkIn)}</Line>
         <Line label={t("Data di partenza")}>{fmtDateWd(booking.checkOut)}</Line>
-        <Line label={t("Orario di arrivo")}>{arrival || "—"}</Line>
+        <Line label={t("Orario di arrivo")}>{arrival || "N/D"}</Line>
         <Line label={t("Notti")}>{nTot}</Line>
         <Line label={t("Camere")}>{rooms.length}</Line>
-        <Line label={t("Occupazione")} mono>{occupancyLabel(booking)}</Line>
+        <Line label={t("Occupazione")} mono>{occupancyLabel({ adults: booking.adults, children: booking.children, cribs: booking.cribs ?? 0 })}</Line>
       </Section>
 
       {/* 3 · Cliente */}
