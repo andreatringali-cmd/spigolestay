@@ -45,7 +45,8 @@ import BookingInfoTab from "@/components/booking-panel/BookingInfoTab";
 import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
 import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
 import { recordOutgoing, markReminder } from "@/lib/guest-messages";
-import { channexCodeOf, safeMailtoHref, safeTelHref } from "@/lib/booking-info";
+import { channexCodeOf, countryName, fmtDateWd, groupRooms, guestNames, languageName, nightRows, notesBlocks, safeMailtoHref, safeTelHref } from "@/lib/booking-info";
+import { bookingSheetHtml, type SheetInput } from "@/lib/booking-sheet";
 
 const fmtDate = (iso: string) => fmtDateIt(iso);
 
@@ -221,6 +222,42 @@ export default function BookingDrawer() {
   const nettoV = nettoOf(booking);
   const paidV = booking.paid ?? 0;
   const balanceV = Math.max(0, totalV - paidV);
+
+  // «Stampa» del pannello: scheda della prenotazione come la stampa di Channex (la ricevuta per l'ospite è il pulsante «Ricevuta» di Gestione).
+  const printSheet = () => {
+    const w = window.open("", "_blank", "width=820,height=940");
+    if (!w) return;
+    const rooms = groupRooms(booking, bookings);
+    const info = booking.otaInfo;
+    const adultsT = rooms.reduce((a, r) => a + (r.adults ?? 0), 0), childT = rooms.reduce((a, r) => a + (r.children ?? 0), 0);
+    const occ = (a: number, c: number, cribs?: number) => [`${a} ${a === 1 ? "adulto" : "adulti"}`, c ? `${c} ${c === 1 ? "bambino" : "bambini"}` : "", cribs ? `${cribs} ${cribs === 1 ? "neonato" : "neonati"}` : ""].filter(Boolean).join(", ");
+    const nT = nights(booking.checkIn, booking.checkOut);
+    const lordo = rooms.reduce((a, r) => a + (r.total ?? 0), 0) || booking.total || 0;
+    const names0 = guestNames(booking, guest)[0] || guest?.fullName || "";
+    const commission = isOtaChannelV ? commissionBaseOf(booking) : 0;
+    const otaNote = notesBlocks(booking).find((n) => n.key === "ota")?.text;
+    const payTxt = pmView.method ? `${t(PAY_METHOD_LABEL[pmView.method])}${pmDetail ? ` · ${t(pmDetail)}` : ""}` : undefined;
+    const input: SheetInput = {
+      property: structure?.name ?? "", channel: (booking.otaName || "").trim() || ch.label,
+      header: [fmtDateWd(booking.checkIn), plural(nT, "notte", "notti"), names0].filter(Boolean).join(" - "),
+      checkIn: fmtDateWd(booking.checkIn), checkOut: fmtDateWd(booking.checkOut), arrival: booking.arrivalTime && booking.arrivalTime !== "Non lo so" ? booking.arrivalTime : (info?.arrivalHour || "N/D"),
+      nights: String(nT), rooms: String(rooms.length), occupancy: occ(adultsT, childT), total: lordo ? eur(lordo) : "—",
+      customer: { name: names0, country: countryName(guest?.country) || undefined, language: languageName(guest?.language) || undefined, email: guest?.email, phone: guest?.phone },
+      otaCode: booking.code && isOtaChannelV ? booking.code : undefined, bookedAt: booking.bookedOn ? fmtDateWd(booking.bookedOn) : undefined,
+      commission: commission > 0 ? eur(commission) : undefined, notes: otaNote, payment: payTxt,
+      roomsList: rooms.map((r) => {
+        const rt = getRoomType(r.roomTypeId); const bd = nightRows(r, (iso) => nightlyRevenue(r, iso)); const ri = r.otaInfo;
+        return {
+          title: `${rt?.name ?? "—"} - ${r.total ? eur(r.total) : "—"}`, checkIn: fmtDateWd(r.checkIn), checkOut: fmtDateWd(r.checkOut),
+          guests: guestNames(r, getGuest(r.guestId)), occupancy: occ(r.adults ?? 0, r.children ?? 0, r.cribs), mealPlan: ri?.mealPlan, smoking: ri?.smokingPreferences, bed: ri?.bedPreferences, policies: ri?.policies || ri?.paymentInstruction,
+          nights: bd.exact ? bd.rows.map((n) => ({ date: fmtDateWd(n.date), rate: r.ratePlanName, price: eur(n.amount) })) : [{ date: `${fmtDateWd(r.checkIn)} → ${fmtDateWd(r.checkOut)}`, rate: r.ratePlanName, price: r.total ? eur(r.total) : "—" }],
+          subtotal: eur(bd.exact ? bd.subtotal : (r.total ?? 0)), total: r.total ? eur(r.total) : "—",
+        };
+      }),
+    };
+    w.document.write(bookingSheetHtml(input, `${t("Prenotazione")} ${bookingCode(booking)}`));
+    w.document.close();
+  };
 
   const printReceipt = () => {
     if (noPrice) { window.alert(t("Prezzo mancante: imposta l'importo del soggiorno prima di stampare la ricevuta.")); return; }
@@ -979,7 +1016,7 @@ export default function BookingDrawer() {
         <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
           <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-txt">{t("Prenotazione")} {booking.code && booking.channel !== "direct" && booking.channel !== "blocked" ? channexCodeOf(booking.channel, bookingCode(booking)) : bookingCode(booking)}</h1>
-          <button onClick={printReceipt} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("Stampa")}</button>
+          <button onClick={printSheet} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("Stampa")}</button>
         </div>
         {/* Schede */}
         <div ref={tabsRef} role="tablist" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-3 [scrollbar-width:none]">
