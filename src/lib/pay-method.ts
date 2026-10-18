@@ -44,11 +44,18 @@ const isOtaChannel = (channel?: string) => !!channel && channel !== "direct" && 
  * pagamento netto dell'OTA (Expedia), quando c'è una carta virtuale o un "Payment charge" (Booking.com trattiene il costo d'incasso solo se incassa
  * lui), e per Airbnb (incassa sempre). Se l'OTA dichiara che è la struttura a incassare (payment_collect = property) è falso, qualunque altro indizio.
  */
-export function otaCollectsPayment(b: PayBookingLike): boolean {
+/** Regola di incasso di un canale, impostata nel Channel Manager (Structure.channelCollect). */
+export interface ChannelCollectRule { collect?: "auto" | "ota" | "property"; payout?: "bonifico" | "carta" }
+export const collectRuleOf = (st: { channelCollect?: Record<string, ChannelCollectRule> } | undefined | null, channel?: string): ChannelCollectRule | undefined => (channel ? st?.channelCollect?.[channel] : undefined);
+
+export function otaCollectsPayment(b: PayBookingLike, rule?: ChannelCollectRule): boolean {
   if (!isOtaChannel(b.channel)) return false;
   const pc = b.otaInfo?.paymentCollect;
   if (pc === "property") return false;
   if (pc === "ota") return true;
+  // Regola del canale (Channel Manager): vale quando la prenotazione non dichiara chi incassa.
+  if (rule?.collect === "ota") return true;
+  if (rule?.collect === "property") return false;
   if (isNetPayout(b)) return true;
   if (b.otaCard?.present) return true;
   if (b.paymentFee != null && b.paymentFee > 0) return true;
@@ -68,8 +75,8 @@ export interface EffectivePayMethod {
 export const ONLINE_PAY_LABEL = "Carta · pagamento online (automatico)";
 
 /** Metodo di incasso in vigore: "Incasso OTA" automatico se l'OTA incassa, altrimenti quello scelto dal gestore (se c'è). */
-export function effectivePayMethod(b: PayBookingLike): EffectivePayMethod {
-  if (otaCollectsPayment(b)) return { method: "ota", auto: true };
+export function effectivePayMethod(b: PayBookingLike, rule?: ChannelCollectRule): EffectivePayMethod {
+  if (otaCollectsPayment(b, rule)) return { method: "ota", auto: true };
   const m = isPayMethod(b.paymentMethod) ? b.paymentMethod : undefined;
   // "ota" scelto a mano su un canale non-OTA non ha senso: si ignora.
   const chosen = m === "ota" && !isOtaChannel(b.channel) ? undefined : m;
@@ -79,9 +86,11 @@ export function effectivePayMethod(b: PayBookingLike): EffectivePayMethod {
 }
 
 /** Dettaglio leggibile dell'incasso OTA ("carta virtuale", "bonifico dell'OTA"), per le etichette. */
-export function otaPayDetail(b: PayBookingLike): string | undefined {
+export function otaPayDetail(b: PayBookingLike, rule?: ChannelCollectRule): string | undefined {
   if (b.otaCard?.present || b.otaInfo?.paymentType === "credit_card") return "carta virtuale";
   if (b.otaInfo?.paymentType === "bank_transfer") return "bonifico";
+  if (rule?.payout === "carta") return "carta virtuale";
+  if (rule?.payout === "bonifico") return "bonifico";
   return undefined;
 }
 
@@ -90,14 +99,14 @@ export function otaPayDetail(b: PayBookingLike): string | undefined {
  * contanti → MP01, carta → MP08, bonifico → MP05. L'incasso OTA è un versamento dell'OTA alla struttura (bonifico), salvo carta virtuale (carta).
  * undefined = nessuna indicazione: la fattura usa il suo valore predefinito.
  */
-export function invoicePayMethodLabel(b: PayBookingLike): string | undefined {
-  const { method } = effectivePayMethod(b);
+export function invoicePayMethodLabel(b: PayBookingLike, rule?: ChannelCollectRule): string | undefined {
+  const { method } = effectivePayMethod(b, rule);
   switch (method) {
     case "contanti": return "Contanti";
     case "carta": return "Carta";
     case "bonifico": return "Bonifico bancario";
     case "altro": return "Bonifico bancario";
-    case "ota": return b.otaCard?.present || b.otaInfo?.paymentType === "credit_card" ? "Carta" : "Bonifico bancario";
+    case "ota": return b.otaCard?.present || b.otaInfo?.paymentType === "credit_card" || rule?.payout === "carta" ? "Carta" : "Bonifico bancario";
     default: return undefined;
   }
 }

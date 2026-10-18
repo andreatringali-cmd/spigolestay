@@ -10,6 +10,7 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import { toISO, parseISO, nights, fmtDM } from "@/lib/dates";
 import { num } from "@/lib/format";
 import { bookingPaidTotal, cityTaxOfBooking, nightlyRevenue } from "@/lib/booking";
+import { stayDue } from "@/lib/incassi";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
 import { contactReportCached } from "@/lib/contacts-check";
@@ -76,7 +77,7 @@ export default function Dashboard2() {
     schedina: dati.schedBy.get(b.id) ?? "none", istat: dati.istatPendingIds.has(b.id) ? "pending" : "none",
     guideSent: isGuideSent(b, dati.threads[b.guestId], remLog[b.id]), reminderNotes: reminderNotes(remLog[b.id]),
   }).steps;
-  const balanceOf = (b: (typeof bookings)[number]) => Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
+  const balanceOf = (b: (typeof bookings)[number]) => stayDue(b, structMap.get(b.structureId));
 
   // --- Giornata ---
   const split = useMemo(() => splitDay(live, today), [live, today]);

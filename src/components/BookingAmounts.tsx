@@ -1,7 +1,8 @@
 import type { Booking, Structure } from "@/lib/types";
 import { commissionIsEstimate, COMMISSION_ESTIMATE_HINT, bookingPaidTotal, cityTaxOfBooking, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
-import { effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
+import { otaCoveredAmount } from "@/lib/incassi";
+import { collectRuleOf, effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
 
 // Riepilogo importi compatto di una prenotazione (poche righe, una riga per concetto): come si arriva al totale (solo se oltre al soggiorno
 // c'è altro), incassato / da incassare, tassa di soggiorno (riscossa a parte) e commissione OTA con il netto. Il totale in grande sta nella riga.
@@ -13,11 +14,11 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
   const hasParkingExtra = extras.some((e) => /parcheggi|parking/i.test(e.name || ""));
   const total = bookingPaidTotal(b);
   const paid = b.paid ?? 0;
-  const resid = Math.max(0, total - paid);
+  const resid = Math.max(0, total - paid - otaCoveredAmount(b, structure));
   const tax = cityTaxOfBooking(structure, b); // camera di un gruppo: quota della tassa del gruppo; altrimenti paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti
   const comm = commissionOf(b);
   const payFee = paymentFeeOf(b);
-  const pm = effectivePayMethod(b).method;
+  const pm = effectivePayMethod(b, collectRuleOf(structure, b.channel)).method;
   const pmTxt = pm ? ` · ${PAY_METHOD_LABEL[pm].toLowerCase()}` : "";
   const parts: string[] = [];
   if (clean > 0 || extras.length > 0 || (b.parking && !hasParkingExtra)) {

@@ -11,6 +11,7 @@ import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 import { toISO, nights, parseISO, fmtDM } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
+import { stayDue } from "@/lib/incassi";
 import { cityTaxForBooking, cityTaxRulesOf } from "@/lib/citytax";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
@@ -69,7 +70,7 @@ export default function Adempimenti2() {
     sched, istat,
     // Stesso importo di check-in, fatture e pagina Tassa di soggiorno (quota di gruppo, età dei bambini, tetto).
     taxOf: (b) => { const st = getStructure(b.structureId); const r = cityTaxRulesOf(st); return r ? cityTaxForBooking(b, r, st).tax : 0; },
-    balanceOf: (b) => Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0)),
+    balanceOf: (b) => stayDue(b, getStructure(b.structureId)),
     totalOf: (b) => bookingPaidTotal(b),
     docs, passive,
   }), [today, nowMs, bookings, guestMap, nameOf, sched, istat, getStructure, docs, passive]);

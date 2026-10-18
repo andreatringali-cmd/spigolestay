@@ -85,6 +85,8 @@ export interface Structure {
   selfCheckin?: boolean;
   accessInfo?: string;     // istruzioni/codici accesso (sensibile)
   // Tassa di soggiorno
+  // Regole di incasso per canale (Channel Manager → «Incasso»): chi incassa dall'ospite e come versa l'OTA. I dati della singola prenotazione (payment_collect di Channex) vincono sempre.
+  channelCollect?: Record<string, { collect?: "auto" | "ota" | "property"; payout?: "bonifico" | "carta" }>;
   cityTax?: boolean;
   cityTaxMode?: "fixed" | "percent"; // fisso €/persona/notte oppure % del pernottamento
   cityTaxAmount?: number;  // € per persona a notte (modalità "fixed")

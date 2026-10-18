@@ -1,7 +1,7 @@
 // Segnalazioni e etichetta di una prenotazione, uguali ovunque compaia la scheda (Calendario · Dettagliato e Prenotazioni · Dettagliata).
-import type { Booking, Unit } from "@/lib/types";
+import type { Booking, Structure, Unit } from "@/lib/types";
 import { shiftISO } from "@/lib/dates";
-import { bookingPaidTotal } from "@/lib/booking";
+import { stayDue } from "@/lib/incassi";
 import { eur } from "@/lib/format";
 import type { Avviso, Journey } from "./_scheda";
 import { contactReportCached, daysUntil } from "@/lib/contacts-check";
@@ -12,7 +12,7 @@ export type Colonna = "arr" | "stay" | "dep";
 /** Le cose da non perdere di vista su una prenotazione, in base alla colonna in cui sta (arrivo, in casa, partenza). Solo cose della prenotazione: il turnover e la pulizia sono informazioni della camera e stanno in Pulizie. */
 export function avvisiOf(
   b: Booking, j: Journey, col: Colonna,
-  ctx: { today: string; unit?: Unit; guest?: { id: string; phone?: string; email?: string; country?: string } },
+  ctx: { today: string; unit?: Unit; guest?: { id: string; phone?: string; email?: string; country?: string }; structure?: Structure },
 ): Avviso[] {
   const { today, unit, guest } = ctx;
   const out: Avviso[] = [];
@@ -30,7 +30,7 @@ export function avvisiOf(
     }
   }
   if (col === "dep") {
-    const resid = Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
+    const resid = stayDue(b, ctx.structure);
     if (resid > 0.005) out.push({ key: "saldo", label: `Parte con saldo aperto: ${eur(resid)}`, tone: b.checkOut <= today ? "err" : "warn" });
   }
   return out;

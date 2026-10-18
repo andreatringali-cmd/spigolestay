@@ -5,10 +5,11 @@ import { normName } from "@/lib/guest-key";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { bookingCode } from "@/lib/bookingCode";
-import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
+import { CHANNELS, type Booking, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO, fmtDate } from "@/lib/dates";
 import { titleCaseName } from "@/lib/names";
 import { eur } from "@/lib/format";
+import { balanceDue, otaCoveredAmount } from "@/lib/incassi";
 import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionIsEstimate, COMMISSION_ESTIMATE_HINT, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
 import { otaGroupName, MIXED_OTA_LABEL } from "@/lib/channel-name";
@@ -66,9 +67,9 @@ export default function PrenotazioniPage() {
     const g = guests.find((x) => x.id === b.guestId);
     return !!(g && (g.lastName || g.fullName) && g.sex && g.birthDate && g.birthPlace && g.citizenship && g.docType && g.docNumber);
   };
-  const payStatus = (b: { total?: number; cleaningFee?: number; extras?: { price?: number }[]; paid?: number }): "paid" | "partial" | "unpaid" => {
+  const payStatus = (b: Booking): "paid" | "partial" | "unpaid" => {
     const due = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b);
-    const paid = b.paid ?? 0;
+    const paid = (b.paid ?? 0) + otaCoveredAmount(b, getStructure(b.structureId)); // + quanto ha già pagato all'OTA quando incassa lei
     if (due > 0 && paid >= due) return "paid";
     if (paid > 0) return "partial";
     return "unpaid";
@@ -390,7 +391,7 @@ export default function PrenotazioniPage() {
     { key: "commissionPct", label: "Commissione %", default: false, get: (b) => commissionShareOf(b) },
     { key: "netto", label: "Netto €", get: (b) => nettoOf(b) },
     { key: "paid", label: "Incassato €", default: false, get: (b) => b.paid ?? 0 },
-    { key: "balance", label: "Saldo dovuto €", default: false, get: (b) => Math.max(0, grand(b) - (b.paid ?? 0)) },
+    { key: "balance", label: "Saldo dovuto €", default: false, get: (b) => balanceDue(b, getStructure(b.structureId)) },
     { key: "parking", label: "Parcheggio", default: false, get: (b) => (b.parking ? t("Sì") : t("No")) },
     { key: "deposit", label: "Caparra ricevuta", default: false, get: (b) => (b.depositPaid ? t("Sì") : t("No")) },
     { key: "status", label: "Stato prenotazione", default: false, get: (b) => STATUS_LABEL[b.status] ?? b.status },

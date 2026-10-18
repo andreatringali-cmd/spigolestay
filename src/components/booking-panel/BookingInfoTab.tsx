@@ -11,7 +11,7 @@ import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type BookingStatus, type Guest } from "@/lib/types";
 import { bookingCode } from "@/lib/bookingCode";
 import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
-import { effectivePayMethod, otaPayDetail, PAY_METHOD_LABEL } from "@/lib/pay-method";
+import { collectRuleOf, effectivePayMethod, otaPayDetail, PAY_METHOD_LABEL } from "@/lib/pay-method";
 import { isRelayEmail } from "@/lib/contacts-check";
 import { eur } from "@/lib/format";
 import type { RevisionCustomer, RevisionView } from "@/lib/booking-revisions";
@@ -163,8 +163,9 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // ── Spese di prenotazione (stesse funzioni del resto dell'app) ──
   const lordo = lordoOf(booking);
   const noPrice = !booking.total;
-  const pm = effectivePayMethod(booking);
-  const pmDetail = pm.method === "ota" ? otaPayDetail(booking) : undefined;
+  const payRule = collectRuleOf(structure, booking.channel);
+  const pm = effectivePayMethod(booking, payRule);
+  const pmDetail = pm.method === "ota" ? otaPayDetail(booking, payRule) : undefined;
   const payTypeTxt = info?.paymentType === "credit_card" ? t("carta di credito") : info?.paymentType === "bank_transfer" ? t("bonifico") : undefined;
   const pmTxt = pm.method ? `${t(PAY_METHOD_LABEL[pm.method])}${pmDetail ? ` · ${t(pmDetail)}` : ""}${pm.auto ? ` · ${t("automatico")}` : ""}` : payTypeTxt;
 

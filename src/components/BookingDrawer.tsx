@@ -17,7 +17,7 @@ import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import BookingExtrasPicker from "@/components/booking/BookingExtrasPicker";
 import { entriesTotal } from "@/lib/booking-extras";
-import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
+import { collectRuleOf, effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO, fmtDate as fmtDateIt, fmtDM, fmtDateTime } from "@/lib/dates";
 import DateField from "@/components/DateField";
@@ -29,7 +29,7 @@ import { plural } from "@/lib/plural";
 import { friendlyError } from "@/lib/friendly-error";
 import { ymdRome } from "@/lib/dates-rome";
 import { bookingGrandTotal } from "@/lib/booking";
-import { balanceDue, paymentStatus } from "@/lib/incassi";
+import { balanceDue, otaCoveredAmount, paymentStatus } from "@/lib/incassi";
 import { describeCancelPenalties } from "@/lib/channex-guestdata";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
@@ -221,7 +221,8 @@ export default function BookingDrawer() {
   const adjV = otaAdjustmentOf(booking); // sconti applicati dall'OTA (differenza con la carta virtuale)
   const nettoV = nettoOf(booking);
   const paidV = booking.paid ?? 0;
-  const balanceV = Math.max(0, totalV - paidV);
+  const otaPaidV = otaCoveredAmount(booking, structure); // già pagato all'OTA quando incassa lei (regola del canale o dato della prenotazione)
+  const balanceV = Math.max(0, totalV - paidV - otaPaidV);
 
   // «Stampa» del pannello: scheda della prenotazione come la stampa di Channex (la ricevuta per l'ospite è il pulsante «Ricevuta» di Gestione).
   const printSheet = () => {
@@ -380,8 +381,9 @@ export default function BookingDrawer() {
     </div>
   );
   // Come è stato incassato: scelto dal gestore, oppure "Incasso OTA" in automatico quando l'OTA incassa dall'ospite.
-  const pmView = effectivePayMethod(booking);
-  const pmDetail = pmView.method === "ota" ? otaPayDetail(booking) : undefined;
+  const payRule = collectRuleOf(structure, booking.channel);
+  const pmView = effectivePayMethod(booking, payRule);
+  const pmDetail = pmView.method === "ota" ? otaPayDetail(booking, payRule) : undefined;
   const isOtaChannelV = booking.channel !== "direct" && booking.channel !== "blocked";
   const payMethodRow = (
     <div className="flex items-center justify-between gap-3">
@@ -440,6 +442,7 @@ export default function BookingDrawer() {
             <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
           </span>
         </div>
+        {otaPaidV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Pagato al portale")}</span><span className="font-mono text-sm font-semibold tabular-nums text-dim">{eur(otaPaidV)}</span></div>}
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
         {extrasV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("di cui extra")}</span><span className="font-mono text-sm tabular-nums text-dim">{eur(extrasV)}</span></div>}
@@ -571,6 +574,12 @@ export default function BookingDrawer() {
             <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
             <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
           </div>
+          {otaPaidV > 0 && (
+            <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
+              <span className="text-dim">{t("Pagato al portale")}</span>
+              <span className="font-mono tabular-nums text-dim">{eur(otaPaidV)}</span>
+            </div>
+          )}
           <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
             <span className="text-dim">{t("Incassato")}</span>
             <span className="font-mono tabular-nums text-dim">{eur(paidV)}</span>
@@ -1058,7 +1067,7 @@ export default function BookingDrawer() {
           const steps = [
             { label: t("Confermata"), done: booking.status === "confirmed" },
             { label: t("Check-in"), done: !!booking.webCheckin },
-            { label: t("Incassata"), done: totalV > 0 && paidV >= totalV },
+            { label: t("Incassata"), done: totalV > 0 && paidV + otaPaidV >= totalV },
             { label: t("Fatturata"), done: !!booking.invoiceNo },
           ];
           return (

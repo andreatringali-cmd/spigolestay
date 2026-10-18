@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
-import { CHANNELS, EVENT_COLORS, type Unit } from "@/lib/types";
+import { CHANNELS, EVENT_COLORS, type Booking, type Unit } from "@/lib/types";
 import {
   addDays,
   dayIndex,
@@ -27,6 +27,7 @@ import {
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
 import { bookingExtrasTotal, bookingPaidTotal, commissionOf } from "@/lib/booking";
+import { otaCoveredAmount } from "@/lib/incassi";
 import { rateForDay, loadWeekendPct, isWeekendISO } from "@/lib/pricing";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { sortUnitsByName } from "@/lib/sortUnits";
@@ -488,8 +489,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const todayIdx = useMemo(() => days.findIndex((d) => toISO(d) === todayISO), [days, todayISO]);
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "Ospite";
   // Stato prenotazione per le icone sulle barre.
-  const payStatusOf = (b: { total?: number; cleaningFee?: number; extras?: { price?: number }[]; paid?: number }): "paid" | "partial" | "unpaid" => {
-    const due = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b); const paid = b.paid ?? 0;
+  const payStatusOf = (b: Booking): "paid" | "partial" | "unpaid" => {
+    const due = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b); const paid = (b.paid ?? 0) + otaCoveredAmount(b, structures.find((x) => x.id === b.structureId)); // + quanto ha già pagato all'OTA quando incassa lei
     if (due > 0 && paid >= due) return "paid"; if (paid > 0) return "partial"; return "unpaid";
   };
   const PAY_DOT: Record<string, string> = { paid: "var(--ok)", partial: "var(--warn)", unpaid: "var(--err)" };

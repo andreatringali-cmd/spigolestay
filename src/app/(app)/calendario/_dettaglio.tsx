@@ -166,7 +166,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   }, [filtersOn, live, today, guestById, getStructure, schedBy, istatBy, threads, remLog, docBy, passes, auto]);
 
   // ── Avvisi per scheda ──
-  const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => avvisiOf(r.b, r.j, col, { today, unit: r.b.unitId ? unitById.get(r.b.unitId) : undefined, guest: guestById.get(r.b.guestId) }), [unitById, today, guestById]);
+  const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => avvisiOf(r.b, r.j, col, { today, unit: r.b.unitId ? unitById.get(r.b.unitId) : undefined, guest: guestById.get(r.b.guestId), structure: getStructure(r.b.structureId) }), [unitById, today, guestById, getStructure]);
 
   // ── Camere libere e blocchi ──
   const free = useMemo(() => freeUnits(activeUnits, busy, from, to), [activeUnits, busy, from, to]);

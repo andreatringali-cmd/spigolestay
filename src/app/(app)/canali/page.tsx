@@ -31,7 +31,7 @@ const CHANNEL_PRESET_COLORS = ["#FFC93C", "#2563EB", "#7C3AED", "#DB2777", "#E11
 
 
 export default function CanaliPage() {
-  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId, updateStructure } = useData();
   const { t } = useLang();
   const [localStructure, setLocalStructure] = useState("all");
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
@@ -389,6 +389,7 @@ export default function CanaliPage() {
                           <th className={`${th} text-right`}>{t("Netto")}</th>
                           <th className={`${th} text-right`}>{t("€ / notte")}</th>
                           <th className={`${th} pl-10`}>{t("Quota ricavi")}</th>
+                          <th className={`${th} text-right`}>{t("Incasso")}</th>
                           <th className={`${th} text-right`}>{t("Colore")}</th>
                         </tr>
                       </thead>
@@ -428,6 +429,11 @@ export default function CanaliPage() {
                                 ) : dash}
                               </td>
                               <td className={`${td} text-right`}>
+                                {(() => { const rule = structures.find((x) => x.id === g.sid)?.channelCollect?.[chKey]; const lab = rule?.collect === "ota" ? t("L'OTA incassa") : rule?.collect === "property" ? t("Incasso io") : t("Automatico"); return (
+                                  <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Impostazioni di incasso")} className="rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-dim hover:bg-wash hover:text-txt">{lab}</button>
+                                ); })()}
+                              </td>
+                              <td className={`${td} text-right`}>
                                 <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Cambia il colore su calendario")} aria-label={t("Cambia il colore su calendario")} className="h-4 w-4 rounded-full border border-line align-middle transition hover:scale-110" style={{ backgroundColor: color }} />
                               </td>
                             </tr>
@@ -442,7 +448,7 @@ export default function CanaliPage() {
                             <td className="px-3 py-2 text-right font-mono tabular-nums" title={tot.gross > 0 ? `${Math.round((tot.comm / tot.gross) * 1000) / 10}% del lordo` : undefined}>{eur(tot.comm)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums" style={{ color: "var(--ok)" }}>{eur(tot.net)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums text-dim">{tot.nights > 0 && tot.gross > 0 ? eur(Math.round(tot.gross / tot.nights)) : "—"}</td>
-                            <td colSpan={2} />
+                            <td colSpan={3} />
                           </tr>
                         </tfoot>
                       )}
@@ -506,7 +512,7 @@ export default function CanaliPage() {
                 <ChannelLogo channel={chKey} size={28} title={label} name={c.title} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-txt">{label}</div>
-                  <div className="text-[11px] text-dim">{t("Colore su calendario")}</div>
+                  <div className="text-[11px] text-dim">{t("Colore su calendario e incasso")}</div>
                 </div>
                 <button onClick={() => setChannelDetail(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt" aria-label={t("Chiudi")}>✕</button>
               </div>
@@ -519,6 +525,42 @@ export default function CanaliPage() {
                           <input type="color" value={pickerColor} onChange={(e) => { saveChannelColor(chKey, e.target.value); setColorTick((n) => n + 1); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                         </label>
                       </div>
+              {(() => {
+                const st = structures.find((x) => x.id === channelDetail.sid);
+                const rule = st?.channelCollect?.[chKey];
+                const collect = rule?.collect ?? "auto";
+                const set = (patch: { collect?: "auto" | "ota" | "property"; payout?: "bonifico" | "carta" }) => {
+                  if (!st) return;
+                  updateStructure(st.id, { channelCollect: { ...(st.channelCollect ?? {}), [chKey]: { ...(rule ?? {}), ...patch } } });
+                };
+                const opt = (v: "auto" | "ota" | "property", title: string, hint: string) => (
+                  <label key={v} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm ${collect === v ? "border-focus bg-wash" : "border-line hover:bg-wash"}`}>
+                    <input type="radio" name={`collect-${chKey}`} checked={collect === v} onChange={() => set({ collect: v })} className="mt-1" />
+                    <span><span className="font-semibold text-txt">{t(title)}</span><span className="block text-[11px] text-dim">{t(hint)}</span></span>
+                  </label>
+                );
+                return (
+                  <div className="mt-4 border-t border-line pt-3">
+                    <div className="mb-2 text-sm font-bold text-txt">{t("Impostazioni di incasso")}</div>
+                    <div className="flex flex-col gap-1.5">
+                      {opt("auto", "Automatico", "Segue i dati della prenotazione; se mancano, si deduce dal canale")}
+                      {opt("ota", "L'OTA incassa dall'ospite", "L'ospite ha già pagato il portale: non risulta nulla da incassare. Il portale ti versa poi l'importo netto.")}
+                      {opt("property", "Incasso io", "L'ospite paga la struttura (all'arrivo o con un link)")}
+                    </div>
+                    {collect === "ota" && (
+                      <label className="mt-2 flex items-center justify-between gap-3 text-sm text-txt">
+                        <span>{t("Come ti paga il portale")}</span>
+                        <select value={rule?.payout ?? ""} onChange={(e) => set({ payout: e.target.value === "carta" ? "carta" : e.target.value === "bonifico" ? "bonifico" : undefined })} className="rounded-lg border border-line bg-paper px-2 py-1 text-sm">
+                          <option value="">{t("Non indicato")}</option>
+                          <option value="bonifico">{t("Bonifico")}</option>
+                          <option value="carta">{t("Carta virtuale")}</option>
+                        </select>
+                      </label>
+                    )}
+                    <p className="mt-2 text-[11px] text-dim">{t("Se la prenotazione dichiara già chi incassa (dato del portale), vale quello.")}</p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );

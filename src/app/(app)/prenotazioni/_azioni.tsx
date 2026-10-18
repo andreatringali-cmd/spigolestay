@@ -10,7 +10,8 @@ import { apiPost } from "@/lib/invoicing/client";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlink";
 import { chatPayGuestMessage, parseEurInput } from "@/lib/chat-pay-core";
-import { bookingGrandTotal, bookingPaidTotal } from "@/lib/booking";
+import { bookingGrandTotal } from "@/lib/booking";
+import { stayDue } from "@/lib/incassi";
 import { reviewLinksBlockFromStorage, reviewRequestMessage, reviewRequestSubject } from "@/lib/reviews";
 import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
@@ -53,7 +54,7 @@ export default function StepActions(p: StepActionsProps) {
   const [draftDoc, setDraftDoc] = useState<{ id: string; stato: string } | null | undefined>(undefined); // fattura già creata per questa prenotazione (undefined = in verifica)
   const hasPhone = !!(guest?.phone ?? "").replace(/\D/g, "");
   const hasMail = !!guest?.email;
-  const due = Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
+  const due = stayDue(b, structure);
 
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") p.onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [p]);
 
