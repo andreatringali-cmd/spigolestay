@@ -436,18 +436,28 @@ export default function BookingDrawer() {
       </div>
       <div className="rounded-xl bg-wash px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm font-semibold text-txt">{t("Incasso per te")}</span>
+          <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
           <span className="inline-flex items-center gap-1.5">
             {underprice?.flagged && <span title={underpriceReason(booking, underprice)} className="font-sans text-base font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
-            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(nettoV)}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
           </span>
         </div>
-        {!noPrice && (
-          <div className="mt-0.5 text-[11px] text-dim">
-            {t("Totale ospite")} <span className="font-mono tabular-nums">{eur(totalV)}</span>
-            {commTotV > 0 && <> · {t("Commissioni")} <span className="font-mono tabular-nums">−{eur(commTotV)}</span> ({String(commPctV).replace(".", ",")}%)</>}
+        {!noPrice && (commV > 0 || payFeeV > 0 || adjV > 0 || (booking.otaDeductions ?? 0) > 0) && (
+          <div className="mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5 text-sm text-dim">
+            {commV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Commissione OTA")}{commissionIsEstimate(booking) ? ` (${t("stima")})` : ""}{payFeeV <= 0 && adjV <= 0 ? ` · ${String(commPctV).replace(".", ",")}%` : ""}</span><span className="font-mono tabular-nums">−{eur(commV)}</span></div>}
+            {payFeeV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Costo d'incasso")}</span><span className="font-mono tabular-nums">−{eur(payFeeV)}</span></div>}
+            {adjV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Sconti OTA (carta virtuale)")}</span><span className="font-mono tabular-nums">−{eur(adjV)}</span></div>}
+            {(booking.otaDeductions ?? 0) > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Trattenute dichiarate dall'OTA")}</span><span className="font-mono tabular-nums">−{eur(booking.otaDeductions)}</span></div>}
+            {commTotV > 0 && (payFeeV > 0 || adjV > 0) && <div className="flex items-baseline justify-between gap-4 text-[11px]"><span>{t("Totale costi")} ({String(commPctV).replace(".", ",")}%)</span><span className="font-mono tabular-nums">−{eur(commTotV)}</span></div>}
           </div>
         )}
+        {!noPrice && (
+          <div className="mt-1.5 flex items-baseline justify-between gap-4 border-t border-line pt-1.5">
+            <span className="text-sm font-semibold text-txt">{t("Incasso netto per te")}</span>
+            <span className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(nettoV)}</span>
+          </div>
+        )}
+        <div className="mt-2 border-t border-line pt-1.5" />
         {otaPaidV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Pagato al portale")}</span><span className="font-mono text-sm font-semibold tabular-nums text-dim">{eur(otaPaidV)}</span></div>}
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.min(paidV, totalV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
