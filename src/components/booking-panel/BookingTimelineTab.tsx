@@ -10,6 +10,7 @@ import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { apiPost } from "@/lib/invoicing/client";
 import { buildTimeline, fmtEventAt, isDateOnly, type ServerEvent, type TimelineClient, type TimelineEvent, type TimelineTone } from "@/lib/booking-timeline";
+import { diffRevisions, type RevisionView } from "@/lib/booking-revisions";
 import type { Booking } from "@/lib/types";
 
 const THREADS_KEY = "spigolestay:threads:v1";
@@ -63,6 +64,24 @@ export default function BookingTimelineTab({ booking }: { booking: Booking }) {
   const partial = res && res.forId === booking.id ? res.partial : [];
   const error = res && res.forId === booking.id ? res.error : "";
 
+  // Cosa è cambiato in ogni modifica del portale: si confrontano le revisioni di Channex (le più recenti, già in cache sul server).
+  const [changes, setChanges] = useState<{ forId: string; byRev: Record<string, string[]> } | null>(null);
+  useEffect(() => {
+    if (!booking.extId?.startsWith("channex:")) return;
+    let alive = true;
+    apiPost<{ revisions?: RevisionView[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: booking.extId })
+      .then((r) => {
+        if (!alive) return;
+        const asc = [...(r.revisions ?? [])].reverse(); // il server le manda dalla più recente
+        const byRev: Record<string, string[]> = {};
+        for (let i = 1; i < asc.length; i++) { const d = diffRevisions(asc[i - 1], asc[i]); if (d.length) byRev[asc[i].revisionId] = d; }
+        setChanges({ forId: booking.id, byRev });
+      })
+      .catch(() => { /* senza dettagli la cronologia resta com'è */ });
+    return () => { alive = false; };
+  }, [booking.id, booking.extId]);
+  const byRev = changes && changes.forId === booking.id ? changes.byRev : null;
+
   const guest = getGuest(booking.guestId);
   const structure = getStructure(booking.structureId);
 
@@ -72,11 +91,17 @@ export default function BookingTimelineTab({ booking }: { booking: Booking }) {
     const guestHasOtherBookings = bookings.some((b) => b.id !== booking.id && b.guestId === booking.guestId && b.channel !== "blocked" && b.status !== "cancelled" && !(booking.groupId && b.groupId === booking.groupId));
     const client: TimelineClient = { activities, threads: browser.threads, msgsent: browser.msgsent, templateNames: browser.templateNames, guestHasOtherBookings, bookingIds: groupIds };
     const list = buildTimeline({ booking, guest, structure, server, client });
-    return list;
-  }, [booking, bookings, activities, browser, guest, structure, server]);
+    if (!byRev) return list;
+    return list.map((e) => {
+      const d = e.revisionId ? byRev[e.revisionId] : undefined;
+      if (!d?.length) return e;
+      const shown = d.slice(0, 6);
+      return { ...e, detail: [e.detail, ...shown, d.length > shown.length ? `…e altre ${d.length - shown.length} modifiche` : ""].filter(Boolean).join("\n") };
+    });
+  }, [booking, bookings, activities, browser, guest, structure, server, byRev]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 px-5 pb-4 pt-5">
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-faint">
           {t("Cronologia")}{events.length > 0 && <span className="ml-1.5 font-normal normal-case tracking-normal">· {events.length}</span>}
@@ -128,7 +153,7 @@ function Row({ e, last, t }: { e: TimelineEvent; last: boolean; t: (s: string) =
       </div>
       <div className="min-w-0 flex-1 pb-3.5">
         <div className="break-words text-[13px] font-medium leading-snug text-txt">{t(e.title)}</div>
-        {e.detail && <div className="mt-0.5 break-words text-[12px] leading-snug text-dim">{e.detail}</div>}
+        {e.detail && <div className="mt-0.5 whitespace-pre-line break-words text-[12px] leading-snug text-dim">{e.detail}</div>}
         <div className="mt-0.5 text-[10px] uppercase tracking-wide text-faint">{t(e.source)}</div>
       </div>
     </li>

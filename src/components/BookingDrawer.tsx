@@ -42,7 +42,6 @@ import MediaImg from "@/components/MediaImg";
 import MediaLink from "@/components/MediaLink";
 import QRCode from "qrcode";
 import BookingInfoTab from "@/components/booking-panel/BookingInfoTab";
-import BookingRevisionsTab from "@/components/booking-panel/BookingRevisionsTab";
 import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
 import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
 import { recordOutgoing, markReminder } from "@/lib/guest-messages";
@@ -83,8 +82,8 @@ interface Form {
   extras: NonNullable<Booking["extras"]>; paymentMethod: PayMethod | "";
 }
 
-type PanelTab = "info" | "rev" | "timeline" | "msg" | "manage";
-const PANEL_TABS: [PanelTab, string][] = [["info", "Informazioni"], ["rev", "Revisioni"], ["timeline", "Timeline"], ["msg", "Messaggi"], ["manage", "Gestione"]];
+type PanelTab = "info" | "timeline" | "msg" | "manage";
+const PANEL_TABS: [PanelTab, string][] = [["info", "Informazioni"], ["timeline", "Timeline"], ["msg", "Messaggi"], ["manage", "Gestione"]];
 
 const inputCls = "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
@@ -1047,7 +1046,6 @@ export default function BookingDrawer() {
           {tab === "manage"
             ? (mode === "edit" ? editBody : (expanded ? viewBody : previewBody))
             : tab === "info" ? <BookingInfoTab booking={booking} />
-            : tab === "rev" ? <BookingRevisionsTab booking={booking} />
             : tab === "timeline" ? <BookingTimelineTab booking={booking} />
             : <BookingMessagesTab booking={booking} />}
         </div>

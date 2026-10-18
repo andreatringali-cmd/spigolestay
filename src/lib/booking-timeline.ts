@@ -38,6 +38,8 @@ export interface TimelineEvent {
   /** Priorità tra eventi con la stessa `uniq` (più alto = vince). */
   prio?: number;
   msg?: TimelineMsgMeta;
+  /** Revisione del portale che ha generato l'evento (serve a mostrare cosa è cambiato in una modifica). */
+  revisionId?: string;
 }
 
 // ─── Righe lette dal server (già normalizzate dalla route) ───────────────────────────────────────────────────────────
@@ -272,7 +274,7 @@ function creationFromServer(c: Ctx, s: Extract<ServerEvent, { src: "channex_book
     if (first) return { at: s.at, kind: "created", title: creationTitle(c.b, c.structureName), detail: code, tone: "info", source: "Portale", uniq: "created", prio: 3 };
     return { at: s.at, kind: "ota_revision", title: "Nuova revisione dal portale", detail: code, tone: "muted", source: "Portale" };
   }
-  if (s.status === "modified") return { at: s.at, kind: "ota_modified", title: "Modificata dal portale", detail: code, tone: "info", source: "Portale" };
+  if (s.status === "modified") return { at: s.at, kind: "ota_modified", title: "Modificata dal portale", detail: code, tone: "info", source: "Portale", revisionId: s.revisionId };
   if (s.status === "cancelled") return { at: s.at, kind: "cancelled", title: "Cancellata dal portale", detail: code, tone: "err", source: "Portale", uniq: "cancelled", prio: 4 };
   return { at: s.at, kind: "ota_revision", title: `Revisione dal portale (${s.status || "sconosciuta"})`, tone: "muted", source: "Portale" };
 }
