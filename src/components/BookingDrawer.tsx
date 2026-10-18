@@ -16,6 +16,7 @@ import NumInput from "@/components/NumInput";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import BookingExtrasPicker from "@/components/booking/BookingExtrasPicker";
+import BookingBillActions from "@/components/booking-panel/BookingBillActions";
 import { entriesTotal } from "@/lib/booking-extras";
 import { collectRuleOf, effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
@@ -122,6 +123,7 @@ export default function BookingDrawer() {
   const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
   const [incassoAmt, setIncassoAmt] = useState<number | null>(null);
+  const [incassoMethod, setIncassoMethod] = useState<PayMethod>("contanti"); // come ha pagato (contanti, carta, bonifico…) per l'incasso che stai registrando
   const checkinRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   // Su telefono le schede scorrono: la scheda attiva si porta in vista (altrimenti "Gestione" resta fuori schermo).
@@ -370,7 +372,7 @@ export default function BookingDrawer() {
   };
 
   // ─────────────── VISTA (sola lettura) ───────────────
-  const registraIncasso = () => { const amt = roundCents(incassoAmt ?? 0); if (!amt) return; updateBooking(booking.id, { paid: roundCents(paidV + amt) }); setIncassoAmt(null); setQa(null); };
+  const registraIncasso = () => { const amt = roundCents(incassoAmt ?? 0); if (!amt) return; updateBooking(booking.id, { paid: roundCents(paidV + amt), ...(pmView.auto ? {} : { paymentMethod: incassoMethod }) }); setIncassoAmt(null); setQa(null); };
   const removeExtra = (i: number) => updateBooking(booking.id, { extras: extrasList.filter((_, j) => j !== i) });
   const gestisciCheckin = () => { setQa(null); setTimeout(() => checkinRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
   // Extra della prenotazione: catalogo della struttura (+ animali, culla, letto suggeriti) con quantità; salva subito.
@@ -483,13 +485,16 @@ export default function BookingDrawer() {
               <span className="text-xs text-dim">{t("Importo")} €</span>
               <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
               <button onClick={() => setIncassoAmt(balanceV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>
-              <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
+              <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
+              <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
+            <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
             </div>
           : <button onClick={() => setQa("incasso")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">💶 {t("Registra incasso")}</button>
       )}
       {qa === "extra"
         ? extraPanel
         : <button onClick={() => setQa("extra")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">＋ {t("Extra")} <span className="font-normal text-faint">· {t("animali, culla, letto aggiuntivo…")}</span></button>}
+      {!noPrice && booking.status !== "cancelled" && <BookingBillActions booking={booking} structure={structure} guest={guest} />}
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
         const rmsg = `Grazie ${first} per aver soggiornato da ${structure?.name ?? "noi"}! Se ti sei trovato bene, ci lasceresti una recensione su Google? Ci aiuta tantissimo. ${reviewUrl}`.trim();
