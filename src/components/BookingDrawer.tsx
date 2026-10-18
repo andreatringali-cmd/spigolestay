@@ -436,14 +436,20 @@ export default function BookingDrawer() {
       </div>
       <div className="rounded-xl bg-wash px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
+          <span className="text-sm font-semibold text-txt">{t("Incasso per te")}</span>
           <span className="inline-flex items-center gap-1.5">
             {underprice?.flagged && <span title={underpriceReason(booking, underprice)} className="font-sans text-base font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
-            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(nettoV)}</span>
           </span>
         </div>
+        {!noPrice && (
+          <div className="mt-0.5 text-[11px] text-dim">
+            {t("Totale ospite")} <span className="font-mono tabular-nums">{eur(totalV)}</span>
+            {commTotV > 0 && <> · {t("Commissioni")} <span className="font-mono tabular-nums">−{eur(commTotV)}</span> ({String(commPctV).replace(".", ",")}%)</>}
+          </div>
+        )}
         {otaPaidV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Pagato al portale")}</span><span className="font-mono text-sm font-semibold tabular-nums text-dim">{eur(otaPaidV)}</span></div>}
-        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
+        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.min(paidV, totalV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: noPrice ? "var(--faint)" : balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{noPrice ? "—" : balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
         {extrasV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("di cui extra")}</span><span className="font-mono text-sm tabular-nums text-dim">{eur(extrasV)}</span></div>}
         <div className="mt-1.5">{payMethodRow}</div>
