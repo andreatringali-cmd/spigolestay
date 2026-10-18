@@ -181,7 +181,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         {hasOtaCode && <Line label={t("ID prenotazione OTA")} mono>{code}<CopyBtn text={code} /></Line>}
         {booking.bookedOn && <Line label={t("Prenotato il")}>{fmtDateWd(booking.bookedOn)}</Line>}
         <Line label={t("Proprietà")}>{structure?.name ?? "—"}</Line>
-        {fx?.ruid && <Line label="RUID" mono>{fx.ruid}<CopyBtn text={fx.ruid} /></Line>}
+        {fx?.ruid && <Line label="RUID" mono><span className="inline-block max-w-[17rem] truncate align-bottom" title={fx.ruid}>{fx.ruid}</span><CopyBtn text={fx.ruid} /></Line>}
       </Section>
 
       {/* 2 · Check-in */}
