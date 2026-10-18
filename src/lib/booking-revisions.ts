@@ -206,7 +206,8 @@ export function redactRaw(row: Json): Json {
 }
 
 function guaranteeView(g: Json, rev: Json): NonNullable<RevisionView["guarantee"]> {
-  const pick = (k: string) => g[k] ?? rev[k];
+  const gm: Json = isObj(g.meta) ? g.meta : {}; // Channex: i campi virtual_card_* stanno in guarantee.meta
+  const pick = (k: string) => g[k] ?? gm[k] ?? rev[k];
   const isVirtual = typeof g.is_virtual === "boolean" ? g.is_virtual : pick("is_virtual_card") === true ? true : undefined;
   const rawBal = numOrNull(pick("virtual_card_current_balance"));
   const dec = numOrNull(pick("virtual_card_decimal_places")) ?? 0;

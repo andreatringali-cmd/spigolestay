@@ -44,9 +44,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 // Riga etichetta/valore: su telefono etichetta sopra e valore sotto, da tablet in su due colonne (etichetta ~11rem).
-function Line({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
+function Line({ label, children, mono, gap }: { label: string; children: ReactNode; mono?: boolean; gap?: boolean }) {
   return (
-    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+    <div className={`flex flex-col gap-0.5 sm:flex-row sm:gap-3 ${gap ? "mt-3" : ""}`}>
       <div className="text-sm text-dim sm:w-44 sm:shrink-0">{label}</div>
       <div className={`min-w-0 flex-1 break-words text-sm text-txt ${mono ? "font-mono tabular-nums" : ""}`}>{children}</div>
     </div>
@@ -99,7 +99,21 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         if (!alive) return;
         const rev0 = r.revisions?.[0];
         if (!rev0) return;
-        setFetched({ forId: booking.id, revisionId: rev0.revisionId, ruid: rev0.ruid, policiesText: rev0.policiesText, deposits: rev0.deposits, guarantee: rev0.guarantee, rooms: (rev0.rooms ?? []).map((x) => ({ promotion: x.promotion, includes: (x.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })) });
+        type RevRow = NonNullable<typeof r.revisions>[number];
+        const toFx = (x: RevRow, from?: RevRow[]) => {
+          // Una revisione di modifica può non riportare garanzia/politiche/codice promo: si prendono dalla più recente che li ha.
+          const pickFrom = <K extends keyof RevRow>(k: K): RevRow[K] | undefined => x[k] ?? from?.find((y) => y[k])?.[k];
+          return {
+            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"),
+            rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
+          };
+        };
+        setFetched(toFx(rev0));
+        if (!rev0.guarantee || !rev0.policiesText || !rev0.ruid) {
+          apiPost<{ revisions?: RevRow[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId })
+            .then((all) => { if (alive && all.revisions?.length) setFetched(toFx(all.revisions[0], all.revisions)); })
+            .catch(() => { /* resta quanto già letto */ });
+        }
         // salva lo stato dell'ultima revisione (senza avvisi né registro attività)
         if ((rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled") && (!booking.otaRevision || !booking.otaRevision.id)) {
           patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: booking.otaRevision?.status ?? rev0.kind, at: booking.otaRevision?.at ?? (rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now()), ...(rev0.revisionId ? { id: rev0.revisionId } : {}) } } }]);
@@ -204,11 +218,9 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         {rooms.map((r, rIdx) => {
           const rt = getRoomType(r.roomTypeId);
           const un = getUnit(r.unitId);
-          const rg = getGuest(r.guestId);
           const rInfo = r.otaInfo;
           const rNights = nights(r.checkIn, r.checkOut);
           const bd = nightRows(r, (iso) => nightlyRevenue(r, iso));
-          const rNames = guestNames(r, rg);
           const lines = cancelPenaltyLines(rInfo?.cancelPenalties);
           const directCancel = lines.length === 0 && !isOta ? directCancelText(r) : undefined;
           const ages = r.childAges && r.childAges.length ? r.childAges : undefined;
@@ -257,8 +269,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                   </div>
                 </div>
 
-                <Line label={t("Ospiti")}>{rNames.length ? rNames.map((n, i) => <div key={i}>{n}</div>) : "—"}</Line>
-                <Line label={t("Occupazione")}>
+                <Line label={t("Occupazione")} gap>
                   {t("Adulti")}: {r.adults}, {t("Bambini")}: {r.children}{ages ? ` (${ages.join(", ")} ${t("anni")})` : ""}, {t("Neonati")}: {typeof r.cribs === "number" ? r.cribs : 0}
                 </Line>
                 {rInfo?.mealPlan && <Line label={t("Piano pasto")}>{rInfo.mealPlan}</Line>}

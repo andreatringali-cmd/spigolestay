@@ -187,3 +187,15 @@ test("normalizeRevision: garanzia — solo dati non sensibili, codice promoziona
   const guest = normalizeRevision({ ...base, guarantee: { card_type: "VI", card_number: "411111******1111", expiration_date: "12/2030", cardholder_name: "Mario Rossi", cvv: "999", is_virtual: false } });
   assert.deepEqual(guest.guarantee, { cardType: "VI", isVirtual: false, cvv: true });
 });
+
+test("normalizeRevision: carta virtuale con campi in guarantee.meta (formato Channex)", () => {
+  const v = normalizeRevision({
+    ...base,
+    guarantee: { card_type: "MC", card_number: "557093******7948", cardholder_name: "Expedia VirtualCard", cvv: "***", expiration_date: "10/2031", is_virtual: true,
+      meta: { virtual_card_currency_code: "EUR", virtual_card_current_balance: "15492", virtual_card_decimal_places: "2", virtual_card_effective_date: "2026-10-19", virtual_card_expiration_date: "2031-10-31" } },
+  });
+  assert.equal(v.guarantee?.vccBalance, 154.92);
+  assert.equal(v.guarantee?.vccCurrency, "EUR");
+  assert.equal(v.guarantee?.vccActivation, "2026-10-19");
+  assert.equal(v.guarantee?.holder, "Expedia VirtualCard");
+});
