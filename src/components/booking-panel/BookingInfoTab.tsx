@@ -14,6 +14,7 @@ import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import { effectivePayMethod, otaPayDetail, PAY_METHOD_LABEL } from "@/lib/pay-method";
 import { isRelayEmail } from "@/lib/contacts-check";
 import { eur } from "@/lib/format";
+import type { RevisionView } from "@/lib/booking-revisions";
 import { fmtDate, nights } from "@/lib/dates";
 import { lordoOf, nightlyRevenue } from "@/lib/booking";
 import {
@@ -28,6 +29,8 @@ const STATUS: Record<BookingStatus, { label: string; color: string }> = {
   no_show: { label: "No-show", color: "var(--faint)" },
 };
 
+type RevisionGuarantee = NonNullable<RevisionView["guarantee"]>;
+const CARD_TYPES: Record<string, string> = { VI: "Visa", MC: "MasterCard", CA: "MasterCard", AX: "American Express", DC: "Diners Club", DS: "Discover", JC: "JCB", UP: "UnionPay" };
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const money = (n: number, cur?: string) => eur(n, !cur || cur.toUpperCase() === "EUR" ? "€" : cur.toUpperCase());
 
@@ -84,17 +87,19 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
-  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string } | null>(null);
+  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; includes: string[] }[] } | null>(null);
+  const [closedRooms, setClosedRooms] = useState<Record<string, boolean>>({});
   const fx = fetched && fetched.forId === booking.id ? fetched : null;
+  const gar = fx?.guarantee;
   useEffect(() => {
     if (!chxId) return;
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
         const rev0 = r.revisions?.[0];
         if (!rev0) return;
-        setFetched({ forId: booking.id, revisionId: rev0.revisionId, ruid: rev0.ruid, policiesText: rev0.policiesText, deposits: rev0.deposits });
+        setFetched({ forId: booking.id, revisionId: rev0.revisionId, ruid: rev0.ruid, policiesText: rev0.policiesText, deposits: rev0.deposits, guarantee: rev0.guarantee, rooms: (rev0.rooms ?? []).map((x) => ({ promotion: x.promotion, includes: (x.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })) });
         // salva lo stato dell'ultima revisione (senza avvisi né registro attività)
         if ((rev0.kind === "new" || rev0.kind === "modified" || rev0.kind === "cancelled") && (!booking.otaRevision || !booking.otaRevision.id)) {
           patchBookingsSilently([{ id: booking.id, patch: { otaRevision: { status: booking.otaRevision?.status ?? rev0.kind, at: booking.otaRevision?.at ?? (rev0.at ? Date.parse(rev0.at) || Date.now() : Date.now()), ...(rev0.revisionId ? { id: rev0.revisionId } : {}) } } }]);
@@ -209,14 +214,15 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           const ages = r.childAges && r.childAges.length ? r.childAges : undefined;
           return (
             <div key={r.id} className="rounded-xl border border-line bg-paper p-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="min-w-0 text-sm font-semibold text-txt">
-                  {rt?.name ?? "—"} · {un?.name ?? t("Da assegnare")}
-                  {r.status === "cancelled" && <> <Pill color={STATUS.cancelled.color}>{t(STATUS.cancelled.label)}</Pill></>}
-                </div>
-                <div className="shrink-0 font-mono text-sm font-bold tabular-nums text-txt">{r.total ? eur(r.total) : "—"}</div>
-              </div>
-              <div className="mt-2 flex flex-col gap-2">
+              <button type="button" onClick={() => setClosedRooms((o) => ({ ...o, [r.id]: !o[r.id] }))} aria-expanded={!closedRooms[r.id]} className="flex w-full items-baseline justify-between gap-3 text-left">
+                <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold text-txt">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 self-center text-dim transition-transform ${closedRooms[r.id] ? "-rotate-90" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+                  <span className="min-w-0 truncate">{rt?.name ?? "—"}</span>
+                  {r.status === "cancelled" && <Pill color={STATUS.cancelled.color}>{t(STATUS.cancelled.label)}</Pill>}
+                </span>
+                <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-txt">{r.total ? eur(r.total) : "—"}</span>
+              </button>
+              {!closedRooms[r.id] && <div className="mt-2 flex flex-col gap-2">
                 <Line label={t("Date")}>{fmtDateWd(r.checkIn)} → {fmtDateWd(r.checkOut)} · {nightsTxt(rNights, t)}</Line>
                 {r.ratePlanName && <Line label={t("Tariffa")}>{r.ratePlanName}</Line>}
 
@@ -242,17 +248,25 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                         <span className="shrink-0 font-mono tabular-nums text-txt">{eur(bd.subtotal)}</span>
                       </div>
                     )}
+                    {(fx?.rooms?.[rIdx]?.includes.length ?? 0) > 0 && (
+                      <div className="mt-0.5 flex gap-3 text-xs italic text-dim">
+                        <span className="shrink-0">{t("Tariffa inclusa")}:</span>
+                        <span className="min-w-0">{fx!.rooms![rIdx].includes.map((x, i) => <div key={i}>{x}</div>)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <Line label={t("Ospiti")}>{rNames.length ? rNames.map((n, i) => <div key={i}>{n}</div>) : "—"}</Line>
                 <Line label={t("Occupazione")}>
-                  {t("Adulti")}: {r.adults} · {t("Bambini")}: {r.children}{ages ? ` (${ages.join(", ")} ${t("anni")})` : ""}{typeof r.cribs === "number" ? ` · ${t("Neonati")}: ${r.cribs}` : ""}
+                  {t("Adulti")}: {r.adults}, {t("Bambini")}: {r.children}{ages ? ` (${ages.join(", ")} ${t("anni")})` : ""}, {t("Neonati")}: {typeof r.cribs === "number" ? r.cribs : 0}
                 </Line>
                 {rInfo?.mealPlan && <Line label={t("Piano pasto")}>{rInfo.mealPlan}</Line>}
-                {rInfo?.smokingPreferences && <Line label={t("Preferenze fumatori")}>{rInfo.smokingPreferences}</Line>}
-                {rInfo?.bedPreferences && <Line label={t("Preferenze letti")}>{rInfo.bedPreferences}</Line>}
-                {(rInfo?.policies || rInfo?.paymentInstruction || (rIdx === 0 && fx?.policiesText)) && <Line label={t("Politiche")}><span className="whitespace-pre-wrap">{rInfo?.policies || rInfo?.paymentInstruction || fx?.policiesText}</span></Line>}
+                {rInfo?.bedPreferences && <Line label={t("Preferenza letto")}>{rInfo.bedPreferences}</Line>}
+                {rInfo?.smokingPreferences && <Line label={t("Preferenze per i fumatori")}>{rInfo.smokingPreferences}</Line>}
+                {rInfo?.paymentInstruction && <Line label={t("Istruzioni di pagamento")}><span className="whitespace-pre-wrap">{rInfo.paymentInstruction}</span></Line>}
+                {(rInfo?.policies || (rIdx === 0 && fx?.policiesText)) && <Line label={t("Politiche")}><span className="whitespace-pre-wrap">{rInfo?.policies || fx?.policiesText}</span></Line>}
+                {fx?.rooms?.[rIdx]?.promotion && <Line label={t("Codice promozionale")}>{fx.rooms[rIdx].promotion}</Line>}
                 {lines.length > 0 && (
                   <Line label={t("Politica di cancellazione")}>
                     <div className="flex flex-col gap-0.5">
@@ -266,7 +280,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                   </Line>
                 )}
                 {directCancel && <Line label={t("Politica di cancellazione")}>{t(directCancel)}</Line>}
-              </div>
+                <Line label={t("Camera assegnata")}>{un?.name ?? t("Da assegnare")}</Line>
+              </div>}
             </div>
           );
         })}
@@ -274,7 +289,20 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
 
       {/* 5 · Garanzia */}
       <Section title={t("Garanzia")}>
-        {booking.otaCard?.present ? (
+        {gar && (gar.cardType || gar.isVirtual !== undefined || gar.vccActivation || gar.vccBalance != null) ? (
+          <>
+            {gar.cardType && <Line label={t("Tipo di carta")}>{CARD_TYPES[gar.cardType.toUpperCase()] ?? gar.cardType}</Line>}
+            {gar.cardNumber && <Line label={t("Numero di carta")} mono>{gar.cardNumber}</Line>}
+            {gar.expiry && <Line label={t("Data di scadenza")}>{gar.expiry}</Line>}
+            {gar.holder && <Line label={t("Nome del titolare")}>{gar.holder}</Line>}
+            {gar.cvv && <Line label="CVV/CVC">{t("Presente")}</Line>}
+            {gar.isVirtual !== undefined && <Line label={t("È virtuale")}>{gar.isVirtual ? t("Sì") : t("No")}</Line>}
+            {gar.vccActivation && <Line label={t("Data di attivazione della VCC")}>{fmtDateWd(gar.vccActivation.slice(0, 10))}</Line>}
+            {gar.vccBalance != null && <Line label={t("Bilancio VCC")} mono>{gar.vccBalance.toFixed(2)}</Line>}
+            {gar.vccCurrency && <Line label={t("Valuta VCC")}>{gar.vccCurrency}</Line>}
+            {booking.otaCard?.present && <Line label={t("Addebito")}>{booking.otaCard.charged ? <Pill color="var(--ok)">{t("Addebitata ✓")}</Pill> : <Pill color="var(--warn)">{t("Da addebitare")}</Pill>}</Line>}
+          </>
+        ) : booking.otaCard?.present ? (
           <>
             <Line label={t("Carta virtuale OTA")}>
               {booking.otaCard.charged ? <Pill color="var(--ok)">{t("Addebitata ✓")}</Pill> : <Pill color="var(--warn)">{t("Da addebitare")}</Pill>}

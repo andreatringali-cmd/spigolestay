@@ -22,6 +22,7 @@ export interface RevisionCharge { label: string; detail?: string; amount: number
 export interface RevisionNight { date: string; amount: number }
 export interface RevisionRoomView {
   roomTypeId?: string; ratePlanId?: string;
+  promotion?: string;            // codice promozionale dell'OTA (room.meta.promotion)
   checkIn: string; checkOut: string; nights: number;
   adults: number; children: number; infants: number; childAges: number[];
   guests: string[];
@@ -59,7 +60,8 @@ export interface RevisionView {
   rooms: RevisionRoomView[];
   charges: RevisionCharge[];     // servizi/spese/tasse a livello di prenotazione e di camera
   policies: string[];            // politiche di cancellazione, pasti, pagamento...
-  guarantee?: { cardType?: string; isVirtual?: boolean };
+  // Garanzia: SOLO dati non sensibili. Numero (se già mascherato dall'OTA), scadenza e titolare solo per le carte VIRTUALI delle OTA; mai il CVV (solo se c'è).
+  guarantee?: { cardType?: string; isVirtual?: boolean; cardNumber?: string; expiry?: string; holder?: string; cvv?: boolean; vccActivation?: string; vccBalance?: number; vccCurrency?: string };
   raw?: Json;                    // attributi originali senza dati di carta/token (solo su richiesta: la route lo toglie con stripRaw)
 }
 
@@ -142,6 +144,23 @@ export function guestsLabel(adults: number, children = 0, infants = 0): string {
 }
 
 // ── Normalizzazione ──────────────────────────────────────────
+/** Codice promozionale di una camera (Channex: room.meta.promotion, a volte un oggetto con il nome). */
+function roomPromotion(room: Json): string | undefined {
+  const m = isObj(room.meta) ? room.meta : null;
+  if (!m) return undefined;
+  const p = m.promotion ?? m.promotion_name ?? m.promo_code;
+  return isObj(p) ? str(p.name) ?? str(p.title) ?? str(p.code) : str(p);
+}
+
+/** Numero carta SOLO se già mascherato dall'OTA (primi 6 e ultimi 4); un numero intero viene ridotto a 6+4, mai mostrato per esteso. */
+function maskedCardNumber(v: unknown): string | undefined {
+  const n = str(v)?.replace(/\s+/g, "");
+  if (!n) return undefined;
+  const digits = n.replace(/\D/g, "");
+  if (/[*xX•]/.test(n)) return n.length <= 24 ? n : undefined;
+  return digits.length >= 12 ? `${digits.slice(0, 6)}${"*".repeat(Math.max(digits.length - 10, 4))}${digits.slice(-4)}` : undefined;
+}
+
 function chargeOf(s: unknown, kind: RevisionCharge["kind"]): RevisionCharge | null {
   if (!isObj(s)) return null;
   const label = str(s.name) || str(s.type);
@@ -186,6 +205,28 @@ export function redactRaw(row: Json): Json {
   return out;
 }
 
+function guaranteeView(g: Json, rev: Json): NonNullable<RevisionView["guarantee"]> {
+  const pick = (k: string) => g[k] ?? rev[k];
+  const isVirtual = typeof g.is_virtual === "boolean" ? g.is_virtual : pick("is_virtual_card") === true ? true : undefined;
+  const rawBal = numOrNull(pick("virtual_card_current_balance"));
+  const dec = numOrNull(pick("virtual_card_decimal_places")) ?? 0;
+  const balance = rawBal == null ? undefined : dec > 0 ? rawBal / Math.pow(10, dec) : rawBal;
+  const act = str(pick("virtual_card_effective_date"));
+  const cvv = str(g.cvv);
+  return {
+    ...(str(g.card_type) ? { cardType: str(g.card_type) } : {}),
+    ...(isVirtual !== undefined ? { isVirtual } : {}),
+    // Numero, scadenza e titolare solo per le carte virtuali (dati del canale, non di un ospite); il CVV mai: solo se presente.
+    ...(isVirtual && maskedCardNumber(g.card_number) ? { cardNumber: maskedCardNumber(g.card_number) } : {}),
+    ...(isVirtual && str(g.expiration_date) ? { expiry: str(g.expiration_date) } : {}),
+    ...(isVirtual && str(g.cardholder_name) ? { holder: str(g.cardholder_name) } : {}),
+    ...(cvv ? { cvv: true } : {}),
+    ...(act ? { vccActivation: act } : {}),
+    ...(balance != null ? { vccBalance: balance } : {}),
+    ...(str(pick("virtual_card_currency_code")) ? { vccCurrency: str(pick("virtual_card_currency_code")) } : {}),
+  };
+}
+
 /**
  * Riga Channex (id + attributi della revisione, come restituita da getBookingRevision) → modello leggibile.
  * `opts.importedAt`: data di importazione (channex_bookings.imported_at), usata se la revisione non porta inserted_at.
@@ -218,6 +259,7 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     return {
       ...(str(room.room_type_id) ? { roomTypeId: str(room.room_type_id) } : {}),
       ...(str(room.rate_plan_id) ? { ratePlanId: str(room.rate_plan_id) } : {}),
+      ...(roomPromotion(room) ? { promotion: roomPromotion(room) } : {}),
       checkIn: ci, checkOut: co, nights: nightsBetween(ci, co),
       adults: intOr0(occ.adults), children: intOr0(occ.children), infants: intOr0(occ.infants),
       childAges: arr(occ.ages).map(Number).filter((n) => Number.isFinite(n) && n >= 0),
@@ -296,7 +338,7 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     ...(str(rev.payment_type) ? { paymentType: str(rev.payment_type) } : {}),
     ...(notes ? { notes } : {}),
     customer, rooms, charges, policies,
-    ...(g ? { guarantee: { ...(str(g.card_type) ? { cardType: str(g.card_type) } : {}), ...(typeof g.is_virtual === "boolean" ? { isVirtual: g.is_virtual } : {}) } } : {}),
+    ...(g ? { guarantee: guaranteeView(g, rev) } : {}),
     raw: redactRaw(r),
   };
 }

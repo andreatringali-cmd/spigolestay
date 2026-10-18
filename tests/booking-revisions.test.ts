@@ -169,3 +169,21 @@ test("normalizeRevision: RUID, politiche dell'OTA e depositi", () => {
   assert.equal(w.policiesText, undefined);
   assert.equal(w.deposits, undefined);
 });
+
+test("normalizeRevision: garanzia — solo dati non sensibili, codice promozionale", () => {
+  const virt = normalizeRevision({
+    ...base,
+    guarantee: { card_type: "MC", card_number: "557093******7948", expiration_date: "10/2031", cardholder_name: "virtual card", cvv: "123", is_virtual: true },
+    virtual_card_current_balance: 15492, virtual_card_decimal_places: 2, virtual_card_currency_code: "EUR", virtual_card_effective_date: "2026-10-19",
+    rooms: [{ ...base.rooms[0], meta: { promotion: "Pacchetto 15%" } }],
+  });
+  assert.deepEqual(virt.guarantee, { cardType: "MC", isVirtual: true, cardNumber: "557093******7948", expiry: "10/2031", holder: "virtual card", cvv: true, vccActivation: "2026-10-19", vccBalance: 154.92, vccCurrency: "EUR" });
+  assert.equal(virt.rooms[0].promotion, "Pacchetto 15%");
+  assert.ok(!JSON.stringify(virt.guarantee).includes("123")); // il CVV non esce mai
+  // numero intero: ridotto a primi 6 + ultimi 4
+  const full = normalizeRevision({ ...base, guarantee: { card_type: "VI", card_number: "4111111111111111", is_virtual: true } });
+  assert.equal(full.guarantee?.cardNumber, "411111******1111");
+  // carta NON virtuale (di un ospite): niente numero, scadenza, titolare
+  const guest = normalizeRevision({ ...base, guarantee: { card_type: "VI", card_number: "411111******1111", expiration_date: "12/2030", cardholder_name: "Mario Rossi", cvv: "999", is_virtual: false } });
+  assert.deepEqual(guest.guarantee, { cardType: "VI", isVirtual: false, cvv: true });
+});
