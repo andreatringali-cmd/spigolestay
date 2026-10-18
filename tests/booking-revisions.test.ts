@@ -199,3 +199,11 @@ test("normalizeRevision: carta virtuale con campi in guarantee.meta (formato Cha
   assert.equal(v.guarantee?.vccActivation, "2026-10-19");
   assert.equal(v.guarantee?.holder, "Expedia VirtualCard");
 });
+
+test("normalizeRevision: ospite Genius (customer.meta.is_genius) e RUID dai meta", () => {
+  const g = normalizeRevision({ ...base, customer: { ...base.customer, meta: { is_genius: true, ruid: "UmFuZG9t" } } });
+  assert.equal(g.customer.genius, true);
+  assert.equal(g.ruid, "UmFuZG9t");
+  assert.equal(normalizeRevision({ ...base, customer: { ...base.customer, meta: { is_genius: false } } }).customer.genius, undefined);
+  assert.equal(normalizeRevision(base).customer.genius, undefined);
+});

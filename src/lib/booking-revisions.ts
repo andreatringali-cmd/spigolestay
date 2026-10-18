@@ -30,7 +30,7 @@ export interface RevisionRoomView {
   nightly: RevisionNight[];
   charges: RevisionCharge[];
 }
-export interface RevisionCustomer { name: string; email?: string; phone?: string; country?: string; city?: string; address?: string; zip?: string; language?: string }
+export interface RevisionCustomer { genius?: boolean; name: string; email?: string; phone?: string; country?: string; city?: string; address?: string; zip?: string; language?: string }
 
 export interface RevisionView {
   revisionId: string;
@@ -214,13 +214,21 @@ export function redactRaw(row: Json): Json {
   return out;
 }
 
+/** RUID: Channex non lo documenta, quindi si cerca nei posti dove di solito sta (attributi, meta della prenotazione, meta del cliente o della garanzia). */
+function ruidOf(rev: Json, customerMeta: Json): string | undefined {
+  const gm = isObj(rev.guarantee) && isObj(rev.guarantee.meta) ? rev.guarantee.meta : {};
+  const m = isObj(rev.meta) ? rev.meta : {};
+  return str(rev.ruid) ?? str(m.ruid) ?? str(customerMeta.ruid) ?? str(gm.ruid);
+}
+
 /** Solo i NOMI dei campi che Channex ha mandato (nessun valore): per capire perché manca la garanzia o il codice promozionale. */
 function shapeOf(rev: Json): string {
   const g = rev.guarantee;
   const gs = isObj(g) ? `{${Object.keys(g).join(",")}${isObj(g.meta) ? ` meta:{${Object.keys(g.meta).join(",")}}` : ""}}` : g === null ? "null" : g === undefined ? "assente" : typeof g;
   const r0 = arr(rev.rooms).filter(isObj)[0];
   const rm = r0 && isObj(r0.meta) ? Object.keys(r0.meta).join(",") : "—";
-  return `guarantee=${gs}; room.meta=[${rm}]; campi=[${Object.keys(rev).join(",")}]`;
+  const cmk = isObj(rev.customer) && isObj(rev.customer.meta) ? Object.keys(rev.customer.meta).join(",") : "—";
+  return `guarantee=${gs}; room.meta=[${rm}]; customer.meta=[${cmk}]; campi=[${Object.keys(rev).join(",")}]`;
 }
 
 function guaranteeView(g: Json, rev: Json): NonNullable<RevisionView["guarantee"]> {
@@ -298,7 +306,9 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
   if (total === null) { const s = rooms.reduce((a, x) => a + (x.total ?? 0), 0); total = s > 0 ? s : null; }
 
   const c = isObj(rev.customer) ? rev.customer : {};
+  const cm: Json = isObj(c.meta) ? c.meta : {};
   const customer: RevisionCustomer = {
+    ...(cm.is_genius === true || cm.is_genius === "true" ? { genius: true } : {}), // Booking.com: customer.meta.is_genius
     name: [str(c.name), str(c.surname)].filter(Boolean).join(" "),
     ...(str(c.mail) || str(c.email) ? { email: str(c.mail) ?? str(c.email) } : {}),
     ...(str(c.phone) ? { phone: str(c.phone) } : {}),
@@ -345,7 +355,7 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     ...(str(rev.ota_name) ? { channel: str(rev.ota_name) } : {}),
     ...(str(rev.ota_reservation_code) ? { otaCode: str(rev.ota_reservation_code) } : {}),
     ...(str(rev.unique_id) ? { uniqueId: str(rev.unique_id) } : {}),
-    ...(str(rev.ruid) ? { ruid: str(rev.ruid) } : {}),
+    ...(ruidOf(rev, cm) ? { ruid: ruidOf(rev, cm) } : {}),
     ...(policiesText ? { policiesText } : {}),
     ...(deposits ? { deposits } : {}),
     currency: (str(rev.currency) ?? "EUR").toUpperCase(),

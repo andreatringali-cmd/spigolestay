@@ -87,14 +87,14 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
-  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; rooms?: { promotion?: string; includes: string[] }[] } | null>(null);
+  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; genius?: boolean; rooms?: { promotion?: string; includes: string[] }[] } | null>(null);
   const [closedRooms, setClosedRooms] = useState<Record<string, boolean>>({});
   const fx = fetched && fetched.forId === booking.id ? fetched : null;
   const gar = fx?.guarantee;
   useEffect(() => {
     if (!chxId) return;
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; rooms?: { promotion?: string; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; rooms?: { promotion?: string; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string; genius?: boolean } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
         const rev0 = r.revisions?.[0];
@@ -104,7 +104,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           // Una revisione di modifica può non riportare garanzia/politiche/codice promo: si prendono dalla più recente che li ha.
           const pickFrom = <K extends keyof RevRow>(k: K): RevRow[K] | undefined => x[k] ?? from?.find((y) => y[k])?.[k];
           return {
-            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), shape: x.shape,
+            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), shape: x.shape, genius: x.customer?.genius === true,
             rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
           };
         };
@@ -211,6 +211,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         <Line label={t("Città")}>{guest?.city || "—"}</Line>
         <Line label={t("Indirizzo")}>{addressTxt || "—"}</Line>
         <Line label={t("CAP")}>{guest?.zip || "—"}</Line>
+        {fx?.genius && !genius && <div><Pill color="var(--warn)" title={t("Ospite Genius di Booking.com")}>🏷 Genius Booker</Pill></div>}
       </Section>
 
       {/* 4 · Camere */}
