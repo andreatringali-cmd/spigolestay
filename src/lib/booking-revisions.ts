@@ -62,7 +62,6 @@ export interface RevisionView {
   policies: string[];            // politiche di cancellazione, pasti, pagamento...
   // Garanzia: SOLO dati non sensibili. Numero (se già mascherato dall'OTA), scadenza e titolare solo per le carte VIRTUALI delle OTA; mai il CVV (solo se c'è).
   guarantee?: { cardType?: string; isVirtual?: boolean; cardNumber?: string; expiry?: string; holder?: string; cvv?: boolean; vccActivation?: string; vccBalance?: number; vccCurrency?: string };
-  shape?: string;                // SOLO nomi dei campi ricevuti (mai valori): serve a capire cosa manda Channex quando manca qualcosa
   raw?: Json;                    // attributi originali senza dati di carta/token (solo su richiesta: la route lo toglie con stripRaw)
 }
 
@@ -221,16 +220,6 @@ function ruidOf(rev: Json, customerMeta: Json): string | undefined {
   return str(rev.ruid) ?? str(m.ruid) ?? str(customerMeta.ruid) ?? str(gm.ruid);
 }
 
-/** Solo i NOMI dei campi che Channex ha mandato (nessun valore): per capire perché manca la garanzia o il codice promozionale. */
-function shapeOf(rev: Json): string {
-  const g = rev.guarantee;
-  const gs = isObj(g) ? `{${Object.keys(g).join(",")}${isObj(g.meta) ? ` meta:{${Object.keys(g.meta).join(",")}}` : ""}}` : g === null ? "null" : g === undefined ? "assente" : typeof g;
-  const r0 = arr(rev.rooms).filter(isObj)[0];
-  const rm = r0 && isObj(r0.meta) ? Object.keys(r0.meta).join(",") : "—";
-  const cmk = isObj(rev.customer) && isObj(rev.customer.meta) ? Object.keys(rev.customer.meta).join(",") : "—";
-  return `guarantee=${gs}; room.meta=[${rm}]; customer.meta=[${cmk}]; campi=[${Object.keys(rev).join(",")}]`;
-}
-
 function guaranteeView(g: Json, rev: Json): NonNullable<RevisionView["guarantee"]> {
   const gm: Json = isObj(g.meta) ? g.meta : {}; // Channex: i campi virtual_card_* stanno in guarantee.meta
   const pick = (k: string) => g[k] ?? gm[k] ?? rev[k];
@@ -368,7 +357,6 @@ export function normalizeRevision(row: unknown, opts: { importedAt?: string | nu
     ...(notes ? { notes } : {}),
     customer, rooms, charges, policies,
     ...(g ? { guarantee: guaranteeView(g, rev) } : {}),
-    shape: shapeOf(rev),
     raw: redactRaw(r),
   };
 }

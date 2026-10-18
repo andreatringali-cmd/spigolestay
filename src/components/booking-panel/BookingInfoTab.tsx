@@ -87,14 +87,14 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   // più recente (1 chiamata) e si completano SOLO i campi vuoti dell'ospite; poi non si richiede per 7 giorni (promemoria solo su questo dispositivo).
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && !guest.city && !guest.zip && !guest.address;
-  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; genius?: boolean; rooms?: { promotion?: string; includes: string[] }[] } | null>(null);
+  const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; genius?: boolean; rooms?: { promotion?: string; guests: string[]; includes: string[] }[] } | null>(null);
   const [closedRooms, setClosedRooms] = useState<Record<string, boolean>>({});
   const fx = fetched && fetched.forId === booking.id ? fetched : null;
   const gar = fx?.guarantee;
   useEffect(() => {
     if (!chxId) return;
     let alive = true;
-    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; shape?: string; rooms?: { promotion?: string; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string; genius?: boolean } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
+    apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; guests?: string[]; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: { city?: string; address?: string; zip?: string; genius?: boolean } }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
         const rev0 = r.revisions?.[0];
@@ -104,8 +104,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           // Una revisione di modifica può non riportare garanzia/politiche/codice promo: si prendono dalla più recente che li ha.
           const pickFrom = <K extends keyof RevRow>(k: K): RevRow[K] | undefined => x[k] ?? from?.find((y) => y[k])?.[k];
           return {
-            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), shape: x.shape, genius: x.customer?.genius === true,
-            rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
+            forId: booking.id, revisionId: x.revisionId, ruid: pickFrom("ruid"), policiesText: pickFrom("policiesText"), deposits: pickFrom("deposits"), guarantee: pickFrom("guarantee"), genius: x.customer?.genius === true,
+            rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, guests: rm.guests ?? from?.find((y) => y.rooms?.[ri]?.guests?.length)?.rooms?.[ri]?.guests ?? [], includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
           };
         };
         setFetched(toFx(rev0));
@@ -222,6 +222,9 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           const rNights = nights(r.checkIn, r.checkOut);
           const bd = nightRows(r, (iso) => nightlyRevenue(r, iso));
           const lines = cancelPenaltyLines(rInfo?.cancelPenalties);
+          const promo = fx?.rooms?.[rIdx]?.promotion;
+          const promoUnderNights = !!promo && booking.channel === "booking"; // Booking.com: la promozione sta sotto ogni notte; Expedia e altri: riga «Codice promozionale»
+          const roomGuests = fx?.rooms?.[rIdx]?.guests ?? [];
           const directCancel = lines.length === 0 && !isOta ? directCancelText(r) : undefined;
           const ages = r.childAges && r.childAges.length ? r.childAges : undefined;
           return (
@@ -243,9 +246,12 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                   <div className="mt-1 flex flex-col gap-0.5 text-sm">
                     {bd.exact
                       ? bd.rows.map((n) => (
-                          <div key={n.date} className="flex items-baseline justify-between gap-3">
-                            <span className="min-w-0 text-dim">{n.label}{r.ratePlanName ? <span className="text-faint"> · {r.ratePlanName}</span> : null}</span>
-                            <span className="shrink-0 font-mono tabular-nums text-txt">{eur(n.amount)}</span>
+                          <div key={n.date}>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="min-w-0 text-dim">{n.label}{r.ratePlanName ? <span className="text-faint"> · {r.ratePlanName}</span> : null}</span>
+                              <span className="shrink-0 font-mono tabular-nums text-txt">{eur(n.amount)}</span>
+                            </div>
+                            {promoUnderNights && <div className="text-[10px] leading-tight text-faint">{promo}</div>}
                           </div>
                         ))
                       : (
@@ -269,7 +275,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                   </div>
                 </div>
 
-                <Line label={t("Occupazione")} gap>
+                {roomGuests.length > 0 && <Line label={t("Ospiti")} gap>{roomGuests.map((n, i) => <div key={i}>{n}</div>)}</Line>}
+                <Line label={t("Occupazione")} gap={roomGuests.length === 0}>
                   {t("Adulti")}: {r.adults}, {t("Bambini")}: {r.children}{ages ? ` (${ages.join(", ")} ${t("anni")})` : ""}, {t("Neonati")}: {typeof r.cribs === "number" ? r.cribs : 0}
                 </Line>
                 {rInfo?.mealPlan && <Line label={t("Piano pasto")}>{rInfo.mealPlan}</Line>}
@@ -277,7 +284,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                 {rInfo?.smokingPreferences && <Line label={t("Preferenze per i fumatori")}>{rInfo.smokingPreferences}</Line>}
                 {rInfo?.paymentInstruction && <Line label={t("Istruzioni di pagamento")}><span className="whitespace-pre-wrap">{rInfo.paymentInstruction}</span></Line>}
                 {(rInfo?.policies || (rIdx === 0 && fx?.policiesText)) && <Line label={t("Politiche")}><span className="whitespace-pre-wrap">{rInfo?.policies || fx?.policiesText}</span></Line>}
-                {fx?.rooms?.[rIdx]?.promotion && <Line label={t("Codice promozionale")}>{fx.rooms[rIdx].promotion}</Line>}
+                {promo && !promoUnderNights && <Line label={t("Codice promozionale")}>{promo}</Line>}
                 {lines.length > 0 && (
                   <Line label={t("Politica di cancellazione")}>
                     <div className="flex flex-col gap-0.5">
@@ -324,7 +331,6 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         ) : (
           <p className="text-sm italic text-dim">{t("Con questa prenotazione non viene fornita alcuna carta di credito")}</p>
         )}
-        {fx?.shape && <p className="break-all text-[10px] text-faint">Dati ricevuti da Channex: {fx.shape}</p>}
       </Section>
 
       {/* 6 · Appunti */}
