@@ -36,8 +36,8 @@ const money = (n: number, cur?: string) => eur(n, !cur || cur.toUpperCase() === 
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="border-b border-line px-5 py-4">
-      <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">{title}</div>
+    <div className="px-5 pb-3 pt-4">
+      <div className="mb-3 border-b border-line pb-1.5 text-[15px] font-medium text-dim">{title}</div>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
