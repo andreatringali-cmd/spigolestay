@@ -84,7 +84,7 @@ interface Form {
 }
 
 type PanelTab = "info" | "timeline" | "msg" | "manage";
-const PANEL_TABS: [PanelTab, string][] = [["info", "Informazioni"], ["timeline", "Timeline"], ["msg", "Messaggi"], ["manage", "Gestione"]];
+const PANEL_TABS: [PanelTab, string][] = [["info", "Informazioni"], ["timeline", "Timeline"], ["msg", "Messaggi OTA"], ["manage", "Gestione"]];
 
 const inputCls = "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
 

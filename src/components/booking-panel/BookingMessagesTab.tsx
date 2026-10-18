@@ -2,23 +2,19 @@
 
 // Scheda «Messaggi» della prenotazione.
 //  · Prenotazioni delle OTA (extId «channex:<id>»): la chat con l'ospite sul portale, letta e scritta su Channex (OtaThreadChat).
-//  · Tutte le altre (dirette, manuali, Octorate): i messaggi già scambiati con l'ospite su WhatsApp/email, in sola lettura; si risponde da «Messaggi».
-import { useCallback, useEffect, useMemo, useState } from "react";
+//  · Tutte le altre (dirette, manuali, Octorate): nessuna chat qui, solo il rimando alla pagina «Messaggi» (WhatsApp ed email).
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import OtaThreadChat from "@/components/booking-panel/OtaThreadChat";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 import { friendlyError } from "@/lib/friendly-error";
-import { fmtDateTime } from "@/lib/dates";
 import { CHANNELS, type Booking } from "@/lib/types";
 import type { OtaThread } from "@/lib/channex-threads";
 
-const THREADS_KEY = "spigolestay:threads:v1"; // registro conversazioni per ospite (lo stesso di Messaggi → Conversazioni)
 const CHANNEX_PREFIX = "channex:";
-const MAX_SHOWN = 60;
 
-interface LogMsg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; att?: { url: string; name?: string }[]; sys?: string }
 
 /** Id prenotazione Channex dalla prenotazione di Xenora; "" se non arriva da Channex. */
 export const channexBookingId = (b: Pick<Booking, "extId">): string => (b.extId?.startsWith(CHANNEX_PREFIX) ? b.extId.slice(CHANNEX_PREFIX.length).trim() : "");
@@ -28,7 +24,7 @@ const warnBox = "rounded-lg border px-3 py-2 text-xs";
 
 export default function BookingMessagesTab({ booking }: { booking: Booking }) {
   const cid = channexBookingId(booking);
-  return cid ? <OtaMessages booking={booking} channexId={cid} /> : <DirectMessages booking={booking} />;
+  return cid ? <OtaMessages booking={booking} channexId={cid} /> : <NotOta booking={booking} />;
 }
 
 // ───────────────────────── Prenotazioni OTA ─────────────────────────
@@ -73,58 +69,16 @@ function OtaMessages({ booking, channexId }: { booking: Booking; channexId: stri
 }
 
 // ───────────────────────── Prenotazioni dirette / manuali / Octorate ─────────────────────────
-function DirectMessages({ booking }: { booking: Booking }) {
+// La scheda è dedicata alla chat dei portali: per le altre prenotazioni rimanda alla pagina Messaggi (WhatsApp ed email).
+function NotOta({ booking }: { booking: Booking }) {
   const { t } = useLang();
   const router = useRouter();
-  const { guests, closeBooking } = useData();
-  const guest = guests.find((g) => g.id === booking.guestId);
-  const [all, setAll] = useState<Record<string, LogMsg[]> | null>(null);
-
-  const read = useCallback(() => {
-    try { const v = JSON.parse(localStorage.getItem(THREADS_KEY) || "{}"); setAll(v && typeof v === "object" ? v : {}); } catch { setAll({}); }
-  }, []);
-  useEffect(() => {
-    read();
-    // Messaggi in arrivo o inviati da Messaggi/webhook: il registro avvisa con questi eventi.
-    const ev = ["spigolestay:threads", "spigolestay:datasync", "focus"];
-    ev.forEach((e) => window.addEventListener(e, read));
-    return () => ev.forEach((e) => window.removeEventListener(e, read));
-  }, [read]);
-
-  const msgs = useMemo(() => {
-    const list = all?.[booking.guestId];
-    return Array.isArray(list) ? list.filter((m) => m && typeof m.text === "string").slice(-MAX_SHOWN) : [];
-  }, [all, booking.guestId]);
-  const hidden = useMemo(() => { const list = all?.[booking.guestId]; return Array.isArray(list) ? Math.max(0, list.length - MAX_SHOWN) : 0; }, [all, booking.guestId]);
-
+  const { closeBooking } = useData();
   const openChat = () => { closeBooking(); router.push(`/messaggi?guest=${encodeURIComponent(booking.guestId)}`); };
-  const openBtn = <button type="button" onClick={openChat} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash">{t("Apri in Messaggi")} →</button>;
-
-  if (all === null) return <p className="py-6 text-center text-sm text-dim">{t("Caricamento…")}</p>;
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs text-dim">{t("Messaggi scambiati con")} {guest?.fullName || t("l'ospite")} {t("su WhatsApp ed email")}. {t("Per rispondere apri Messaggi.")}</p>
-        <span className="shrink-0">{openBtn}</span>
-      </div>
-      {msgs.length === 0 ? (
-        <p className={note}>{t("Nessun messaggio scambiato con questo ospite.")}</p>
-      ) : (
-        <div className="flex max-h-[46dvh] min-h-[160px] flex-col gap-2.5 overflow-y-auto rounded-xl border border-line bg-wash/40 p-3">
-          {hidden > 0 && <p className="text-center text-[11px] text-faint">{hidden} {t("messaggi più vecchi non mostrati")}</p>}
-          {msgs.map((m, i) => (
-            <div key={m.id || i} className={`flex ${m.dir === "out" ? "justify-end" : "justify-start"}`}>
-              <div className={`flex max-w-[82%] flex-col ${m.dir === "out" ? "items-end" : "items-start"}`}>
-                <div className={`whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[13px] ${m.dir === "out" ? "text-white" : "bg-surface text-txt"}`} style={m.dir === "out" ? { backgroundColor: "var(--focus)" } : { border: "1px solid var(--line)" }}>
-                  {m.text}
-                  {Array.isArray(m.att) && m.att.length > 0 && <div className="mt-1 flex flex-col gap-1">{m.att.map((a, j) => <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" className="underline">📎 {a.name || t("Allegato")}</a>)}</div>}
-                </div>
-                <span className="mt-0.5 text-[10px] text-faint">{m.ts ? fmtDateTime(m.ts) : ""}{m.via ? ` · ${m.via}` : ""}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="flex flex-col items-start gap-3 px-5 py-5">
+      <p className="text-sm text-dim">{t("Questa scheda mostra la chat con l'ospite sui portali (Booking.com, Airbnb, Expedia). Questa prenotazione non arriva da un portale: i messaggi su WhatsApp ed email sono in Messaggi.")}</p>
+      <button type="button" onClick={openChat} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-focus hover:bg-wash">{t("Apri in Messaggi")} →</button>
     </div>
   );
 }
