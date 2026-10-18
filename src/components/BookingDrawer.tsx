@@ -122,6 +122,7 @@ export default function BookingDrawer() {
   const [checkinQr, setCheckinQr] = useState("");
   const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
+  const [payOpen, setPayOpen] = useState(false); // «Impostazioni dei pagamenti»: chiusa all'apertura della scheda
   const [incassoAmt, setIncassoAmt] = useState<number | null>(null);
   const [incassoMethod, setIncassoMethod] = useState<PayMethod>("contanti"); // come ha pagato (contanti, carta, bonifico…) per l'incasso che stai registrando
   const checkinRef = useRef<HTMLDivElement>(null);
@@ -157,6 +158,7 @@ export default function BookingDrawer() {
     setTab("info");
     setExpanded(false);
     setQa(null);
+    setPayOpen(false);
     setIncassoAmt(null); // importo/messaggi di un'altra prenotazione non devono restare nei campi della nuova
     setVoucher({});
     setEmit({});
@@ -482,6 +484,15 @@ export default function BookingDrawer() {
           </details>
         )}
       </div>
+      <div className="rounded-xl border border-line">
+        <button type="button" onClick={() => setPayOpen((v) => !v)} aria-expanded={payOpen} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left">
+          <span className="flex items-center gap-2 text-sm font-semibold text-txt">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 text-dim transition-transform ${payOpen ? "" : "-rotate-90"}`}><path d="M6 9l6 6 6-6" /></svg>
+            {t("Impostazioni dei pagamenti")}
+          </span>
+          {!noPrice && dueV > 0 && <span className="font-mono text-xs font-semibold tabular-nums" style={{ color: "var(--warn)" }}>{t("Da incassare")} {eur(dueV)}</span>}
+        </button>
+        {payOpen && <div className="flex flex-col gap-2 border-t border-line p-3">
       {dueV > 0 && (
         qa === "incasso"
           ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
@@ -489,8 +500,7 @@ export default function BookingDrawer() {
               <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
               <button onClick={() => setIncassoAmt(dueV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(dueV)}</button>
               <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
-              <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
-            <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
+              <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
             </div>
           : <button onClick={() => setQa("incasso")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">💶 {t("Registra incasso")}</button>
       )}
@@ -498,6 +508,8 @@ export default function BookingDrawer() {
         ? extraPanel
         : <button onClick={() => setQa("extra")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">＋ {t("Extra")} <span className="font-normal text-faint">· {t("animali, culla, letto aggiuntivo…")}</span></button>}
       {!noPrice && booking.status !== "cancelled" && <BookingBillActions booking={booking} structure={structure} guest={guest} />}
+        </div>}
+      </div>
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
         const rmsg = `Grazie ${first} per aver soggiornato da ${structure?.name ?? "noi"}! Se ti sei trovato bene, ci lasceresti una recensione su Google? Ci aiuta tantissimo. ${reviewUrl}`.trim();
@@ -550,6 +562,7 @@ export default function BookingDrawer() {
             <span className="text-xs text-dim">{t("Importo")} €</span>
             <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
             {dueV > 0 && <button onClick={() => setIncassoAmt(dueV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(dueV)}</button>}
+              <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
             <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
           </div>
         )}
