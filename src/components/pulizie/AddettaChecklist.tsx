@@ -56,23 +56,21 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   const wd = weekDates(viewDay);
   const pct = week.required ? Math.round((week.done / week.required) * 100) : 0;
 
-  const tick = (task: CleanTask, targetId: string, structureId: string) => {
+  // Un solo pulsante per voce. Finché mancano spunte ne aggiunge una (anche più volte nello stesso giorno); a voce completa, un altro tocco annulla le spunte di OGGI.
+  const tick = (task: CleanTask, targetId: string, structureId: string, st: TaskState) => {
     if (!canEdit) return;
     const n = stamp();
-    setChecks((prev) => toggleCheck(prev, { taskId: task.id, targetId, structureId, todayISO: n.today, nowISO: n.iso, nowMs: n.ms, newId: newId() }));
-  };
-
-  // Voce da fare più volte e già spuntata oggi: «+» aggiunge un'altra spunta di oggi (es. l'hai fatta due volte nello stesso giorno). Toccando la riga si annullano le spunte di oggi.
-  const tickAgain = (task: CleanTask, targetId: string, structureId: string) => {
-    if (!canEdit) return;
-    const n = stamp();
-    setChecks((prev) => [...prev, { id: newId(), taskId: task.id, targetId, structureId, date: n.today, at: n.iso, updatedAt: n.ms }]);
+    if (st.done < st.required) {
+      setChecks((prev) => [...prev, { id: newId(), taskId: task.id, targetId, structureId, date: n.today, at: n.iso, updatedAt: n.ms }]);
+    } else if (st.today) {
+      setChecks((prev) => toggleCheck(prev, { taskId: task.id, targetId, structureId, todayISO: n.today, nowISO: n.iso, nowMs: n.ms, newId: newId() })); // rimuove le spunte di oggi
+    }
   };
 
   const sub = (s: TaskState): string => {
     if (!isCurrent) return s.last ? `${s.done}/${s.required} · ultima ${fmtDMY(s.last.date).slice(0, 5)} ${hhmm(s.last.at)}` : `${s.done}/${s.required}`;
     if (s.state === "later" && s.nextDay) return `${s.done}/${s.required} · prossima ${WEEKDAY_LONG[s.nextDay - 1].toLowerCase()}`;
-    if (s.today) return `${s.done}/${s.required} questa settimana · fatta oggi alle ${hhmm(s.today.at)} · tocca per annullare`;
+    if (s.today) return `${s.done}/${s.required} questa settimana · ultima oggi alle ${hhmm(s.today.at)}`;
     if (s.last) return `${s.done}/${s.required} questa settimana · ultima ${fmtDMY(s.last.date).slice(0, 5)} ${hhmm(s.last.at)}`;
     return `${s.done}/${s.required} questa settimana`;
   };
@@ -80,24 +78,26 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   const row = (task: CleanTask, target: { id: string; label: string; structureId: string }) => {
     const s = taskState(task, target.id, checks, ref);
     if (onlyTodo && (s.state === "done" || (isCurrent && s.state === "later"))) return null;
-    const ticked = isCurrent && !!s.today;
+    const full = isCurrent && s.done >= s.required;              // voce completa: spunta verde
+    const partial = isCurrent && s.done > 0 && s.done < s.required; // fatta in parte (es. 1 di 2): cerchio arancione con «1/2»
+    const ticked = full;
     const chip = isCurrent ? STATE_CHIP[s.state] : s.state === "done" ? STATE_CHIP.done : isPast ? { label: "Non fatta", color: "var(--err)" } : { label: "", color: "var(--faint)" };
     return (
       <div key={`${task.id}:${target.id}`} className="flex items-stretch">
       <button
-        onClick={() => tick(task, target.id, target.structureId)}
-        disabled={!canEdit || !isCurrent}
+        onClick={() => tick(task, target.id, target.structureId, s)}
+        disabled={!canEdit || !isCurrent || (full && !s.today)}
+        title={!isCurrent ? undefined : full ? (s.today ? "Completa: tocca per annullare le spunte di oggi" : "Completa per questa settimana") : "Tocca per segnarla come fatta"}
         className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left transition active:bg-wash ${s.state === "done" && !ticked ? "opacity-70" : ""}`}
         aria-pressed={ticked}
       >
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 text-lg font-bold leading-none ${ticked ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-white" : s.state === "done" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-transparent"}`}>✓</span>
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 font-bold leading-none ${full ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-lg text-white" : partial ? "border-[color:#CA8A04] bg-[color:color-mix(in_srgb,#CA8A04_12%,transparent)] text-[11px] text-[color:#CA8A04]" : "border-line text-lg text-transparent"}`}>{partial ? `${s.done}/${s.required}` : "✓"}</span>
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-sm font-semibold ${s.state === "done" ? "text-dim" : "text-txt"}`}>{task.scope === "room" ? target.label : task.name}</span>
           <span className="block truncate text-[11px] text-dim">{sub(s)}</span>
         </span>
         {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{isCurrent && s.overdue ? "In ritardo" : chip.label}</span>}
       </button>
-      {canEdit && isCurrent && ticked && s.done < s.required && <button onClick={() => tickAgain(task, target.id, target.structureId)} aria-label="Segna un'altra volta oggi" title="Fatta un'altra volta oggi" className="grid w-11 shrink-0 place-items-center text-base font-bold text-focus hover:bg-wash">+</button>}
       {isManager && <button onClick={() => setEditing(task)} aria-label={`Modifica la voce «${task.name}»`} title="Modifica la voce" className="grid w-11 shrink-0 place-items-center text-dim hover:bg-wash hover:text-txt"><Icon name="settings" size={15} /></button>}
       </div>
     );
