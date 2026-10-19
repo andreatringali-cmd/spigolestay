@@ -502,6 +502,9 @@ export default function StrutturaSchedaPage() {
                 : <div className="grid h-full place-items-center text-center text-xs text-faint">{t("Inserisci indirizzo o coordinate")}<br />{t("per vedere la posizione sulla mappa")}</div>}
             </div>
           </Card>
+
+          {/* Google Hotel: sotto la mappa, nella colonna (non a tutta larghezza) */}
+          {!isNew && existing && <GoogleHotelSection structure={f as Structure} />}
         </div>
 
         {/* ---- Colonna destra ---- */}
@@ -767,7 +770,6 @@ export default function StrutturaSchedaPage() {
           )}
         </div>
       </div>
-      {!isNew && existing && <GoogleHotelSection structure={f as Structure} />}
     </div>
   );
 }

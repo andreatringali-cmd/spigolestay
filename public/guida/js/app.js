@@ -805,7 +805,9 @@
     var ws = document.querySelector(".welcome-sub"); if (ws) ws.textContent = "Bed & Breakfast " + (P.city || "Siracusa");
     var wl = document.querySelector(".welcome-logo"); if (wl) wl.src = logo;
     var bl = document.querySelector(".brand-logo"); if (bl) bl.src = logo;
-    document.documentElement.style.setProperty("--welcome-watermark", "url('/" + logo + "')");
+    // Il logo può essere un file del sito (percorso) oppure un'immagine incorporata (data:) caricata nella scheda struttura.
+    var wmUrl = /^(data:|https?:)/.test(logo) || logo.charAt(0) === "/" ? logo : "/" + logo;
+    document.documentElement.style.setProperty("--welcome-watermark", "url(\"" + wmUrl + "\")");
     if (name) document.title = name + " · Guest Guide";
   }
   applyBranding();

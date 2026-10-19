@@ -1064,7 +1064,13 @@ export default function GuidaOspitiPage() {
               <F label="Nome guida"><input value={`Guida - ${guide.name}`} disabled readOnly className={fldRO} /></F>
               <F label="Nome struttura"><input value={guide.name} disabled readOnly className={fldRO} /></F>
               <F label="Città"><input value={guide.city} disabled readOnly className={fldRO} /></F>
-              <F label="Logo struttura"><input value={guide.guideLogo || "— nessun logo nelle impostazioni —"} disabled readOnly className={fldRO} /></F>
+              <F label="Logo struttura">
+                <div className={fldRO + " flex h-16 items-center"}>
+                  {guide.guideLogo
+                    ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={guide.guideLogo} alt="Logo struttura" className="max-h-12 max-w-full object-contain" />)
+                    : <span className="text-xs">— nessun logo nelle impostazioni —</span>}
+                </div>
+              </F>
               <F label="Indirizzo"><input value={guide.address} disabled readOnly className={fldRO} /></F>
               <F label="Link Google Maps"><input value={guide.mapsUrl} disabled readOnly className={fldRO} /></F>
               <F label="Telefono"><input value={guide.phone} disabled readOnly className={fldRO} /></F>

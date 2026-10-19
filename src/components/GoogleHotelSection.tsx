@@ -81,7 +81,7 @@ export default function GoogleHotelSection({ structure }: { structure: Structure
   const okColor = "var(--ok)", warnColor = "var(--warn)";
   const when = last ? fmtDateTime(last.at) : "";
   return (
-    <Card className="mt-4">
+    <Card>
       <SectionTitle>{t("Google Hotel")}</SectionTitle>
       <p className="mb-3 text-xs text-dim">{t("Per comparire su Google servono i dati di questa scheda e almeno una foto. I dati vengono inviati da soli quando salvi la scheda.")}</p>
       <div className="mb-4 flex flex-wrap items-center gap-1.5 text-xs">
