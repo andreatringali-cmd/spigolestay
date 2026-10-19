@@ -473,11 +473,11 @@ export default function PrenotazioniPage() {
           <option value="all">{t("Tutti i canali")}</option>
           {channelOptions.map((o) => (<option key={o.key} value={o.key}>{o.label} ({o.count})</option>))}
         </Select>
+        {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
+        <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
         </div>
         <div className="flex items-center gap-2 max-sm:w-full sm:contents">
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:flex-wrap">
-          {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
-          <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
           <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
           <ExportMenu onExcel={doExcel} excelFields={excelFields} />
         </div>
