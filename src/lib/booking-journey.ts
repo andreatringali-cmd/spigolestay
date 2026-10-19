@@ -173,6 +173,7 @@ export function journeyBucket(b: Booking, today: string, j: ReturnType<typeof jo
 /** Il clic su un passaggio apre la finestra di invio (messaggio all'ospite)? Per i passaggi da fare sì; il check-out anche in anticipo
  *  (il promemoria di partenza si manda il giorno prima), finché l'ospite non è partito. Altrimenti si va alla pagina collegata. */
 export function stepOpensModal(s: Pick<JourneyStep, "key" | "state"> & { resend?: boolean }): boolean {
+  if ((s.key === "pay" || s.key === "tax") && s.state !== "na") return true; // Pagamento e Tassa aprono sempre le azioni (link, incasso), anche se risultano saldati
   if (s.resend) return true; // Check-in/Check-out segnati fatti per il messaggio inviato: si può riaprire per rimandarlo
   if (s.key === "checkout") return s.state !== "done";
   return s.state !== "done" && s.state !== "na";

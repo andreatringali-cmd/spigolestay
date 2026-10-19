@@ -33,3 +33,11 @@ test("Check-in verde per messaggio inviato: il clic riapre l'azione (non porta a
   assert.equal(step(full, "checkin").state, "done");
   assert.equal(stepOpensModal(step(full, "checkin")), false);
 });
+
+test("Pagamento e Tassa: il clic apre sempre le azioni, anche se saldati; passaggi senza compito vanno alla pagina", async () => {
+  const { stepOpensModal } = await import("../src/lib/booking-journey.ts");
+  assert.equal(stepOpensModal({ key: "pay", state: "done" }), true);
+  assert.equal(stepOpensModal({ key: "tax", state: "done" }), true);
+  assert.equal(stepOpensModal({ key: "pay", state: "na" }), false);
+  assert.equal(stepOpensModal({ key: "invoice", state: "done" }), false);
+});

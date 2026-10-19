@@ -209,7 +209,11 @@ export default function StepActions(p: StepActionsProps) {
       p.onChanged();
       return { ok: true, message: "Registrato ✓" };
     };
-    body = (<>
+    const settled = kind === "saldo" ? due <= 0.005 : !!b.cityTaxPaid; // niente da incassare
+    body = settled ? (<>
+      <p className="text-sm text-dim">{kind === "saldo" ? "Il saldo del soggiorno risulta già pagato (o incassato dall'OTA)." : "La tassa di soggiorno risulta già incassata."}</p>
+      <div className="flex flex-wrap gap-2"><button className={btnGhost} onClick={() => { p.onClose(); router.push("/pagamenti"); }}>Apri Incassi</button></div>
+    </>) : (<>
       <p className="text-sm text-dim">{kind === "saldo" ? `Mancano ${eur(due)} sul soggiorno.` : "La tassa di soggiorno non risulta incassata."} {sent
         ? <><b>Il link di pagamento è già stato inviato</b>{lastTs(remKind) ? ` (${whenLabel(lastTs(remKind)!)})` : " in chat"}: l'ospite non ha ancora pagato. Puoi <b>sollecitarlo</b> con un nuovo messaggio.</>
         : <><b>Non hai ancora mandato il link di pagamento.</b> Invialo adesso: quando l'ospite paga, l'incasso si registra da solo.</>}</p>
