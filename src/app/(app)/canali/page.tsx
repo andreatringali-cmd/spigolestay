@@ -266,7 +266,6 @@ export default function CanaliPage() {
       <section className="mb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
-          <button onClick={() => setChartsOn((v) => !v)} aria-pressed={chartsOn} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} aria-label={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line transition ${chartsOn ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t("annullate")}` : ""}`} />
@@ -323,7 +322,9 @@ export default function CanaliPage() {
               {relink.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: relink.ok === false ? "var(--err)" : relink.ok ? "var(--ok)" : "var(--dim)" }}>{relink.msg}</div>}
             </div>
           </div>
-          <div className="flex flex-col gap-2 lg:w-auto lg:shrink-0 lg:flex-row lg:flex-wrap lg:items-center">
+          <div className="flex flex-wrap items-center gap-2 lg:w-auto lg:shrink-0">
+            {!otaOff && <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>}
+            <button onClick={() => setChartsOn((v) => !v)} aria-pressed={chartsOn} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} aria-label={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line transition ${chartsOn ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
             {chxMap[effStructure] ? (
               <button onClick={() => { importOta(); doFullSync(); void loadOtaStatus(); }} disabled={impSync.running || fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto" title={t("Controlla le nuove prenotazioni dalle OTA e rimanda a Channex l'intera finestra di disponibilità/prezzi, in un colpo solo. Normalmente entrambe avvengono già da sole.")}>{impSync.running || fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Sincronizza ora")}</button>
             ) : (
@@ -341,10 +342,7 @@ export default function CanaliPage() {
          è configurato (nessun errore da mostrare a chi non usa affatto questa integrazione). */}
       {!otaOff && (
         <>
-          <div className="mb-3 mt-1 flex flex-wrap items-center justify-between gap-2">
-            <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
-            <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>
-          </div>
+          <div className="mb-3 mt-1"><SectionTitle>{t("Canali OTA collegati")}</SectionTitle></div>
           <Card className="mb-5">
           {otaErr ? (
             <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr} <button onClick={loadOtaStatus} disabled={otaLoading} className="ml-1 font-semibold underline disabled:opacity-40">{t("Riprova")}</button></p>
