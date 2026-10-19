@@ -217,3 +217,12 @@ test("agenda: arrivi, partenze e fermi per i giorni a venire", () => {
   assert.deepEqual([ag[2].arrivi, ag[2].partenze, ag[2].fermi], [0, 0, 1]);
   assert.equal(ag[2].rooms.length, 1);
 });
+
+test("voci d'esempio nel codice: tre per struttura, id fissi, solo di quella struttura", () => {
+  const a = L.exampleTasksFor("s1"), b = L.exampleTasksFor("s1"), c = L.exampleTasksFor("s2");
+  assert.equal(a.length, 3);
+  assert.deepEqual(a.map((t: any) => t.id), b.map((t: any) => t.id));          // stessi id ogni volta: niente doppioni
+  assert.ok(a.every((t: any) => t.id.startsWith(L.EXAMPLE_TASK_PREFIX + "s1:") && t.structureId === "s1" && t.scope === "common"));
+  assert.notEqual(a[0].id, c[0].id);                                              // ogni struttura ha le sue
+  assert.ok(a.every((t: any) => t.updatedAt === 1));                              // una modifica o eliminazione vera prevale
+});

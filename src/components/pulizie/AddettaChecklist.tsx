@@ -2,16 +2,16 @@
 
 // Checklist di cose da fare per camere e zone comuni, con frequenza settimanale decisa dal titolare.
 // L'addetta spunta (data e ora si registrano da sole); il titolare crea, modifica ed elimina le voci.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Structure, Unit } from "@/lib/types";
 import {
-  KEY_CHECKS, KEY_TASKS, WEEKDAY_SHORT, WEEKDAY_LONG, freqLabel, liveTasks, normalizeFreq, removeEntity, targetsFor, taskState, toggleCheck, weekDates, weekSummary,
+  EXAMPLE_TASK_PREFIX, KEY_CHECKS, KEY_TASKS, exampleTasksFor, WEEKDAY_SHORT, WEEKDAY_LONG, freqLabel, liveTasks, normalizeFreq, removeEntity, targetsFor, taskState, toggleCheck, weekDates, weekSummary,
   type CleanCheck, type CleanTask, type Freq, type TaskScope, type TaskState,
 } from "@/lib/pulizie-addetta";
 import { fmtDMY } from "@/lib/dates";
 import { useConfirm } from "@/components/ConfirmProvider";
 import Icon from "@/components/Icon";
-import { useSyncedList } from "./useSyncedList";
+import { readList, useSyncedList } from "./useSyncedList";
 import { Card, Field, Seg, Sheet, btnGhost, btnPrimary, hhmm, inputCls, newId, stamp } from "./addetta-ui";
 
 const STATE_CHIP: Record<TaskState["state"], { label: string; color: string }> = {
@@ -30,6 +30,19 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   const now = stamp();
   const today = now.today;
   const live = useMemo(() => liveTasks(tasks), [tasks]);
+  // Esempi scritti nel codice: una struttura senza voci parte con le tre voci d'esempio (una sola volta: gli id sono fissi, se le elimini non tornano).
+  // Si attende qualche secondo: la sincronizzazione può portare le voci vere da un altro dispositivo.
+  useEffect(() => {
+    if (!canEdit) return;
+    const t = setTimeout(() => {
+      const prev = readList<CleanTask>(KEY_TASKS);
+      const lv = liveTasks(prev);
+      const add = structures.flatMap((s) =>
+        prev.some((x) => x.id.startsWith(`${EXAMPLE_TASK_PREFIX}${s.id}:`)) || lv.some((x) => targetsFor(x, [s], units).length) ? [] : exampleTasksFor(s.id));
+      if (add.length) setTasks((p) => [...p, ...add.filter((a) => !p.some((x) => x.id === a.id))]);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [canEdit, structures, units, setTasks]);
   const week = useMemo(() => weekSummary(live, structures, units, checks, today), [live, structures, units, checks, today]);
   const wd = weekDates(today);
   const pct = week.required ? Math.round((week.done / week.required) * 100) : 0;

@@ -139,13 +139,18 @@ export function weekSummary(tasks: CleanTask[], structures: Structure[], units: 
   return { required, done, targets, completed };
 }
 
-/** Le tre voci reali indicate dal titolare, per partire senza scrivere tutto da zero. */
-export function exampleTasks(nowMs: number, newId: () => string): CleanTask[] {
-  const mk = (name: string, freq: Freq, order: number): CleanTask => ({ id: newId(), name, scope: "common", freq, order, updatedAt: nowMs });
+/**
+ * Le tre voci d'esempio indicate dal titolare, scritte nel codice: ogni struttura senza voci parte con queste (zone comuni, solo per quella struttura).
+ * Gli id sono FISSI per struttura (`ex:<struttura>:<n>`): lo stesso esempio non si crea due volte (nemmeno da due dispositivi) e, se lo elimini, non ricompare.
+ * updatedAt = 1: qualunque modifica o eliminazione vera, anche arrivata da un altro dispositivo, prevale sull'esempio.
+ */
+export const EXAMPLE_TASK_PREFIX = "ex:";
+export function exampleTasksFor(structureId: string): CleanTask[] {
+  const mk = (n: number, name: string, freq: Freq): CleanTask => ({ id: `${EXAMPLE_TASK_PREFIX}${structureId}:${n}`, name, scope: "common", structureId, freq, order: n, updatedAt: 1 });
   return [
-    mk("Pulizia sopra i pensili della cucina", { kind: "weekly", times: 1 }, 1),
-    mk("Pulizia pianerottolo e scale fino al piano terra", { kind: "weekly", times: 2 }, 2),
-    mk("Pulizia persiane e vetri delle finestre", { kind: "weekly", times: 2 }, 3),
+    mk(1, "Pulizia sopra i pensili della cucina", { kind: "weekly", times: 1 }),
+    mk(2, "Pulizia pianerottolo e scale fino al piano terra", { kind: "weekly", times: 2 }),
+    mk(3, "Pulizia persiane e vetri delle finestre", { kind: "weekly", times: 2 }),
   ];
 }
 
