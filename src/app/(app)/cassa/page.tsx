@@ -240,7 +240,8 @@ export default function CassaPage() {
   const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(raw.bookings, guests, getStructure, rules, scope, today, fcEnd, router, payouts), overrides), [raw.bookings, guests, getStructure, rules, scopeKey, today, fcEnd, router, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
-    .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
+    // Il saldo di partenza resta sempre visibile in cima al registro (anche se il periodo comincia dopo la sua data), purché non sia oltre la fine del periodo.
+    .filter((m) => (inPeriod(m.date) || (m.cat === OPENING_CAT && (!to || m.date <= to))) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
     .sort((a, b) => (ascending ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi o dal «Dal» scelto: dal più vicino; storico: dal più recente
   const catsInRegister = new Set([...all, ...forecastView].map((m) => m.cat)); // categorie presenti nel registro (filtro Categoria: solo quelle attive)
   const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
@@ -283,8 +284,8 @@ export default function CassaPage() {
   const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? raw.bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
   const infoText = (i: { amount: number; pct: number; date: string }) => `${t("commissione")} − ${eur(i.amount)} (${String(i.pct).replace(".", ",")}%) · ${t("trattenuta il")} ${fmtDMY(i.date)}`;
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return ascending ? d : -d; });
-  // I saldi di partenza non sono righe del registro: contano nel saldo e si vedono nel dettaglio della riga «Oggi» (si modificano dalla card «Saldo attuale»).
-  const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout)).filter((r) => r.type !== "opening" && !(r.type === "mov" && r.mov.cat === OPENING_CAT));
+  // Il saldo di partenza è una riga del registro (in cima se si legge in ordine dal «Dal»); i dettagli dei conti si vedono anche nella riga «Oggi» e si modificano dalla card «Saldo attuale».
+  const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout));
   // cella "saldo conti" (riusata dalle voci bonifico)
   const balCell = (bal: number | null, inc: boolean) => (
     <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
