@@ -42,6 +42,27 @@ export function healRoundedTotals(bookings: Booking[]): BookingPatch[] {
   return out;
 }
 
+/**
+ * Prenotazioni importate da Channex (QUALSIASI canale: Expedia, Airbnb…) con il totale arrotondato all'euro (381) ma i prezzi per notte con i centesimi
+ * (5 × 76,28 = 381,40): il totale diventa la somma delle notti. Solo se il totale è intero, la somma è entro 1 € e i prezzi coprono tutte le notti.
+ */
+export function healTotalsFromNights(bookings: Booking[]): BookingPatch[] {
+  const out: BookingPatch[] = [];
+  for (const b of bookings) {
+    if (!isActive(b) || channexIdOf(b) === null) continue;
+    const total = Number(b.total);
+    const rates = b.nightlyRates;
+    if (!rates || !Number.isFinite(total) || total <= 0 || !Number.isInteger(total)) continue;
+    const nightsN = Math.round((Date.parse(b.checkOut) - Date.parse(b.checkIn)) / 86400000);
+    const vals = Object.entries(rates).filter(([d]) => d >= b.checkIn && d < b.checkOut).map(([, v]) => Number(v));
+    if (nightsN <= 0 || vals.length !== nightsN || vals.some((v) => !Number.isFinite(v) || v <= 0)) continue;
+    const sum = round2(vals.reduce((a, v) => a + v, 0));
+    if (sum === total || Math.abs(sum - total) >= 1) continue;
+    out.push({ id: b.id, patch: { total: sum } });
+  }
+  return out;
+}
+
 // ── b) doppioni Octorate / Channex ──────────────────────────────────────────────────────────────────
 /** Campi che esistono solo su una riga e che, se vuoti sulla riga viva, si portano dalla gemella. */
 export const TWIN_FILL_FIELDS = [

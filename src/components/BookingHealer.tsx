@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { ymdRome } from "@/lib/dates-rome";
 import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
-import { applyPatches, healDuplicates, healRoundedTotals, mergePatches, needsChannexCheck, reconcilePatches, type ReconcileResult } from "@/lib/booking-heal";
+import { applyPatches, healDuplicates, healRoundedTotals, healTotalsFromNights, mergePatches, needsChannexCheck, reconcilePatches, type ReconcileResult } from "@/lib/booking-heal";
 
 // Allineamento AUTOMATICO e silenzioso delle prenotazioni già presenti (nessun pulsante, nessun incolla). Montato nell'AppShell accanto a ChannexAutoSync.
 //  1) in locale, subito dopo il caricamento: totali Booking con i centesimi (= incassato, se a meno di 1 €) e doppioni Octorate/Channex (la riga Octorate si segna
@@ -62,7 +62,9 @@ export default function BookingHealer() {
         const base = ref.current.bookings;
         const dups = healDuplicates(base);
         const tots = healRoundedTotals(applyPatches(base, dups));
-        const local = mergePatches(dups, tots);
+        const afterTots = applyPatches(applyPatches(base, dups), tots);
+        const nightTots = healTotalsFromNights(afterTots); // totale = somma dei prezzi per notte (centesimi) su ogni canale Channex
+        const local = mergePatches(mergePatches(dups, tots), nightTots);
         if (local.length) ref.current.patch(local);
 
         // 2) Channex: commissioni e totali esatti, a blocchi.

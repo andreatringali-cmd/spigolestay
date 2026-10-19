@@ -194,3 +194,21 @@ test("mergePatches somma i campi per id", () => {
   assert.deepEqual(mergePatches([{ id: "a", patch: { total: 1 } }], [{ id: "a", patch: { paid: 2 } }, { id: "b", patch: { paid: 3 } }]),
     [{ id: "a", patch: { total: 1, paid: 2 } }, { id: "b", patch: { paid: 3 } }]);
 });
+
+// ── totale dalla somma delle notti (qualsiasi canale Channex) ──
+test("healTotalsFromNights: Expedia 381 → 381,40 dalle 5 notti da 76,28", () => {
+  const { healTotalsFromNights } = H;
+  const rates = { "2026-10-21": 76.28, "2026-10-22": 76.28, "2026-10-23": 76.28, "2026-10-24": 76.28, "2026-10-25": 76.28 };
+  const b = bk({ channel: "expedia", checkIn: "2026-10-21", checkOut: "2026-10-26", total: 381, nightlyRates: rates });
+  assert.deepEqual(healTotalsFromNights([b]), [{ id: b.id, patch: { total: 381.4 } }]);
+});
+test("healTotalsFromNights: non tocca totali già esatti, differenze ≥ 1 €, notti mancanti, annullate, non Channex", () => {
+  const { healTotalsFromNights } = H;
+  const r = { "2026-10-21": 76.28, "2026-10-22": 76.28 };
+  const base = { channel: "expedia", checkIn: "2026-10-21", checkOut: "2026-10-23", nightlyRates: r };
+  assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 152.56 })]), []);        // già esatto
+  assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 150 })]), []);           // differenza ≥ 1 €
+  assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 153, checkOut: "2026-10-24" })]), []); // notte senza prezzo
+  assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 153, status: "cancelled" })]), []);
+  assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 153, extId: "octorate:1" })]), []);
+});
