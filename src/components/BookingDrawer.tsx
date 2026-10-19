@@ -48,6 +48,7 @@ import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
 import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
 import { recordOutgoing, markReminder } from "@/lib/guest-messages";
 import { renderSystemMessage } from "@/lib/msg-overrides";
+import { fillTemplateForBooking, fillTemplateNow, linkedTemplate, templateRawFor } from "@/lib/template-fill";
 import { channexCodeOf, countryName, fmtDateWd, groupRooms, guestNames, languageName, nightRows, notesBlocks, safeMailtoHref, safeTelHref } from "@/lib/booking-info";
 import { bookingSheetHtml, type SheetInput } from "@/lib/booking-sheet";
 
@@ -240,6 +241,21 @@ export default function BookingDrawer() {
   const balanceV = Math.max(0, totalV - paidV - otaPaidV);
 
   // «Stampa» del pannello: scheda della prenotazione come la stampa di Channex (la ricevuta per l'ospite è il pulsante «Ricevuta» di Gestione).
+  // Testo dal MODELLO collegato al passaggio (check-in, guida, recensione) se c'è: i pulsanti usano lo stesso testo dei modelli. Senza modello, il testo di base.
+  const fillDeps = { bookings, getUnit, getRoomType };
+  const modelText = async (srcId: string): Promise<string | null> => {
+    const tpl = linkedTemplate(srcId, booking.structureId);
+    if (!tpl) return null;
+    const text = await fillTemplateForBooking(templateRawFor(tpl, guest), booking, guest, structure, fillDeps);
+    return text.trim() ? text : null;
+  };
+  const modelTextNow = (srcId: string): string | null => {
+    const tpl = linkedTemplate(srcId, booking.structureId);
+    if (!tpl) return null;
+    const text = fillTemplateNow(templateRawFor(tpl, guest), booking, guest, structure, fillDeps);
+    return text.trim() ? text : null;
+  };
+
   const printSheet = () => {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
@@ -534,7 +550,7 @@ export default function BookingDrawer() {
       </div>
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
-        const rmsg = renderSystemMessage("reviewQuick", guestLangOf(guest), { nome: first, struttura: structure?.name ?? "noi", link: reviewUrl ?? "" }).trim();
+        const rmsg = (modelTextNow("recensione") ?? renderSystemMessage("reviewQuick", guestLangOf(guest), { nome: first, struttura: structure?.name ?? "noi", link: reviewUrl ?? "" })).trim();
         const rwa = phoneDigits ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(rmsg)}` : "";
         return (
           <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--ok) 32%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 6%, transparent)" }}>
@@ -749,7 +765,7 @@ export default function BookingDrawer() {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
           const ciMsg = (u: string) => renderSystemMessage("checkinShort", guestLangOf(guest), { nome: guest?.fullName ? guest.fullName.split(" ")[0] : "", struttura: structure?.name ?? "Xenora", link: u });
-          const sendCiWa = async () => { if (!sendOnce(`ci:${booking.id}`)) return; const s = await shortenLink(link); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciMsg(s))}`, "_blank", "noopener,noreferrer"); if (guest) { recordOutgoing(guest.id, ciMsg(s), "WhatsApp (link)", undefined, { bid: booking.id, rem: "checkin" }); markReminder(booking.id, "checkin"); } };
+          const sendCiWa = async () => { if (!sendOnce(`ci:${booking.id}`)) return; const s = await shortenLink(link); const ciText = (await modelText("selfcheckin")) ?? ciMsg(s); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciText)}`, "_blank", "noopener,noreferrer"); if (guest) { recordOutgoing(guest.id, ciText, "WhatsApp (link)", undefined, { bid: booking.id, rem: "checkin" }); markReminder(booking.id, "checkin"); } };
           const copyCi = async () => { const s = await shortenLink(link); try { await navigator.clipboard.writeText(s); } catch {} };
           if (!moduleOn("checkin")) return (
             <div className="flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
@@ -778,15 +794,16 @@ export default function BookingDrawer() {
           const sendGuideWa = async () => {
             if (!sendOnce(`guidewa:${booking.id}`)) return;
             const short = await shortenGuideLink(gLink);
-            window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(guideMsgWith(short))}`, "_blank", "noopener,noreferrer");
-            if (guest) { recordOutgoing(guest.id, guideMsgWith(short), "WhatsApp (link)", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); }
+            const gText = (await modelText("guida")) ?? guideMsgWith(short);
+            window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(gText)}`, "_blank", "noopener,noreferrer");
+            if (guest) { recordOutgoing(guest.id, gText, "WhatsApp (link)", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); }
           };
           const sendGuideEmail = async () => {
             if (!guest?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
             if (!sendOnce(`guideemail:${booking.id}`)) return;
             const to = guest.email;
             const short = await shortenGuideLink(gLink);
-            const msg = guideMsgWith(short);
+            const msg = (await modelText("guida")) ?? guideMsgWith(short);
             try {
               const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: guestLangOf(guest), to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
               const j = await r.json().catch(() => ({}));

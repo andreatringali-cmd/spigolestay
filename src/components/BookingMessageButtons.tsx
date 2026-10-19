@@ -5,12 +5,8 @@
 // I segnaposto ({ospite}, {struttura}, {checkin}, {link_checkin}…) si riempiono con i dati di questa prenotazione, nella lingua dell'ospite.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { eur } from "@/lib/format";
-import { buildGroupGuestLink, buildGuestLink, shortenLink } from "@/lib/guestlink";
-import { asLang, fillTokens, guestFallback, stayTimeText, structureFallback } from "@/lib/auto-messages-core";
-import { messageBalance } from "@/lib/msg-balance";
-import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens } from "@/lib/auto-review";
-import { structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
+import { asLang } from "@/lib/auto-messages-core";
+import { fillTemplateForBooking } from "@/lib/template-fill";
 import { guestLangOf } from "@/lib/guest-lang";
 import { waDigits } from "@/lib/contacts-check";
 import { recordOutgoing } from "@/lib/guest-messages";
@@ -46,33 +42,7 @@ export default function BookingMessageButtons({ booking, guest: guestProp, struc
   const digits = waDigits(guest?.phone, guest?.country);
   const lang = asLang(guestLangOf(guest));
 
-  const fill = async (raw: string): Promise<string> => {
-    const unit = getUnit(booking.unitId);
-    const emptyStructure = !(structure?.name ?? "").trim();
-    const groupBk = booking.groupId ? bookings.filter((x) => x.groupId === booking.groupId) : [booking];
-    const guideRaw = groupBk.length > 1
-      ? buildGroupGuestLink({ structureId: booking.structureId, guestName: guest?.fullName || "", lang, rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) })
-      : buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unit?.code || unit?.name || "", guestName: guest?.fullName || "", parking: !!booking.parking, lang });
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    let reviewSettingsRaw: string | null = null; try { reviewSettingsRaw = localStorage.getItem(REVIEW_SETTINGS_KEY); } catch { /* storage non disponibile */ }
-    let guideReviewUrl = ""; try { guideReviewUrl = JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")?.[booking.structureId]?.reviewUrl || ""; } catch { /* nessuna guida */ }
-    const nights = Math.max(1, Math.round((Date.parse(booking.checkOut) - Date.parse(booking.checkIn)) / 86400000));
-    const ctx: Record<string, string> = {
-      ospite: (guest?.firstName || guest?.fullName || "").split(" ")[0] || guestFallback(lang),
-      struttura: emptyStructure ? structureFallback(lang) : (structure?.name ?? ""),
-      camera: unit?.name ?? getRoomType(booking.roomTypeId)?.name ?? "",
-      checkin: stayTimeText("checkin", lang, booking.checkIn, structure?.checkInFrom),
-      checkout: stayTimeText("checkout", lang, booking.checkOut, structure?.checkOutBy),
-      codice_accesso: unit?.accessInfo || structure?.accessInfo || "",
-      saldo: eur(messageBalance(booking, structure)),
-      notti: String(nights),
-      link_guida: /\{link_guida\}/i.test(raw) ? await shortenLink(guideRaw) : guideRaw,
-      link_checkin: /\{link_checkin\}/i.test(raw) ? await shortenLink(`${origin}/checkin?b=${encodeURIComponent(booking.id)}`) : `${origin}/checkin?b=${encodeURIComponent(booking.id)}`,
-      whatsapp: structureWhatsapp(structure ?? {}) || WHATSAPP_FALLBACK[lang] || WHATSAPP_FALLBACK.it,
-      ...reviewTokens(reviewLinksFor({ structureId: booking.structureId, placeId: structure?.googlePlaceId, guideReviewUrl, settings: parseReviewSettings(reviewSettingsRaw) })),
-    };
-    return fillTokens(raw, ctx, { lang, emptyStructure });
-  };
+  const fill = (raw: string) => fillTemplateForBooking(raw, booking, guest, structure, { bookings, getUnit, getRoomType });
 
   const send = async (tpl: Tpl) => {
     if (!digits) return;

@@ -17,7 +17,7 @@ const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival",
 // I trigger "il giorno di…" non usano il conteggio giorni (sono ancorati esattamente a check-in/check-out).
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
 // Ordine dei passaggi obbligatori della prenotazione (Check-in, Pagamento, Guida ospiti, … Check-out, recensione): i modelli collegati vengono per primi, in quest'ordine; poi quelli aggiunti dal titolare.
-const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, checkout: 7, recensione: 8 };
+const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, checkout: 8, recensione: 8 };
 const stepRank = (tp: { srcId?: string }) => (tp.srcId && tp.srcId in STEP_RANK ? STEP_RANK[tp.srcId] : 100);
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 

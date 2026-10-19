@@ -17,6 +17,7 @@ import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, reminderIntr
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
+import { fillTemplateForBooking, linkedTemplate, templateRawFor } from "@/lib/template-fill";
 import { fmtDMY } from "@/lib/dates";
 import Icon from "@/components/Icon";
 
@@ -42,7 +43,14 @@ export default function StepActions(p: StepActionsProps) {
   const { b, step, guest, structure } = p;
   const router = useRouter();
   const ask = useConfirm();
-  const { updateBooking, openBooking, bookings, getUnit } = useData();
+  const { updateBooking, openBooking, bookings, getUnit, getRoomType } = useData();
+  // Testo del messaggio dal MODELLO collegato al passaggio (Messaggi → Modelli); senza modello (o vuoto) si usa il testo di base.
+  const fromModel = async (srcId: string): Promise<string | null> => {
+    const tpl = linkedTemplate(srcId, b.structureId);
+    if (!tpl) return null;
+    const text = await fillTemplateForBooking(templateRawFor(tpl, guest), b, guest, structure, { bookings, getUnit, getRoomType });
+    return text.trim() ? text : null;
+  };
   const lang = langOf(guest);
   const [busy, setBusy] = useState("");
   const [res, setRes] = useState<{ ok: boolean; text: string } | null>(null);
@@ -149,6 +157,8 @@ export default function StepActions(p: StepActionsProps) {
     const partial = dec > 0 && dec < exp;
     const missing = exp - dec;
     const build = async () => {
+      const model = partial ? null : await fromModel("selfcheckin");
+      if (model) return { text: model, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` };
       const url = await shortenLink(fullCheckin);
       const core = partial ? CHECKIN_MORE_MSG[lang](missing, url) : CHECKIN_MSG[lang](url);
       const hi = greeting(lang, guest).trim(); // saluto su una riga a sé: dopo la virgola la frase riparte con la maiuscola senza stonare
@@ -235,7 +245,7 @@ export default function StepActions(p: StepActionsProps) {
       </>);
     }
   } else if (step.key === "guide") {
-    const build = async () => ({ text: `${intro("guide")}${greeting(lang, guest)}${GUIDE_MSG[lang](await shortenLink(guideUrl()))}`, subject: `Guida ospiti${structure?.name ? ` · ${structure.name}` : ""}` });
+    const build = async () => ({ text: (await fromModel("guida")) ?? `${intro("guide")}${greeting(lang, guest)}${GUIDE_MSG[lang](await shortenLink(guideUrl()))}`, subject: `Guida ospiti${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">La guida ospiti (check-in, Wi-Fi, dintorni, codici della camera) non risulta inviata. Mandala adesso all'ospite.</p>
       {sendButtons(build, "guide", "Invia la guida")}
@@ -262,7 +272,7 @@ export default function StepActions(p: StepActionsProps) {
   } else if (step.key === "checkout") {
     const hi = greeting(lang, guest).trim();
     const dm = fmtDMY(b.checkOut); // data completa gg.mm.aaaa
-    const build = async () => ({ text: `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
+    const build = async () => ({ text: (await fromModel("checkout")) ?? `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">Manda all&apos;ospite il promemoria della partenza: data e orario del check-out, come contattarti per qualsiasi necessità e un ringraziamento.</p>
       {sendButtons(build, "checkout", "Invia il promemoria", undefined, <button className={btnGhost} onClick={() => { p.onClose(); router.push("/pulizie"); }}>Apri Pulizie</button>)}
@@ -270,7 +280,7 @@ export default function StepActions(p: StepActionsProps) {
   } else if (step.key === "review") {
     // Stessi link del messaggio automatico (link scelto in Modelli & automazioni, Place ID o guida; Tripadvisor se impostato) e testo nella lingua dell'ospite.
     const links = reviewLinksBlockFromStorage(b.structureId, structure?.googlePlaceId);
-    const build = async () => ({ text: reviewRequestMessage({ guestName: guest?.firstName || guest?.fullName, structureName: structure?.name, linksBlock: links, lang }), subject: reviewRequestSubject(lang, structure?.name) });
+    const build = async () => ({ text: (await fromModel("recensione")) ?? reviewRequestMessage({ guestName: guest?.firstName || guest?.fullName, structureName: structure?.name, linksBlock: links, lang }), subject: reviewRequestSubject(lang, structure?.name) });
     body = links ? (<>
       <p className="text-sm text-dim">L'ospite è partito: una richiesta di recensione ora ha più probabilità di essere accolta.</p>
       {sendButtons(build, "review", "Richiedi la recensione", (via) => updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }))}
