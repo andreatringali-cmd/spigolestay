@@ -12,7 +12,8 @@ const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-s
 
 export default function ReviewSettingsCard() {
   const { t } = useLang();
-  const { structures } = useData();
+  const { structures: allStructures, activeStructureId } = useData();
+  const structures = activeStructureId === "all" ? allStructures : allStructures.filter((x) => x.id === activeStructureId); // solo la struttura selezionata in alto a destra
   const [s, setS] = useState<ReviewSettings>(DEFAULT_REVIEW_SETTINGS);
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
@@ -41,8 +42,8 @@ export default function ReviewSettingsCard() {
     <Card className="mb-4">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-2 text-left">
         <span>
-          <SectionTitle>{t("Richiesta di recensione dopo il soggiorno")}</SectionTitle>
-          <span className="-mt-2 block text-xs text-dim">{t("Il giorno dopo la partenza l'ospite riceve un invito a una recensione sincera, con i link ai portali.")}{missing.length > 0 ? ` ${t("Senza almeno un link il messaggio non parte.")}` : ""}</span>
+          <SectionTitle>{t("Link per le recensioni")}</SectionTitle>
+          <span className="-mt-2 block text-xs text-dim">{t("I link ai portali da usare nei tuoi messaggi di richiesta recensione (segnaposto {link_recensioni}).")}{missing.length > 0 ? ` ${t("Senza almeno un link il messaggio non parte.")}` : ""}</span>
         </span>
         <span className="shrink-0 text-dim">{open ? "▲" : "▼"}</span>
       </button>

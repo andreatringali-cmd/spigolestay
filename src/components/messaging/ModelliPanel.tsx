@@ -7,7 +7,6 @@ import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
 import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted } from "@/lib/msg-templates";
 import ReviewSettingsCard from "@/components/messaging/ReviewSettingsCard";
-import SystemMessagesCard from "@/components/messaging/SystemMessagesCard";
 import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
 
@@ -88,7 +87,6 @@ export default function ModelliPanel() {
 
       {/* Richiesta di recensione: link ai portali e regole di esclusione (lette dal cron dei messaggi automatici) */}
       <ReviewSettingsCard />
-      <SystemMessagesCard />
 
       {/* Modelli raggruppati per fase del ciclo ospite, in ordine cronologico */}
       <div className="space-y-6">
