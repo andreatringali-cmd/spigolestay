@@ -62,3 +62,9 @@ test("ogni struttura è a sé: i modelli per tutte si dividono in una copia per 
   for (const sid of S) assert.deepEqual(full.filter((x) => x.structureIds[0] === sid && x.id.startsWith("mand-")).map((x) => x.srcId).sort(), ["checkout", "pay", "tax"]);
   assert.equal(full.filter((x) => x.srcId === "selfcheckin").length, 3); // già presenti, non si aggiunge
 });
+
+test("modelli eliminati dal titolare: tolti anche le copie per struttura, senza toccare quelli simili", async () => {
+  const { dropRemovedTemplates } = await import("../src/lib/msg-templates.ts");
+  const out = dropRemovedTemplates([{ id: "seed-welcome" }, { id: "seed-welcome@767db967" }, { id: "seed-checkin" }, { id: "seed-checkin-online" }, { id: "seed-review@ddc4ba98" }, { id: "seed-benvenuto-guida" }, { id: "mand-pay@7c476811" }]);
+  assert.deepEqual(out.map((x) => x.id), ["seed-checkin-online", "seed-benvenuto-guida", "mand-pay@7c476811"]);
+});

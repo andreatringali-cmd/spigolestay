@@ -5,7 +5,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
-import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, splitTemplatesPerStructure, ensureMandatoryPerStructure } from "@/lib/msg-templates";
+import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, splitTemplatesPerStructure, ensureMandatoryPerStructure, dropRemovedTemplates } from "@/lib/msg-templates";
 import ReviewSettingsCard from "@/components/messaging/ReviewSettingsCard";
 import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
@@ -54,7 +54,7 @@ export default function ModelliPanel() {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
       const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
       // Il vecchio modello collegato alla recensione diventa un modello normale (eliminabile): check-out e recensione sono UN solo messaggio.
-      setTemplates(mergeSeedTemplates(base).map((tp) => (tp.srcId === "recensione" ? { ...tp, srcId: undefined } : tp))); // i dati (anche trigger e orari) restano intatti: l'invio automatico è spento dall'interruttore del server
+      setTemplates(dropRemovedTemplates(mergeSeedTemplates(base)).map((tp) => (tp.srcId === "recensione" ? { ...tp, srcId: undefined } : tp))); // i dati (anche trigger e orari) restano intatti: l'invio automatico è spento dall'interruttore del server
     } catch {}
     setReady(true);
   }, []);

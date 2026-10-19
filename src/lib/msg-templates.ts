@@ -212,6 +212,15 @@ export function ensureMandatoryPerStructure<T extends { srcId?: string; structur
   return out;
 }
 
+/**
+ * Modelli d'esempio ELIMINATI dal titolare (richiesta del 19/10/2026) in ogni struttura: Benvenuto pre-arrivo, Istruzioni check-in, Richiesta recensione (con le loro copie «<id>@<struttura>»).
+ * Se un dispositivo con la lista vecchia li rimette, al caricamento si tolgono di nuovo (la cancellazione resta locale e si sincronizza).
+ */
+const REMOVED_TEMPLATE_BASES = ["seed-welcome", "seed-checkin", "seed-review"];
+export function dropRemovedTemplates<T extends { id: string }>(saved: T[]): T[] {
+  return saved.filter((tp) => !REMOVED_TEMPLATE_BASES.includes(tp.id.split("@")[0]));
+}
+
 /** Se false i modelli d'esempio NON si aggiungono più da soli: i modelli li crea il titolare (ottobre 2026). */
 export const SEED_TEMPLATES_ENABLED = false;
 export function mergeSeedTemplates<T extends { id: string; texts?: Record<string, string> }>(saved: T[], deletedSeedIds: string[] = loadDeletedSeedIds(), enabled: boolean = SEED_TEMPLATES_ENABLED): T[] {
