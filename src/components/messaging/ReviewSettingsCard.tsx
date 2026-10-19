@@ -10,13 +10,13 @@ import { REVIEW_SETTINGS_KEY, DEFAULT_REVIEW_SETTINGS, parseReviewSettings, revi
 // Salvate in "spigolestay:reviewsettings" (si sincronizza con l'account, quindi le legge anche il cron dei messaggi automatici).
 const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus";
 
-export default function ReviewSettingsCard() {
+export default function ReviewSettingsCard({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
   const { t } = useLang();
   const { structures: allStructures, activeStructureId } = useData();
   const structures = activeStructureId === "all" ? allStructures : allStructures.filter((x) => x.id === activeStructureId); // solo la struttura selezionata in alto a destra
   const [s, setS] = useState<ReviewSettings>(DEFAULT_REVIEW_SETTINGS);
   const [ready, setReady] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [drafts, setDrafts] = useState<Record<string, string>>({}); // testo digitato per campo ("<id>:g" / "<id>:t"), anche se non ancora un link valido
 
   useEffect(() => { try { setS(parseReviewSettings(localStorage.getItem(REVIEW_SETTINGS_KEY))); } catch { /* storage non disponibile */ } setReady(true); }, []);

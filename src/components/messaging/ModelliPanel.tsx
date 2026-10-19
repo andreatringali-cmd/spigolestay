@@ -58,6 +58,7 @@ export default function ModelliPanel() {
   }, []);
   useEffect(() => { if (!ready) return; try { localStorage.setItem("spigolestay:msgtemplates", JSON.stringify(templates)); } catch {} }, [templates, ready]);
 
+  const [showSettings, setShowSettings] = useState(false); // ingranaggio: impostazioni (link recensioni…)
   const [editing, setEditing] = useState<MsgTemplate | null>(null);
   const [editLang, setEditLang] = useState<Lang>("it");
   const saveTpl = () => { if (!editing || !editing.name.trim()) return; unmarkSeedDeleted(editing.id); setTemplates((prev) => (prev.some((t) => t.id === editing.id) ? prev.map((t) => (t.id === editing.id ? editing : t)) : [...prev, editing])); setEditing(null); };
@@ -87,10 +88,14 @@ export default function ModelliPanel() {
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+        <button type="button" onClick={() => { setEditing(emptyTpl(activeStructureId !== "all" ? [activeStructureId] : undefined)); setEditLang("it"); }} className="inline-flex items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
+        <button type="button" onClick={() => setShowSettings((v) => !v)} aria-pressed={showSettings} aria-label={t("Impostazioni")} title={t("Impostazioni (link recensioni…)")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${showSettings ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+        </button>
       </div>
 
-      {/* Richiesta di recensione: link ai portali e regole di esclusione (lette dal cron dei messaggi automatici) */}
-      <ReviewSettingsCard />
+      {/* Impostazioni (ingranaggio): per ora i link alle recensioni */}
+      {showSettings && <ReviewSettingsCard defaultOpen />}
 
       {/* Modelli raggruppati per fase del ciclo ospite, in ordine cronologico */}
       <div className="space-y-6">
