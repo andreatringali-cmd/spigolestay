@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { deliverPuliziePlan, romeNowSlot } from "@/lib/pulizie-send";
+import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -13,11 +14,10 @@ export const dynamic = "force-dynamic";
 //
 // Una configurazione per struttura (destinatari/orario propri, es. persone diverse che puliscono
 // strutture diverse): chiave `spigolestay:pulizie:autoshare:{structureId}`, sincronizzata come le
-// altre chiavi "piatte" dentro app_state/org_state (vedi authsync.tsx). Su piano Vercel Hobby i
-// cron possono girare al massimo una volta al giorno (vedi stesso limite in auto-messages):
-// questo cron ha UN solo orario fisso (vercel.json) e invia se quell'orario è >= all'orario
-// scelto dall'utente — l'orario configurato è quindi una soglia minima ("non prima di ___"), non
-// un istante esatto. Anti-duplicati: tabella `pulizie_share_log` (unico per tenant+struttura+
+// altre chiavi "piatte" dentro app_state/org_state (vedi authsync.tsx). Per non rileggere ogni 10 minuti i dati pesanti
+// degli utenti, ogni salvataggio scrive anche una riga nella tabella piccola `pulizie_schedule` (tenant, struttura, orario, email): il cron legge
+// SOLO quella e carica i dati completi soltanto di chi ha un invio in scadenza e non ancora fatto oggi. Gira ogni 10 minuti (vercel.json): l'invio parte
+// al primo giro dopo l'orario scelto (entro 10 minuti). Anti-duplicati: tabella `pulizie_share_log` (unico per tenant+struttura+
 // giorno), così ogni struttura riceve al massimo un invio al giorno.
 //
 // Auth: Bearer <CRON_SECRET> (Vercel Cron) oppure ?secret= per test manuale.
@@ -54,9 +54,10 @@ export async function GET(req: Request) {
   let configured = 0, matched = 0, sent = 0, waSent = 0;
   const errors: string[] = [];
 
-  const processRow = async (tenantId: string, blob: Record<string, string>) => {
+  const processRow = async (tenantId: string, blob: Record<string, string>, allowed: Set<string>) => {
     let data: Json = {};
     try { data = JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { return; }
+    try { data = mergeOrgData(data, await loadOrgDatas(admin, tenantId)); } catch { /* restano i dati personali */ } // le strutture in società vivono solo nell'org
     const structures = arr(data.structures) as unknown as Structure[];
     if (!structures.length) return;
     let notes: Record<string, string> = {};
@@ -68,16 +69,14 @@ export async function GET(req: Request) {
 
     for (const st of structures) {
       const structureId = s((st as unknown as Json).id);
-      if (!structureId) continue;
+      if (!structureId || !allowed.has(`${tenantId}|${structureId}`)) continue; // solo gli invii in scadenza (e non doppioni)
       let cfg: AutoShareCfg;
       try { cfg = { enabled: false, time: "08:00", email: false, emailTo: "", whatsapp: false, whatsappTo: "", ...(JSON.parse(blob[CFG_PREFIX + structureId] || "{}") as Partial<AutoShareCfg>) }; } catch { continue; }
       cfg.whatsapp = false; // il planning parte solo per email
       if (!cfg.enabled || !cfg.email) continue;
       configured++;
-      // Il cron gira UNA volta al giorno (piano Hobby, precisione oraria): tolleranza di 60 minuti, così
-      // un orario scelto alle 08:00 parte anche se Vercel lo esegue alle 07:xx (ora solare) e non salta mai la giornata.
       const toMin = (hm: string) => { const [h, m] = hm.split(":").map(Number); return (h || 0) * 60 + (m || 0); };
-      if (toMin(nowSlot) < toMin(cfg.time || "08:00") - 60) continue; // troppo presto rispetto all'orario scelto
+      if (toMin(nowSlot) < toMin(cfg.time || "08:00")) continue; // non prima dell'orario scelto
       matched++;
 
       // Claim anti-duplicato: una sola riga per tenant+struttura+giorno; se già presente, salta.
@@ -98,17 +97,31 @@ export async function GET(req: Request) {
   };
 
   try {
-    const scan = async (table: "app_state" | "org_state", keyCol: "user_id" | "org_id") => {
-      const { data: rows } = await admin.from(table).select(`${keyCol}, data`).limit(5000);
-      for (const row of (rows ?? []) as Json[]) {
-        const tenantId = s(row[keyCol]);
-        const blob = ((row.data ?? {}) as Record<string, string>) || {};
-        if (!tenantId) continue;
-        try { await processRow(tenantId, blob); } catch (e) { errors.push(`row ${tenantId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
-      }
-    };
-    await scan("app_state", "user_id");
-    await scan("org_state", "org_id");
+    // 1) Righe in scadenza: invio attivo con email, orario già passato, non ancora inviato oggi (tabella piccola, nessun dato pesante).
+    const { data: sched, error: schedErr } = await admin.from("pulizie_schedule").select("tenant_id, structure_id, send_time, email_to").eq("enabled", true).eq("email", true);
+    if (schedErr) throw new Error(`pulizie_schedule: ${schedErr.message}`);
+    type Sch = { tenant_id: string; structure_id: string; send_time: string; email_to: string };
+    const minOf = (hm: string) => { const [h, m] = (hm || "08:00").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+    const nowMin = minOf(nowSlot);
+    const all = (sched ?? []) as Sch[];
+    // Più utenti possono avere lo stesso invio (stessa struttura, stessa email): parte una volta sola al giorno.
+    const dest = (r: Sch) => `${r.structure_id}|${(r.email_to || "").trim().toLowerCase()}`;
+    const { data: done } = await admin.from("pulizie_share_log").select("tenant_id, structure_id").eq("slot_date", todayRome);
+    const doneSet = new Set(((done ?? []) as { tenant_id: string; structure_id: string }[]).map((r) => `${r.tenant_id}|${r.structure_id}`));
+    const sentDest = new Set(all.filter((r) => doneSet.has(`${r.tenant_id}|${r.structure_id}`)).map(dest)); // destinazioni già servite oggi (da chiunque)
+    const takenDest = new Set<string>();
+    const duePre = all.filter((r) => {
+      if (minOf(r.send_time) > nowMin || doneSet.has(`${r.tenant_id}|${r.structure_id}`) || sentDest.has(dest(r)) || takenDest.has(dest(r))) return false;
+      takenDest.add(dest(r));
+      return true;
+    });
+    const dueTenants = Array.from(new Set(duePre.map((r) => r.tenant_id)));
+    // 2) Solo per chi ha qualcosa da inviare si leggono i dati completi.
+    for (const tenantId of dueTenants) {
+      const { data: row } = await admin.from("app_state").select("data").eq("user_id", tenantId).maybeSingle();
+      const blob = ((row?.data ?? {}) as Record<string, string>) || {};
+      try { await processRow(tenantId, blob, new Set(duePre.map((r) => `${r.tenant_id}|${r.structure_id}`))); } catch (e) { errors.push(`row ${tenantId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
+    }
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "scan_failed", configured, matched, sent }, { status: 500 });
   }

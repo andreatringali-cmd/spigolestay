@@ -38,8 +38,13 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
     setCfg(loadAutoShareCfg(structureId));
   }, [structureId]);
 
-  const save = () => {
+  const [saveErr, setSaveErr] = useState("");
+  const save = async () => {
+    setSaveErr("");
     try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify({ ...cfg, whatsapp: false })); } catch {} // solo email: WhatsApp resta spento
+    // L'orario va anche nella tabella letta dal cron ogni 10 minuti: senza questo l'invio non parte all'ora scelta.
+    try { await apiPost("pulizie/schedule", { structureId, enabled: cfg.enabled, time: cfg.time, email: cfg.email, emailTo: cfg.emailTo }); }
+    catch (e) { setSaveErr(e instanceof Error ? e.message : "Non sono riuscito a salvare l'orario. Riprova."); return; }
     setSaved(true);
     window.setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -80,7 +85,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
             className="rounded-lg border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus"
           />
         </div>
-        <p className="mb-3 px-1 text-[11px] text-faint">{t("Un solo invio al giorno, verso le 8:30-9:30 del mattino (o dopo, se scegli un orario più tardi).")}</p>
+        <p className="mb-3 px-1 text-[11px] text-faint">{t("Un solo invio al giorno, all'orario scelto (entro 10 minuti).")}</p>
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2.5">
@@ -141,6 +146,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
           )}
         </div>
 
+        {saveErr && <p className="mt-3 text-[11px] font-medium" style={{ color: "var(--err)" }}>{saveErr}</p>}
         <div className="mt-4 flex items-center justify-end gap-2">
           <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash hover:text-txt">{t("Annulla")}</button>
           <button onClick={save} className="rounded-lg px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{saved ? t("Salvato ✓") : t("Salva")}</button>
