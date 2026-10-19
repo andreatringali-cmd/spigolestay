@@ -88,7 +88,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   const chxId = booking.extId?.startsWith("channex:") ? booking.extId.slice(8) : "";
   const needCustomer = !!chxId && !!guest && (!guest.language || !guest.phone || !guest.country || (!guest.city && !guest.zip && !guest.address));
   const [fetched, setFetched] = useState<{ forId: string; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; genius?: boolean; language?: string; customer?: RevisionCustomer; rooms?: { promotion?: string; guests: string[]; includes: string[] }[] } | null>(null);
-  const [closedRooms, setClosedRooms] = useState<Record<string, boolean>>({});
+  const [openRooms, setOpenRooms] = useState<Record<string, boolean>>({}); // le camere partono chiuse: si aprono dal titolo
   const fx = fetched && fetched.forId === booking.id ? fetched : null;
   const gar = fx?.guarantee;
   useEffect(() => {
@@ -235,15 +235,15 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
           const ages = r.childAges && r.childAges.length ? r.childAges : undefined;
           return (
             <div key={r.id} className="rounded-xl border border-line bg-paper p-3">
-              <button type="button" onClick={() => setClosedRooms((o) => ({ ...o, [r.id]: !o[r.id] }))} aria-expanded={!closedRooms[r.id]} className="flex w-full items-baseline justify-between gap-3 text-left">
+              <button type="button" onClick={() => setOpenRooms((o) => ({ ...o, [r.id]: !o[r.id] }))} aria-expanded={!!openRooms[r.id]} className="flex w-full items-baseline justify-between gap-3 text-left">
                 <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold text-txt">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 self-center text-dim transition-transform ${closedRooms[r.id] ? "-rotate-90" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 self-center text-dim transition-transform ${openRooms[r.id] ? "" : "-rotate-90"}`}><path d="M6 9l6 6 6-6" /></svg>
                   <span className="min-w-0 truncate">{rt?.name ?? "—"}</span>
                   {r.status === "cancelled" && <Pill color={STATUS.cancelled.color}>{t(STATUS.cancelled.label)}</Pill>}
                 </span>
                 <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-txt">{r.total ? eur(r.total) : "—"}</span>
               </button>
-              {!closedRooms[r.id] && <div className="mt-2 flex flex-col gap-2">
+              {openRooms[r.id] && <div className="mt-2 flex flex-col gap-2">
                 <Line label={t("Date")}>{fmtDateWd(r.checkIn)} → {fmtDateWd(r.checkOut)} · {nightsTxt(rNights, t)}</Line>
                 {r.ratePlanName && <Line label={t("Tariffa")}>{r.ratePlanName}</Line>}
 
