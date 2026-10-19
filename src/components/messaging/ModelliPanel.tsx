@@ -161,14 +161,14 @@ export default function ModelliPanel() {
               <div className="mt-2"><VarLegend vars={MSG_VARS} onInsert={insertVar} /></div>
             </div>
 
-            <label className={`mt-4 flex items-start gap-2.5 rounded-lg border border-line p-3 ${editing.srcId ? "cursor-not-allowed" : "cursor-pointer"}`}>
-              <input type="checkbox" checked={!!editing.srcId || !!editing.showInBooking} disabled={!!editing.srcId} onChange={(e) => setEditing({ ...editing, showInBooking: e.target.checked })} className="mt-0.5 h-4 w-4" />
+            {!editing.srcId && ( // i modelli dei passaggi obbligatori compaiono sempre: niente riquadro
+            <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3">
+              <input type="checkbox" checked={!!editing.showInBooking} onChange={(e) => setEditing({ ...editing, showInBooking: e.target.checked })} className="mt-0.5 h-4 w-4" />
               <span className="text-sm text-txt">{t("Mostra nella scheda della prenotazione")}
-                <span className="mt-0.5 block text-xs text-dim">{editing.srcId
-                  ? t("Obbligatorio: questo modello è un passaggio del percorso della prenotazione (check-in, guida, recensione…) e compare sempre.")
-                  : t("Compare come pulsante: lo premi e si apre WhatsApp con il messaggio già pronto per l'ospite. Senza la spunta il modello resta qui e non compare nelle prenotazioni.")}</span>
+                <span className="mt-0.5 block text-xs text-dim">{t("Compare come pulsante: lo premi e si apre WhatsApp con il messaggio già pronto per l'ospite. Senza la spunta il modello resta qui e non compare nelle prenotazioni.")}</span>
               </span>
             </label>
+            )}
 
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
