@@ -1188,10 +1188,10 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       </div>
 
       {/* Legenda OTA — solo i canali aggiunti su Channex; contorno verde = collegato, rosso = non collegato */}
-      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5">
-        <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">Canali</span>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5 max-sm:flex-nowrap max-sm:gap-x-1.5">
+        <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-faint max-sm:hidden">Canali</span>
         {/* Sito ufficiale e Xenosite: SEMPRE presenti, con pallino verde se ci sono/sono pubblicati, rosso se no. */}
-        <span title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
+        <span title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt max-sm:gap-1 max-sm:pr-1.5">
           <span className="grid h-[22px] w-[22px] shrink-0 place-items-center overflow-hidden rounded-full bg-wash text-dim">
             {siteStruct ? (
               siteStruct.logo
@@ -1199,12 +1199,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>
             ) : <Icon name="globe" size={13} />}
           </span>
-          Sito
+          <span className="max-sm:hidden">Sito</span>
           <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: siteStruct ? "var(--ok)" : "var(--err)" }} />
         </span>
-        <span title={miniSiteStruct ? `Xenosite pubblicato · ${miniSiteStruct.name}` : "Xenosite non ancora pubblicato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
+        <span title={miniSiteStruct ? `Xenosite pubblicato · ${miniSiteStruct.name}` : "Xenosite non ancora pubblicato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt max-sm:gap-1 max-sm:pr-1.5">
           <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-white p-[3px] shadow-[0_0_0_1px_rgba(0,0,0,.08)]"><Image src="/xenora-mark.png" alt="" width={16} height={16} className="h-full w-full object-contain" style={{ opacity: miniSiteStruct ? 1 : 0.45 }} /></span>
-          Xenosite
+          <span className="max-sm:hidden">Xenosite</span>
           <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: miniSiteStruct ? "var(--ok)" : "var(--err)" }} />
         </span>
         {(Object.keys(realChannels) as (keyof typeof CHANNELS)[]).map((c) => {
@@ -1213,15 +1213,15 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           const isBb = c === "other" && isBedAndBreakfastIt(chxTitle);
           const label = isBb ? "bb.it" : (c === "other" && chxTitle ? shortChannelTitle(chxTitle) : (CHANNELS[c]?.label ?? c));
           return (
-            <span key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
+            <span key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt max-sm:gap-1 max-sm:pr-1.5">
               <ChannelLogo channel={c} size={22} title={label} name={chxTitle} />
-              {label}
+              <span className="max-sm:hidden">{label}</span>
               <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? "var(--ok)" : "var(--err)" }} />
             </span>
           );
         })}
         <div className="ml-auto flex items-center gap-2">
-          {lastRun && <span className="text-[11px] text-faint" title="Data e ora dell'ultima sincronizzazione">Aggiornato · {lastRun}</span>}
+          {lastRun && <span className="text-[11px] text-faint max-sm:hidden" title="Data e ora dell'ultima sincronizzazione">Aggiornato · {lastRun}</span>}
           <button onClick={syncNow} disabled={syncing} title={syncing ? "Sincronizzazione in corso…" : "Sincronizza ora con i canali collegati"} aria-label="Sincronizza ora con i canali collegati" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60">
             <svg className={syncing ? "animate-spin" : ""} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
           </button>
