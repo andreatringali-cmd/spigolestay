@@ -136,14 +136,16 @@ export default function StepActions(p: StepActionsProps) {
   };
   const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, _label: string, after?: (via: "wa" | "mail") => void, extra?: React.ReactNode) => (
     <>
-    {historyBox(remKind)}
+    <div className="flex flex-col gap-1">
+      {historyBox(remKind)}
+      {isRecent(remKind) && <button className="self-start text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
+    </div>
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
       <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
       <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail || isRecent(remKind)} title={hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : "Email"}</button>
       <button className={`${btnGhost} px-2.5`} disabled={!!busy} title="Copia il testo del messaggio" aria-label="Copia il testo del messaggio" onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}><Icon name="copy" size={16} /></button>
       {extra}
     </div>
-    {isRecent(remKind) && <button className="self-start text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
     </>
   );
 
