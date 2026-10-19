@@ -8,11 +8,11 @@ export default function Loading() {
         <Image
           src="/xenora-mark.png"
           alt="Xenora"
-          width={40}
-          height={40}
+          width={64}
+          height={64}
           priority
           className="animate-pulse object-contain"
-          style={{ width: 40, height: 40 }}
+          style={{ width: 64, height: 64 }}
         />
       </div>
     </div>

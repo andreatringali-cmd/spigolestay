@@ -440,11 +440,11 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 
 function Splash({ label }: { label: string }) {
-  // Solo la farfalla Xenora che pulsa (piccola, anche su telefono): niente testo e niente pulsanti durante il caricamento.
+  // Solo la farfalla Xenora che pulsa: niente testo e niente pulsanti durante il caricamento.
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff" }}>
+    <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff" }}>{/* a tutto schermo e centrata: la farfalla sta esattamente al centro, senza spostarsi quando cambia la barra del browser */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/xenora-mark.png" alt={label || "Xenora"} width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+      <img src="/xenora-mark.png" alt={label || "Xenora"} width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
       <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
     </div>
   );
