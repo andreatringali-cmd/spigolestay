@@ -34,7 +34,11 @@ export async function POST(req: Request) {
 
   console.log("[sync/delta]", table, id.slice(0, 8), "rev", expectedRev, describeDelta(delta), describeFieldChanges(row.data ?? null, delta)); // diagnostica: cosa viene rimandato a ogni ciclo (solo conteggi e nomi di chiavi)
   let next: Record<string, string>;
-  try { next = applyDelta(row.data ?? null, delta).row; }
+  try {
+    const applied = applyDelta(row.data ?? null, delta);
+    if (!applied.stats.changed) return NextResponse.json({ ok: true, rev: expectedRev, noop: true }); // già tutto uguale sul server: nessuna scrittura, la versione non cambia
+    next = applied.row;
+  }
   catch (e) {
     if (e instanceof DeltaError) return NextResponse.json({ ok: false, error: e.code, message: e.message }, { status: e.code === "mass_delete" ? 422 : 500 });
     return NextResponse.json({ ok: false, error: "apply_failed" }, { status: 500 });

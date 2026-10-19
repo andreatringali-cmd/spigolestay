@@ -176,3 +176,13 @@ test("le lapidi del delta si UNISCONO a quelle del server (mai sostituite)", () 
   const d = D.emptyDelta(); d.tombs.bookings = ["nuova-lapide"];
   assert.deepEqual(parse(D.applyDelta(full, d).row)._deleted.bookings, ["gone1", "nuova-lapide"]);
 });
+
+test("delta con entità identiche a quelle sul server: nessuna modifica (changed=false); con una vera differenza: changed=true", () => {
+  const full = fullRow(); const fd = parse(full);
+  const same1 = D.emptyDelta(); same1.colls.bookings = { upsert: [fd.bookings[0], fd.bookings[3]], del: [] }; same1.flat["spigolestay:promos"] = "[1, 2]"; // stesso contenuto, scritto diverso
+  assert.equal(D.applyDelta(full, same1).stats.changed, false);
+  const diff = D.emptyDelta(); diff.colls.bookings = { upsert: [{ ...fd.bookings[0], notes: "x" }], del: [] };
+  assert.equal(D.applyDelta(full, diff).stats.changed, true);
+  const newOne = D.emptyDelta(); newOne.colls.bookings = { upsert: [bk("brandnew", "2026-11-01", "2026-11-02")], del: [] };
+  assert.equal(D.applyDelta(full, newOne).stats.changed, true);
+});

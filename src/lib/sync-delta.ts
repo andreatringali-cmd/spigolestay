@@ -153,7 +153,7 @@ export class DeltaError extends Error {
  * SERVER. Applica `delta` a una riga COMPLETA (`row`) e ritorna la nuova riga. Non modifica l'originale.
  * Protezioni: senza `confirm`, più di MAX_DEL_BOOKINGS prenotazioni (o MAX_DEL_OTHER altre entità) cancellate in una volta = rifiutato.
  */
-export function applyDelta(row: Record<string, string> | null, delta: Delta): { row: Record<string, string>; stats: { upserts: number; deletes: number; tombs: number } } {
+export function applyDelta(row: Record<string, string> | null, delta: Delta): { row: Record<string, string>; stats: { upserts: number; deletes: number; tombs: number; changed: boolean } } {
   const out: Record<string, string> = { ...(row ?? {}) };
   let d: Json;
   if (out[DATA_KEY]) {
@@ -231,7 +231,9 @@ export function applyDelta(row: Record<string, string> | null, delta: Delta): { 
     } else d[k] = v;
   }
 
+  // Nessuna modifica reale (es. entità inviate identiche a quelle già sul server): il chiamante non deve scrivere né far salire la versione.
+  let changed = !same(parseObj(row?.[DATA_KEY]) ?? {}, d);
   if (out[DATA_KEY] || Object.keys(d).length) out[DATA_KEY] = JSON.stringify(d);
-  for (const [k, v] of Object.entries(delta.flat)) if (k !== DATA_KEY && typeof v === "string") out[k] = v;
-  return { row: out, stats: { upserts, deletes, tombs: tombCount } };
+  for (const [k, v] of Object.entries(delta.flat)) if (k !== DATA_KEY && typeof v === "string") { if (!sameFlat(row?.[k], v)) changed = true; out[k] = v; }
+  return { row: out, stats: { upserts, deletes, tombs: tombCount, changed } };
 }
