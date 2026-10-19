@@ -218,7 +218,7 @@ test("lapidi al tetto (3000): non si rimandano le stesse a ogni ciclo, converge 
   let writes = 0;
   for (let i = 0; i < 4; i++) if (dev.cycle(srv).wrote) writes++;
   assert.equal(writes, 0, "dopo il primo invio non si rimanda più nulla");
-  assert.ok(parse(srv.row)._deleted.bookings.length <= 3000);
+  assert.ok(parse(srv.row)._deleted.bookings.length <= 20000); // il server tiene più del browser (3000): così le due liste non ruotano
   assert.ok(parse(srv.row)._deleted.bookings.includes("loc3"));          // le lapidi locali sono arrivate
   assert.equal(parse(srv.row).bookings.length, 300);
 });
