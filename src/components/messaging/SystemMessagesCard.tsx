@@ -10,7 +10,7 @@ import { MSG_LANGS, MSG_LANG_LABEL, MSG_OVERRIDES_EVENT, SYSTEM_MESSAGES, loadOv
 
 export default function SystemMessagesCard() {
   const { t } = useLang();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true); // aperta: l'elenco dei messaggi si vede subito
   const [openId, setOpenId] = useState<string | null>(null);
   const [lang, setLang] = useState<MsgLang>("it");
   const [over, setOver] = useState<OverrideMap>({});
