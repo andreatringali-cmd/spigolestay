@@ -4,8 +4,20 @@
     {
       "name": "spigolestay-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "spigolestay-local",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set NEXT_PUBLIC_LOCAL_ONLY=1&& npm run dev -- -p 3100"
+      ],
+      "port": 3100
     }
   ]
 }
