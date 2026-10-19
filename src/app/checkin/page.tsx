@@ -37,13 +37,6 @@ const okBox = { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)
 
 type T = (s: string, vars?: Record<string, string | number>) => string;
 
-// Guida dell'ospite DELLA STRUTTURA (stesso formato di lib/auto-guide-link.ts: p = struttura, lang, g = nome). Dominio fisso del sito, non quello della finestra.
-const GUIDE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it").replace(/[/]+$/, "");
-const guideHref = (structureId: string, lang: string, guestName?: string) => {
-  const q = new URLSearchParams({ p: structureId, lang });
-  if ((guestName || "").trim()) q.set("g", (guestName || "").trim());
-  return `${GUIDE_ORIGIN}/guida/index.html?${q.toString()}`;
-};
 
 interface DocData { firstName: string; lastName: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string }
 const emptyExtra = () => ({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "", photoFront: "", photoBack: "", room: "" });
@@ -611,11 +604,9 @@ function Engine() {
             return (
               <div className="mt-4">
                 <iframe title={t("Mappa per arrivare")} src={`https://www.google.com/maps?q=${q}&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="h-52 w-full rounded-lg border border-line" />
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${q}`} target="_blank" rel="noreferrer" className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90">{t("🧭 Come arrivare")}</a>
               </div>
             );
           })()}
-          {st?.id && <a href={guideHref(st.id, lang, info.guest.firstName)} target="_blank" rel="noreferrer" className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Apri la guida dell'ospite →")}</a>}
         </div>
       </div>
     </div>
