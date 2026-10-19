@@ -26,7 +26,7 @@ async function readBlob(admin: SupabaseClient, tenantId: string): Promise<Blob> 
 }
 
 // Genera/aggiorna le righe ISTAT (pending) dagli arrivi; conserva le già inviate.
-export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: { structureId?: string; fromDays?: number } = {}): Promise<{ count: number }> {
+export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: { structureId?: string; fromDays?: number; bookingId?: string } = {}): Promise<{ count: number }> {
   const blob = await readBlob(admin, tenantId);
   const { data: sett } = await admin.from("istat_settings").select("structure_id, start_from").eq("tenant_id", tenantId);
   const startFrom = new Map((sett ?? []).map((s) => [s.structure_id as string, s.start_from as string | null]));
@@ -36,7 +36,7 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
   const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const bookings = (blob.bookings ?? []).filter((b) =>
     !isInactive(b) &&
-    (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId));
+    (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId) && (!opts.bookingId || b.id === opts.bookingId));
 
   // Pulizia ORFANI: elimina le righe NON inviate di prenotazioni annullate/no-show
   // o non più esistenti, così il movimento turistico rispecchia sempre le prenotazioni attive.
@@ -44,6 +44,7 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
   {
     let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).neq("stato", "sent");
     if (opts.structureId) q = q.eq("structure_id", opts.structureId);
+    if (opts.bookingId) q = q.eq("booking_id", opts.bookingId);
     const { data: existing } = await q;
     const orphanIds = ((existing ?? []) as { id: string; booking_id: string | null }[])
       .filter((r) => !r.booking_id || !activeIds.has(r.booking_id)).map((r) => r.id);

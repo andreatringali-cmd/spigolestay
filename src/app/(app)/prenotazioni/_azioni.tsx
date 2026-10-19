@@ -172,7 +172,9 @@ export default function StepActions(p: StepActionsProps) {
       return { text: `${hi ? `${hi}\n` : ""}${intro("checkin")}${core}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` };
     };
     body = (<>
-      <p className="text-sm text-dim">{partial
+      <p className="text-sm text-dim">{dec >= exp
+        ? <>L'ospite ha <b>completato il check-in online</b> ({dec}/{exp}). Le schedine per Questura e Osservatorio turistico sono già pronte nelle sezioni Alloggiati Web e ISTAT. Se serve puoi rimandargli il link per correggere i dati.</>
+        : partial
         ? <>L'ospite ha compilato il check-in per <b>{dec} {dec === 1 ? "persona" : "persone"} su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il modulo si riapre vuoto: l'ospite deve compilare di nuovo i dati di tutti) o <b>compilare tu</b> con i dati già salvati. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
         : <>L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</>}</p>
       {sendButtons(build, "checkin", "", undefined, <button className={`${btnGhost} whitespace-nowrap`} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila tu</button>)}

@@ -15,6 +15,7 @@ import { memberOrgIds, putMedia, removeMedia } from "@/lib/media-server";
 import { privateRefsIn, orphanedRefs } from "@/lib/media-orphans";
 import { AttachmentError, MAX_EXTRA_GUESTS, canViewStore, createAttachmentResolver, storeMediaTarget, uploadSecret } from "@/lib/checkin-media";
 import { todayRome } from "@/lib/dates-rome";
+import { ownerOfOrg } from "@/lib/auto-trace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -291,7 +292,15 @@ export async function POST(req: Request) {
     // online la schedina risulta subito "pronta da inviare" alla Questura (niente sync manuale).
     try {
       const { syncSchedine } = await import("@/lib/alloggiati/service");
-      await syncSchedine(admin, store.ownerId, { structureId: store.sid, bookingId: s((store.booking as Json).id) || bid }); // solo la prenotazione appena salvata: la finestra intera costa 2 query per prenotazione (timeout)
+      const { syncIstat } = await import("@/lib/istat/service");
+      // Titolare a cui appartengono schedine e righe ISTAT. Il link /checkin?b=… non porta lo slug: lo store trovato per id non conosce il titolare (ownerId vuoto),
+      // quindi prima la sync girava su un tenant "" e non creava nulla. Struttura condivisa → titolare dell'organizzazione; personale → l'utente stesso.
+      const tenant = store.ownerId || (store.table === "app_state" ? store.keyVal : (await ownerOfOrg(admin, store.keyVal)) ?? "");
+      const bookingKey = s((store.booking as Json).id) || bid;
+      if (tenant) {
+        await syncSchedine(admin, tenant, { structureId: store.sid, bookingId: bookingKey });
+        await syncIstat(admin, tenant, { structureId: store.sid, bookingId: bookingKey });
+      } // solo la prenotazione appena salvata: la finestra intera costa 2 query per prenotazione (timeout)
     } catch { /* generazione schedina non critica */ }
 
     // Avvisa il gestore (best-effort).

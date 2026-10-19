@@ -76,16 +76,16 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   const sc = c.schedina ?? "none";
   steps.push({
     key: "alloggiati", label: "Schedina Questura", href: "/alloggiati-web",
-    state: sc === "inviata" ? "done" : sc === "da_validare" ? "late" : arrived ? "late" : "todo",
-    detail: sc === "inviata" ? "Inviata alla Questura" : sc === "da_validare" ? "Dati da correggere" : sc === "pronta" ? "Pronta da inviare" : complete ? "Da preparare" : "Attende il check-in",
+    state: sc === "inviata" || sc === "pronta" ? "done" : sc === "da_validare" ? "late" : arrived ? "late" : "todo", // verde appena la schedina è nella sezione Alloggiati Web (pronta o già inviata)
+    detail: sc === "inviata" ? "Inviata alla Questura" : sc === "da_validare" ? "Dati da correggere" : sc === "pronta" ? "In Alloggiati Web · pronta da inviare" : complete ? "Da preparare" : "Attende il check-in",
   });
 
   // 5 · Osservatorio turistico (ISTAT)
   const is = c.istat ?? "none";
   steps.push({
     key: "istat", label: "Osservatorio (ISTAT)", href: "/istat",
-    state: is === "sent" ? "done" : departed ? "late" : "todo",
-    detail: is === "sent" ? "Inviato" : is === "pending" ? "Pronto da inviare" : complete ? "Da preparare" : "Attende il check-in",
+    state: is === "sent" || (is === "pending" && complete) ? "done" : departed ? "late" : "todo", // verde quando il check-in è compilato e la riga è già nella sezione ISTAT
+    detail: is === "sent" ? "Inviato" : is === "pending" ? (complete ? "In ISTAT · pronto da inviare" : "Attende il check-in") : complete ? "Da preparare" : "Attende il check-in",
   });
 
   // 6 · Guida ospiti (utile prima dell'arrivo)
@@ -178,6 +178,7 @@ export function stepOpensModal(s: Pick<JourneyStep, "key" | "state"> & { resend?
   if ((s.key === "pay" || s.key === "tax") && s.state !== "na") return true; // Pagamento e Tassa aprono sempre le azioni (link, incasso), anche se risultano saldati
   if (s.locked) return false;
   if (s.resend) return true; // Check-in/Check-out segnati fatti per il messaggio inviato: si può riaprire per rimandarlo
+  if (s.key === "checkin") return true; // anche a check-in completato: apre la scheda col riepilogo (non porta più su Adempimenti)
   if (s.key === "checkout") return s.state !== "done";
   return s.state !== "done" && s.state !== "na";
 }

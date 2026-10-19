@@ -33,3 +33,16 @@ test("nota interna: via la dicitura «Importato da Octorate»", () => {
   assert.equal(internalNote("Importato da Octorate · Late arrival"), "Late arrival");
   assert.equal(internalNote("Importato da CSV"), "");
 });
+test("Schedina e ISTAT: verdi appena sono nelle sezioni (check-in compilato), arancioni se la schedina va corretta", () => {
+  const ci: any = { ...b, webCheckin: true };
+  const ctx = (schedina: any, istat: any) => ({ today: "2026-10-18", guideSent: false, schedina, istat });
+  const pronta = journeyOf(ci, ctx("pronta", "pending"));
+  assert.equal(step(pronta, "alloggiati").state, "done");
+  assert.equal(step(pronta, "istat").state, "done");
+  assert.equal(step(journeyOf(ci, ctx("da_validare", "pending")), "alloggiati").state, "late");
+  assert.notEqual(step(journeyOf(ci, ctx("none", "none")), "alloggiati").state, "done");
+  assert.notEqual(step(journeyOf(b, ctx("none", "pending")), "istat").state, "done"); // riga ISTAT senza check-in compilato: ancora da fare
+});
+test("Check-in completato: il clic apre la scheda, non porta su Adempimenti", () => {
+  assert.equal(stepOpensModal({ key: "checkin", state: "done" }), true);
+});
