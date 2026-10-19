@@ -41,13 +41,13 @@ export async function POST(req: Request) {
     if (!st) continue;
     let cfg: { enabled?: boolean; email?: boolean; emailTo?: string; whatsapp?: boolean; whatsappTo?: string } = {};
     try { cfg = JSON.parse(blob[CFG_PREFIX + structureId] || "{}"); } catch { cfg = {}; }
-    const wantsEmail = !!cfg.email && !!cfg.emailTo, wantsWa = !!cfg.whatsapp && !!cfg.whatsappTo;
-    if (!wantsEmail && !wantsWa) return NextResponse.json({ ok: false, error: "Nessun destinatario salvato: scegli email e/o WhatsApp in Invio automatico, poi premi Salva." });
+    const wantsEmail = !!cfg.email && !!cfg.emailTo, wantsWa = false; // il planning parte solo per email
+    if (!wantsEmail && !wantsWa) return NextResponse.json({ ok: false, error: "Nessun destinatario salvato: scegli l'email in Invio automatico, poi premi Salva." });
     let notes: Record<string, string> = {};
     try { notes = JSON.parse(blob[NOTES_KEY] || "{}") as Record<string, string>; } catch { notes = {}; }
     const results = await deliverPuliziePlan({
       admin: auth.admin, tenantId: auth.tenantId, origin: siteOrigin(req), structure: st,
-      cfg: { email: !!cfg.email, emailTo: cfg.emailTo ?? "", whatsapp: !!cfg.whatsapp, whatsappTo: cfg.whatsappTo ?? "" },
+      cfg: { email: !!cfg.email, emailTo: cfg.emailTo ?? "", whatsapp: false, whatsappTo: "" },
       date: romeNowSlot().ymd,
       units: arr(data.units) as unknown as Unit[], roomTypes: arr(data.roomTypes) as unknown as RoomType[],
       bookings: arr(data.bookings) as unknown as Booking[], guests: arr(data.guests) as unknown as Guest[], notes,

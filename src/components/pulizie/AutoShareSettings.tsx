@@ -3,12 +3,10 @@
 import { fmtDateTime } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
-import { WhatsAppIcon, MailIcon } from "@/components/BrandIcons";
+import { MailIcon } from "@/components/BrandIcons";
 import { apiPost } from "@/lib/invoicing/client";
 import { useLang } from "@/lib/i18n";
-import { checkPhone } from "@/lib/contacts-check";
 import { spiegaErroreWa } from "@/lib/invii-log";
-import { sameDigits } from "@/lib/same-digits";
 
 const KEY_PREFIX = "spigolestay:pulizie:autoshare:";
 export interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
@@ -24,7 +22,6 @@ export function loadAutoShareCfg(structureId: string): AutoShareCfg {
 export default function AutoShareSettings({ structureId, structureName, onClose }: { structureId: string; structureName: string; onClose: () => void }) {
   const { t } = useLang();
   const [cfg, setCfg] = useState<AutoShareCfg>(DEFAULT_CFG);
-  const [waStatus, setWaStatus] = useState<"checking" | "connected" | "off">("checking");
   const [saved, setSaved] = useState(false);
   // "Invia ora": prova subito con le impostazioni salvate, senza aspettare l'orario.
   const [nowBusy, setNowBusy] = useState(false);
@@ -33,20 +30,16 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
   const [log, setLog] = useState<{ at: string; channel: string; ok: boolean; detail?: string; ref?: string }[] | null>(null);
   useEffect(() => {
     let alive = true;
-    fetch("/api/invii-log?job=pulizie").then((r) => r.json()).then((j) => { if (alive) setLog(((j?.rows ?? []) as { ref?: string }[]).filter((x) => !x.ref || x.ref === structureId) as never); }).catch(() => { if (alive) setLog([]); });
+    fetch("/api/invii-log?job=pulizie").then((r) => r.json()).then((j) => { if (alive) setLog(((j?.rows ?? []) as { ref?: string; channel?: string }[]).filter((x) => x.channel !== "whatsapp" && (!x.ref || x.ref === structureId)) as never); }).catch(() => { if (alive) setLog([]); });
     return () => { alive = false; };
   }, [structureId]);
-  const phone = cfg.whatsappTo.trim() ? checkPhone(cfg.whatsappTo) : null;
 
   useEffect(() => {
     setCfg(loadAutoShareCfg(structureId));
-    apiPost<{ connected: boolean }>("whatsapp/settings", { action: "status" })
-      .then((r) => setWaStatus(r.connected ? "connected" : "off"))
-      .catch(() => setWaStatus("off"));
   }, [structureId]);
 
   const save = () => {
-    try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify(cfg)); } catch {}
+    try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify({ ...cfg, whatsapp: false })); } catch {} // solo email: WhatsApp resta spento
     setSaved(true);
     window.setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -55,7 +48,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
     setNowBusy(true); setNowRes(null);
     try {
       // Salva le impostazioni correnti e aspetta qualche secondo che arrivino al server (l'invio legge quelle salvate lì).
-      try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify(cfg)); } catch {}
+      try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify({ ...cfg, whatsapp: false })); } catch {}
       await new Promise((r) => window.setTimeout(r, 4000));
       setNowRes(await apiPost<{ ok: boolean; error?: string; results?: { channel: string; ok: boolean; detail: string }[] }>("pulizie/send-now", { structureId }));
     } catch (e) { setNowRes({ ok: false, error: e instanceof Error ? e.message : "errore di rete" }); }
@@ -102,24 +95,6 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
             />
           </div>
 
-          <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2.5">
-            <input type="checkbox" checked={cfg.whatsapp} disabled={waStatus !== "connected"} onChange={(e) => setCfg((c) => ({ ...c, whatsapp: e.target.checked }))} className="h-4 w-4 shrink-0 accent-[color:var(--focus)] disabled:opacity-40" />
-            <WhatsAppIcon size={16} />
-            <input
-              type="tel"
-              value={cfg.whatsappTo}
-              disabled={waStatus !== "connected"}
-              onChange={(e) => setCfg((c) => ({ ...c, whatsappTo: e.target.value }))}
-              placeholder={t("numero, es. 393331234567")}
-              className="min-w-0 flex-1 bg-transparent text-sm text-txt outline-none placeholder:text-faint disabled:opacity-40"
-            />
-          </div>
-          {cfg.whatsapp && phone && (phone.status === "ok" || phone.status === "landline") && phone.pretty && !sameDigits(cfg.whatsappTo, phone.pretty) && (
-            <p className="px-1 text-[11px] text-faint">{t("Manca il prefisso del Paese: l'invio usa")} <b className="text-txt">{phone.pretty}</b> <button type="button" onClick={() => setCfg((c) => ({ ...c, whatsappTo: phone.pretty! }))} className="ml-1 font-semibold text-focus hover:underline">{t("Scrivilo così")}</button></p>
-          )}
-          {cfg.whatsapp && phone && phone.status === "invalid" && <p className="px-1 text-[11px] font-medium" style={{ color: "var(--err)" }}>{t("Numero non valido")}: {phone.reason}</p>}
-          {phone?.status === "landline" && <p className="px-1 text-[11px] font-medium" style={{ color: "var(--warn)" }}>{t("Numero fisso: di solito non ha WhatsApp")}</p>}
-          {waStatus === "off" && <p className="px-1 text-[11px] text-faint">{t("WhatsApp Business non è ancora collegato (Conversazioni → Impostazioni) — per ora solo email.")}</p>}
         </div>
 
         {log && log.length > 0 && (
@@ -142,8 +117,8 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
 
         <div className="mt-3 rounded-xl border border-line bg-paper px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 text-[11px] leading-snug text-dim">{t("Prova adesso con queste impostazioni: invia il planning di oggi ai destinatari scelti.")}</div>
-            <button type="button" onClick={sendNow} disabled={nowBusy || (!(cfg.email && cfg.emailTo.trim()) && !(cfg.whatsapp && cfg.whatsappTo.trim()))} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:bg-wash disabled:opacity-50">{nowBusy ? t("Invio…") : t("Invia ora")}</button>
+            <div className="min-w-0 text-[11px] leading-snug text-dim">{t("Prova adesso con queste impostazioni: invia il planning di oggi all'indirizzo email scelto.")}</div>
+            <button type="button" onClick={sendNow} disabled={nowBusy || !(cfg.email && cfg.emailTo.trim())} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:bg-wash disabled:opacity-50">{nowBusy ? t("Invio…") : t("Invia ora")}</button>
           </div>
           {nowRes && (
             <ul className="mt-2 flex flex-col gap-1 text-[11px] leading-snug">

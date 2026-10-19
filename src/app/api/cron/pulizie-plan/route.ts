@@ -71,7 +71,8 @@ export async function GET(req: Request) {
       if (!structureId) continue;
       let cfg: AutoShareCfg;
       try { cfg = { enabled: false, time: "08:00", email: false, emailTo: "", whatsapp: false, whatsappTo: "", ...(JSON.parse(blob[CFG_PREFIX + structureId] || "{}") as Partial<AutoShareCfg>) }; } catch { continue; }
-      if (!cfg.enabled || (!cfg.email && !cfg.whatsapp)) continue;
+      cfg.whatsapp = false; // il planning parte solo per email
+      if (!cfg.enabled || !cfg.email) continue;
       configured++;
       // Il cron gira UNA volta al giorno (piano Hobby, precisione oraria): tolleranza di 60 minuti, così
       // un orario scelto alle 08:00 parte anche se Vercel lo esegue alle 07:xx (ora solare) e non salta mai la giornata.
