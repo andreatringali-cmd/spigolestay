@@ -136,18 +136,7 @@ export default function ModelliPanel() {
               <label className="block w-20 text-xs font-medium text-dim" title={t("Numero d'ordine: più basso = più in alto nella lista")}>{t("Ordine")}<input type="number" min={0} value={editing.order ?? ""} onChange={(e) => setEditing({ ...editing, order: e.target.value === "" ? undefined : Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" placeholder="—" /></label>
             </div>
 
-            {structures.length > 1 && (
-              <div className="mt-3 text-xs font-medium text-dim">{t("Strutture")} <span className="font-normal text-faint">{t("(nessuna selezionata = tutte le strutture)")}</span>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {structures.map((s) => {
-                    const on = !!editing.structureIds?.includes(s.id);
-                    return (
-                      <button key={s.id} type="button" onClick={() => { const cur = editing.structureIds ?? []; const next = on ? cur.filter((x) => x !== s.id) : [...cur, s.id]; setEditing({ ...editing, structureIds: next.length ? next : undefined }); }} className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${on ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>{s.name}</button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Nessuna scelta delle strutture: un modello nuovo vale per la struttura selezionata in alto a destra (o per tutte, con «Tutte») */}
 
             <div className="mt-4">
               <div className="mb-1.5 flex items-center gap-1">
