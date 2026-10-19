@@ -16,6 +16,9 @@ const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "
 const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival", "Giorni prima dell'arrivo"], ["on_arrival", "Il giorno del check-in"], ["after_arrival", "Giorni dopo l'arrivo"], ["on_checkout", "Il giorno del check-out"], ["after_checkout", "Giorni dopo il check-out"]];
 // I trigger "il giorno di…" non usano il conteggio giorni (sono ancorati esattamente a check-in/check-out).
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
+// Ordine dei passaggi obbligatori della prenotazione (Check-in, Pagamento, Guida ospiti, … Check-out, recensione): i modelli collegati vengono per primi, in quest'ordine; poi quelli aggiunti dal titolare.
+const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, checkout: 7, recensione: 8 };
+const stepRank = (tp: { srcId?: string }) => (tp.srcId && tp.srcId in STEP_RANK ? STEP_RANK[tp.srcId] : 100);
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
 // Fasi del ciclo ospite in ordine cronologico: usate per ordinare e raggruppare i modelli.
@@ -63,6 +66,7 @@ export default function ModelliPanel() {
   const isAuto = (tp: MsgTemplate) => tp.trigger !== "manual"; // "automatico" = ha un orario/trigger (a prescindere se è in pausa)
   const shown = [...templates]
     .sort((a, b) =>
+      stepRank(a) - stepRank(b) ||
       PHASE_ORDER[a.trigger] - PHASE_ORDER[b.trigger] ||
       (a.order ?? 9999) - (b.order ?? 9999) ||
       chronoKey(a) - chronoKey(b) ||
@@ -101,7 +105,7 @@ export default function ModelliPanel() {
                       <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
                       <div className="mt-0.5 text-xs text-dim">{tpl.structureIds?.length ? ` · ${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
                     </div>
-                    {tpl.showInBooking && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Nella scheda")}</span>}
+                    {(tpl.showInBooking || tpl.srcId) && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Nella scheda")}</span>}
                   </div>
                   <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
                   <div className="mt-2 flex gap-2">
@@ -146,10 +150,12 @@ export default function ModelliPanel() {
               <div className="mt-2"><VarLegend vars={MSG_VARS} onInsert={insertVar} /></div>
             </div>
 
-            <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3">
-              <input type="checkbox" checked={!!editing.showInBooking} onChange={(e) => setEditing({ ...editing, showInBooking: e.target.checked })} className="mt-0.5 h-4 w-4" />
+            <label className={`mt-4 flex items-start gap-2.5 rounded-lg border border-line p-3 ${editing.srcId ? "cursor-not-allowed" : "cursor-pointer"}`}>
+              <input type="checkbox" checked={!!editing.srcId || !!editing.showInBooking} disabled={!!editing.srcId} onChange={(e) => setEditing({ ...editing, showInBooking: e.target.checked })} className="mt-0.5 h-4 w-4" />
               <span className="text-sm text-txt">{t("Mostra nella scheda della prenotazione")}
-                <span className="mt-0.5 block text-xs text-dim">{t("Compare come pulsante: lo premi e si apre WhatsApp con il messaggio già pronto per l'ospite. Senza la spunta il modello resta qui e non compare nelle prenotazioni.")}</span>
+                <span className="mt-0.5 block text-xs text-dim">{editing.srcId
+                  ? t("Obbligatorio: questo modello è un passaggio del percorso della prenotazione (check-in, guida, recensione…) e compare sempre.")
+                  : t("Compare come pulsante: lo premi e si apre WhatsApp con il messaggio già pronto per l'ospite. Senza la spunta il modello resta qui e non compare nelle prenotazioni.")}</span>
               </span>
             </label>
 

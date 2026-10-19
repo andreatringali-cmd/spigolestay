@@ -17,7 +17,7 @@ import { recordOutgoing } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
 const TPL_KEY = "spigolestay:msgtemplates";
-type Tpl = { id: string; name: string; texts: Record<string, string>; showInBooking?: boolean; structureIds?: string[] };
+type Tpl = { id: string; name: string; texts: Record<string, string>; showInBooking?: boolean; srcId?: string; structureIds?: string[] };
 
 /** Modelli con la spunta, validi per la struttura di questa prenotazione. Si rileggono quando cambia il salvataggio o si torna sulla pagina. */
 function useBookingTemplates(structureId: string): Tpl[] {
@@ -31,7 +31,8 @@ function useBookingTemplates(structureId: string): Tpl[] {
     window.addEventListener("focus", read);
     return () => { window.removeEventListener("storage", read); window.removeEventListener("focus", read); };
   }, [read]);
-  return useMemo(() => all.filter((t) => t.showInBooking && t.name && (!t.structureIds?.length || t.structureIds.includes(structureId))), [all, structureId]);
+  return useMemo(() => all.filter((t) => t.showInBooking && !t.srcId && t.name && // i modelli collegati ai passaggi obbligatori (srcId) sono già i pulsanti del percorso: qui solo quelli aggiunti dal titolare
+     (!t.structureIds?.length || t.structureIds.includes(structureId))), [all, structureId]);
 }
 
 export default function BookingMessageButtons({ booking, guest: guestProp, structure: structureProp, className = "" }: { booking: Booking; guest?: Guest; structure?: Structure; className?: string }) {
