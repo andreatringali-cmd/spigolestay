@@ -13,6 +13,7 @@ import { billMessage, billOf } from "@/lib/booking-bill";
 import { shortenLink } from "@/lib/guestlink";
 import { chatPayGuestMessage, parseEurInput } from "@/lib/chat-pay-core";
 import { guestLangOf } from "@/lib/guest-lang";
+import { fillTemplateForBooking, linkedTemplate, templateRawFor } from "@/lib/template-fill";
 import { markReminder, sendEmailToGuest, sendWhatsAppToGuest } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
@@ -22,7 +23,7 @@ const esc = (s: unknown) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "
 export default function BookingBillActions({ booking, structure, guest }: { booking: Booking; structure?: Structure; guest?: Guest }) {
   const { t } = useLang();
   const ask = useConfirm();
-  const { updateBooking } = useData();
+  const { updateBooking, bookings, getUnit, getRoomType } = useData();
   const lang = guestLangOf(guest);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -48,11 +49,21 @@ export default function BookingBillActions({ booking, structure, guest }: { book
     try { await fn(); } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Operazione non riuscita." }); } finally { setBusy(""); }
   };
 
+  // Testo del pagamento: dal MODELLO «Pagamento» / «Tassa di soggiorno» (Messaggi → Modelli) se c'è, altrimenti il testo di base.
+  const payText = async (kind: "saldo" | "tassa", amountEur: number, link: string): Promise<string> => {
+    const tpl = linkedTemplate(kind === "tassa" ? "tax" : "pay", booking.structureId);
+    if (tpl) {
+      const text = await fillTemplateForBooking(templateRawFor(tpl, guest), booking, guest, structure, { bookings, getUnit, getRoomType }, { importo: eur(amountEur), link_pagamento: link });
+      if (text.trim()) return text;
+    }
+    return chatPayGuestMessage(lang, kind, Math.round(amountEur * 100), link);
+  };
+
   // ── Tassa di soggiorno ──
   const sendTaxLink = (via: "wa" | "mail") => wrap(`tax-${via}`, async () => {
     const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: booking.id, kind: "tassa" });
     const link = await shortenLink(r.url);
-    await send(via, chatPayGuestMessage(lang, "tassa", Math.round(r.amount * 100), link), `${structure?.name ? structure.name + " · " : ""}${t("Tassa di soggiorno")}`, "pay-tassa");
+    await send(via, await payText("tassa", r.amount, link), `${structure?.name ? structure.name + " · " : ""}${t("Tassa di soggiorno")}`, "pay-tassa");
   });
   const markTaxPaid = async () => {
     if (!(await ask({ title: t("Tassa di soggiorno"), message: t("Segnare la tassa di soggiorno come incassata?"), confirmLabel: t("Sì, incassata") }))) return;
@@ -68,7 +79,7 @@ export default function BookingBillActions({ booking, structure, guest }: { book
     const asked = amount.trim() ? (parseEurInput(amount) ?? NaN) : undefined;
     if (asked !== undefined && (!isFinite(asked) || asked <= 0)) throw new Error(t("Importo non valido."));
     const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: booking.id, kind: "saldo", ...(asked !== undefined ? { amount: asked } : {}) });
-    return `${text}\n\n${chatPayGuestMessage(lang, "saldo", Math.round(r.amount * 100), await shortenLink(r.url))}`;
+    return `${text}\n\n${await payText("saldo", r.amount, await shortenLink(r.url))}`;
   };
   const sendBill = (via: "wa" | "mail") => wrap(`bill-${via}`, async () => {
     await send(via, await finalText(), `${structure?.name ? structure.name + " · " : ""}${t("Conto del soggiorno")}`, "bill");

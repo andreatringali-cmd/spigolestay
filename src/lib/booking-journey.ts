@@ -8,7 +8,7 @@ import { bookingPaidTotal, cityTaxOfBooking } from "./booking";
 import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
 
 export type StepState = "done" | "todo" | "late" | "na";
-export interface JourneyStep { key: string; label: string; state: StepState; detail: string; href?: string; auto?: AutoLine /* invio automatico: "Non inviato · invio previsto alle 10:00" */; sent?: boolean /* sollecito già inviato: si attende la risposta (arancione, non rosso) */ }
+export interface JourneyStep { key: string; label: string; state: StepState; detail: string; href?: string; auto?: AutoLine /* invio automatico: "Non inviato · invio previsto alle 10:00" */; sent?: boolean; resend?: boolean /* fatto perché il messaggio è partito: il clic riapre l'azione per rimandarlo */ /* sollecito già inviato: si attende la risposta (arancione, non rosso) */ }
 export interface Chip { key: string; label: string; tone: "info" | "warn" | "err" }
 
 export interface JourneyCtx {
@@ -123,7 +123,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   for (const st of steps) if ((st.state === "todo" || st.state === "late") && NOTE_OF[st.key] && c.reminderNotes?.[NOTE_OF[st.key]]) st.sent = true;
   // I messaggi li manda il titolare a mano: per Check-in e Check-out, una volta mandato il messaggio il compito è fatto (pallino verde con la spunta).
   // Il dettaglio continua a dire cosa manca ("L'ospite non ha ancora compilato · inviato 2 volte").
-  for (const st of steps) if ((st.key === "checkin" || st.key === "checkout") && st.sent && st.state !== "done") { st.state = "done"; st.sent = false; }
+  for (const st of steps) if ((st.key === "checkin" || st.key === "checkout") && st.sent && st.state !== "done") { st.state = "done"; st.sent = false; st.resend = true; }
 
   // Invii automatici: sotto il passaggio ancora da fare, se ne esiste uno programmato, quando parte.
   if (c.auto) {
@@ -176,7 +176,8 @@ export function journeyBucket(b: Booking, today: string, j: ReturnType<typeof jo
 
 /** Il clic su un passaggio apre la finestra di invio (messaggio all'ospite)? Per i passaggi da fare sì; il check-out anche in anticipo
  *  (il promemoria di partenza si manda il giorno prima), finché l'ospite non è partito. Altrimenti si va alla pagina collegata. */
-export function stepOpensModal(s: Pick<JourneyStep, "key" | "state">): boolean {
+export function stepOpensModal(s: Pick<JourneyStep, "key" | "state"> & { resend?: boolean }): boolean {
+  if (s.resend) return true; // Check-in/Check-out segnati fatti per il messaggio inviato: si può riaprire per rimandarlo
   if (s.key === "checkout") return s.state !== "done";
   return s.state !== "done" && s.state !== "na";
 }

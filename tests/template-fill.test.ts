@@ -31,3 +31,8 @@ test("fillTemplateNow: segnaposto riempiti con i dati della prenotazione", () =>
   assert.ok(out.includes("19.10.2026"));
   assert.ok(!out.includes("{"));
 });
+
+test("modelli di pagamento: {importo} e {link_pagamento} dei dati extra", () => {
+  const out = T.fillTemplateNow("Ciao {ospite}, paga {importo} qui: {link_pagamento}", booking, guest, structure, deps, undefined, { importo: "€ 120,00", link_pagamento: "https://x/g/abc" });
+  assert.equal(out, "Ciao Anna, paga € 120,00 qui: https://x/g/abc");
+});

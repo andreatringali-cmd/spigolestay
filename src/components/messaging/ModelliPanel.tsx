@@ -5,7 +5,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
-import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted } from "@/lib/msg-templates";
+import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, ensureMandatoryTemplates } from "@/lib/msg-templates";
 import ReviewSettingsCard from "@/components/messaging/ReviewSettingsCard";
 import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
@@ -17,7 +17,7 @@ const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival",
 // I trigger "il giorno di…" non usano il conteggio giorni (sono ancorati esattamente a check-in/check-out).
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
 // Ordine dei passaggi obbligatori della prenotazione (Check-in, Pagamento, Guida ospiti, … Check-out, recensione): i modelli collegati vengono per primi, in quest'ordine; poi quelli aggiunti dal titolare.
-const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, checkout: 8, recensione: 8 };
+const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, tax: 5, checkout: 8, recensione: 8 };
 const stepRank = (tp: { srcId?: string }) => (tp.srcId && tp.srcId in STEP_RANK ? STEP_RANK[tp.srcId] : 100);
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
@@ -52,7 +52,7 @@ export default function ModelliPanel() {
     try {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
       const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
-      setTemplates(mergeSeedTemplates(base).map((tp) => (tp.trigger === "manual" && !tp.active ? tp : { ...tp, trigger: "manual" as Trigger, active: false }))); // messaggi automatici spenti: tutti i modelli sono manuali
+      setTemplates(ensureMandatoryTemplates(mergeSeedTemplates(base)).map((tp) => (tp.trigger === "manual" && !tp.active ? tp : { ...tp, trigger: "manual" as Trigger, active: false }))); // messaggi automatici spenti: tutti i modelli sono manuali
     } catch {}
     setReady(true);
   }, []);
@@ -110,7 +110,7 @@ export default function ModelliPanel() {
                   <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
                   <div className="mt-2 flex gap-2">
                     <button onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
-                    <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
+                    {!tpl.srcId && <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
                   </div>
                 </Card>
               ))}

@@ -46,7 +46,7 @@ function guideUrl(booking: Booking, guest: Guest | undefined, deps: FillDeps, la
 }
 
 /** Come fillTemplateForBooking ma SENZA rete: i link restano lunghi, salvo quelli già accorciati passati in `short`. Per i punti dove serve subito il testo. */
-export function fillTemplateNow(raw: string, booking: Booking, guest: Guest | undefined, structure: Structure | undefined, deps: FillDeps, short?: { guida?: string; checkin?: string }): string {
+export function fillTemplateNow(raw: string, booking: Booking, guest: Guest | undefined, structure: Structure | undefined, deps: FillDeps, short?: { guida?: string; checkin?: string }, extra?: Record<string, string>): string {
   const lang = asLang(guestLangOf(guest));
   const unit = deps.getUnit(booking.unitId);
   const emptyStructure = !(structure?.name ?? "").trim();
@@ -66,15 +66,16 @@ export function fillTemplateNow(raw: string, booking: Booking, guest: Guest | un
     link_checkin: short?.checkin ?? checkinUrl(booking),
     whatsapp: structureWhatsapp(structure ?? {}) || WHATSAPP_FALLBACK[lang] || WHATSAPP_FALLBACK.it,
     ...reviewTokens(reviewLinksFor({ structureId: booking.structureId, placeId: structure?.googlePlaceId, guideReviewUrl, settings: parseReviewSettings(reviewSettingsRaw) })),
+    ...(extra ?? {}), // es. {importo} e {link_pagamento} dei messaggi di pagamento
   };
   return fillTokens(raw, ctx, { lang, emptyStructure });
 }
 
 /** Versione completa: i link lunghi (guida con codici, check-in) vengono accorciati solo se il testo li usa. */
-export async function fillTemplateForBooking(raw: string, booking: Booking, guest: Guest | undefined, structure: Structure | undefined, deps: FillDeps): Promise<string> {
+export async function fillTemplateForBooking(raw: string, booking: Booking, guest: Guest | undefined, structure: Structure | undefined, deps: FillDeps, extra?: Record<string, string>): Promise<string> {
   const lang = asLang(guestLangOf(guest));
   const short: { guida?: string; checkin?: string } = {};
   if (/\{link_checkin\}/i.test(raw)) short.checkin = await shortenLink(checkinUrl(booking));
   if (/\{link_guida\}/i.test(raw)) short.guida = await shortenLink(guideUrl(booking, guest, deps, lang));
-  return fillTemplateNow(raw, booking, guest, structure, deps, short);
+  return fillTemplateNow(raw, booking, guest, structure, deps, short, extra);
 }

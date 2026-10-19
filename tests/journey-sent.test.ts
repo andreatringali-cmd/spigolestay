@@ -23,3 +23,13 @@ test("nota interna: via la dicitura «Importato da Octorate»", () => {
   assert.equal(internalNote("Importato da Octorate · Late arrival"), "Late arrival");
   assert.equal(internalNote("Importato da CSV"), "");
 });
+
+test("Check-in verde per messaggio inviato: il clic riapre l'azione (non porta ad Adempimenti)", async () => {
+  const { stepOpensModal } = await import("../src/lib/booking-journey.ts");
+  const after = journeyOf(b, { today: "2026-10-19", guideSent: false, reminderNotes: { checkin: "inviato 2 volte" } });
+  assert.equal(stepOpensModal(step(after, "checkin")), true);
+  // dati davvero completi: fatto davvero, il clic porta alla pagina
+  const full = journeyOf({ ...b, webCheckin: true } as any, { today: "2026-10-19", guideSent: false });
+  assert.equal(step(full, "checkin").state, "done");
+  assert.equal(stepOpensModal(step(full, "checkin")), false);
+});

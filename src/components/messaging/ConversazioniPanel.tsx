@@ -17,6 +17,7 @@ import { GUIDE_MSG, CHECKIN_MSG, emailBrandPayload, type Lang } from "@/lib/gues
 import { asLang, autoSubject, decideSend, dedupeGroups, fillTokens, guestFallback, sentKeysFor, stayTimeText, structureFallback } from "@/lib/auto-messages-core";
 import { slotDateOf, stepsOfTemplate } from "@/lib/auto-schedule";
 import { messageBalance } from "@/lib/msg-balance";
+import { linkedTemplate, templateRawFor } from "@/lib/template-fill";
 import { guestLangOf } from "@/lib/guest-lang";
 import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
@@ -625,7 +626,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   };
   // Stessa sostituzione dei segnaposto del cron dei messaggi automatici (lib/auto-messages-core.ts): orari nella lingua dell'ospite, {saldo} come il voucher
   // (con la tassa dovuta, 2 decimali), segnaposto sconosciuti o vuoti non lasciati scritti.
-  const fillFor = (raw: string, b: Booking, g: Guest) => {
+  const fillFor = (raw: string, b: Booking, g: Guest, extra?: Record<string, string>) => {
     const st = getStructure(b.structureId); const unit = getUnit(b.unitId);
     const lang = asLang(langOf(g));
     const emptyStructure = !(st?.name ?? "").trim();
@@ -642,6 +643,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       link_checkin: checkinUrlFor(b),
       whatsapp: structureWhatsapp(st ?? {}) || WHATSAPP_FALLBACK[lang] || WHATSAPP_FALLBACK.it,
       ...reviewTokens(reviewLinksOf(b)),
+      ...(extra ?? {}),
     };
     return fillTokens(raw, ctx, { lang, emptyStructure });
   };
@@ -700,7 +702,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     try {
       const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind: payKind, amount: plan.cents / 100 });
       const g = guests.find((x) => x.id === current.id);
-      const msg = chatPayGuestMessage(langOf(g), payKind, Math.round(r.amount * 100), await shortenLink(r.url));
+      const payLink = await shortenLink(r.url);
+      const payTpl = linkedTemplate(payKind === "tassa" ? "tax" : "pay", b.structureId); // modello «Pagamento» / «Tassa di soggiorno» se c'è
+      const msg = (payTpl && g ? fillFor(templateRawFor(payTpl, g), b, g, { importo: eur(r.amount), link_pagamento: payLink }) : "") || chatPayGuestMessage(langOf(g), payKind, Math.round(r.amount * 100), payLink);
       setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${msg}`);
       setPayFor(null);
     } catch (e) { setPayErr(e instanceof Error ? e.message : t("Errore")); }

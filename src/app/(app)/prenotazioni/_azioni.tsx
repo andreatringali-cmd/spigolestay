@@ -45,10 +45,10 @@ export default function StepActions(p: StepActionsProps) {
   const ask = useConfirm();
   const { updateBooking, openBooking, bookings, getUnit, getRoomType } = useData();
   // Testo del messaggio dal MODELLO collegato al passaggio (Messaggi → Modelli); senza modello (o vuoto) si usa il testo di base.
-  const fromModel = async (srcId: string): Promise<string | null> => {
+  const fromModel = async (srcId: string, extra?: Record<string, string>): Promise<string | null> => {
     const tpl = linkedTemplate(srcId, b.structureId);
     if (!tpl) return null;
-    const text = await fillTemplateForBooking(templateRawFor(tpl, guest), b, guest, structure, { bookings, getUnit, getRoomType });
+    const text = await fillTemplateForBooking(templateRawFor(tpl, guest), b, guest, structure, { bookings, getUnit, getRoomType }, extra);
     return text.trim() ? text : null;
   };
   const lang = langOf(guest);
@@ -181,7 +181,8 @@ export default function StepActions(p: StepActionsProps) {
       const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind, ...(asked !== undefined ? { amount: asked } : {}) });
       const hi = greeting(lang, guest).trim(); // saluto su una riga a sé
       const link = await shortenLink(r.url); // link corto /g/<codice>
-      return { text: `${hi ? `${hi}\n` : ""}${intro(remKind) || (sent ? reminderIntro(lang) : "")}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), link)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
+      const model = await fromModel(kind === "saldo" ? "pay" : "tax", { importo: eur(r.amount), link_pagamento: link }); // modello «Pagamento» / «Tassa di soggiorno»
+      return { text: model ?? `${hi ? `${hi}\n` : ""}${intro(remKind) || (sent ? reminderIntro(lang) : "")}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), link)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
     };
     const manual = async () => {
       if (kind === "saldo") {

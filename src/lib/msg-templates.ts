@@ -144,6 +144,49 @@ const norm = (s: unknown) => (typeof s === "string" ? s.replace(/\r\n/g, "\n").t
  * Modelli salvati + modelli d'esempio: aggiunge quelli d'esempio mancanti (per id) e aggiorna i modelli d'esempio MAI MODIFICATI
  * (testi identici ai vecchi) alla versione nuova. Sostituisce solo i testi: attivazione, giorni, orario e strutture restano quelli dell'host.
  */
+/**
+ * Modelli dei passaggi OBBLIGATORI della prenotazione che ancora non esistono (Pagamento, Tassa, Check-out): se non c'è già un modello collegato a quel passaggio
+ * (srcId) se ne aggiunge uno con un testo di partenza, che il titolare può riscrivere. Segnaposto speciali per i pagamenti: {importo} e {link_pagamento}.
+ */
+export const MANDATORY_TEMPLATES: (MsgTemplateSeed & { srcId: string })[] = [
+  {
+    id: "mand-pay", srcId: "pay", name: "Pagamento", trigger: "manual", days: 0, time: "10:00", active: false,
+    texts: {
+      it: "Ciao {ospite}, puoi pagare il saldo del soggiorno ({importo}) online con carta, in modo sicuro: {link_pagamento}",
+      en: "Hi {ospite}, you can pay the balance of your stay ({importo}) online by card, securely, here: {link_pagamento}",
+      fr: "Bonjour {ospite}, vous pouvez régler le solde de votre séjour ({importo}) en ligne par carte, en toute sécurité, ici : {link_pagamento}",
+      de: "Hallo {ospite}, den Restbetrag Ihres Aufenthalts ({importo}) können Sie hier sicher online per Karte bezahlen: {link_pagamento}",
+      es: "Hola {ospite}, puedes pagar el saldo de tu estancia ({importo}) online con tarjeta, de forma segura, aquí: {link_pagamento}",
+    },
+  },
+  {
+    id: "mand-tax", srcId: "tax", name: "Tassa di soggiorno", trigger: "manual", days: 0, time: "10:00", active: false,
+    texts: {
+      it: "Ciao {ospite}, puoi pagare la tassa di soggiorno ({importo}) online con carta, in modo sicuro: {link_pagamento}",
+      en: "Hi {ospite}, you can pay the city tax ({importo}) online by card, securely, here: {link_pagamento}",
+      fr: "Bonjour {ospite}, vous pouvez régler la taxe de séjour ({importo}) en ligne par carte, en toute sécurité, ici : {link_pagamento}",
+      de: "Hallo {ospite}, die Kurtaxe ({importo}) können Sie hier sicher online per Karte bezahlen: {link_pagamento}",
+      es: "Hola {ospite}, puedes pagar la tasa turística ({importo}) online con tarjeta, de forma segura, aquí: {link_pagamento}",
+    },
+  },
+  {
+    id: "mand-checkout", srcId: "checkout", name: "Check-out", trigger: "manual", days: 0, time: "10:00", active: false,
+    texts: {
+      it: "Ciao {ospite}, il check-out è previsto il {checkout}. Per qualsiasi esigenza (ad esempio il deposito bagagli) scrivici pure qui. Grazie per aver scelto {struttura}, è stato un piacere ospitarti!",
+      en: "Hi {ospite}, check-out is on {checkout}. If you need anything (for example luggage storage), just reply here. Thank you for choosing {struttura}, it was a pleasure to host you!",
+      fr: "Bonjour {ospite}, le check-out est prévu le {checkout}. Pour toute demande (par exemple la consigne à bagages), répondez simplement ici. Merci d'avoir choisi {struttura}, ce fut un plaisir de vous accueillir !",
+      de: "Hallo {ospite}, der Check-out ist am {checkout}. Bei Fragen (zum Beispiel zur Gepäckaufbewahrung) schreiben Sie uns einfach hier. Vielen Dank, dass Sie sich für {struttura} entschieden haben, es war uns eine Freude!",
+      es: "Hola {ospite}, el check-out es el {checkout}. Para cualquier necesidad (por ejemplo, consigna de equipaje), escríbenos aquí. Gracias por elegir {struttura}, ¡ha sido un placer recibirte!",
+    },
+  },
+];
+
+/** Aggiunge i modelli dei passaggi obbligatori mancanti (uno per passaggio). */
+export function ensureMandatoryTemplates<T extends { srcId?: string }>(saved: T[]): T[] {
+  const have = new Set(saved.map((x) => x.srcId).filter(Boolean));
+  return [...saved, ...(MANDATORY_TEMPLATES.filter((m) => !have.has(m.srcId)) as unknown as T[])];
+}
+
 /** Se false i modelli d'esempio NON si aggiungono più da soli: i modelli li crea il titolare (ottobre 2026). */
 export const SEED_TEMPLATES_ENABLED = false;
 export function mergeSeedTemplates<T extends { id: string; texts?: Record<string, string> }>(saved: T[], deletedSeedIds: string[] = loadDeletedSeedIds(), enabled: boolean = SEED_TEMPLATES_ENABLED): T[] {

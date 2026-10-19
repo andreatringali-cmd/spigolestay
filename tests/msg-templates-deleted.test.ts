@@ -32,3 +32,11 @@ test("modelli d'esempio spenti (default): non si aggiunge nulla da solo", () => 
   const saved = [{ id: "mio", name: "Il mio", texts: { it: "Ciao" } }];
   assert.deepEqual(mergeSeedTemplates(saved, []), saved);
 });
+
+test("modelli dei passaggi obbligatori: si aggiungono solo quelli mancanti (Pagamento, Tassa, Check-out)", async () => {
+  const { ensureMandatoryTemplates } = await import("../src/lib/msg-templates.ts");
+  const out = ensureMandatoryTemplates([{ srcId: "selfcheckin", id: "a" }, { srcId: "pay", id: "mio-pagamento" }] as any[]) as any[];
+  assert.deepEqual(out.map((x) => x.srcId), ["selfcheckin", "pay", "tax", "checkout"]);
+  assert.equal(out.find((x) => x.srcId === "pay").id, "mio-pagamento"); // il modello esistente non si tocca
+  assert.ok(out.find((x) => x.srcId === "tax").texts.it.includes("{link_pagamento}"));
+});
