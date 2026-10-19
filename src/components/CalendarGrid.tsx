@@ -1107,7 +1107,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               </div>
             )}
           </div>
-          <Link href="/prenotazioni/nuova" className="sm:order-[42] inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+          <Link href="/prenotazioni/nuova" className="sm:order-[41] sm:ml-auto inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
         </div>
         <div className="flex w-full items-center gap-2 sm:contents">
           <div ref={monthRef} className="relative shrink-0 sm:order-[10]">
@@ -1162,10 +1162,10 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               </div>
             )}
           </div>
-          <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 shrink-0 place-items-center sm:order-[40] sm:ml-auto rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+          <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 shrink-0 place-items-center sm:order-[32] rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
             <Icon name="chart" size={16} />
           </button>
-          <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim sm:order-[41] transition hover:bg-wash hover:text-txt">
+          <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim sm:order-[42] transition hover:bg-wash hover:text-txt">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
           </Link>
         </div>
