@@ -12,8 +12,12 @@ export type NavBadges = Record<string, number>; // href → numero (assente o 0 
 
 const THREADS_KEY = "spigolestay:threads:v1";
 const MSG_SEEN_KEY = "nav:msgseen";      // conversazione → timestamp dell'ultimo messaggio visto (solo su questo dispositivo, non sincronizzato)
-const BK_SEEN_KEY = "nav:bookingseen";   // id delle prenotazioni già viste (solo su questo dispositivo: non pesa sulla sincronizzazione)
-const BK_MAX = 4000;
+const BK_SEEN_KEY = "nav:bookingseen2";  // prenotazioni recenti già viste, per struttura+codice (solo su questo dispositivo: non pesa sulla sincronizzazione)
+const BK_MAX = 500;
+const ACK_KEY = "nav:ack";           // adempimenti: quanti elementi c'erano l'ultima volta che hai aperto la pagina (solo su questo dispositivo)
+const ackMem: Record<string, number> = {}; // copia in memoria, se il salvataggio nel browser non riesce
+const seenMem = new Set<string>(); // copia in memoria delle «viste», se il salvataggio nel browser non riesce
+const bookingKey = (b: { structureId: string; code?: string; id: string }) => `${b.structureId}|${b.code || b.id}`;
 
 type ThreadMsg = { dir?: string; ts?: number };
 
@@ -70,6 +74,7 @@ export function useNavBadges(pathname: string): NavBadges {
   const [tick, setTick] = useState(0);
   const [issues, setIssues] = useState(0);
   const [remote, setRemote] = useState({ schedine: 0, istat: 0, scartate: 0 });
+  const [remoteReady, setRemoteReady] = useState(false);
   const [bkNew, setBkNew] = useState(0);
   const today = toISO(new Date());
 
@@ -88,34 +93,37 @@ export function useNavBadges(pathname: string): NavBadges {
   }, [tick, activeStructureId]);
 
   // Prenotazioni nuove: ancora in corso o future, PRENOTATE da poco e non ancora viste (lo storico importato e le vecchie riscritte dalla sincronizzazione non contano).
+  // «Vista» = la prenotazione (struttura + codice), non il suo id: se la sincronizzazione la riscrive con un altro id non torna come nuova; una prenotazione di più camere conta una volta.
   const recentFrom = toISO(new Date(Date.now() - NEW_WINDOW_DAYS * 86400000));
   const isFresh = (b: (typeof bookings)[number]) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkOut >= today && !!b.bookedOn && b.bookedOn.slice(0, 10) >= recentFrom;
-  const liveIds = useMemo(
-    () => bookings.filter((b) => isFresh(b) && inScope(b.structureId, activeStructureId)).map((b) => b.id),
+  const freshList = useMemo(
+    () => bookings.filter((b) => isFresh(b)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bookings, today, activeStructureId],
+    [bookings, today],
   );
   useEffect(() => {
     if (!bookings.length) { setBkNew(0); return; }
-    let seen = readJson<string[] | null>(BK_SEEN_KEY, null);
+    const stored = readJson<string[] | null>(BK_SEEN_KEY, null);
+    // Si ricorda anche in memoria: se il salvataggio nel browser fallisce (spazio pieno) il numero non ricompare finché non ricarichi la pagina.
+    const known = new Set([...(stored ?? []), ...seenMem]);
     const onPage = pathname === "/prenotazioni" || pathname.startsWith("/prenotazioni/");
-    if (seen === null || onPage) {
-      // Prima volta, oppure stai guardando la pagina Prenotazioni: tutto ciò che c'è ora è visto. Le nuove (non ancora viste) si ricordano per l'evidenza in pagina.
-      if (seen !== null) {
-        const known = new Set(seen);
-        let added = false;
-        for (const b of bookings) if (isFresh(b) && !known.has(b.id) && !freshIds.has(b.id)) { freshIds.add(b.id); added = true; }
-        if (added) { try { window.dispatchEvent(new Event(FRESH_EVENT)); } catch {} }
+    if (stored === null || onPage) {
+      // Prima volta, oppure stai guardando la pagina Prenotazioni: le prenotazioni recenti che ci sono ora sono viste. Le nuove (non ancora viste) si ricordano per l'evidenza in pagina.
+      let added = false;
+      for (const b of freshList) {
+        const k = bookingKey(b);
+        if (stored !== null && !known.has(k) && !freshIds.has(b.id)) { freshIds.add(b.id); added = true; }
+        known.add(k); seenMem.add(k);
       }
-      const all = Array.from(new Set([...(seen ?? []), ...bookings.map((b) => b.id)])).slice(-BK_MAX);
-      writeJson(BK_SEEN_KEY, all);
+      if (added) { try { window.dispatchEvent(new Event(FRESH_EVENT)); } catch {} }
+      writeJson(BK_SEEN_KEY, Array.from(known).slice(-BK_MAX)); // solo prenotazioni recenti: poche decine
       setBkNew(0);
       return;
     }
-    const set = new Set(seen);
-    setBkNew(liveIds.filter((id) => !set.has(id)).length);
+    const keys = new Set(freshList.filter((b) => inScope(b.structureId, activeStructureId)).map(bookingKey));
+    setBkNew([...keys].filter((k) => !known.has(k)).length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, liveIds, pathname, tick]);
+  }, [bookings, freshList, pathname, tick, activeStructureId]);
 
   // Conteggi leggeri su Supabase (schedine pronte, ISTAT da inviare, fatture scartate), al massimo uno al minuto
   const loadRemote = useCallback(async () => {
@@ -130,6 +138,7 @@ export function useNavBadges(pathname: string): NavBadges {
         mine(supabase.from("documents").select("id", head).eq("stato", "scartata")),
       ]);
       setRemote({ schedine: a.count ?? 0, istat: i.count ?? 0, scartate: d.count ?? 0 });
+      setRemoteReady(true);
     } catch {}
   }, [today, activeStructureId]);
   useEffect(() => {
@@ -142,12 +151,36 @@ export function useNavBadges(pathname: string): NavBadges {
   const checkinToday = useMemo(() => bookings.filter((b) => b.checkIn === today && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && inScope(b.structureId, activeStructureId)
     && !(b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber))).length, [bookings, today, activeStructureId]);
 
-  return useMemo(() => ({
-    "/prenotazioni": bkNew,
+  // Adempimenti: il numero avvisa solo delle novità. Aprendo la pagina si azzera; ricompare solo se gli elementi da fare AUMENTANO rispetto all'ultima volta che l'hai aperta.
+  const raw = useMemo<NavBadges>(() => ({
     "/adempimenti": checkinToday + remote.schedine + remote.istat,
     "/alloggiati-web": remote.schedine,
     "/istat": remote.istat,
+  }), [checkinToday, remote]);
+  const [ack, setAck] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!remoteReady) return; // finché i conteggi del server non sono arrivati non si può fissare il punto di partenza
+    const stored = readJson<Record<string, number> | null>(ACK_KEY, null);
+    const cur: Record<string, number> = { ...(stored ?? {}), ...ackMem };
+    let changed = stored === null;
+    for (const [href, n] of Object.entries(raw)) {
+      const onPage = pathname === href || pathname.startsWith(href + "/");
+      // Prima volta o pagina aperta: ciò che c'è ora è visto. Se gli elementi calano, il punto di partenza cala con loro (i nuovi tornano a contare).
+      if (cur[href] === undefined || onPage || n < cur[href]) { if (cur[href] !== n) { cur[href] = n; changed = true; } }
+      ackMem[href] = cur[href];
+    }
+    if (changed) writeJson(ACK_KEY, cur);
+    setAck(cur);
+  }, [raw, remoteReady, pathname]);
+  const fresh = (href: string): number => (remoteReady ? Math.max(0, (raw[href] ?? 0) - (ack[href] ?? raw[href] ?? 0)) : 0);
+
+  return useMemo(() => ({
+    "/prenotazioni": bkNew,
+    "/adempimenti": fresh("/adempimenti"),
+    "/alloggiati-web": fresh("/alloggiati-web"),
+    "/istat": fresh("/istat"),
     "/documenti": remote.scartate,
     "/pulizie": issues,
-  }), [bkNew, checkinToday, remote, issues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [bkNew, raw, ack, remoteReady, remote.scartate, issues]);
 }
