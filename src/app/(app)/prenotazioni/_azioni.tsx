@@ -143,7 +143,7 @@ export default function StepActions(p: StepActionsProps) {
       <button className={`${btnGhost} px-2.5`} disabled={!!busy} title="Copia il testo del messaggio" aria-label="Copia il testo del messaggio" onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}><Icon name="copy" size={16} /></button>
       {extra}
     </div>
-    {isRecent(remKind) && <button className="self-start text-xs font-semibold text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
+    {isRecent(remKind) && <button className="self-start text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
     </>
   );
 
