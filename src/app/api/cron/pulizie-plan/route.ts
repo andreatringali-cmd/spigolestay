@@ -30,7 +30,7 @@ const CFG_PREFIX = "spigolestay:pulizie:autoshare:";
 const s = (v: unknown) => (typeof v === "string" ? v : "");
 const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 
-interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
+interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;

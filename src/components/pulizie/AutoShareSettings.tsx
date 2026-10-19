@@ -9,8 +9,8 @@ import { useLang } from "@/lib/i18n";
 import { spiegaErroreWa } from "@/lib/invii-log";
 
 const KEY_PREFIX = "spigolestay:pulizie:autoshare:";
-export interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
-const DEFAULT_CFG: AutoShareCfg = { enabled: false, time: "08:00", email: true, emailTo: "", whatsapp: false, whatsappTo: "" };
+export interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string; subject: string; intro: string; outro: string }
+const DEFAULT_CFG: AutoShareCfg = { enabled: false, time: "08:00", email: true, emailTo: "", whatsapp: false, whatsappTo: "", subject: "", intro: "", outro: "" };
 
 // Una configurazione per struttura (planning e destinatari diversi per ciascuna, es. persone
 // diverse che puliscono Spigolehouse e Spigolerooms) — non un'unica impostazione condivisa.
@@ -57,7 +57,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-xl">
+      <div className="max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl">
         <div className="mb-3 flex items-center gap-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color:var(--focus)]/10 text-[color:var(--focus)]"><Icon name="clock" size={16} /></span>
           <div>
@@ -95,6 +95,14 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
             />
           </div>
 
+        </div>
+
+        {/* Testo del messaggio: solo apertura e chiusura; l'elenco delle camere lo compone il programma. Vale per WhatsApp, Copia e l'email automatica. */}
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Testo del messaggio")}</div>
+          <input type="text" value={cfg.subject} onChange={(e) => setCfg((c) => ({ ...c, subject: e.target.value }))} placeholder={t("Oggetto email (vuoto = Planning pulizie · struttura · data)")} maxLength={120} className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+          <textarea value={cfg.intro} onChange={(e) => setCfg((c) => ({ ...c, intro: e.target.value }))} placeholder={t("Riga iniziale (es. Buongiorno, ecco il planning di oggi)")} rows={2} maxLength={300} className="resize-none rounded-xl border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+          <textarea value={cfg.outro} onChange={(e) => setCfg((c) => ({ ...c, outro: e.target.value }))} placeholder={t("Riga finale (es. Scrivimi se c'è qualcosa che non torna. Grazie!)")} rows={2} maxLength={300} className="resize-none rounded-xl border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         </div>
 
         {log && log.length > 0 && (

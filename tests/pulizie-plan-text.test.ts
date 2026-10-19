@@ -75,3 +75,11 @@ test("campi dettagliati: più camere dello stesso lavoro separate da punto e vir
   assert.equal(f.cambio.split("; ").length, 2);
   assert.match(f.cambio, /^1 — .*; 4 — esce Thomas Pies · entra SUN HE \(2 pers\., fino al 14\.10\)$/);
 });
+
+test("riga iniziale e finale scelte dal titolare: prima e dopo l'elenco; vuote = niente", () => {
+  const base = buildPuliziePlanText({ ...(args as object), style: "plain" } as never);
+  const custom = buildPuliziePlanText({ ...(args as object), style: "plain", intro: "Buongiorno, ecco il planning", outro: "Grazie!" } as never);
+  assert.ok(custom.startsWith("Buongiorno, ecco il planning\n\nPulizie di oggi"));
+  assert.ok(custom.endsWith("\n\nGrazie!"));
+  assert.equal(buildPuliziePlanText({ ...(args as object), style: "plain", intro: "  ", outro: "" } as never), base);
+});

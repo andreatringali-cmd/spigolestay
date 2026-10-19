@@ -126,6 +126,8 @@ export function buildPuliziePlanText(opts: {
   notes?: Record<string, string>;
   t?: (s: string) => string;
   style?: PlanStyle;
+  intro?: string; // riga iniziale scelta dal titolare (prima dell'elenco)
+  outro?: string; // riga finale scelta dal titolare (dopo l'elenco)
 }): string {
   const { date, scopedStructures, rooms, guests, notes = {}, t = (x: string) => x, style = "whatsapp" } = opts;
   const bold = (x: string) => (style === "whatsapp" ? `*${x}*` : x);
@@ -170,6 +172,9 @@ export function buildPuliziePlanText(opts: {
     if (nothing.length) lines.push("", `${t("NIENTE DA FARE")}: ${nothing.map((r) => r.unit.name).join(", ")}`);
   }
   if (lines.length === 1) lines.push("", t("Nessuna pulizia in programma."));
+  const intro = (opts.intro ?? "").trim(), outro = (opts.outro ?? "").trim();
+  if (intro) lines.unshift(intro, "");
+  if (outro) lines.push("", outro);
   return lines.join("\n");
 }
 

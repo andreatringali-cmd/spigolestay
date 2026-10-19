@@ -7,7 +7,7 @@ import { logInvio } from "@/lib/invii-log";
 import { computePuliziePlan, buildPuliziePlanText, buildPuliziePlanSummary, buildPuliziePlanFields, fmtLongIT } from "@/lib/puliziePlan";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
-export interface PulizieSendCfg { email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
+export interface PulizieSendCfg { email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
 export interface PulizieSendResult { channel: "email" | "whatsapp"; ok: boolean; detail: string }
 
 /** Data (Y-M-D) e "HH:MM" adesso nel fuso Europe/Rome. */
@@ -30,8 +30,9 @@ export async function deliverPuliziePlan(a: {
   const structureId = str(stJ.id), name = str(stJ.name);
   const { rooms } = computePuliziePlan({ date, structures: [st], units: a.units, roomTypes: a.roomTypes, bookings: a.bookings });
   const planArgs = { date, scopedStructures: [st], rooms, guests: a.guests, notes: a.notes };
-  const text = buildPuliziePlanText({ ...planArgs, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
-  const emailText = buildPuliziePlanText({ ...planArgs, style: "plain" }); // email: niente asterischi
+  const custom = { intro: cfg.intro, outro: cfg.outro }; // riga iniziale e finale scelte dal titolare
+  const text = buildPuliziePlanText({ ...planArgs, ...custom, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
+  const emailText = buildPuliziePlanText({ ...planArgs, ...custom, style: "plain" }); // email: niente asterischi
   const summary = buildPuliziePlanSummary(planArgs);
   // Una voce per tipo di lavoro, per il modello WhatsApp "a righe". Prima la versione dettagliata (chi esce, chi entra, persone, fino a quando: come nel messaggio condiviso a mano);
   // il corpo del modello Meta ha un limite (1024 caratteri in tutto), quindi se il dettaglio non ci sta si ripiega sulla versione con i soli numeri delle camere.
@@ -39,7 +40,7 @@ export async function deliverPuliziePlan(a: {
   const detailedLen = Object.values(detailedF).reduce((n, v) => n + v.length, 0);
   const f = detailedLen <= DETAIL_MAX ? detailedF : buildPuliziePlanFields(planArgs);
   const dateLong = fmtLongIT(date);                                         // "domenica 11.10.2026" invece di "2026-10-11"
-  const subject = `Planning pulizie · ${name} · ${dateLong}`;
+  const subject = (cfg.subject ?? "").trim() || `Planning pulizie · ${name} · ${dateLong}`; // oggetto scelto dal titolare, altrimenti quello standard
   const out: PulizieSendResult[] = [];
 
   if (cfg.email && cfg.emailTo) {

@@ -16,7 +16,7 @@ import { WhatsAppIcon, MailIcon, PdfIcon } from "@/components/BrandIcons";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type PlanRoom } from "@/lib/puliziePlan";
-import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
+import AutoShareSettings, { loadAutoShareCfg } from "@/components/pulizie/AutoShareSettings";
 import AddettaView from "@/components/pulizie/AddettaView";
 import AddettaPurchases from "@/components/pulizie/AddettaPurchases";
 import AddettaAgenda from "@/components/pulizie/AddettaAgenda";
@@ -292,7 +292,11 @@ export default function PuliziePage() {
   const notify = (title: string, body: string) => { try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body }); } catch {} };
 
   // Testo del programma da condividere con la signora delle pulizie (stessa logica del cron di invio automatico).
-  const buildPlanText = (style: "whatsapp" | "plain" = "whatsapp") => buildPuliziePlanText({ date, scopedStructures, rooms, guests, notes, t, style });
+  // Riga iniziale e finale scelte nell'invio programmato: valgono con una sola struttura selezionata.
+  const buildPlanText = (style: "whatsapp" | "plain" = "whatsapp") => {
+    const c = autoShareStructure ? loadAutoShareCfg(autoShareStructure.id) : null;
+    return buildPuliziePlanText({ date, scopedStructures, rooms, guests, notes, t, style, intro: c?.intro, outro: c?.outro });
+  };
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
   const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText("plain"))}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText("plain")); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
