@@ -36,7 +36,8 @@ export function stableStringify(v: unknown): string {
   const o = v as Record<string, unknown>;
   return "{" + Object.keys(o).sort().filter((k) => o[k] !== undefined).map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
 }
-const same = (a: unknown, b: unknown): boolean => a === b || stableStringify(a) === stableStringify(b);
+const isEmptyLike = (v: unknown): boolean => v === undefined || v === null || (Array.isArray(v) && v.length === 0) || (typeof v === "object" && v !== null && !Array.isArray(v) && Object.keys(v as object).length === 0);
+const same = (a: unknown, b: unknown): boolean => a === b || (isEmptyLike(a) && isEmptyLike(b)) || stableStringify(a) === stableStringify(b); // «assente» e «vuoto» sono la stessa cosa
 
 const asObj = (x: unknown): Json => (x && typeof x === "object" && !Array.isArray(x) ? (x as Json) : {});
 const asArr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);

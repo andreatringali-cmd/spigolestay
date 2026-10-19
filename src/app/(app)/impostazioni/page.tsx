@@ -15,6 +15,7 @@ import { useTheme } from "@/lib/theme";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import StyleChooser from "@/components/StyleChooser";
+import FastModeCard from "@/components/FastModeCard";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { NOTIF_DEF, loadNotifPrefs } from "@/lib/notifPrefs";
@@ -350,6 +351,8 @@ export default function ImpostazioniPage() {
       </Card>
 
       <AdsSettingsCard />
+
+      <FastModeCard />
 
       <Card className="mt-4">
         <SectionTitle>{t("Backup & dati")}</SectionTitle>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncAuth, idColOf, isSyncTable } from "@/lib/sync-server";
 import { applyDelta, isEmptyDelta, DeltaError, type Delta } from "@/lib/sync-delta";
+import { deltaAllowedFor } from "@/lib/delta-allow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const auth = await syncAuth(req);
   if ("error" in auth) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+  if (!deltaAllowedFor(auth.userId)) return NextResponse.json({ ok: false, error: "not_enabled" }, { status: 403 }); // prova riservata agli account abilitati
   const body = await req.json().catch(() => null) as { table?: unknown; id?: unknown; expectedRev?: unknown; delta?: Delta } | null;
   if (!body || !isSyncTable(body.table) || typeof body.id !== "string" || !body.id || !body.delta || typeof body.delta !== "object") {
     return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });

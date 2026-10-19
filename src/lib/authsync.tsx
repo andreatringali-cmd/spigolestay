@@ -23,29 +23,16 @@ import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled } from "./supabase";
 import MfaChallenge from "@/components/MfaChallenge";
-import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
-import { mergeKeyedList } from "./list-merge";
+import DeltaBar from "@/components/DeltaBar";
 import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig } from "./org-cassa-config";
-import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, mergeSentLog, stripVolatileUsers } from "./sync-merge";
+import { buildDelta, isEmptyDelta } from "./sync-delta";
+import { deltaAllowedFor } from "./delta-allow";
+import { applyRaceChanges } from "./sync-merge";
+import { isSyncKey, LOCAL_OWNER_KEY, contentSig, stableStringify, settingsSig, reloadSig, mergeSnapshots, SIG_SKIP } from "./sync-core";
 
-// Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
-const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
-// Chiavi legate al singolo dispositivo/sessione: NON vanno sincronizzate.
-const SKIP_KEYS = new Set<string>([
-  "spigolestay:loginlogged",  // marcatore "accesso già loggato" per sessione tab
-  "spigolestay:hydrated-for", // marcatore interno di reidratazione
-  "spigolestay:channex-arisnapshot", // cache per-dispositivo dell'ultimo ARI inviato (centinaia di KB): non si sincronizza, vive in sessionStorage
-]);
 // Pulizia una tantum: la vecchia copia nel localStorage occupava ~400 KB di una quota di ~5 MB.
 if (typeof window !== "undefined") { try { localStorage.removeItem("spigolestay:channex-arisnapshot"); } catch { /* storage non disponibile */ } }
-
-const MAX_TOMBS = 3000;
-
-function isSyncKey(k: string): boolean {
-  if (SKIP_KEYS.has(k)) return false;
-  return SYNC_PREFIXES.some((p) => k.startsWith(p));
-}
 
 function snapshot(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -85,7 +72,6 @@ function wipeLocalAccount() {
 // riusato da un account DIVERSO (demo, test, PC condiviso) con il server ancora vuoto per il
 // nuovo account faceva "vincere il locale" e copiava sul server del nuovo utente i dati del
 // precedente — un vero incidente di sicurezza/isolamento dati, non solo un fastidio nei test.
-const LOCAL_OWNER_KEY = "spigolestay:localowner";
 function markLocalOwner(uid: string) { try { localStorage.setItem(LOCAL_OWNER_KEY, uid); } catch {} }
 // Ci si fida del locale SOLO con conferma positiva che è di questo uid — non il contrario
 // ("sospetto solo se so che è di un altro"). Un dispositivo già contaminato PRIMA che questo
@@ -127,387 +113,47 @@ function hasRealData(obj: Record<string, string> | null | undefined): boolean {
   } catch { return false; }
 }
 
-// Serializzazione canonica (chiavi ordinate) per confrontare due stati per CONTENUTO e non per
-// come sono scritti: due JSON con le stesse informazioni ma chiavi in ordine diverso risultano uguali.
-// Serve per evitare reload/riscritture inutili quando l'app salva lo stesso contenuto in altro ordine.
-function stableStringify(v: unknown): string {
-  if (v === null || typeof v !== "object") return JSON.stringify(v);
-  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
-  const o = v as Record<string, unknown>;
-  const keys = Object.keys(o).sort();
-  return "{" + keys.map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
-}
-// Preferenze SOLO di vista/dispositivo: non guidano scritture/reload né si sincronizzano tra
-// dispositivi (ognuno tiene la propria vista). TUTTO il resto è dato d'account e va salvato.
-const SIG_SKIP = new Set<string>([
-  "spigolestay:activestruct", "spigolestay:activestructs", "spigolestay:calview:v2", "spigolestay:piani:view",
-  "spigolestay:camere:collapsed:v1", "spigolestay:activityseen",
-  // Preferenze "quali grafici/viste mostrare": per-dispositivo, non devono sincronizzarsi.
-  "spigolestay:prenchart:v2", "spigolestay:prenchartorder", "spigolestay:camere:aperte:v2",
-  "spigolestay:dashcharts:v6", "spigolestay:statscharts:on", "spigolestay:cassacharts:on",
-]);
-// Firma "per contenuto" di TUTTO lo stato d'account (tutte le chiavi sincronizzabili, non solo
-// alcune): così QUALSIASI modifica (PEC, codice fiscale, pagamenti, disponibilità, impostazioni…)
-// viene rilevata e quindi salvata sul server, e non più persa al ricaricamento.
-function contentSig(obj: Record<string, string> | null | undefined): string {
-  if (!obj) return "";
-  const keys = Object.keys(obj).filter((k) => isSyncKey(k) && !SIG_SKIP.has(k)).sort();
-  return keys.map((k) => {
-    const raw = obj[k];
-    if (raw == null || raw === "") return `${k}=`;
-    try { return `${k}=${stableStringify(JSON.parse(raw))}`; } catch { return `${k}=${raw}`; }
-  }).join(" ");
-}
-
-// Collezioni "entità" dove perdere un elemento = perdere dati reali dell'utente.
-// (roomTypes incluso così tariffe/piani si fondono per id invece di sovrascriversi in blocco.)
-// directReviews incluso così le recensioni dirette (aggiunte dal server via /api/public-review
-// e le risposte del gestore) si fondono per id invece di sovrascriversi in blocco.
-// events incluso così la cancellazione di un evento è tombstonata e rispettata dalla fusione:
-// senza, l'array eventi si sovrascriveva in blocco e un evento eliminato poteva "risorgere".
-const ENTITY_COLLECTIONS = ["structures", "roomTypes", "units", "bookings", "guests", "directReviews", "events"];
-
-// Chiavi "piatte" (fuori dal blob dati:v1) che contengono ARRAY di entità con id + updatedAt:
-// scorte, ordini e segnalazioni delle Pulizie. Vanno FUSE per elemento (last-write-wins per id),
-// NON con il "vince il locale" in blocco: senza, un secondo dispositivo/scheda con una copia
-// STANTÌA dell'array (es. il telefono resta aperto mentre segni sul desktop, o la signora delle
-// pulizie) sovrascriveva sul server le modifiche appena fatte altrove — è la causa per cui lo
-// stato "Disponibile" dei prodotti "tornava indietro". Le cancellazioni sono soft-delete
-// (_deleted:true con updatedAt più recente) così non risorgono.
-const PULIZIE_MAP_KEYS = ["spigolestay:pulizie:done", "spigolestay:pulizie:linen", "spigolestay:pulizie:notes"];
-const FLAT_ENTITY_KEYS = ["spigolestay:pulizie:stock", "spigolestay:pulizie:orders", "spigolestay:pulizie:issues", "spigolestay:pulizie:tasks", "spigolestay:pulizie:checks", "spigolestay:pulizie:hours"];
-const THREADS_KEY = "spigolestay:threads:v1";
-// Preventivi (array piatto, id ma senza updatedAt): vedi mergePreventivi più sotto. Scritta anche dal
-// server (conferma dopo pagamento Stripe, src/app/api/stripe/quote/confirm/route.ts).
-const PREVENTIVI_KEY = "spigolestay:preventivi";
-const SENT_LOG_KEY = "spigolestay:msgsent";
-
-type WithId = { id?: unknown };
-function idOf(it: unknown): string | null {
-  if (it && typeof it === "object") {
-    const id = (it as WithId).id;
-    if (id !== undefined && id !== null && id !== "") return String(id);
-  }
-  return null;
-}
-
-// Timbro di ultima-modifica di un'entità (epoch ms). Assente = 0 (mai timbrata).
-function tsOf(it: unknown): number {
-  const t = (it as { updatedAt?: unknown })?.updatedAt;
-  return typeof t === "number" && isFinite(t) ? t : 0;
-}
-
-// Fusione per-elemento (id + updatedAt LAST-WRITE-WINS) di un array salvato in una chiave piatta
-// (scorte/ordini/segnalazioni Pulizie). Unione per id: se lo stesso id è in locale e sul server
-// vince quello con updatedAt più recente (a parità, il locale); i soft-delete (_deleted:true)
-// partecipano come qualsiasi altro elemento, quindi una cancellazione recente vince e non risorge.
-function mergeFlatEntityArray(localRaw: string | undefined, serverRaw: string | undefined): string | null {
-  let local: unknown[];
-  let server: unknown[];
-  try { const p = JSON.parse(localRaw ?? "[]"); if (!Array.isArray(p)) return null; local = p; } catch { return null; }
-  try { const p = JSON.parse(serverRaw ?? "[]"); server = Array.isArray(p) ? p : []; } catch { server = []; }
-  const byId = new Map<string, unknown>();
-  const put = (it: unknown) => {
-    const id = idOf(it);
-    const key = id ?? `#${JSON.stringify(it)}`; // elementi senza id: identità per contenuto
-    const cur = byId.get(key);
-    if (cur === undefined || tsOf(it) >= tsOf(cur)) byId.set(key, it); // >= : a parità vince il locale
-  };
-  for (const it of server) put(it); // prima il server…
-  for (const it of local) put(it);  // …poi il locale (vince a parità di timbro)
-  // Ordine deterministico per id: evita riscritture/loop inutili quando il contenuto è identico.
-  const out = [...byId.values()].sort((a, b) => { const ia = idOf(a) ?? "", ib = idOf(b) ?? ""; return ia < ib ? -1 : ia > ib ? 1 : 0; });
-  return JSON.stringify(out);
-}
-
-// Fusione delle conversazioni WhatsApp/chat (Record<guestId, Msg[]>): unione per id dentro ogni
-// thread, MAI "vince il locale" in blocco. Senza, un messaggio in arrivo appena salvato dal
-// webhook (/api/whatsapp/webhook) veniva cancellato pochi istanti dopo dal primo salvataggio
-// automatico della pagina Messaggi aperta nel browser, che non sa nulla del nuovo arrivo e
-// risalva la sua copia più vecchia sopra. I messaggi sono immutabili (mai modificati dopo la
-// creazione), quindi basta l'unione per id, ordinata per data.
-function mergeThreads(localRaw: string | undefined, serverRaw: string | undefined): string | null {
-  let local: Record<string, unknown[]>;
-  let server: Record<string, unknown[]>;
-  try { const p = JSON.parse(localRaw ?? "{}"); if (!p || typeof p !== "object" || Array.isArray(p)) return null; local = p as Record<string, unknown[]>; } catch { return null; }
-  try { const p = JSON.parse(serverRaw ?? "{}"); server = (p && typeof p === "object" && !Array.isArray(p)) ? (p as Record<string, unknown[]>) : {}; } catch { server = {}; }
-  const out: Record<string, unknown[]> = {};
-  for (const key of new Set([...Object.keys(server), ...Object.keys(local)])) {
-    const byId = new Map<string, unknown>();
-    // Stesso messaggio su entrambi i lati: si tiene lo stato di consegna più avanzato (inviato <
-    // consegnato < letto), scritto dal webhook di WhatsApp; la copia locale senza stato non lo cancella.
-    const RANK: Record<string, number> = { sent: 1, failed: 1.5, delivered: 2, read: 3 };
-    const put = (m: unknown) => {
-      const id = idOf(m); const k = id ?? `#${JSON.stringify(m)}`;
-      const cur = byId.get(k) as { st?: string; wid?: string } | undefined;
-      if (!cur) { byId.set(k, m); return; }
-      const nx = m as { st?: string; wid?: string };
-      const st = (RANK[nx.st ?? ""] ?? 0) >= (RANK[cur.st ?? ""] ?? 0) ? nx.st : cur.st;
-      byId.set(k, { ...cur, ...(m as object), ...(st ? { st } : {}), ...((nx.wid ?? cur.wid) ? { wid: nx.wid ?? cur.wid } : {}) });
-    };
-    for (const m of (Array.isArray(server[key]) ? server[key] : [])) put(m);
-    for (const m of (Array.isArray(local[key]) ? local[key] : [])) put(m);
-    const tsOfMsg = (m: unknown) => { const t = (m as { ts?: unknown })?.ts; return typeof t === "number" && isFinite(t) ? t : 0; };
-    out[key] = [...byId.values()].sort((a, b) => tsOfMsg(a) - tsOfMsg(b));
-  }
-  return JSON.stringify(out);
-}
-
-// Fusione del REGISTRO ATTIVITÀ (campo "activities" dentro spigolestay:data:v1): unione per id,
-// MAI "vince il locale" in blocco. L'import prenotazioni Channex (lato server, vedi pushActivity in
-// src/lib/channex-inbound.ts) aggiunge voci al registro scrivendo DIRETTAMENTE su app_state/org_state;
-// "activities" non è tra le ENTITY_COLLECTIONS fuse per id, quindi senza questa unione la voce appena
-// aggiunta dal server spariva al primo autosalvataggio di un browser con la copia locale ancora senza
-// quella voce — stesso bug architetturale di mergeThreads, qui su un campo del blob dati invece che su
-// una chiave separata. Le attività sono immutabili (mai modificate dopo la creazione): basta l'unione
-// per id, più recenti prima (stesso ordine con cui vengono inserite), tetto a 500 come la sorgente.
-function mergeActivities(localVal: unknown, serverVal: unknown): unknown[] {
-  const local = Array.isArray(localVal) ? localVal : [];
-  const server = Array.isArray(serverVal) ? serverVal : [];
-  const byId = new Map<string, unknown>();
-  const put = (it: unknown) => { const id = idOf(it); byId.set(id ?? `#${JSON.stringify(it)}`, it); };
-  for (const it of server) put(it);
-  for (const it of local) put(it);
-  const tsOfAct = (it: unknown) => { const t = (it as { ts?: unknown })?.ts; return typeof t === "number" && isFinite(t) ? t : 0; };
-  return [...byId.values()].sort((a, b) => tsOfAct(b) - tsOfAct(a)).slice(0, 500);
-}
-
-// Fusione dei PREVENTIVI (spigolestay:preventivi, array piatto con "id" ma SENZA "updatedAt"): parte
-// SEMPRE dall'array locale (stessa semantica di prima: una cancellazione locale resta valida, non la
-// si reintroduce), ma se il server ha marcato un preventivo "confermato" — scritto DIRETTAMENTE dal
-// server dopo un pagamento Stripe riuscito, vedi src/app/api/stripe/quote/confirm/route.ts — quello
-// stato vince sempre sul locale "inviato": senza, una scheda Preventivi aperta in un altro tab con la
-// copia ancora "inviato" lo risalvava sopra al sync successivo, cancellando silenziosamente la
-// conferma (stesso bug di mergeThreads/mergeFlatEntityArray). Non essendoci un updatedAt per il LWW
-// generico, la regola è sullo STATO (che può solo avanzare da "inviato" a "confermato", mai tornare
-// indietro), non sul tempo.
-// L'implementazione (con la base per non perdere i preventivi creati altrove) è mergePreventivi3 in sync-merge.ts.
-
-// Chiavi di CONTATTO (email/telefono normalizzati) per riconoscere un iscritto newsletter / lead.
-function leadContactKeys(g: unknown): string[] {
-  const o = (g && typeof g === "object") ? (g as { email?: unknown; phone?: unknown }) : {};
-  const keys: string[] = [];
-  const email = typeof o.email === "string" ? o.email.trim().toLowerCase() : "";
-  if (email) keys.push("email:" + email);
-  const phone = typeof o.phone === "string" ? o.phone.replace(/[\s+()./-]/g, "") : "";
-  if (phone.length >= 6) keys.push("tel:" + phone);
-  return keys;
-}
-// Un contatto è un "lead newsletter" se arriva dal sito pubblico o è taggato newsletter.
-function isNewsletterLead(g: unknown): boolean {
-  const o = (g && typeof g === "object") ? (g as { source?: unknown; tags?: unknown }) : {};
-  if (o.source === "sito") return true;
-  return Array.isArray(o.tags) && (o.tags as unknown[]).includes("newsletter");
-}
-
-// Fusione a 3 vie di una collezione di entità:
-//  - base   = elenco all'ultima sincronizzazione (cosa "sapevamo" prima)
-//  - locale = elenco attuale in questo browser
-//  - server = elenco attuale sul server
-// Regole (priorità: non perdere dati reali):
-//  - per un'entità presente sia in locale sia sul server vince la copia con `updatedAt` PIÙ RECENTE
-//    (LAST-WRITE-WINS a livello di entità): così una copia stantìa di un client non può più
-//    sovrascrivere un campo aggiornato di recente altrove (es. l'account Stripe della struttura).
-//  - aggiungo le entità presenti sul server ma non in locale SOLO se sono nuove rispetto alla base
-//    (aggiunte altrove). Se erano nella base e non sono più in locale => cancellate qui: non le reintroduco.
-function merge3(baseArr: unknown[], localArr: unknown[], serverArr: unknown[]): unknown[] {
-  const base = Array.isArray(baseArr) ? baseArr : [];
-  const local = Array.isArray(localArr) ? localArr : [];
-  const server = Array.isArray(serverArr) ? serverArr : [];
-  const baseIds = new Set<string>();
-  for (const it of base) { const id = idOf(it); if (id) baseIds.add(id); }
-  const serverById = new Map<string, unknown>();
-  for (const it of server) { const id = idOf(it); if (id) serverById.set(id, it); }
-  const localIds = new Set<string>();
-  const out: unknown[] = [];
-  for (const it of local) {
-    const id = idOf(it);
-    if (id === null) { out.push(it); continue; }   // entità locale senza id: la tengo
-    localIds.add(id);
-    const s = serverById.get(id);
-    // presente in entrambi: vince il timbro più recente (a parità, il locale).
-    out.push(s && tsOf(s) > tsOf(it) ? s : it);
-  }
-  for (const it of server) {
-    const id = idOf(it);
-    if (id === null) continue;            // entità server senza id: la ignoro (evito duplicati)
-    if (localIds.has(id)) continue;       // già gestita sopra (LWW)
-    if (baseIds.has(id)) continue;        // c'era prima e ora non è in locale => cancellata qui
-    out.push(it);                          // nuova sul server => la aggiungo
-  }
-  return out;
-}
-
-// Firma STABILE per decidere se RICARICARE la pagina: basata sugli INSIEMI di id delle
-// entità (ordine-indipendente) + poche chiavi chiave. Evita il loop di reload quando la
-// fusione produce lo stesso contenuto ma con liste in ordine diverso.
-// Firma delle sole chiavi che l'app legge all'apertura e non aggiorna da sola (utenti e permessi, piano, moduli):
-// solo se cambiano (da un altro dispositivo) serve ricaricare la pagina. Tutto il resto (prenotazioni, ospiti, camere…) si aggiorna sul posto.
-function settingsSig(obj: Record<string, string> | null | undefined): string {
-  if (!obj) return "";
-  let sig = "";
-  for (const k of ["spigolestay:users", "spigolestay:plan", "spigolestay:modules"]) {
-    const raw = obj[k];
-    // lastLogin/sessions degli utenti cambiano a ogni accesso e sono solo informativi: non devono far ricaricare gli altri dispositivi.
-    if (raw) { try { const v = JSON.parse(raw); sig += `${k}=${stableStringify(k === "spigolestay:users" ? stripVolatileUsers(v) : v)}`; } catch { sig += `${k}=${raw}`; } }
-  }
-  return sig;
-}
-
-function reloadSig(obj: Record<string, string> | null | undefined): string {
-  if (!obj) return "";
-  let sig = "";
-  try {
-    const d = JSON.parse(obj["spigolestay:data:v1"] || "{}") as Record<string, unknown>;
-    for (const k of ENTITY_COLLECTIONS) {
-      const ids = (Array.isArray(d[k]) ? d[k] : []).map(idOf).filter(Boolean).sort();
-      sig += `${k}:${ids.join(",")};`;
-    }
-    const del = (d._deleted ?? {}) as Record<string, unknown>;
-    for (const k of ENTITY_COLLECTIONS) { const t = (arr(del[k]) as string[]).slice().sort(); if (t.length) sig += `x${k}:${t.join(",")};`; }
-  } catch { /* blob non valido */ }
-  for (const k of ["spigolestay:users", "spigolestay:plan", "spigolestay:modules"]) {
-    const raw = obj[k]; if (raw) { try { const v = JSON.parse(raw); sig += `${k}=${stableStringify(k === "spigolestay:users" ? stripVolatileUsers(v) : v)}`; } catch { sig += `${k}=${raw}`; } }
-  }
-  return sig;
-}
-
-// Fonde lo stato locale con quello del server usando la base (ultimo stato sincronizzato).
-// - chiavi solo sul server -> mantenute; chiavi in comune -> vince il locale;
-// - strutture/camere/prenotazioni/ospiti -> fusione a 3 vie (aggiunte tenute, cancellazioni rispettate).
-const isObjectLike = (x: unknown): boolean => !!x && typeof x === "object" && !Array.isArray(x);
-function mergeSnapshots(
-  local: Record<string, string>,
-  server: Record<string, string> | null | undefined,
-  base: Record<string, string> | null | undefined,
-): Record<string, string> {
-  const merged: Record<string, string> = { ...(server ?? {}), ...local };
-  try {
-    const lRaw = local["spigolestay:data:v1"];
-    const sRaw = server?.["spigolestay:data:v1"];
-    if (lRaw && sRaw) {
-      const l = JSON.parse(lRaw) as Record<string, unknown>;
-      const s = JSON.parse(sRaw) as Record<string, unknown>;
-      let b: Record<string, unknown> = {};
-      try { const bRaw = base?.["spigolestay:data:v1"]; if (bRaw) b = JSON.parse(bRaw) as Record<string, unknown>; } catch {}
-      const out: Record<string, unknown> = { ...s, ...l }; // vince il locale sui campi in comune
-      // Prezzi forzati per giorno (rateOverrides): fusione per CHIAVE a 3 vie, non "vince il locale in blocco". Un dispositivo con la mappa vuota o vecchia
-      // (es. socio appena invitato, EMPTY_ORG_DATA) non cancella i prezzi già sul server; una chiave cambiata o tolta qui vince il locale.
-      if (isObjectLike(l.rateOverrides) || isObjectLike(s.rateOverrides)) out.rateOverrides = mergeRecord3(b.rateOverrides, l.rateOverrides, s.rateOverrides);
-      // Lapidi (tombstone): una cancellazione non deve "risorgere".
-      //  - Lapidi dal SERVER = AUTORITATIVE: se un'altra sessione/socio ha cancellato un'entità
-      //    condivisa, va rimossa anche qui ANCHE se è ancora nel mio locale non sincronizzato
-      //    (è la causa per cui prima le camere/tipologie eliminate ricomparivano).
-      //  - Lapidi locali/base = "revivibili": se l'entità è di nuovo nel locale (ripristino da
-      //    backup) tolgo la lapide locale, così torna viva.
-      const delB = (b._deleted ?? {}) as Record<string, unknown>;
-      const delL = (l._deleted ?? {}) as Record<string, unknown>;
-      const delS = (s._deleted ?? {}) as Record<string, unknown>;
-      const outDeleted: Record<string, string[]> = {};
-      for (const key of ENTITY_COLLECTIONS) {
-        const mergedColl = merge3(b[key] as unknown[], l[key] as unknown[], s[key] as unknown[]);
-        const authoritative = new Set<string>(arr(delS[key]) as string[]);       // server: sempre valide
-        const revivable = new Set<string>([...(arr(delB[key]) as string[]), ...(arr(delL[key]) as string[])]);
-        for (const it of arr(l[key])) { const id = idOf(it); if (id) revivable.delete(id); } // ripristino da backup
-        const tomb = new Set<string>([...authoritative, ...revivable]);
-        out[key] = mergedColl.filter((it) => { const id = idOf(it); return !(id && tomb.has(id)); });
-        // Le lapidi crescono per sempre e pesano nel localStorage (quota ~5 MB): si tengono solo le ultime MAX_TOMBS.
-        if (tomb.size) outDeleted[key] = tomb.size > MAX_TOMBS ? [...tomb].slice(-MAX_TOMBS) : [...tomb];
-      }
-      out._deleted = outDeleted;
-
-      // Anti-resurrezione degli ISCRITTI NEWSLETTER (lead): il sito pubblico (/api/public-lead) può
-      // re-inserire un contatto cancellato con un NUOVO id, che il tombstone per-id non intercetta.
-      // Teniamo perciò un elenco di CONTATTI cancellati (email/telefono normalizzati): un lead sul
-      // server che corrisponde a un contatto cancellato e NON ha prenotazioni viene rimosso, così
-      // non "riappare dopo la sync". Gli ospiti veri (con prenotazioni) non vengono mai toccati.
-      const leadsB = arr((b as { _deletedLeads?: unknown })._deletedLeads) as unknown[];
-      const leadsL = arr((l as { _deletedLeads?: unknown })._deletedLeads) as unknown[];
-      const leadsS = arr((s as { _deletedLeads?: unknown })._deletedLeads) as unknown[];
-      const deletedLeads = new Set<string>([...leadsB, ...leadsL, ...leadsS].filter((x): x is string => typeof x === "string"));
-      if (deletedLeads.size) {
-        const bookedGuestIds = new Set<string>();
-        for (const bk of arr(out.bookings) as { guestId?: unknown }[]) { const gid = bk?.guestId; if (typeof gid === "string" && gid) bookedGuestIds.add(gid); }
-        out.guests = (arr(out.guests) as unknown[]).filter((g) => {
-          if (!isNewsletterLead(g)) return true;                        // non è un lead: mai rimosso
-          const id = idOf(g); if (id && bookedGuestIds.has(id)) return true; // ha prenotazioni: è un ospite vero
-          return !leadContactKeys(g).some((k) => deletedLeads.has(k));  // lead con contatto cancellato → via
-        });
-      }
-      out._deletedLeads = [...deletedLeads];
-
-      // Registro attività: unione per id (vedi mergeActivities), MAI "vince il locale" come il resto
-      // dei campi non-ENTITY_COLLECTIONS di questo blob — l'import Channex lo scrive anche dal server.
-      out.activities = mergeActivities(l.activities, s.activities);
-
-      merged["spigolestay:data:v1"] = JSON.stringify(out);
-    }
-  } catch { /* JSON non valido: resta il merge a livello di chiavi */ }
-
-  // Fusione per-elemento delle collezioni PIATTE delle Pulizie (scorte/ordini/segnalazioni):
-  // LWW per id, così una copia stantìa non riporta indietro i cambi fatti altrove. Il merge a
-  // livello di chiavi qui sopra le trattava come "vince il locale" in blocco (causa del reset).
-  for (const key of FLAT_ENTITY_KEYS) {
-    const lRaw = local[key];
-    const sRaw = server?.[key];
-    if (lRaw === undefined && sRaw === undefined) continue;
-    const m = mergeFlatEntityArray(lRaw, sRaw);
-    if (m !== null) merged[key] = m;
-  }
-
-  const lThreads = local[THREADS_KEY];
-  const sThreads = server?.[THREADS_KEY];
-  if (lThreads !== undefined || sThreads !== undefined) {
-    const m = mergeThreads(lThreads, sThreads);
-    if (m !== null) merged[THREADS_KEY] = m;
-  }
-
-  // Preventivi: vedi mergePreventivi3 — stato "confermato" scritto dal server + preventivi creati altrove (non nella base).
-  const lPrev = local[PREVENTIVI_KEY];
-  const sPrev = server?.[PREVENTIVI_KEY];
-  if (lPrev !== undefined || sPrev !== undefined) {
-    const m = mergePreventivi3(base?.[PREVENTIVI_KEY], lPrev, sPrev);
-    if (m !== null) merged[PREVENTIVI_KEY] = m;
-  }
-
-  // Registro invii («Invii programmati»): lo scrive anche il cron dal server; unione per `key`, così la voce del cron non sparisce se qui ne è stata aggiunta un'altra.
-  if (local[SENT_LOG_KEY] !== undefined || server?.[SENT_LOG_KEY] !== undefined) {
-    const m = mergeSentLog(base?.[SENT_LOG_KEY], local[SENT_LOG_KEY], server?.[SENT_LOG_KEY]);
-    if (m !== null) merged[SENT_LOG_KEY] = m;
-  }
-
-  // Foto del sito (e immagini ausiliarie): dopo la migrazione su Storage il server ha i riferimenti, mentre un browser con una copia VECCHIA
-  // ha ancora le data URI e, con "vince il locale", le riscriverebbe sul server. Se il locale è identico al server tranne che nelle foto,
-  // si adotta la versione del server (nessuna modifica dell'utente viene scartata: vedi adoptMigratedMedia in media-migrate-plan.ts).
-  for (const key of Object.keys(local)) {
-    if (!isMediaFlatKey(key)) continue;
-    const adopted = adoptMigratedMedia(local[key], server?.[key]);
-    if (adopted !== null) merged[key] = adopted;
-  }
-  // Categorie e conti della Cassa sono liste salvate per intero: si fondono voce per voce (chi crea una voce su un dispositivo non la perde se un altro ha la lista vecchia).
-  for (const key of ["spigolestay:cassa:cats", "spigolestay:cassa:conti"]) {
-    if (local[key] === undefined || server?.[key] === undefined) continue;
-    const m = mergeKeyedList(local[key], server[key], base?.[key]);
-    if (m !== null) merged[key] = m;
-  }
-  // Mappe dei segni di Pulizie (fatto/biancheria/note): fusione per chiave a 3 vie, così i segni fatti da due dispositivi non si cancellano a vicenda.
-  for (const key of PULIZIE_MAP_KEYS) {
-    const m = mergeRecordJson(base?.[key], local[key], server?.[key]);
-    if (m !== null) merged[key] = m;
-  }
-  // Tutte le altre chiavi piatte (impostazioni, utenti e permessi, piano, modelli messaggi…): regola a 3 vie. Se questo dispositivo non le ha toccate
-  // (uguali alla base) e il server le ha cambiate, si adotta il server; prima il locale vinceva sempre e un dispositivo con dati vecchi li rimetteva sul server.
-  // Escluse le chiavi che hanno già una regola propria qui sopra e quelle per-dispositivo. Le chiavi del sito/foto NON sono escluse: adoptMigratedMedia sopra
-  // copre la migrazione delle foto, ma i testi cambiati altrove vanno adottati anche qui (locale uguale alla base).
-  return adoptServerFlatKeys(merged, local, server, base, (k) =>
-    k === "spigolestay:data:v1" || FLAT_ENTITY_KEYS.includes(k) || k === THREADS_KEY || k === PREVENTIVI_KEY || k === SENT_LOG_KEY || PULIZIE_MAP_KEYS.includes(k)
-    || k === "spigolestay:cassa:cats" || k === "spigolestay:cassa:conti" || SIG_SKIP.has(k) || k === LOCAL_OWNER_KEY);
-}
-
 type SbClient = NonNullable<typeof supabase>;
 type ServerRow = { data: Record<string, string> | null; rev: number | null };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MODALITÀ VELOCE (Fase 2), per dispositivo: il browser scarica solo una FINESTRA di prenotazioni/ospiti (/api/sync/window) e rimanda al server solo le
+// MODIFICHE (/api/sync/delta), che il server applica all'archivio completo. Il server resta completo, quindi si può tornare alla modalità normale in ogni momento.
+// Nella modalità normale non cambia nulla. Acceso da Impostazioni → «Modalità veloce» (chiave locale), mai in automatico.
+// ─────────────────────────────────────────────────────────────────────────────
+export const DELTA_FLAG_KEY = "xn-delta-sync";        // "1" = modalità veloce voluta su questo dispositivo (non si sincronizza)
+const DELTA_ACTIVE_KEY = "xn-delta-active";           // uid per cui la copia locale è già passata a finestra
+const DELTA_PAST_KEY = "xn-delta-past";               // sessione: "all" = carica tutto lo storico (finestra illimitata)
+let DELTA_MODE = false;
+export { deltaAllowedFor };
+export const deltaWanted = (uid: string): boolean => { if (!deltaAllowedFor(uid)) return false; try { return localStorage.getItem(DELTA_FLAG_KEY) === "1"; } catch { return false; } };
+export const deltaIsActive = (): boolean => DELTA_MODE;
+function deltaPast(): string { try { return sessionStorage.getItem(DELTA_PAST_KEY) === "all" ? "all" : ""; } catch { return ""; } }
+
+async function readViaWindow(table: string, idVal: string): Promise<ServerRow> {
+  const res = await fetch(`/api/sync/window?table=${encodeURIComponent(table)}&id=${encodeURIComponent(idVal)}${deltaPast() ? "&past=all" : ""}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("window_" + res.status); // un errore NON è «nessun dato»
+  const j = await res.json() as { ok?: boolean; data?: Record<string, string> | null; rev?: number | null };
+  if (!j || j.ok !== true) throw new Error("window_bad");
+  return { data: j.data ?? null, rev: typeof j.rev === "number" ? j.rev : null };
+}
+
+let deltaBlocked = 0;
+// Invia le modifiche. Ritorna il nuovo rev, oppure null (conflitto o rifiuto: si riprova al ciclo dopo).
+async function postDelta(table: string, idVal: string, expectedRev: number, delta: ReturnType<typeof buildDelta>): Promise<number | null> {
+  const res = await fetch("/api/sync/delta", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ table, id: idVal, expectedRev, delta }) });
+  if (res.status === 409) return null;                      // rev cambiata altrove: si rilegge e si riprova
+  const j = await res.json().catch(() => null) as { ok?: boolean; rev?: number; error?: string; message?: string } | null;
+  if (!res.ok || !j?.ok) {
+    if (j?.error === "mass_delete") { deltaBlocked++; try { window.dispatchEvent(new CustomEvent("xenora:delta-blocked", { detail: j.message ?? "" })); } catch { /* niente */ } }
+    return null;
+  }
+  deltaBlocked = 0;
+  return typeof j.rev === "number" ? j.rev : expectedRev + 1;
+}
+
 async function readServer(client: SbClient, userId: string): Promise<ServerRow> {
+  if (DELTA_MODE) return readViaWindow("app_state", userId);
   const { data, error } = await client.from("app_state").select("data, rev").eq("user_id", userId).maybeSingle();
   if (error) throw error; // un errore NON è "nessun dato": altrimenti un account esistente sembrerebbe nuovo
   const row = data as { data?: Record<string, string> | null; rev?: number | null } | null;
@@ -596,6 +242,7 @@ function splitByOrg(d: DataObj): { personal: DataObj; orgs: Map<string, DataObj>
 
 // Legge una riga di stato da una tabella qualsiasi (app_state per user, org_state per org).
 async function readRow(client: SbClient, table: string, idCol: string, idVal: string): Promise<ServerRow> {
+  if (DELTA_MODE) return readViaWindow(table, idVal);
   const { data, error } = await client.from(table).select("data, rev").eq(idCol, idVal).maybeSingle();
   if (error) throw error;
   const row = data as { data?: Record<string, string> | null; rev?: number | null } | null;
@@ -621,6 +268,18 @@ type SyncRef = { rev: number; last: Record<string, string> };
 async function saveOne(client: SbClient, table: string, idCol: string, idVal: string, snap: Record<string, string>, ref: SyncRef): Promise<{ merged: Record<string, string>; wrote: boolean }> {
   const { data: serverData, rev: serverRev } = await readRow(client, table, idCol, idVal);
   const merged = mergeSnapshots(snap, serverData, ref.last);
+  if (DELTA_MODE) {
+    // Modalità veloce: solo le modifiche, mai il blocco intero (una finestra riscritta come se fosse tutto cancellerebbe l'archivio).
+    const delta = buildDelta(serverData, ref.last, merged);
+    if (!isEmptyDelta(delta) && serverRev !== null) {
+      const nr = await postDelta(table, idVal, serverRev, delta);
+      if (nr === null) return { merged, wrote: false }; // conflitto o rifiuto: ritenta al ciclo dopo
+      ref.rev = nr; ref.last = merged; return { merged, wrote: true };
+    }
+    if (serverRev !== null) ref.rev = serverRev;
+    ref.last = merged;
+    return { merged, wrote: false };
+  }
   const changedServer = contentSig(merged) !== contentSig(serverData ?? {});
   if (changedServer) {
     const nr = await writeRowWithLock(client, table, idCol, idVal, merged, serverRev);
@@ -705,6 +364,40 @@ async function syncOnce(
   const changedLocal = contentSig(newBlob) !== contentSig(snap);
   return { changedLocal, newBlob, wrote: pRes.wrote };
 }
+
+// Prepara (o disattiva) la modalità veloce per questo dispositivo. Ritorna true se DELTA_MODE è attivo dopo la chiamata.
+async function prepareDeltaMode(
+uid: string,
+revRef: { current: number },
+lastSynced: { current: Record<string, string> },
+orgRefs: { current: Record<string, SyncRef> },
+): Promise<boolean> {
+  DELTA_MODE = false;
+  let active = "";
+  try { active = localStorage.getItem(DELTA_ACTIVE_KEY) || ""; } catch { /* storage non disponibile */ }
+  if (!deltaWanted(uid)) { // spenta: la copia locale a finestra si fonde con l'archivio completo del server alla prossima idratazione (base vuota = unione)
+    if (active) { try { localStorage.removeItem(DELTA_ACTIVE_KEY); } catch { /* niente */ } }
+    return false;
+  }
+  if (active === uid) { DELTA_MODE = true; return true; }
+  try {
+    // 1) salva col sistema normale tutto ciò che il locale ha di nuovo (se ha dati di questo account)
+    let hasLocal = false;
+    try { hasLocal = !!kvGet("spigolestay:data:v1") && !localBelongsToOther(uid); } catch { /* niente */ }
+    if (hasLocal) {
+      const r = await syncOnce(supabase!, uid, revRef, lastSynced, orgRefs);
+      if (r.changedLocal && r.newBlob && !restore(r.newBlob)) return false; // niente spazio: non si cambia nulla
+    }
+    // 2) la copia locale dei dati grandi si scarta: si riparte dalla finestra
+    kvRemove("spigolestay:data:v1");
+    lastSynced.current = {}; orgRefs.current = {}; revRef.current = -1;
+    try { sessionStorage.removeItem("spigolestay:hydrated-for"); } catch { /* niente */ }
+    try { localStorage.setItem(DELTA_ACTIVE_KEY, uid); } catch { /* niente */ }
+    DELTA_MODE = true;
+    return true;
+  } catch { DELTA_MODE = false; return false; } // salvataggio non riuscito: modalità normale, nessun dato toccato
+}
+
 
 // Firma LEGGERA dello stato locale: contatore delle scritture sul blocco grande + checksum delle chiavi piccole (nessun parse JSON).
 function cheapLocalSig(): string {
@@ -1020,7 +713,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // syncOnce esce subito (locale vuoto) e la pagina resta VUOTA.
         let localHasData = false;
         try { localHasData = !!(kvGet("spigolestay:data:v1")); } catch {}
-        if (sessionStorage.getItem(flagKey) === uid && localHasData) {
+        // Modalità veloce: se lo stato voluto (acceso/spento) coincide con quello di questa copia locale si prosegue com'è (e si ricorda per le letture/scritture);
+        // se sta cambiando, niente scorciatoia: si passa dal percorso completo, che prepara (o scioglie) la finestra.
+        const wantDelta = deltaWanted(uid);
+        let activeUid = ""; try { activeUid = localStorage.getItem(DELTA_ACTIVE_KEY) || ""; } catch { /* niente */ }
+        const switching = wantDelta !== (activeUid === uid);
+        if (!switching) DELTA_MODE = wantDelta;
+        if (!switching && sessionStorage.getItem(flagKey) === uid && localHasData) {
           try {
             const res = await syncOnce(supabase!, uid, revRef, lastSynced, orgRefs);
             if (res.changedLocal && res.newBlob) restore(res.newBlob); // l'app non è ancora montata: parte già con i dati aggiornati
@@ -1035,6 +734,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // condiviso): lo svuotiamo PRIMA di leggere/confrontare, così non può in nessun caso
         // essere scambiato per dati "non ancora sincronizzati" di questo utente.
         if (localBelongsToOther(uid)) wipeLocalAccount();
+        // Modalità veloce: prima volta su questo dispositivo → si salva TUTTO ciò che c'è in locale con la modalità normale, poi la copia locale dei dati
+        // si scarta e si riparte dalla finestra. Se il salvataggio non riesce non si cambia nulla (resta la modalità normale).
+        await prepareDeltaMode(uid, revRef, lastSynced, orgRefs); // se non riesce DELTA_MODE resta falso: modalità normale
         const { data: serverData, rev: serverRev } = await readServer(supabase!, uid);
         if (cancelled) return;
         const serverReal = hasRealData(serverData);
@@ -1052,7 +754,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastSynced.current = merged;
           revRef.current = serverRev ?? 0;
           // Se la fusione ha aggiunto qualcosa al server, riallineo il server.
-          if (contentSig(merged) !== contentSig(serverData ?? {})) {
+          if (DELTA_MODE) {
+            const delta = buildDelta(serverData, {}, merged);
+            if (!isEmptyDelta(delta) && serverRev !== null) { const nr = await postDelta("app_state", uid, serverRev, delta); if (nr !== null) revRef.current = nr; }
+          } else if (contentSig(merged) !== contentSig(serverData ?? {})) {
             const nr = await writeWithLock(supabase!, uid, merged, serverRev);
             if (nr !== null) revRef.current = nr;
           }
@@ -1121,6 +826,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         startPush(uid);
         return;
       } catch {
+        // Modalità veloce: se la lettura a finestra non riesce si spegne l'interruttore, così il «Riprova» riparte dalla modalità normale (mai bloccati fuori dai propri dati).
+        if (DELTA_MODE) { try { localStorage.removeItem(DELTA_FLAG_KEY); } catch { /* niente */ } }
         // Errore di rete/server: se il browser ha già i dati si lavora in locale (il sync riprende da solo);
         // se è vuoto NON si entra (sembrerebbe un account nuovo e partirebbe l'onboarding): schermata con "Riprova".
         let localHas = false;
@@ -1191,6 +898,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           Spazio del browser esaurito: le ultime modifiche potrebbero non essere salvate su questo dispositivo. Svuota i dati del sito xenora.it dalle impostazioni del browser e riaccedi (i dati restano sul server), oppure scrivici.{(() => { const d = lastIdbError(); return d ? ` [${d}]` : ""; })()}
         </div>
       )}
+      <DeltaBar />
       {children}
     </Ctx.Provider>
   );
