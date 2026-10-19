@@ -193,12 +193,10 @@ export function ensureMandatoryTemplates<T extends { srcId?: string }>(saved: T[
  * La prima struttura mantiene l'id originale, le altre ricevono "<id>@<struttura>". Non fa nulla se i modelli sono già tutti di una sola struttura.
  */
 export function splitTemplatesPerStructure<T extends { id: string; structureIds?: string[] }>(saved: T[], structureIds: string[]): T[] {
-  const known = new Set(structureIds);
   const out: T[] = [];
   for (const tp of saved) {
-    const own = (tp.structureIds ?? []).filter((id) => known.has(id));
-    if ((tp.structureIds?.length ?? 0) === 1 && own.length === 1) { out.push(tp); continue; }
-    const targets = tp.structureIds?.length ? own : structureIds; // senza struttura = tutte; con strutture non più esistenti si scartano
+    if ((tp.structureIds?.length ?? 0) === 1) { out.push(tp); continue; } // già di una sola struttura (anche se non è tra quelle visibili ora): mai toccato né scartato
+    const targets = tp.structureIds?.length ? tp.structureIds : structureIds; // senza struttura = tutte quelle passate
     targets.forEach((sid, i) => out.push({ ...tp, id: i === 0 ? tp.id : `${tp.id}@${sid.slice(0, 8)}`, structureIds: [sid] }));
   }
   return out;

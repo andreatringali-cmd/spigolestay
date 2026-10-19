@@ -283,7 +283,7 @@ export default function StepActions(p: StepActionsProps) {
     const build = async () => ({ text: (await fromModel("checkout")) ?? `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">Manda all&apos;ospite il promemoria della partenza: data e orario del check-out, come contattarti per qualsiasi necessità e un ringraziamento.</p>
-      {sendButtons(build, "checkout", "Invia il promemoria", (via) => { const tpl = linkedTemplate("checkout", b.structureId); if (tpl && Object.values(tpl.texts).some((x) => /link_(recensioni|google|tripadvisor)/i.test(x)) && !b.reviewRequestedAt) updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }); }, <button className={btnGhost} onClick={() => { p.onClose(); router.push("/pulizie"); }}>Apri Pulizie</button>)}
+      {sendButtons(build, "checkout", "Invia il promemoria", (via) => { const tpl = linkedTemplate("checkout", b.structureId); if (tpl && Object.values(tpl.texts).some((x) => /link_(recensioni|google|tripadvisor)/i.test(x)) && !!reviewLinksBlockFromStorage(b.structureId, structure?.googlePlaceId) && !b.reviewRequestedAt) updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }); }, <button className={btnGhost} onClick={() => { p.onClose(); router.push("/pulizie"); }}>Apri Pulizie</button>)}
     </>);
   } else if (step.key === "review") {
     // Stessi link del messaggio automatico (link scelto in Modelli & automazioni, Place ID o guida; Tripadvisor se impostato) e testo nella lingua dell'ospite.
@@ -294,7 +294,7 @@ export default function StepActions(p: StepActionsProps) {
       {sendButtons(build, "review", "Richiedi la recensione", (via) => updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }))}
     </>) : (<>
       <p className="text-sm text-dim">Per chiedere la recensione serve almeno un link (Google o Tripadvisor): non sono impostati né il Google Place ID della struttura né i link in Modelli &amp; automazioni.</p>
-      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => router.push("/strutture")}>Imposta il Google Place ID</button><button className={btnGhost} onClick={() => router.push("/messaggi")}>Imposta i link nei Modelli</button></div>
+      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => router.push("/strutture")}>Imposta il Google Place ID</button><button className={btnGhost} onClick={() => router.push("/messaggi?tab=modelli")}>Imposta i link nei Modelli</button></div>
     </>);
   } else {
     body = (<>

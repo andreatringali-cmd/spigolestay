@@ -1,9 +1,8 @@
 "use client";
 
-// Messaggi 2: conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia), semplici e pulite come nell'app Messaggi di Channex.
+// Messaggi OTA: conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia), semplici e pulite come nell'app Messaggi di Channex.
 // Riceve e invia SOLO messaggi OTA, direttamente su Channex (nessuna copia salvata da noi). Il segno "letto" resta su questo dispositivo (preferenza di vista).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PageHeader } from "@/components/ui";
 import ChannelLogo from "@/components/ChannelLogo";
 import OtaThreadChat from "@/components/booking-panel/OtaThreadChat";
 import { useData } from "@/lib/store";
@@ -18,7 +17,7 @@ const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm t
 const readSeen = (): Record<string, number> | null => { try { const v = JSON.parse(localStorage.getItem(SEEN_KEY) || "null"); return v && typeof v === "object" ? v : null; } catch { return null; } };
 const writeSeen = (m: Record<string, number>) => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(m)); } catch { /* storage non disponibile */ } };
 
-export default function Messaggi2Page() {
+export default function OtaMessagesPanel() {
   const { bookings, guests, getStructure, openBooking, selectedStructureIds } = useData();
   const [threads, setThreads] = useState<OtaThread[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -96,8 +95,7 @@ export default function Messaggi2Page() {
 
   return (
     <div>
-      <PageHeader title="Messaggi 2" subtitle="Le conversazioni con gli ospiti di Booking.com, Airbnb ed Expedia: ricevi e rispondi direttamente sui portali" />
-      <div className="grid h-[calc(100dvh-10.5rem)] min-h-[460px] overflow-hidden rounded-xl border border-line bg-surface shadow-sm md:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid h-[calc(100dvh-15rem)] min-h-[460px] overflow-hidden rounded-xl border border-line bg-surface shadow-sm md:grid-cols-[340px_minmax(0,1fr)]">
         {/* ── Elenco ── */}
         <div className={`${selId ? "max-md:hidden" : ""} flex min-h-0 flex-col border-r border-line`}>
           <div className="flex items-center gap-4 border-b border-line px-4">

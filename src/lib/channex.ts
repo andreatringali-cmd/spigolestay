@@ -362,7 +362,7 @@ export async function sendBookingAttachment(channexBookingId: string, file: { ba
   });
 }
 
-// ── Messaggi a THREAD (Messages API: /message_threads) — pagina Messaggi 2 ──
+// ── Messaggi a THREAD (Messages API: /message_threads) — pagina Messaggi ──
 // Una conversazione per prenotazione/richiesta, con elenco, chiusura e "non è richiesta una risposta" (solo Booking.com). Stessa app "Messages" installata per property.
 // L'account Channex è condiviso tra tutti i clienti: la route che le usa controlla SEMPRE che la property del thread sia dell'utente (vedi channex-threads.ts / allowedChannexProperties).
 export async function listMessageThreadsFor(propertyId: string, page = 1, limit = 100) {

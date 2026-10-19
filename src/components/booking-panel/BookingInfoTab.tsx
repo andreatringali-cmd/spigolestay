@@ -31,6 +31,8 @@ const STATUS: Record<BookingStatus, { label: string; color: string }> = {
 
 type RevisionGuarantee = NonNullable<RevisionView["guarantee"]>;
 const CARD_TYPES: Record<string, string> = { VI: "Visa", MC: "MasterCard", CA: "MasterCard", AX: "American Express", DC: "Diners Club", DS: "Discover", JC: "JCB", UP: "UnionPay" };
+// Dati letti da Channex per la scheda, ricordati 5 minuti per prenotazione: riaprire la scheda non rifà le chiamate (la quota Channex è condivisa).
+const FX_CACHE = new Map<string, { t: number; v: unknown }>();
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const money = (n: number, cur?: string) => eur(n, !cur || cur.toUpperCase() === "EUR" ? "€" : cur.toUpperCase());
 
@@ -93,7 +95,10 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   const gar = fx?.guarantee;
   useEffect(() => {
     if (!chxId) return;
+    const hit = FX_CACHE.get(booking.id);
+    if (hit && Date.now() - hit.t < 5 * 60_000) { setFetched(hit.v as typeof fetched); return; }
     let alive = true;
+    const keep = (v: NonNullable<typeof fetched>) => { FX_CACHE.set(booking.id, { t: Date.now(), v }); setFetched(v); };
     apiPost<{ ok?: boolean; revisions?: { kind?: string; at?: string | null; revisionId?: string; ruid?: string; policiesText?: string; deposits?: string; guarantee?: RevisionGuarantee; rooms?: { promotion?: string; guests?: string[]; charges?: { label: string; inclusive?: boolean }[] }[]; customer?: RevisionCustomer }[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId, latest: true })
       .then((r) => {
         if (!alive) return;
@@ -108,10 +113,10 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
             rooms: (x.rooms ?? []).map((rm, ri) => ({ promotion: rm.promotion ?? from?.find((y) => y.rooms?.[ri]?.promotion)?.rooms?.[ri]?.promotion, guests: rm.guests ?? from?.find((y) => y.rooms?.[ri]?.guests?.length)?.rooms?.[ri]?.guests ?? [], includes: (rm.charges ?? []).filter((c) => c.inclusive === true).map((c) => c.label) })),
           };
         };
-        setFetched(toFx(rev0));
+        keep(toFx(rev0));
         if (!rev0.guarantee || !rev0.policiesText || !rev0.ruid) {
           apiPost<{ revisions?: RevRow[] }>("channex/revisions", { bookingId: booking.id, channexBookingId: chxId })
-            .then((all) => { if (alive && all.revisions?.length) setFetched(toFx(all.revisions[0], all.revisions)); })
+            .then((all) => { if (alive && all.revisions?.length) keep(toFx(all.revisions[0], all.revisions)); })
             .catch(() => { /* resta quanto già letto */ });
         }
         // salva lo stato dell'ultima revisione (senza avvisi né registro attività)
@@ -121,8 +126,8 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
         const c = rev0.customer;
         if (!c || !needCustomer || !guest) return;
         const patch: Partial<Guest> = {};
-        if (c.city) patch.city = c.city;
-        if (c.zip) patch.zip = c.zip;
+        if (c.city && !guest.city) patch.city = c.city; // solo campi VUOTI: quello che hai scritto a mano non si sovrascrive
+        if (c.zip && !guest.zip) patch.zip = c.zip;
         if (c.language && !guest.language) patch.language = c.language;
         if (c.phone && !guest.phone) patch.phone = c.phone;
         if (c.country && !guest.country) patch.country = c.country;

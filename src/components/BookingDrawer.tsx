@@ -417,7 +417,10 @@ export default function BookingDrawer() {
   const pmDetail = pmView.method === "ota" ? otaPayDetail(booking, payRule) : undefined;
   // «Da incassare» per la struttura: sulle OTA è il NETTO (quello che ti arriva), non il totale che paga l'ospite. Fa eccezione l'OTA che dichiara/imposta «incassa la struttura»: lì l'ospite ti consegna il totale.
   const ownCollectV = booking.otaInfo?.paymentCollect === "property" || payRule?.collect === "property";
-  const dueV = (booking.channel !== "direct" && booking.channel !== "blocked") && !ownCollectV && !noPrice ? Math.max(0, roundCents(nettoStayV + extrasV - paidV - otaPaidV)) : balanceV;
+  // OTA che incassa (soggiorno già pagato al portale): restano gli extra → balanceV. OTA senza dato su chi incassa: l'incasso atteso è il netto + gli extra.
+  const dueV = (booking.channel !== "direct" && booking.channel !== "blocked") && !ownCollectV && !noPrice
+    ? (otaPaidV > 0 ? balanceV : Math.max(0, roundCents(nettoStayV + extrasV - paidV)))
+    : balanceV;
   const isOtaChannelV = booking.channel !== "direct" && booking.channel !== "blocked";
   const payMethodRow = (
     <div className="flex items-center justify-between gap-3">

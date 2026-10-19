@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-// Messaggi 2: conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia) lette e scritte direttamente su Channex.
+// Messaggi OTA: conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia) lette e scritte direttamente su Channex.
 // Azioni (POST JSON): list · for_booking · messages · send · send_attachment · close · no_reply.
 // L'account Channex è UNICO per tutti i clienti: ogni azione verifica che la property del thread sia tra quelle dell'utente (proprie o di una struttura condivisa).
 const MAX_PROPERTIES = 12;     // oltre: si prendono le prime (chiamate a Channex limitate a 20/min)

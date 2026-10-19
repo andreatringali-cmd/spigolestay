@@ -1,7 +1,7 @@
 "use client";
 
 // Conversazione con l'ospite di una OTA (Booking.com, Airbnb, Expedia) letta e scritta direttamente su Channex.
-// Usata dalla pagina "Messaggi 2" (a tutta pagina) e dalla scheda "Messaggi" della prenotazione (compatta).
+// Usata dalla pagina "Messaggi" (a tutta pagina) e dalla scheda "Messaggi" della prenotazione (compatta).
 // Contiene: bolle ospite/struttura/sistema, scrittura con Ctrl+Invio, allegati, "Non è richiesta una risposta", chiusura, aggiornamento ogni 60 secondi (solo a pagina visibile e con attività recente).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -24,7 +24,7 @@ export interface OtaThreadChatProps {
   guestName?: string;
   /** true = versione per la scheda prenotazione: area messaggi ad altezza fissa, intestazione sottile. */
   compact?: boolean;
-  /** Pulsante «‹» per tornare all'elenco (solo telefono, nella pagina Messaggi 2). */
+  /** Pulsante «‹» per tornare all'elenco (solo telefono, nella pagina Messaggi). */
   onBack?: () => void;
   /** Pulsanti in più nell'intestazione (es. «Apri prenotazione»). */
   actions?: ReactNode;

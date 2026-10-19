@@ -46,3 +46,11 @@ test("Accelerator Fee di Expedia dalle note di Channex", async () => {
   assert.equal(otaAcceleratorFee({ otaInfo: { notes: "Collect Amount: €10" } }), 0);
   assert.equal(otaAcceleratorFee({}), 0);
 });
+
+test("OTA che incassa: se `paid` arriva già al totale del soggiorno non si conta due volte; gli extra restano dovuti", () => {
+  const s = st({ airbnb: { collect: "ota" } });
+  const a = (o: Record<string, unknown> = {}) => bk({ channel: "airbnb", total: 300, extras: [{ name: "Culla", price: 40 }], ...o });
+  assert.equal(balanceDue(a({ paid: 300 }), s), 40);   // incasso dell'OTA già registrato: restano solo gli extra
+  assert.equal(balanceDue(a({ paid: 0 }), s), 40);     // non registrato: coperto dal portale, restano gli extra
+  assert.equal(balanceDue(a({ paid: 40 }), s), 0);     // extra pagati in contanti
+});

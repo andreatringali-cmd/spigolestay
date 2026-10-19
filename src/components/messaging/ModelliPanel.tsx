@@ -43,7 +43,8 @@ const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
 export default function ModelliPanel() {
   const ask = useConfirm();
   const { t } = useLang();
-  const { structures, activeStructureId } = useData();
+  const { structures, raw, activeStructureId } = useData();
+  const allStructures = raw.structures; // TUTTE le strutture (con una selezione multipla `structures` ne contiene solo alcune)
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [ready, setReady] = useState(false);
   const [search, setSearch] = useState("");
@@ -53,19 +54,19 @@ export default function ModelliPanel() {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
       const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
       // Il vecchio modello collegato alla recensione diventa un modello normale (eliminabile): check-out e recensione sono UN solo messaggio.
-      setTemplates(mergeSeedTemplates(base).map((tp) => (tp.srcId === "recensione" ? { ...tp, srcId: undefined } : tp)).map((tp) => (tp.trigger === "manual" && !tp.active ? tp : { ...tp, trigger: "manual" as Trigger, active: false }))); // messaggi automatici spenti: tutti i modelli sono manuali
+      setTemplates(mergeSeedTemplates(base).map((tp) => (tp.srcId === "recensione" ? { ...tp, srcId: undefined } : tp))); // i dati (anche trigger e orari) restano intatti: l'invio automatico è spento dall'interruttore del server
     } catch {}
     setReady(true);
   }, []);
   // Ogni struttura è a sé: i modelli per «tutte» si dividono in una copia per struttura e ogni struttura ha i suoi modelli obbligatori (una volta, appena le strutture sono note).
   useEffect(() => {
-    if (!ready || !structures.length) return;
-    const ids = structures.map((x) => x.id);
+    if (!ready || !allStructures.length) return;
+    const ids = allStructures.map((x) => x.id);
     setTemplates((prev) => {
       const next = ensureMandatoryPerStructure(splitTemplatesPerStructure(prev, ids), ids);
       return next.length === prev.length && next.every((x, i) => x === prev[i]) ? prev : next;
     });
-  }, [ready, structures]);
+  }, [ready, allStructures]);
   useEffect(() => { if (!ready) return; try { localStorage.setItem("spigolestay:msgtemplates", JSON.stringify(templates)); } catch {} }, [templates, ready]);
 
   const [showSettings, setShowSettings] = useState(false); // ingranaggio: impostazioni (link recensioni…)
@@ -78,7 +79,6 @@ export default function ModelliPanel() {
   const shown = [...templates]
     .sort((a, b) =>
       stepRank(a) - stepRank(b) ||
-      PHASE_ORDER[a.trigger] - PHASE_ORDER[b.trigger] ||
       (a.order ?? 9999) - (b.order ?? 9999) ||
       chronoKey(a) - chronoKey(b) ||
       (a.time ?? "").localeCompare(b.time ?? "") ||
@@ -91,7 +91,7 @@ export default function ModelliPanel() {
       (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
     );
   // Modelli raggruppati per fase del ciclo ospite (solo le fasi non vuote), nell'ordine cronologico.
-  const groups = PHASE_SEQUENCE.map((ph) => ({ ph, items: shown.filter((tp) => tp.trigger === ph) })).filter((g) => g.items.length > 0);
+  const groups: { ph: Trigger; items: MsgTemplate[] }[] = shown.length ? [{ ph: "manual", items: shown }] : []; // un solo elenco: i messaggi si mandano a mano
 
   return (
     <div>
@@ -125,7 +125,7 @@ export default function ModelliPanel() {
                   <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
                   <div className="mt-2 flex gap-2">
                     <button onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
-                    {!(tpl.srcId && templates.filter((x) => x.srcId === tpl.srcId).length <= 1) && <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+                    {!(tpl.srcId && templates.filter((x) => x.srcId === tpl.srcId && (x.structureIds?.[0] ?? "") === (tpl.structureIds?.[0] ?? "")).length <= 1) && <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
                   </div>
                 </Card>
               ))}

@@ -29,8 +29,11 @@ export function totalDue(b: TotalLike, structure: Structure | undefined): number
  * Non è un incasso della struttura (non entra in `paid`, quindi non tocca Cassa e report): serve solo a non far risultare "da incassare" ciò che l'ospite
  * ha già pagato. Restano dovuti la tassa di soggiorno, gli extra e la pulizia aggiunti dalla struttura.
  */
-export function otaCoveredAmount(b: CollectLike, structure: Structure | undefined): number {
-  return otaCollectsPayment(b, collectRuleOf(structure, b.channel)) ? Math.max(0, roundCents(b.total ?? 0)) : 0;
+export function otaCoveredAmount(b: CollectLike & PaidLike, structure: Structure | undefined): number {
+  if (!otaCollectsPayment(b, collectRuleOf(structure, b.channel))) return 0;
+  const total = Math.max(0, roundCents(b.total ?? 0));
+  // Se `paid` arriva già al totale del soggiorno (importazioni vecchie, o l'incasso dell'OTA registrato a mano) quel pagamento è GIÀ dentro `paid`: non si conta due volte.
+  return amountPaid(b) >= total ? 0 : total;
 }
 
 /** Saldo del solo soggiorno (senza tassa): quanto manca al netto di ciò che l'ospite ha già pagato all'OTA quando incassa lei. Per liste, avvisi e dashboard. */

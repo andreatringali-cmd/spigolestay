@@ -5,6 +5,7 @@ import { fmtDM } from "./dates";
 import { eur } from "./format";
 import type { Booking, Guest, Structure } from "./types";
 import { bookingPaidTotal, cityTaxOfBooking } from "./booking";
+import { stayDue } from "./incassi";
 import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
 
 export type StepState = "done" | "todo" | "late" | "na";
@@ -55,7 +56,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   // 2 · Pagamento
   const due = bookingPaidTotal(b);
   const paid = b.paid ?? 0;
-  const resid = Math.max(0, due - paid);
+  const resid = stayDue(b, c.structure); // al netto di ciò che l'ospite ha già pagato all'OTA quando incassa lei
   if (due <= 0) steps.push({ key: "pay", label: "Pagamento", state: "na", detail: "Nessun importo", href: "/pagamenti" });
   else steps.push({
     key: "pay", label: "Pagamento", href: "/pagamenti",

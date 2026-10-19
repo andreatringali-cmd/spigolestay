@@ -1,4 +1,4 @@
-// Messaggi 2: conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia) lette DIRETTAMENTE da Channex (Messages API a "thread").
+// Messaggi OTA: conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia) lette DIRETTAMENTE da Channex (Messages API a "thread").
 // Moduli puri (nessuna rete/DB): la route /api/channex/threads li usa per normalizzare le risposte e per i controlli di proprietà; la pagina li usa per mostrarle.
 import type { Channel } from "./types";
 

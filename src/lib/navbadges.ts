@@ -60,7 +60,6 @@ function unreadMessages(): number {
 export function useNavBadges(pathname: string): NavBadges {
   const { bookings, activeStructureId } = useData();
   const [tick, setTick] = useState(0);
-  const [msgs, setMsgs] = useState(0);
   const [issues, setIssues] = useState(0);
   const [remote, setRemote] = useState({ schedine: 0, istat: 0, scartate: 0 });
   const [bkNew, setBkNew] = useState(0);
@@ -74,9 +73,8 @@ export function useNavBadges(pathname: string): NavBadges {
     return () => ev.forEach((e) => window.removeEventListener(e, h));
   }, []);
 
-  // Messaggi non letti + segnalazioni di pulizia aperte (locali, istantanei)
+  // Segnalazioni di pulizia aperte (locali, istantanee)
   useEffect(() => {
-    setMsgs(unreadMessages());
     const list = readJson<{ resolved?: boolean; _deleted?: boolean; structureId?: string }[]>("spigolestay:pulizie:issues", []);
     setIssues(list.filter((i) => !i.resolved && !i._deleted && inScope(i.structureId, activeStructureId)).length);
   }, [tick, activeStructureId]);
@@ -127,12 +125,11 @@ export function useNavBadges(pathname: string): NavBadges {
     && !(b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber))).length, [bookings, today, activeStructureId]);
 
   return useMemo(() => ({
-    "/messaggi": msgs,
     "/prenotazioni": bkNew,
     "/adempimenti": checkinToday + remote.schedine + remote.istat,
     "/alloggiati-web": remote.schedine,
     "/istat": remote.istat,
     "/documenti": remote.scartate,
     "/pulizie": issues,
-  }), [msgs, bkNew, checkinToday, remote, issues]);
+  }), [bkNew, checkinToday, remote, issues]);
 }

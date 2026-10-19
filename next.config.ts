@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
       { source: "/concierge", destination: "/messaggi", permanent: true },
       { source: "/conversazioni", destination: "/messaggi", permanent: true },
       { source: "/modelli", destination: "/messaggi?tab=modelli", permanent: true },
+      { source: "/messaggi-2", destination: "/messaggi", permanent: true },
     ];
   },
 };

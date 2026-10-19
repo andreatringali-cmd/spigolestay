@@ -178,10 +178,11 @@ const HELP: Record<string, Guide> = {
     ],
   },
   "/messaggi": {
-    title: "Centro messaggi",
-    intro: "Crea, salva e automatizza i messaggi per gli ospiti nelle varie lingue.",
+    title: "Messaggi",
+    intro: "Qui trovi le conversazioni con gli ospiti delle OTA (Booking.com, Airbnb, Expedia) e i modelli di messaggio. WhatsApp ed email li segui fuori da Xenora.",
     sections: [
-      { h: "Cosa puoi fare", items: ["Scrivi messaggi liberi o usa i modelli preimpostati (benvenuto, check-in, check-out…).", "Imposta l'invio automatico a un orario o a X giorni dall'arrivo/partenza.", "Integra il link della guida ospiti da inviare su WhatsApp o email."] },
+      { h: "Messaggi OTA", items: ["Leggi e rispondi agli ospiti di Booking.com, Airbnb ed Expedia: le risposte partono direttamente sul portale.", "Le conversazioni sono divise in Attive e Chiuse; il pallino indica i messaggi da leggere.", "Da una conversazione puoi aprire la prenotazione collegata."] },
+      { h: "Modelli", items: ["Scrivi i tuoi messaggi pronti (benvenuto, check-in, check-out…) nelle varie lingue.", "Scegli quali mostrare come pulsante WhatsApp o email nella scheda della prenotazione.", "Imposta l'invio automatico a un orario o a X giorni dall'arrivo/partenza."] },
     ],
   },
   "/preventivi": {

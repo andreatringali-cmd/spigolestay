@@ -76,10 +76,12 @@ export default function BookingBillActions({ booking, structure, guest }: { book
   const openBill = () => { setText(billMessage(bill, { lang, name: guest?.firstName || guest?.fullName, property: structure?.name })); setAmount(""); setWithLink(false); setMsg(null); setOpen(true); };
   const finalText = async (): Promise<string> => {
     if (!withLink) return text;
-    const asked = amount.trim() ? (parseEurInput(amount) ?? NaN) : undefined;
-    if (asked !== undefined && (!isFinite(asked) || asked <= 0)) throw new Error(t("Importo non valido."));
-    const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: booking.id, kind: "saldo", ...(asked !== undefined ? { amount: asked } : {}) });
-    return `${text}\n\n${await payText("saldo", r.amount, await shortenLink(r.url))}`;
+    // Importo vuoto = il «Da pagare» del conto (NON tutto il residuo della prenotazione, che comprende anche la tassa di soggiorno).
+    const asked = amount.trim() ? (parseEurInput(amount) ?? NaN) : bill.due;
+    if (!isFinite(asked) || asked <= 0) throw new Error(t("Importo non valido."));
+    const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: booking.id, kind: "saldo", amount: asked });
+    // La frase del link è quella di base: il conto ha già il suo saluto, niente seconda apertura «Ciao …» dal modello Pagamento.
+    return `${text}\n\n${chatPayGuestMessage(lang, "saldo", Math.round(r.amount * 100), await shortenLink(r.url))}`;
   };
   const sendBill = (via: "wa" | "mail") => wrap(`bill-${via}`, async () => {
     await send(via, await finalText(), `${structure?.name ? structure.name + " · " : ""}${t("Conto del soggiorno")}`, "bill");

@@ -19,6 +19,8 @@ export const MSG_VARS: VarItem[] = [
   { token: "{link_guida}", desc: "Link alla guida ospiti personalizzata" },
   { token: "{link_checkin}", desc: "Link al self check-in online" },
   { token: "{whatsapp}", desc: "Numero WhatsApp della struttura (per scriverle all'arrivo)" },
+  { token: "{importo}", desc: "Importo del link di pagamento (solo nei modelli Pagamento e Tassa di soggiorno)" },
+  { token: "{link_pagamento}", desc: "Link di pagamento con carta (solo nei modelli Pagamento e Tassa di soggiorno)" },
   { token: "{link_recensioni}", desc: "Link per lasciare una recensione (Google e Tripadvisor, se impostati)" },
 ];
 
