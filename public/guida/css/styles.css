@@ -339,15 +339,15 @@ main { max-width: 900px; margin: 0 auto; padding: 26px 18px 60px; }
   margin-bottom: 6px;
 }
 
-/* Sottotitolo del benvenuto: terracotta, sotto il titolo */
-.welcome-subheading {
-  font-family: var(--font-display);
-  font-weight: 500;
+/* Sottotitolo del benvenuto: stesso carattere, corpo e colore dei paragrafi che lo seguono (prima, per la regola .home-welcome p, aveva un carattere diverso e restava più piccolo) */
+.home-welcome p.welcome-subheading {
+  font-family: inherit;
+  font-weight: inherit;
   font-size: .95rem;
   font-style: italic;
   line-height: 1.65;
-  color: var(--accent);
-  margin-bottom: 14px;
+  color: var(--primary);
+  margin-bottom: 12px;
 }
 
 .home-welcome p {
