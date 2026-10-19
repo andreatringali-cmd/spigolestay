@@ -107,11 +107,9 @@ export default function StepActions(p: StepActionsProps) {
     const list = hist[kind] ?? [];
     if (!list.length) return <p className="rounded-lg border border-dashed border-line px-3 py-2 text-xs text-faint">Nessun messaggio inviato finora per questo passaggio.</p>;
     const last = list[list.length - 1];
-    const recent = Date.now() - last.ts < REMINDER_COOLDOWN_MS;
     return (
       <div className="rounded-lg border border-line bg-paper px-3 py-2">
         <div className="flex items-center justify-between gap-2 text-xs"><span className="font-semibold text-txt">Messaggi inviati: {list.length}</span><span className="text-dim">ultimo {agoLabel(last.ts)}</span></div>
-        {recent && <div className="mt-1.5 rounded-md px-2 py-1 text-[11px] font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 14%, transparent)" }}>Hai scritto da poco ({whenLabel(last.ts)}): meglio aspettare prima di rimandare.</div>}
         <ul className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-dim">
           {[...list].reverse().slice(0, 6).map((e, i) => <li key={i} className="flex justify-between gap-2"><span>{whenLabel(e.ts)}</span><span className="truncate text-faint">{e.via}</span></li>)}
           {list.length > 6 && <li className="text-faint">+ altri {list.length - 6} precedenti</li>}
@@ -138,7 +136,7 @@ export default function StepActions(p: StepActionsProps) {
     <>
     <div className="flex flex-col gap-1">
       {historyBox(remKind)}
-      {isRecent(remKind) && <button className="self-start text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
+      {isRecent(remKind) && <button className="self-start text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: hai scritto da poco ({whenLabel(lastTs(remKind) ?? Date.now())}), meglio aspettare prima di rimandare. Sblocca comunque</button>}
     </div>
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
       <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
