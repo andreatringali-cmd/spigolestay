@@ -533,7 +533,7 @@ function Engine() {
   // Il passo "Pagamento" compare solo se c'è un saldo da pagare online. Dopo l'invio i passi 1-3 sono completati.
   const alreadySent = !!info.booking.webCheckin && opChecked && !isOperator && !editing && (isGroup ? groupRooms.every((r) => r.webCheckin) : !needsMoreGuests(expectedGuests, info.booking.extraGuests?.length ?? 0));
   const showDone = done || alreadySent;
-  const showPayStep = canPay;
+  const showPayStep = false; // il pagamento non fa più parte del check-in online: si salda in struttura o col link che manda il gestore
   const stepsList: { n: 1 | 2 | 3 | 4; label: string }[] = [
     { n: 1, label: t("Dati ospiti") }, { n: 2, label: t("Documenti") }, { n: 3, label: t("Consenso e invio") },
     ...(showPayStep ? [{ n: 4 as const, label: t("Pagamento") }] : []),
@@ -591,28 +591,12 @@ function Engine() {
           <p className="mt-1 text-sm text-dim">{t("Grazie {name}. Abbiamo ricevuto i tuoi dati per il soggiorno a {structure}. A presto!", { name: doc?.firstName || info.guest.firstName, structure: st?.name ?? "" })}</p>
           {st?.checkInFrom && <p className="mt-3 text-sm text-txt">{t("Ti aspettiamo dal {date}, check-in dalle {time}.", { date: fmtD(info.booking.checkIn), time: st.checkInFrom })}</p>}
           <button type="button" onClick={() => { setDone(false); setEditing(true); setStep(1); setShowErr(false); setAckMissing(false); topScroll(); }} className="mt-3 text-xs font-medium text-focus hover:underline">{t("Devi correggere qualcosa o aggiungere un ospite? Modifica i dati")}</button>
-        </div>
-
-        {/* Passo 4 · Pagamento: separato dall'invio, mai obbligatorio per il check-in */}
-        {grand > 0 && (
-          <div className={`${box} mt-4 p-5`}>
-            <h2 className="mb-2 font-display text-lg font-bold text-txt">{t("Pagamento")}</h2>
-            {paidNow && <div className="mb-3 rounded-lg px-3 py-2 text-sm font-medium" style={okBox}>{t("✓ Pagamento ricevuto — grazie! L'incasso è stato registrato.")}</div>}
-            {balance <= 0 ? (
-              <div className="rounded-lg px-3 py-2 text-sm font-semibold" style={okBox}>{t("✓ Pagamento già ricevuto: non devi fare altro.")}</div>
-            ) : canPay ? (
-              <>
-                {paySummary}
-                <button type="button" onClick={payNow} disabled={paying} className="mt-3 w-full rounded-lg bg-focus py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{paying ? t("Apro il pagamento…") : t("Paga ora {amount}", { amount: eur(balance) })}</button>
-                <p className="mt-2 text-center text-xs text-dim">{t("Facoltativo: il check-in è già completo. Se preferisci puoi saldare all'arrivo in struttura.")}</p>
-              </>
-            ) : (
-              <p className="text-center text-sm text-dim">{t("Il saldo di {amount} si paga all'arrivo in struttura.", { amount: eur(balance) })}</p>
-            )}
-            {payErr && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={errBox}>{t(payErr)}</div>}
-            {canPay && <p className="mt-2 text-center text-[11px] text-faint">{t("Il pagamento online arriva direttamente alla struttura (Stripe).")}</p>}
+          <div className="mx-auto mt-4 max-w-sm">
+            {walletState === "unavailable"
+              ? <p className="mt-2 text-center text-xs text-faint">{t("Aggiungi a Google Wallet: disponibile a breve.")}</p>
+              : <button type="button" onClick={addToWallet} disabled={walletState === "loading"} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90 disabled:opacity-50">{walletState === "loading" ? t("Preparo il pass…") : t("🔖 Aggiungi a Google Wallet")}</button>}
           </div>
-        )}
+        </div>
 
         <div className={`${box} mt-4 p-5 text-left`}>
           <h2 className="mb-3 font-display text-lg font-bold text-txt">{t("Informazioni utili")}</h2>
@@ -622,10 +606,16 @@ function Engine() {
             {st?.checkOutBy && <div className="flex gap-2"><span>🕙</span><span className="text-txt">{t("Check-out entro le {time}", { time: st.checkOutBy })}</span></div>}
             {st?.phone && <div className="flex gap-2"><span>📞</span><a href={`tel:${st.phone}`} className="text-focus hover:underline">{st.phone}</a></div>}
           </div>
+          {st?.address && (() => {
+            const q = encodeURIComponent([st.address, st.streetNumber, st.city].filter(Boolean).join(" "));
+            return (
+              <div className="mt-4">
+                <iframe title={t("Mappa per arrivare")} src={`https://www.google.com/maps?q=${q}&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="h-52 w-full rounded-lg border border-line" />
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${q}`} target="_blank" rel="noreferrer" className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90">{t("🧭 Come arrivare")}</a>
+              </div>
+            );
+          })()}
           {st?.id && <a href={guideHref(st.id, lang, info.guest.firstName)} target="_blank" rel="noreferrer" className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Apri la guida dell'ospite →")}</a>}
-          {walletState === "unavailable"
-            ? <p className="mt-2 text-center text-xs text-faint">{t("Aggiungi a Google Wallet: disponibile a breve.")}</p>
-            : <button type="button" onClick={addToWallet} disabled={walletState === "loading"} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90 disabled:opacity-50">{walletState === "loading" ? t("Preparo il pass…") : t("🔖 Aggiungi a Google Wallet")}</button>}
         </div>
       </div>
     </div>
