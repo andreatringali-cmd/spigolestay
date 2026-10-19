@@ -108,11 +108,12 @@ export const fmtLongIT = (iso: string) => `${new Date(iso + "T00:00:00Z").toLoca
 // Niente emoji (WhatsApp Business non le rende sempre). stile "whatsapp": titoli in *grassetto*; stile "plain" (email): niente asterischi.
 export type PlanStyle = "whatsapp" | "plain";
 
+// Titoli = le diciture del gestionale (ACT_LABEL: «Partenza + Arrivo», «Arrivo», «Partenza», «Riassetto», «Niente»), uguali nella pagina Pulizie, nel PDF, su WhatsApp e nell'email.
 const GROUPS: { key: ActionKey; title: string }[] = [
-  { key: "turnover", title: "CAMBIO COMPLETO (esce un ospite, ne entra un altro)" },
-  { key: "arrivo", title: "DA PREPARARE PER L'ARRIVO" },
-  { key: "partenza", title: "DOPO LA PARTENZA" },
-  { key: "riassetto", title: "RIASSETTO (ospiti in casa)" },
+  { key: "turnover", title: ACT_LABEL.turnover },
+  { key: "arrivo", title: ACT_LABEL.arrivo },
+  { key: "partenza", title: ACT_LABEL.partenza },
+  { key: "riassetto", title: ACT_LABEL.riassetto },
 ];
 
 // Ordine naturale delle camere: 1, 2, 3, 10 (non 1, 10, 2).
@@ -146,7 +147,7 @@ export function buildPuliziePlanText(opts: {
     for (const g of GROUPS) {
       const grp = list.filter((r) => !r.oos && r.action === g.key);
       if (!grp.length) continue;
-      lines.push("", t(g.title));
+      lines.push("", bold(t(g.title)));
       for (const r of grp) {
         let row: string;
         if (g.key === "turnover" && r.dep && r.arr) {
@@ -169,7 +170,7 @@ export function buildPuliziePlanText(opts: {
       for (const r of oos) lines.push(`• ${r.unit.name}${r.oosNote ? ` — ${r.oosNote}` : ""}${noteOf(r)}`);
     }
     const nothing = list.filter((r) => !r.oos && r.action === "niente");
-    if (nothing.length) lines.push("", `${t("NIENTE DA FARE")}: ${nothing.map((r) => r.unit.name).join(", ")}`);
+    if (nothing.length) lines.push("", `${t(ACT_LABEL.niente)}: ${nothing.map((r) => r.unit.name).join(", ")}`);
   }
   if (lines.length === 1) lines.push("", t("Nessuna pulizia in programma."));
   const intro = (opts.intro ?? "").trim(), outro = (opts.outro ?? "").trim();
