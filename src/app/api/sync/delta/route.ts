@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncAuth, idColOf, isSyncTable } from "@/lib/sync-server";
-import { applyDelta, isEmptyDelta, DeltaError, type Delta } from "@/lib/sync-delta";
+import { applyDelta, isEmptyDelta, describeDelta, DeltaError, type Delta } from "@/lib/sync-delta";
 import { deltaAllowedFor } from "@/lib/delta-allow";
 
 export const runtime = "nodejs";
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
   if (!row) return NextResponse.json({ ok: false, error: "no_row" }, { status: 404 });
   if (row.rev !== expectedRev) return NextResponse.json({ ok: false, conflict: true, rev: row.rev ?? null }, { status: 409 });
 
+  console.log("[sync/delta]", table, id.slice(0, 8), "rev", expectedRev, describeDelta(delta)); // diagnostica: cosa viene rimandato a ogni ciclo (solo conteggi e nomi di chiavi)
   let next: Record<string, string>;
   try { next = applyDelta(row.data ?? null, delta).row; }
   catch (e) {

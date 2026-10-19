@@ -28,6 +28,15 @@ export interface Delta {
   flat: Record<string, string>;             // altre chiavi della riga (impostazioni, conversazioni…): valore intero
   confirm?: boolean;                        // consenso esplicito a cancellazioni oltre soglia
 }
+/** Riassunto leggibile di un delta (per i log: quante voci per tipo, SENZA dati personali). */
+export function describeDelta(d: Delta): string {
+  const parts: string[] = [];
+  for (const [c, v] of Object.entries(d.colls)) if (v.upsert.length || v.del.length) parts.push(`${c}:+${v.upsert.length}/-${v.del.length}`);
+  for (const [c, v] of Object.entries(d.tombs)) if (v.length) parts.push(`lapidi.${c}:${v.length}`);
+  if (Object.keys(d.fields).length) parts.push("campi:" + Object.keys(d.fields).join(","));
+  if (Object.keys(d.flat).length) parts.push("chiavi:" + Object.keys(d.flat).join(","));
+  return parts.join(" ") || "vuoto";
+}
 export const emptyDelta = (): Delta => ({ colls: {}, tombs: {}, fields: {}, flat: {} });
 
 export function stableStringify(v: unknown): string {
@@ -38,6 +47,13 @@ export function stableStringify(v: unknown): string {
 }
 const isEmptyLike = (v: unknown): boolean => v === undefined || v === null || (Array.isArray(v) && v.length === 0) || (typeof v === "object" && v !== null && !Array.isArray(v) && Object.keys(v as object).length === 0);
 const same = (a: unknown, b: unknown): boolean => a === b || (isEmptyLike(a) && isEmptyLike(b)) || stableStringify(a) === stableStringify(b); // «assente» e «vuoto» sono la stessa cosa
+
+// Chiavi piatte: stesso contenuto anche se scritto in modo diverso (ordine delle chiavi, spazi) = uguale. Senza, ogni ciclo rimanderebbe valori identici.
+function sameFlat(server: string | undefined, merged: string): boolean {
+  if (server === merged) return true;
+  if (server === undefined) return false;
+  try { return stableStringify(JSON.parse(server)) === stableStringify(JSON.parse(merged)); } catch { return false; }
+}
 
 const asObj = (x: unknown): Json => (x && typeof x === "object" && !Array.isArray(x) ? (x as Json) : {});
 const asArr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
@@ -97,7 +113,7 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
     if (k === DATA_KEY) continue;
     const v = merged[k];
     if (typeof v !== "string") continue;
-    if ((server?.[k] ?? null) !== v) delta.flat[k] = v;
+    if (!sameFlat(server?.[k], v)) delta.flat[k] = v;
   }
   return delta;
 }
