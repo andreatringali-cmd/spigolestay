@@ -48,6 +48,7 @@ import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
 import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
 import { recordOutgoing, markReminder } from "@/lib/guest-messages";
 import { renderSystemMessage } from "@/lib/msg-overrides";
+import { waSendUrl } from "@/lib/wa-link";
 import { fillTemplateForBooking, fillTemplateNow, linkedTemplate, templateRawFor } from "@/lib/template-fill";
 import { channexCodeOf, countryName, fmtDateWd, groupRooms, guestNames, languageName, nightRows, notesBlocks, safeMailtoHref, safeTelHref } from "@/lib/booking-info";
 import { bookingSheetHtml, type SheetInput } from "@/lib/booking-sheet";
@@ -554,7 +555,7 @@ export default function BookingDrawer() {
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
         const rmsg = renderSystemMessage("reviewQuick", guestLangOf(guest), { nome: first, struttura: structure?.name ?? "noi", link: reviewUrl ?? "" }).trim();
-        const rwa = phoneDigits ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(rmsg)}` : "";
+        const rwa = phoneDigits ? waSendUrl(phoneDigits, rmsg) : "";
         return (
           <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--ok) 32%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 6%, transparent)" }}>
             <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-faint">⭐ {t("Recensione Google")}</div>
@@ -768,7 +769,7 @@ export default function BookingDrawer() {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
           const ciMsg = (u: string) => renderSystemMessage("checkinShort", guestLangOf(guest), { nome: guest?.fullName ? guest.fullName.split(" ")[0] : "", struttura: structure?.name ?? "Xenora", link: u });
-          const sendCiWa = async () => { if (!sendOnce(`ci:${booking.id}`)) return; const s = await shortenLink(link); const ciText = (await modelText("selfcheckin")) ?? ciMsg(s); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciText)}`, "_blank", "noopener,noreferrer"); if (guest) { recordOutgoing(guest.id, ciText, "WhatsApp (link)", undefined, { bid: booking.id, rem: "checkin" }); markReminder(booking.id, "checkin"); } };
+          const sendCiWa = async () => { if (!sendOnce(`ci:${booking.id}`)) return; const s = await shortenLink(link); const ciText = (await modelText("selfcheckin")) ?? ciMsg(s); window.open(waSendUrl(phoneDigits, ciText), "_blank", "noopener,noreferrer"); if (guest) { recordOutgoing(guest.id, ciText, "WhatsApp (link)", undefined, { bid: booking.id, rem: "checkin" }); markReminder(booking.id, "checkin"); } };
           const copyCi = async () => { const s = await shortenLink(link); try { await navigator.clipboard.writeText(s); } catch {} };
           if (!moduleOn("checkin")) return (
             <div className="flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
@@ -798,7 +799,7 @@ export default function BookingDrawer() {
             if (!sendOnce(`guidewa:${booking.id}`)) return;
             const short = await shortenGuideLink(gLink);
             const gText = (await modelText("guida")) ?? guideMsgWith(short);
-            window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(gText)}`, "_blank", "noopener,noreferrer");
+            window.open(waSendUrl(phoneDigits, gText), "_blank", "noopener,noreferrer");
             if (guest) { recordOutgoing(guest.id, gText, "WhatsApp (link)", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); }
           };
           const sendGuideEmail = async () => {

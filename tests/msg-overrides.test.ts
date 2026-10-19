@@ -67,3 +67,11 @@ test("messaggi della scheda: contatto, invito check-in breve, recensione rapida"
   assert.equal(M.renderSystemMessage("checkinShort", "it", { nome: "", struttura: "Casa", link: "L" }), "Buongiorno, per velocizzare l'arrivo a Casa completa il check-in online qui: L");
   assert.equal(M.renderSystemMessage("reviewQuick", "it", { nome: "Anna", struttura: "Casa", link: "https://g/r" }), "Grazie Anna per aver soggiornato da Casa! Se ti sei trovato bene, ci lasceresti una recensione su Google? Ci aiuta tantissimo. https://g/r");
 });
+
+test("link WhatsApp: Web sul computer (emoji giuste), wa.me sul telefono", async () => {
+  const { waSendUrl } = await import("../src/lib/wa-link.ts");
+  const desktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120";
+  const phone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148";
+  assert.equal(waSendUrl("39333", "Ciao 😊", desktop), "https://web.whatsapp.com/send?phone=39333&text=Ciao%20%F0%9F%98%8A");
+  assert.equal(waSendUrl("39333", "Ciao 😊", phone), "https://wa.me/39333?text=Ciao%20%F0%9F%98%8A");
+});

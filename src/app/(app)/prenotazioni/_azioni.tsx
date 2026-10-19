@@ -220,11 +220,7 @@ export default function StepActions(p: StepActionsProps) {
       <label className="flex items-center gap-2 text-xs text-dim">Importo (lascia vuoto per tutto il residuo)
         <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={kind === "saldo" ? eur(due) : "tutta la tassa"} className="w-32 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
       </label>
-      {sendButtons(mk, remKind, sent ? "Sollecita il pagamento" : "Invia link di pagamento")}
-      <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-        <span className="w-full text-xs text-faint">Ha pagato in contanti o con altro mezzo?</span>
-        <button className={btnGhost} disabled={!!busy} onClick={() => run("manual", manual)}>{kind === "saldo" ? "Registra incasso a mano" : "Segna tassa incassata"}</button>
-      </div>
+      {sendButtons(mk, remKind, sent ? "Sollecita il pagamento" : "Invia link di pagamento", undefined, <button className={`${btnGhost} whitespace-nowrap`} disabled={!!busy} title="Ha pagato in contanti o con altro mezzo?" onClick={() => run("manual", manual)}>{kind === "saldo" ? "Registra incasso a mano" : "Segna tassa incassata"}</button>)}
     </>);
   } else if (step.key === "alloggiati" || step.key === "istat") {
     const isQ = step.key === "alloggiati";
@@ -287,7 +283,7 @@ export default function StepActions(p: StepActionsProps) {
     const build = async () => ({ text: (await fromModel("checkout")) ?? `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">Manda all&apos;ospite il promemoria della partenza: data e orario del check-out, come contattarti per qualsiasi necessità e un ringraziamento.</p>
-      {sendButtons(build, "checkout", "Invia il promemoria", (via) => { const tpl = linkedTemplate("checkout", b.structureId); if (tpl && Object.values(tpl.texts).some((x) => /link_(recensioni|google|tripadvisor)/i.test(x)) && !!reviewLinksBlockFromStorage(b.structureId, structure?.googlePlaceId) && !b.reviewRequestedAt) updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }); }, <button className={btnGhost} onClick={() => { p.onClose(); router.push("/pulizie"); }}>Apri Pulizie</button>)}
+      {sendButtons(build, "checkout", "Invia il promemoria", (via) => { const tpl = linkedTemplate("checkout", b.structureId); if (tpl && Object.values(tpl.texts).some((x) => /link_(recensioni|google|tripadvisor)/i.test(x)) && !!reviewLinksBlockFromStorage(b.structureId, structure?.googlePlaceId) && !b.reviewRequestedAt) updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: via === "wa" ? "whatsapp" : "email" }); })}
     </>);
   } else if (step.key === "review") {
     // Stessi link del messaggio automatico (link scelto in Modelli & automazioni, Place ID o guida; Tripadvisor se impostato) e testo nella lingua dell'ospite.

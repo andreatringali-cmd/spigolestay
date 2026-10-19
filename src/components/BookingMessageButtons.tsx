@@ -10,6 +10,7 @@ import { fillTemplateForBooking } from "@/lib/template-fill";
 import { guestLangOf } from "@/lib/guest-lang";
 import { waDigits } from "@/lib/contacts-check";
 import { recordOutgoing } from "@/lib/guest-messages";
+import { waSendUrl } from "@/lib/wa-link";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
 const TPL_KEY = "spigolestay:msgtemplates";
@@ -51,7 +52,7 @@ export default function BookingMessageButtons({ booking, guest: guestProp, struc
     if (!raw.trim()) { setNote("Il modello è vuoto."); return; }
     const text = await fill(raw);
     if (guest) recordOutgoing(guest.id, text, "WhatsApp (link)", undefined, { bid: booking.id, rem: `tpl:${tpl.id}` });
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    window.open(waSendUrl(digits, text), "_blank", "noopener,noreferrer");
   };
 
   return (

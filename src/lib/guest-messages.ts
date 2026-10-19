@@ -8,6 +8,7 @@ import { apiPost } from "./invoicing/client";
 import { waDigits } from "./contacts-check";
 import { guestLangOf } from "./guest-lang";
 import { renderSystemMessage } from "./msg-overrides";
+import { waSendUrl } from "./wa-link";
 
 export type Lang = "it" | "en" | "fr" | "de" | "es";
 
@@ -89,7 +90,7 @@ export const WHATSAPP_API_ENABLED = false;
 export async function sendWhatsAppToGuest(g: Guest | undefined, text: string, meta?: SendMeta): Promise<SendResult> {
   const digits = waDigits(g?.phone, g?.country); // con il prefisso del Paese anche se il numero è stato scritto senza
   if (!g || !digits) return { ok: false, how: "none", message: "L'ospite non ha un numero di telefono." };
-  const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  const wa = waSendUrl(digits, text); // WhatsApp Web sul computer (le emoji restano giuste), wa.me sul telefono
   if (WHATSAPP_API_ENABLED && (await whatsappConnected())) {
     // Finestra chiusa: la Cloud API non consegnerebbe il testo libero. Meglio dirlo subito e aprire WhatsApp col testo pronto (da lì parte dal tuo telefono e arriva).
     if (!whatsappWindowOpen(g.id)) {
