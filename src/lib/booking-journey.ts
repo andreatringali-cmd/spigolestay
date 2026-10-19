@@ -119,7 +119,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   for (const st of steps) if ((st.state === "todo" || st.state === "late") && NOTE_OF[st.key] && st.key !== "checkin" && c.reminderNotes?.[NOTE_OF[st.key]]) st.sent = true; // il check-in resta rosso anche dopo l'invio
   // I messaggi li manda il titolare a mano: per Check-in e Check-out, una volta mandato il messaggio il compito è fatto (pallino verde con la spunta).
   // Il dettaglio continua a dire cosa manca ("L'ospite non ha ancora compilato · inviato 2 volte").
-  for (const st of steps) if (st.key === "checkout" && st.sent && st.state !== "done") { st.state = "done"; st.sent = false; st.resend = true; }
+  for (const st of steps) if (st.key === "checkout" && (st.sent || !!c.reminderNotes?.checkout) && st.state !== "done") { st.state = "done"; st.sent = false; st.resend = true; } // anche prima del giorno della partenza (passaggio grigio «na»): mandato = fatto
   // Schedina Questura e Osservatorio (ISTAT) partono da sole dal check-in online dell'ospite: nessun pulsante.
   for (const st of steps) if (st.key === "alloggiati" || st.key === "istat") st.locked = true;
 

@@ -148,7 +148,7 @@ function StepButton({ s, onStep, structureId }: { s: JourneyStep; onStep: (s: Jo
     <button disabled={s.locked} onClick={(e) => { e.stopPropagation(); if (!s.locked) onStep(s); }} title={s.locked ? `${label}: ${s.detail} · parte da sola dal check-in online` : `${label}: ${s.detail}`} className={`flex min-w-0 items-start gap-2 rounded-lg text-left transition ${s.locked ? "cursor-default" : "hover:bg-wash"}`}>
       <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: col, border: `1.5px solid ${col}`, background: s.state === "done" ? `color-mix(in srgb, ${col} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
       <span className="min-w-0">
-        <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate text-xs font-semibold text-txt">{label}</span>{sentTag && <span className="shrink-0 text-[10px] font-semibold" style={{ color: "var(--warn)" }}>{sentTag}</span>}</span>
+        <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate text-xs font-semibold text-txt">{label}</span>{sentTag && <span className="shrink-0 text-[10px] font-semibold" style={{ color: s.state === "done" ? col : "var(--warn)" }}>{sentTag}</span>}</span>
         <span className="block truncate text-[11px]" style={{ color: s.state === "late" ? (s.sent ? "var(--warn)" : "var(--err)") : "var(--faint)" }}>{detail}</span>
         {s.auto && <span className="block truncate text-[11px] font-medium" title={s.auto.text} style={{ color: s.auto.tone === "warn" ? "var(--warn)" : "var(--focus)" }}>⏱ {s.auto.text}</span>}
       </span>

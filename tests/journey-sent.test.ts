@@ -46,3 +46,8 @@ test("Schedina e ISTAT: verdi appena sono nelle sezioni (check-in compilato), ar
 test("Check-in completato: il clic apre la scheda, non porta su Adempimenti", () => {
   assert.equal(stepOpensModal({ key: "checkin", state: "done" }), true);
 });
+test("Check-out mandato prima del giorno della partenza: verde col rinvio possibile", () => {
+  const r = journeyOf({ ...b, checkOut: "2026-10-30" } as any, { today: "2026-10-19", guideSent: false, reminderNotes: { checkout: "inviato 1 volta" } });
+  assert.equal(step(r, "checkout").state, "done");
+  assert.equal(step(r, "checkout").resend, true);
+});
