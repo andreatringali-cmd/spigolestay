@@ -8,13 +8,12 @@ export default function Loading() {
         <Image
           src="/xenora-mark.png"
           alt="Xenora"
-          width={64}
-          height={64}
+          width={40}
+          height={40}
           priority
           className="animate-pulse object-contain"
-          style={{ width: 64, height: 64 }}
+          style={{ width: 40, height: 40 }}
         />
-        <div className="text-xs font-medium tracking-wide text-faint">Caricamento…</div>
       </div>
     </div>
   );

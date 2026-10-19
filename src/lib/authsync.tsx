@@ -439,22 +439,13 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-function Splash({ label, forceLabel = false }: { label: string; forceLabel?: boolean }) {
-  // Se resta qui più di 6 secondi compare (con la sola grafica CSS, quindi ANCHE se la pagina non si è ancora «accesa» per un collegamento lento) il passaggio in cui è
-  // e un pulsante «Ricarica» (un normale collegamento: funziona anche senza JavaScript).
-  const reveal = !forceLabel;
+function Splash({ label }: { label: string }) {
+  // Solo la farfalla Xenora che pulsa (piccola, anche su telefono): niente testo e niente pulsanti durante il caricamento.
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff" }}>
-      {/* Solo la farfalla Xenora che pulsa durante il caricamento */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-        <img src="/xenora-mark.png" alt={label || "Xenora"} width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
-        <div style={{ textAlign: "center", fontFamily: "system-ui, sans-serif", fontSize: 13, color: "#6b7280", ...(reveal ? { opacity: 0, pointerEvents: "none", animation: "xreveal .4s ease 6s forwards" } : {}) }}>
-          <div>{label}</div>
-          {reveal && <a href="" style={{ display: "inline-block", marginTop: 8, padding: "6px 14px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#111", fontSize: 13, cursor: "pointer", textDecoration: "none" }}>Ricarica</a>}
-        </div>
-      </div>
-      <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}@keyframes xreveal{from{opacity:0;pointer-events:none}to{opacity:1;pointer-events:auto}}`}</style>
+      <img src="/xenora-mark.png" alt={label || "Xenora"} width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+      <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
     </div>
   );
 }
@@ -872,7 +863,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = { user: session?.user ?? null, session, enabled: supabaseEnabled, signOut };
 
   // Modalità solo-locale (variabili non configurate): nessun gate.
-  if (signingOut) return <Splash label="Uscita in corso…" forceLabel />;
+  if (signingOut) return <Splash label="Uscita in corso…" />;
   if (!bigReady) return <Splash label="Avvio…" />;
   if (!supabaseEnabled) return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
   if (loading) return <Splash label="Avvio…" />;
