@@ -12,6 +12,7 @@ import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import { copyGuideContent, guideHasText } from "@/lib/guide-copy";
+import { exampleContentFrom, loadExampleIt } from "@/lib/guide-example";
 
 // Forma dati "guida" = window.PROPERTY del motore (public/guida). Multi-tenant: una per struttura.
 interface Guide {
@@ -819,14 +820,17 @@ export default function GuidaOspitiPage() {
   const refresh = () => reloadPreview();
   // L'esempio sostituisce i TESTI della guida, ma non tocca dati reali: dei dati struttura e delle credenziali
   // (WiFi, orari, telefoni, link) compila solo i campi ancora vuoti.
-  const loadDemo = () => {
+  const loadDemo = async () => {
     if (hasRealContent && !confirm("Sostituire i testi della guida con l'esempio di Siracusa?\n\nI dati già inseriti (indirizzo, telefoni, WiFi, orari, link) NON vengono toccati: l'esempio compila solo i campi vuoti. Le traduzioni verranno rigenerate.")) return;
     const sRec = (struct ?? {}) as unknown as Record<string, unknown>;
     const structPatch = Object.fromEntries(Object.entries(DEMO_STRUCT).filter(([k]) => !String(sRec[k] ?? "").trim()));
     if (Object.keys(structPatch).length) updateStructure(sid, structPatch);
     const gRec = guide as unknown as Record<string, unknown>;
     const guidePatch = Object.fromEntries(Object.entries(DEMO_GUIDE).filter(([k]) => !String(gRec[k] ?? "").trim()));
-    set({ ...guidePatch, content: DEMO_CONTENT, i18n: {} });
+    // I testi si copiano dall'esempio del telefono «Esempio»: la tua guida parte identica (se l'esempio non si carica, resta la copia interna).
+    let content: GContent = DEMO_CONTENT;
+    try { content = exampleContentFrom(await loadExampleIt(), DEMO_CONTENT as never) as unknown as GContent; } catch { /* copia interna */ }
+    set({ ...guidePatch, content, i18n: {} });
     refresh();
   };
   const savedThis = !!all[sid];

@@ -17,6 +17,14 @@ const BK_MAX = 4000;
 
 type ThreadMsg = { dir?: string; ts?: number };
 
+// Prenotazioni arrivate da poco e non ancora viste: restano in memoria (NON nel browser) finché la pagina non si ricarica, così Prenotazioni
+// le mette in cima e le evidenzia. Al ricaricamento sono già "viste" e l'evidenza sparisce.
+const FRESH_EVENT = "spigolestay:freshbookings";
+const freshIds = new Set<string>();
+export const freshBookingIds = (): ReadonlySet<string> => freshIds;
+export const FRESH_BOOKINGS_EVENT = FRESH_EVENT;
+const NEW_WINDOW_DAYS = 3; // «nuova» = prenotata negli ultimi giorni: una prenotazione vecchia che la sincronizzazione riscrive non è una novità
+
 const readJson = <T,>(key: string, fallback: T): T => { try { const r = localStorage.getItem(key); return r ? (JSON.parse(r) as T) : fallback; } catch { return fallback; } };
 const writeJson = (key: string, v: unknown) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
 
@@ -79,9 +87,12 @@ export function useNavBadges(pathname: string): NavBadges {
     setIssues(list.filter((i) => !i.resolved && !i._deleted && inScope(i.structureId, activeStructureId)).length);
   }, [tick, activeStructureId]);
 
-  // Prenotazioni nuove: quelle non ancora viste, ancora in corso o future (lo storico importato non conta).
+  // Prenotazioni nuove: ancora in corso o future, PRENOTATE da poco e non ancora viste (lo storico importato e le vecchie riscritte dalla sincronizzazione non contano).
+  const recentFrom = toISO(new Date(Date.now() - NEW_WINDOW_DAYS * 86400000));
+  const isFresh = (b: (typeof bookings)[number]) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkOut >= today && !!b.bookedOn && b.bookedOn.slice(0, 10) >= recentFrom;
   const liveIds = useMemo(
-    () => bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkOut >= today && inScope(b.structureId, activeStructureId)).map((b) => b.id),
+    () => bookings.filter((b) => isFresh(b) && inScope(b.structureId, activeStructureId)).map((b) => b.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [bookings, today, activeStructureId],
   );
   useEffect(() => {
@@ -89,7 +100,13 @@ export function useNavBadges(pathname: string): NavBadges {
     let seen = readJson<string[] | null>(BK_SEEN_KEY, null);
     const onPage = pathname === "/prenotazioni" || pathname.startsWith("/prenotazioni/");
     if (seen === null || onPage) {
-      // Prima volta, oppure stai guardando la pagina Prenotazioni: tutto ciò che c'è ora è visto.
+      // Prima volta, oppure stai guardando la pagina Prenotazioni: tutto ciò che c'è ora è visto. Le nuove (non ancora viste) si ricordano per l'evidenza in pagina.
+      if (seen !== null) {
+        const known = new Set(seen);
+        let added = false;
+        for (const b of bookings) if (isFresh(b) && !known.has(b.id) && !freshIds.has(b.id)) { freshIds.add(b.id); added = true; }
+        if (added) { try { window.dispatchEvent(new Event(FRESH_EVENT)); } catch {} }
+      }
       const all = Array.from(new Set([...(seen ?? []), ...bookings.map((b) => b.id)])).slice(-BK_MAX);
       writeJson(BK_SEEN_KEY, all);
       setBkNew(0);
@@ -97,6 +114,7 @@ export function useNavBadges(pathname: string): NavBadges {
     }
     const set = new Set(seen);
     setBkNew(liveIds.filter((id) => !set.has(id)).length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings, liveIds, pathname, tick]);
 
   // Conteggi leggeri su Supabase (schedine pronte, ISTAT da inviare, fatture scartate), al massimo uno al minuto

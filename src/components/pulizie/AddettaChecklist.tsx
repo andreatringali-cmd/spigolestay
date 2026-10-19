@@ -26,7 +26,6 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   const [tasks, setTasks] = useSyncedList<CleanTask>(KEY_TASKS);
   const [checks, setChecks] = useSyncedList<CleanCheck>(KEY_CHECKS);
   const [editing, setEditing] = useState<null | Partial<CleanTask>>(null);
-  const [manage, setManage] = useState(false);
   const [onlyTodo, setOnlyTodo] = useState(false);
   const now = stamp();
   const today = now.today;
@@ -54,11 +53,11 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
     const ticked = !!s.today;
     const chip = STATE_CHIP[s.state];
     return (
+      <div key={`${task.id}:${target.id}`} className="flex items-stretch">
       <button
-        key={`${task.id}:${target.id}`}
         onClick={() => tick(task, target.id, target.structureId)}
         disabled={!canEdit}
-        className={`flex min-h-[56px] w-full items-center gap-3 px-3 py-2 text-left transition active:bg-wash ${s.state === "done" && !ticked ? "opacity-70" : ""}`}
+        className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left transition active:bg-wash ${s.state === "done" && !ticked ? "opacity-70" : ""}`}
         aria-pressed={ticked}
       >
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 text-lg font-bold leading-none ${ticked ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-white" : s.state === "done" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-transparent"}`}>✓</span>
@@ -68,6 +67,8 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
         </span>
         {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{s.overdue ? "In ritardo" : chip.label}</span>}
       </button>
+      {isManager && <button onClick={() => setEditing(task)} aria-label={`Modifica la voce «${task.name}»`} title="Modifica la voce" className="grid w-11 shrink-0 place-items-center text-dim hover:bg-wash hover:text-txt"><Icon name="settings" size={15} /></button>}
+      </div>
     );
   };
 
@@ -92,40 +93,18 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Gestione voci: solo titolare */}
-      {isManager && (
-        <Card className="p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setManage((v) => !v)} className="flex min-h-[40px] items-center gap-1.5 text-sm font-bold text-txt"><Icon name="settings" size={15} /> Voci della checklist <span className="font-normal text-faint">· {live.length}</span> <span className="text-xs text-dim">{manage ? "▲" : "▼"}</span></button>
-            <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="ml-auto flex min-h-[40px] items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>
-          </div>
-          {manage && (
-            <div className="mt-2 divide-y divide-[color:var(--line)] rounded-lg border border-line">
-              {live.length === 0 && <div className="px-3 py-3 text-xs text-faint">Nessuna voce.</div>}
-              {live.map((t) => (
-                <button key={t.id} onClick={() => setEditing(t)} className="flex min-h-[48px] w-full items-center gap-2 px-3 py-2 text-left hover:bg-wash">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-txt">{t.name}</span>
-                    <span className="block truncate text-[11px] text-dim">{t.scope === "common" ? "Zona comune" : "Camere"} · {t.structureId ? (structures.find((s) => s.id === t.structureId)?.name ?? "—") : "tutte le strutture"} · {freqLabel(t.freq)}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-dim">Modifica</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Avanzamento della settimana */}
+      {/* Riga filtri: settimana e avanzamento, «Solo da fare», «Nuova voce» (titolare). Sotto, le voci da spuntare. */}
       <Card className="p-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-sm font-bold text-txt">Questa settimana</span>
-          <span className="whitespace-nowrap text-[11px] text-dim">{fmtDMY(wd[0]).slice(0, 5)} – {fmtDMY(wd[6]).slice(0, 5)}</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--ok)" }} /></div>
-        <div className="mt-1.5 flex items-center justify-between text-[11px] text-dim">
-          <span>{week.done}/{week.required} spunte · {week.completed}/{week.targets} voci complete</span>
-          <label className="flex min-h-[32px] cursor-pointer items-center gap-1.5"><input type="checkbox" checked={onlyTodo} onChange={(e) => setOnlyTodo(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Solo da fare</label>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-txt">Questa settimana <span className="font-normal text-dim">{fmtDMY(wd[0]).slice(0, 5)} – {fmtDMY(wd[6]).slice(0, 5)}</span></div>
+            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-dim">
+              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--ok)" }} /></span>
+              <span>{week.done}/{week.required} spunte · {week.completed}/{week.targets} voci complete</span>
+            </div>
+          </div>
+          <label className="flex min-h-[40px] cursor-pointer items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={onlyTodo} onChange={(e) => setOnlyTodo(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Solo da fare</label>
+          {isManager && <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="ml-auto flex min-h-[40px] items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>}
         </div>
       </Card>
 

@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { normName } from "@/lib/guest-key";
 import Link from "next/link";
 import { useData } from "@/lib/store";
+import { freshBookingIds, FRESH_BOOKINGS_EVENT } from "@/lib/navbadges";
 import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type Booking, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO, fmtDate } from "@/lib/dates";
@@ -202,6 +203,14 @@ export default function PrenotazioniPage() {
   // Raggruppa in un'unica riga le prenotazioni con lo stesso groupId (prenotazione di più camere).
   const [groupOpen, setGroupOpen] = useState<Set<string>>(() => new Set());
   const toggleGroup = (gid: string) => setGroupOpen((s) => { const n = new Set(s); if (n.has(gid)) n.delete(gid); else n.add(gid); return n; });
+  // Prenotazioni nuove (arrivate da poco, non ancora viste): in cima e con un'evidenza diversa. Restano così finché non ricarichi la pagina.
+  const [freshSet, setFreshSet] = useState<ReadonlySet<string>>(() => new Set(freshBookingIds()));
+  useEffect(() => {
+    const h = () => setFreshSet(new Set(freshBookingIds()));
+    h();
+    window.addEventListener(FRESH_BOOKINGS_EVENT, h);
+    return () => window.removeEventListener(FRESH_BOOKINGS_EVENT, h);
+  }, []);
   const displayList = useMemo(() => {
     const byGroup = new Map<string, typeof sorted>();
     for (const b of sorted) if (b.groupId) { const l = byGroup.get(b.groupId); if (l) l.push(b); else byGroup.set(b.groupId, [b]); }
@@ -216,8 +225,11 @@ export default function PrenotazioniPage() {
       }
       out.push({ kind: "single", b });
     }
-    return out;
-  }, [sorted]);
+    if (!freshSet.size) return out;
+    const isNew = (it: (typeof out)[number]) => (it.kind === "single" ? freshSet.has(it.b.id) : it.members.some((m) => freshSet.has(m.id)));
+    return [...out.filter(isNew), ...out.filter((it) => !isNew(it))]; // le nuove prima di tutte, nell'ordine dell'elenco
+  }, [sorted, freshSet]);
+  const NEW_ROW = "bg-[color:color-mix(in_srgb,var(--focus)_11%,transparent)] [&>td:first-child]:shadow-[inset_3px_0_0_var(--focus)]"; // riga di una prenotazione nuova
   const PAGE = 150;
   const [limit, setLimit] = useState(PAGE);
   useEffect(() => { setLimit(PAGE); }, [q, channel, from, to, dateField, activeStructureId]); // cambia filtro: si riparte dalla prima pagina
@@ -570,13 +582,13 @@ export default function PrenotazioniPage() {
             {shownList.map((item) => {
               if (item.kind === "single") {
                 const b = item.b;
-                return <tr key={b.id} onClick={() => openBooking(b.id)} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${rowDim(b)}`}>{renderCells(b)}</tr>;
+                return <tr key={b.id} onClick={() => openBooking(b.id)} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${freshSet.has(b.id) ? NEW_ROW : ""} ${rowDim(b)}`}>{renderCells(b)}</tr>;
               }
               const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
               const colSpan = activeStructureId === "all" ? 14 : 13;
               return (
                 <Fragment key={gid}>
-                  <tr onClick={() => toggleGroup(gid)} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)] hover:bg-wash">
+                  <tr onClick={() => toggleGroup(gid)} className={`cursor-pointer border-b border-line hover:bg-wash ${members.some((m) => freshSet.has(m.id)) ? NEW_ROW : "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]"}`}>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
@@ -593,7 +605,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
                   {open && members.map((m) => (
-                    <tr key={m.id} onClick={() => openBooking(m.id)} className={`cursor-pointer border-b border-line bg-wash/40 hover:bg-wash ${rowDim(m)}`}>{renderCells(m, true)}</tr>
+                    <tr key={m.id} onClick={() => openBooking(m.id)} className={`cursor-pointer border-b border-line hover:bg-wash ${freshSet.has(m.id) ? NEW_ROW : "bg-wash/40"} ${rowDim(m)}`}>{renderCells(m, true)}</tr>
                   ))}
                   {open && <tr className="border-b border-line"><td colSpan={colSpan} className="px-3 py-0.5" /></tr>}
                 </Fragment>
