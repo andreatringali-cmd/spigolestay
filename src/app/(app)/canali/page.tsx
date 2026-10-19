@@ -404,7 +404,14 @@ export default function CanaliPage() {
                           const dash = <span className="text-faint">—</span>;
                           const commTip = `${commInfo.source === "stima" ? "~" : ""}${commPct}% · ${commInfo.source === "stima" ? "percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "percentuale impostata da te" : "percentuale standard: non ci sono abbastanza dati reali per stimarla"}`;
                           return (
-                            <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
+                            <tr
+                              key={c.id || c.channel + i}
+                              onClick={() => setChannelDetail({ sid: g.sid, c })}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setChannelDetail({ sid: g.sid, c }); } }}
+                              tabIndex={0}
+                              title={t("Apri le impostazioni del canale")}
+                              className="cursor-pointer border-b border-line outline-none last:border-0 hover:bg-wash focus-visible:bg-wash"
+                            >
                               <td className={td}>
                                 <span className="flex min-w-0 items-center gap-2">
                                   <ChannelLogo channel={chKey} size={20} title={label} name={c.title} />
@@ -428,7 +435,7 @@ export default function CanaliPage() {
                                 ) : dash}
                               </td>
                               <td className={`${td} text-right`}>
-                                <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Cambia il colore su calendario")} aria-label={t("Cambia il colore su calendario")} className="h-4 w-4 rounded-full border border-line align-middle transition hover:scale-110" style={{ backgroundColor: color }} />
+                                <span aria-hidden className="inline-block h-4 w-4 rounded-full border border-line align-middle" style={{ backgroundColor: color }} />
                               </td>
                             </tr>
                           );
