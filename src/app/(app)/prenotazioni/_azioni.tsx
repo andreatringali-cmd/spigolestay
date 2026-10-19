@@ -136,7 +136,7 @@ export default function StepActions(p: StepActionsProps) {
     <>
     <div className="flex flex-col gap-1">
       {historyBox(remKind)}
-      {isRecent(remKind) && <button className="self-start text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: hai scritto da poco ({whenLabel(lastTs(remKind) ?? Date.now())}), meglio aspettare prima di rimandare. Sblocca comunque</button>}
+      {isRecent(remKind) && <button className="self-start text-left text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: hai scritto da poco ({whenLabel(lastTs(remKind) ?? Date.now())}), meglio aspettare prima di rimandare. Sblocca comunque</button>}
     </div>
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
       <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
