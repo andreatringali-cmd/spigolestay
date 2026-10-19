@@ -9,7 +9,7 @@ import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { toISO, parseISO, nights, fmtDM } from "@/lib/dates";
 import { num } from "@/lib/format";
-import { bookingPaidTotal, cityTaxOfBooking, nightlyRevenue } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOfBooking } from "@/lib/booking";
 import { stayDue } from "@/lib/incassi";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
@@ -18,7 +18,7 @@ import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
   addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, greetingFor, histogram, isLive, LEAD_LABELS, LEAD_UPPER,
-  leadDays, monthStats, occupancyStrip, pickupDaily, rateSeries, splitDay, statusSentence, STAY_LABELS, STAY_UPPER, stayNights, todaySentence, topCountries,
+  leadDays, monthStats, occupancyStrip, pickupDaily, splitDay, statusSentence, STAY_LABELS, STAY_UPPER, stayNights, todaySentence, topCountries,
   unassignedArrivals,
 } from "@/lib/dashboard";
 import Hero from "./_hero";
@@ -36,7 +36,6 @@ import { D2Styles } from "./_kit";
 import { useDashboard2Dati } from "./_dati";
 import { loadChannelColor } from "@/lib/channelOverrides";
 
-const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const OTA_CH = ["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const shortDate = (iso: string) => fmtDM(iso);
@@ -84,6 +83,7 @@ export default function Dashboard2() {
   // 61 giorni: i 30 passati, oggi (posizione 30) e i 30 a venire. Dalla striscia escono anche le sparkline dell'hero.
   const strip = useMemo(() => occupancyStrip(live, scopedUnits, addDaysISO(today, -30), 61, today), [live, scopedUnits, today]);
   const tonight = strip[30];
+  const stripFwd = useMemo(() => occupancyStrip(live, scopedUnits, today, 60, today), [live, scopedUnits, today]); // grafico Occupazione: da oggi in avanti
   const last14 = strip.slice(17, 31);
 
   // --- Adempimenti ---
@@ -121,35 +121,29 @@ export default function Dashboard2() {
     oos: scopedUnits.filter((u) => u.outOfService).length,
   }), [live, today, contactIssues, dati.inviiKo, pulseBad, scopedUnits]);
 
-  // --- Ricavi del mese e canali ---
-  const mIdx = Number(today.slice(5, 7)) - 1;
-  const monthStart = `${today.slice(0, 7)}-01`;
-  const monthDays = new Date(Date.UTC(Number(today.slice(0, 4)), mIdx + 1, 0)).getUTCDate();
-  const nextMonthStart = addDaysISO(monthStart, monthDays);
-  // Ricavi: stessa cifra del riepilogo di Prenotazioni con «In corso e future» (chi parte oggi conta ancora; totale lordo = soggiorno + pulizia + extra).
-  const upcoming = useMemo(() => {
-    const list = live.filter((b) => b.checkOut >= today);
-    return { total: list.reduce((a, b) => a + bookingPaidTotal(b), 0), count: list.length, nights: list.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0) };
-  }, [live, today]);
-  const cur = useMemo(() => monthStats(live, monthStart, nextMonthStart, today, nightlyRevenue), [live, monthStart, nextMonthStart, today]);
-  const channelRows: ChannelRow[] = useMemo(() => cur.byChannel.filter((r) => r.revenue > 0 && r.channel in CHANNELS).slice(0, 5).map((r) => ({
+  // --- Ricavi, canali, provenienza, anticipo e durata: TUTTI sulle prenotazioni in corso e future, come il riepilogo di Prenotazioni ---
+  // (chi parte oggi conta ancora; totale lordo = soggiorno + pulizia + extra).
+  const upcomingList = useMemo(() => live.filter((b) => b.checkOut >= today), [live, today]);
+  const upcoming = useMemo(() => ({
+    total: upcomingList.reduce((a, b) => a + bookingPaidTotal(b), 0), count: upcomingList.length, nights: upcomingList.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0),
+  }), [upcomingList]);
+  // Ricavi per canale: il totale di ogni prenotazione intero (spalmato sulle sue notti) sull'intero arco delle prenotazioni.
+  const byChannel = useMemo(() => {
+    if (!upcomingList.length) return [];
+    const from = upcomingList.reduce((m, b) => (b.checkIn < m ? b.checkIn : m), upcomingList[0].checkIn);
+    const to = upcomingList.reduce((m, b) => (b.checkOut > m ? b.checkOut : m), upcomingList[0].checkOut);
+    return monthStats(upcomingList, from, to, today, (b) => bookingPaidTotal(b) / stayNights(b)).byChannel;
+  }, [upcomingList, today]);
+  const channelRows: ChannelRow[] = useMemo(() => byChannel.filter((r) => r.revenue > 0 && r.channel in CHANNELS).slice(0, 5).map((r) => ({
     channel: r.channel as Channel, label: r.mixed ? "Altre OTA" : CHANNELS[r.channel as Channel].label, color: loadChannelColor(r.channel as Channel) || `var(${CHANNELS[r.channel as Channel].cssVar})`, // il colore scelto in Canali, altrimenti quello del portale
-    revenue: Math.round(r.revenue), count: r.count, share: cur.total ? Math.round((r.revenue / cur.total) * 100) : 0, name: r.name,
-  })), [cur]);
+    revenue: Math.round(r.revenue), count: r.count, share: upcoming.total ? Math.round((r.revenue / upcoming.total) * 100) : 0, name: r.name,
+  })), [byChannel, upcoming.total]);
 
-  // ADR e RevPAR degli ultimi 14 giorni (ricavo per notte / camere occupate, e / camere disponibili).
-  const rates = useMemo(() => {
-    const rev = monthStats(live, addDaysISO(today, -13), addDaysISO(today, 1), today, nightlyRevenue).daily;
-    return rateSeries(rev, last14.map((c) => c.occupied), tonight?.total ?? 0);
-  }, [live, today, last14, tonight]);
-
-  // Pickup, anticipo, durata e provenienza (ultimi 12 mesi di arrivi).
-  const pickup = useMemo(() => pickupDaily(live, today, 30), [live, today]);
-  const yearAgo = addDaysISO(today, -365);
-  const lastYear = useMemo(() => live.filter((b) => b.checkIn >= yearAgo && b.checkIn <= today), [live, yearAgo, today]);
-  const leadHisto = useMemo(() => histogram(lastYear.map(leadDays).filter((v): v is number => v !== null), LEAD_UPPER, LEAD_LABELS), [lastYear]);
-  const stayHisto = useMemo(() => histogram(lastYear.map(stayNights), STAY_UPPER, STAY_LABELS), [lastYear]);
-  const countries = useMemo(() => topCountries(lastYear.map((b) => guestMap.get(b.guestId)?.country), 5), [lastYear, guestMap]);
+  // Pickup (ricevute negli ultimi 30 giorni, tra quelle in corso e future), anticipo, durata e provenienza.
+  const pickup = useMemo(() => pickupDaily(upcomingList, today, 30), [upcomingList, today]);
+  const leadHisto = useMemo(() => histogram(upcomingList.map(leadDays).filter((v): v is number => v !== null), LEAD_UPPER, LEAD_LABELS), [upcomingList]);
+  const stayHisto = useMemo(() => histogram(upcomingList.map(stayNights), STAY_UPPER, STAY_LABELS), [upcomingList]);
+  const countries = useMemo(() => topCountries(upcomingList.map((b) => guestMap.get(b.guestId)?.country), 5), [upcomingList, guestMap]);
 
   // --- Righe di "Oggi" ---
   const multiAll = sFilter === "all" && structures.length > 1;
@@ -216,10 +210,10 @@ export default function Dashboard2() {
           occupied={tonight?.occupied ?? 0} totalRooms={tonight?.total ?? 0} pct={tonight?.pct ?? 0}
         />
         <div className="grid gap-4 lg:grid-cols-12">
-          <div className={`order-4 lg:order-none ${hasPickup ? "lg:col-span-8" : "lg:col-span-12"} ${wrap}`}><Giorni cells={strip} delay={60} /></div>
+          <div className={`order-4 lg:order-none ${hasPickup ? "lg:col-span-8" : "lg:col-span-12"} ${wrap}`}><Giorni cells={stripFwd} delay={60} /></div>
           {hasPickup && <div className={`order-5 lg:order-none lg:col-span-4 ${wrap}`}><Pickup pickup={pickup} delay={120} /></div>}
-          <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} adr={{ avg: rates.adrAvg, series: rates.adr }} revpar={{ avg: rates.revparAvg, series: rates.revpar }} delay={60} /></div>
-          {channelRows.length > 0 && <div className={`order-7 lg:order-none ${SPAN[rowC]} ${wrap}`}><Canali rows={channelRows} total={cur.total} monthName={MESI[mIdx]} delay={120} /></div>}
+          <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} delay={60} /></div>
+          {channelRows.length > 0 && <div className={`order-7 lg:order-none ${SPAN[rowC]} ${wrap}`}><Canali rows={channelRows} total={upcoming.total} monthName="in corso e future" delay={120} /></div>}
           {countries.rows.length > 0 && <div className={`order-8 lg:order-none ${SPAN[rowC]} ${wrap}`}><Provenienza rows={countries.rows} known={countries.known} delay={180} /></div>}
           {hasPren && <div className={`order-9 lg:order-none lg:col-span-12 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
           <div className={`order-11 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} health={health} delay={60} /></div>

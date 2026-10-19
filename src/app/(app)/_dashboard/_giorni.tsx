@@ -1,6 +1,6 @@
 "use client";
 
-// Occupazione: ultimi 30 giorni (smeraldo) e prossimi 30 (indaco) in un solo grafico ad area, con fascia weekend, linea "oggi" e tooltip.
+// Occupazione da oggi in avanti (indaco) in un grafico ad area, con fascia weekend, linea "oggi" e tooltip. Se la serie contiene anche giorni passati, questi sono in smeraldo.
 import { fmtDM } from "@/lib/dates";
 import { type DayCell } from "@/lib/dashboard";
 import { tint } from "../_ui";
@@ -19,7 +19,8 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
   const line = (a: number, b: number) => cells.slice(a, b + 1).map((c, k) => `${k === 0 ? "M" : "L"}${x(a + k).toFixed(1)},${y(c.pct).toFixed(1)}`).join(" ");
   const area = (a: number, b: number) => `${line(a, b)} L${x(b).toFixed(1)},${H - PAD} L${x(a).toFixed(1)},${H - PAD} Z`;
   const avg = (a: number, b: number) => { const l = cells.slice(a, b).filter((c) => c.total > 0); return l.length ? Math.round(l.reduce((s, c) => s + c.pct, 0) / l.length) : 0; };
-  const past = avg(0, ti), next = avg(ti + 1, n);
+  const noPast = ti === 0; // serie da oggi in avanti: niente parte passata
+  const past = avg(0, ti), next = noPast ? avg(0, n) : avg(ti + 1, n);
   const hc = idx !== null ? cells[idx] : null;
   const hasRooms = cells.some((c) => c.total > 0);
   return (
@@ -28,8 +29,8 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
         title="Occupazione"
         right={hasRooms ? (
           <div className="flex items-center gap-1.5 text-[11px] font-semibold">
-            <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: tint(P.cy, 14), color: P.cy }} title="Media degli ultimi 30 giorni">30g · <CountUp value={past} format={(v) => `${Math.round(v)}%`} /></span>
-            <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: tint(P.vi, 14), color: P.vi }} title="Media dei prossimi 30 giorni">+30g · <CountUp value={next} format={(v) => `${Math.round(v)}%`} /></span>
+            {!noPast && <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: tint(P.cy, 14), color: P.cy }} title="Media degli ultimi 30 giorni">30g · <CountUp value={past} format={(v) => `${Math.round(v)}%`} /></span>}
+            <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: tint(P.vi, 14), color: P.vi }} title={`Media dei prossimi ${noPast ? n : 30} giorni`}>{noPast ? `${n}g` : "+30g"} · <CountUp value={next} format={(v) => `${Math.round(v)}%`} /></span>
           </div>
         ) : null}
       />
@@ -37,7 +38,7 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
         <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-faint">Nessuna camera configurata.</div>
       ) : (
         <>
-          <div className="relative" {...bind} role="img" aria-label={`Occupazione degli ultimi 30 e dei prossimi 30 giorni. Media passata ${past}%, prevista ${next}%.`}>
+          <div className="relative" {...bind} role="img" aria-label={noPast ? `Occupazione dei prossimi ${n} giorni. Media prevista ${next}%.` : `Occupazione degli ultimi 30 e dei prossimi 30 giorni. Media passata ${past}%, prevista ${next}%.`}>
             <div style={{ clipPath: on || reduced ? "inset(-8px 0 -8px 0)" : "inset(-8px 100% -8px 0)", transition: reduced ? "none" : "clip-path 1.4s cubic-bezier(.22,1,.36,1) .15s" }}>
               <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-32 w-full overflow-visible sm:h-36" aria-hidden>
                 <defs>
@@ -48,9 +49,9 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
                   <rect key={c.iso} x={x(i) - W / (n - 1) / 2} y={PAD / 2} width={W / (n - 1)} height={H - PAD} fill="var(--faint)" opacity=".1" />
                 ))}
                 {[50, 100].map((g) => <line key={g} x1="0" x2={W} y1={y(g)} y2={y(g)} stroke="var(--line)" strokeWidth="1" strokeDasharray="2 5" vectorEffect="non-scaling-stroke" />)}
-                <path d={area(0, ti)} fill="url(#d2-occ-p)" />
+                {!noPast && <path d={area(0, ti)} fill="url(#d2-occ-p)" />}
                 <path d={area(ti, n - 1)} fill="url(#d2-occ-f)" />
-                <path d={line(0, ti)} fill="none" stroke="var(--d2-cy)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                {!noPast && <path d={line(0, ti)} fill="none" stroke="var(--d2-cy)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
                 <path d={line(ti, n - 1)} fill="none" stroke="var(--d2-vi)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                 <line x1={x(ti)} x2={x(ti)} y1={PAD / 2} y2={H - PAD / 2} stroke="var(--txt)" strokeWidth="1" strokeDasharray="3 3" opacity=".45" vectorEffect="non-scaling-stroke" />
                 {hc && <line x1={x(idx!)} x2={x(idx!)} y1={PAD / 2} y2={H - PAD / 2} stroke="var(--txt)" strokeWidth="1" opacity=".35" vectorEffect="non-scaling-stroke" />}
@@ -67,8 +68,8 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
             )}
           </div>
           <div className="relative mt-1.5 flex justify-between text-[10px] text-faint">
-            <span>{fmtDM(cells[0].iso)}</span>
-            <span className="font-semibold text-dim">oggi</span>
+            <span>{noPast ? "oggi" : fmtDM(cells[0].iso)}</span>
+            {noPast ? <span /> : <span className="font-semibold text-dim">oggi</span>}
             <span>{fmtDM(cells[n - 1].iso)}</span>
           </div>
         </>

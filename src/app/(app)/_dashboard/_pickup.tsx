@@ -1,6 +1,6 @@
 "use client";
 
-// Pickup: prenotazioni ricevute ogni giorno negli ultimi 30 giorni. Colonne sottili, ultimi 7 giorni evidenziati, confronto con la settimana prima.
+// Pickup: prenotazioni (in corso e future) ricevute ogni giorno negli ultimi 30 giorni. Colonne sottili, ultimi 7 giorni evidenziati, confronto con la settimana prima.
 import { fmtDM } from "@/lib/dates";
 import { type PickupStats } from "@/lib/dashboard";
 import { tint } from "../_ui";

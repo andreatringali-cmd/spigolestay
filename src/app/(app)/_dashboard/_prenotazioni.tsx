@@ -1,6 +1,6 @@
 "use client";
 
-// Anticipo e durata: due mini istogrammi (quanti giorni prima si prenota, quante notti si resta) sulle prenotazioni degli ultimi 12 mesi.
+// Anticipo e durata: due mini istogrammi (quanti giorni prima si prenota, quante notti si resta) sulle prenotazioni in corso e future.
 import { type Histo } from "@/lib/dashboard";
 import { Columns, CountUp, P, Tile, TileHead, Tip, useChartHover } from "./_kit";
 
@@ -33,7 +33,7 @@ function Mini({ title, unit, histo, color, delay, fmtAvg }: { title: string; uni
 export default function Prenotazioni({ lead, stay, delay = 0 }: { lead: Histo; stay: Histo; delay?: number }) {
   return (
     <Tile label="Anticipo e durata" delay={delay}>
-      <TileHead title="Prenotazioni" sub="Anticipo e durata, 12 mesi" />
+      <TileHead title="Prenotazioni" sub="Anticipo e durata, in corso e future" />
       <div className="grid gap-5 sm:grid-cols-2">
         {lead.total > 0 && <Mini title="Anticipo" unit="giorni" histo={lead} color={P.vi} delay={150} fmtAvg={(v) => String(Math.round(v))} />}
         {stay.total > 0 && <Mini title="Durata" unit="notti" histo={stay} color={P.cy} delay={250} fmtAvg={(v) => (Math.round(v * 10) / 10).toString().replace(".", ",")} />}

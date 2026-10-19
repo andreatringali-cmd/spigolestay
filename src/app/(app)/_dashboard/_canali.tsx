@@ -24,7 +24,7 @@ export default function Canali({ rows, total, monthName, delay = 0 }: { rows: Ch
     <Tile label="Canali" delay={delay}>
       <TileHead title="Canali" sub={monthName} right={<MoreLink href="/canali">Gestisci</MoreLink>} />
       <div className="flex items-center gap-4">
-        <div className="relative h-[116px] w-[116px] shrink-0 sm:h-[128px] sm:w-[128px]" role="img" aria-label={`Quote dei ricavi di ${monthName} per canale: ${rows.map((r) => `${r.label} ${r.share}%`).join(", ")}`}>
+        <div className="relative h-[116px] w-[116px] shrink-0 sm:h-[128px] sm:w-[128px]" role="img" aria-label={`Quote dei ricavi per canale (${monthName}): ${rows.map((r) => `${r.label} ${r.share}%`).join(", ")}`}>
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden>
             <circle cx="50" cy="50" r="38" fill="none" stroke="var(--wash)" strokeWidth="12" />
             {segs.map((s) => (

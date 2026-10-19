@@ -1,6 +1,6 @@
 "use client";
 
-// Provenienza: i primi 5 Paesi degli ospiti (ultimi 12 mesi) con bandiera e barre sottili.
+// Provenienza: i primi 5 Paesi degli ospiti (prenotazioni in corso e future) con bandiera e barre sottili.
 import Flag from "@/components/Flag";
 import type { CountryRow } from "@/lib/dashboard";
 import { tint } from "../_ui";
@@ -20,7 +20,7 @@ export default function Provenienza({ rows, known, delay = 0 }: { rows: CountryR
   const top = rows[0]?.count || 1;
   return (
     <Tile label="Provenienza degli ospiti" delay={delay}>
-      <TileHead title="Provenienza" sub={`${known} prenotazioni, 12 mesi`} right={<MoreLink href="/provenienza">Dettagli</MoreLink>} />
+      <TileHead title="Provenienza" sub={`${known} prenotazioni, in corso e future`} right={<MoreLink href="/provenienza">Dettagli</MoreLink>} />
       <ul className="flex flex-col gap-3">
         {rows.map((r, i) => (
           <li key={r.code} className="flex items-center gap-3" title={`${r.name}: ${r.count} ${r.count === 1 ? "prenotazione" : "prenotazioni"} (${r.share}%)`}>
