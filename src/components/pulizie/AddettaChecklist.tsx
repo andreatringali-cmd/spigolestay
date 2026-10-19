@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import type { Structure, Unit } from "@/lib/types";
 import {
-  KEY_CHECKS, KEY_TASKS, WEEKDAY_SHORT, WEEKDAY_LONG, exampleTasks, freqLabel, liveTasks, normalizeFreq, removeEntity, targetsFor, taskState, toggleCheck, weekDates, weekSummary,
+  KEY_CHECKS, KEY_TASKS, WEEKDAY_SHORT, WEEKDAY_LONG, freqLabel, liveTasks, normalizeFreq, removeEntity, targetsFor, taskState, toggleCheck, weekDates, weekSummary,
   type CleanCheck, type CleanTask, type Freq, type TaskScope, type TaskState,
 } from "@/lib/pulizie-addetta";
 import { fmtDMY } from "@/lib/dates";
@@ -71,7 +71,6 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
     );
   };
 
-  const seed = () => setTasks((prev) => [...prev, ...exampleTasks(Date.now(), newId).map((t) => ({ ...t, structureId: structures.length === 1 ? structures[0].id : undefined }))]);
   const saveTask = () => {
     const e = editing; if (!e || !e.name?.trim()) return;
     const n = Date.now();
@@ -131,18 +130,6 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
       </Card>
 
       {!canEdit && <p className="rounded-lg bg-wash px-3 py-2 text-xs text-dim">Hai solo il permesso di lettura: non puoi spuntare le voci.</p>}
-
-      {groups.length === 0 && (
-        <Card className="p-4 text-center text-sm text-dim">
-          {isManager ? (<>
-            <p>La checklist è vuota. Crea le voci da far spuntare alla signora (con quante volte a settimana).</p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className={btnPrimary}>Nuova voce</button>
-              <button onClick={seed} className={btnGhost}>Aggiungi 3 esempi</button>
-            </div>
-          </>) : "Il titolare non ha ancora impostato la checklist."}
-        </Card>
-      )}
 
       {groups.map(({ s, common, rooms }) => (
         <div key={s.id} className="flex flex-col gap-3">

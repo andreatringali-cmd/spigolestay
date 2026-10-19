@@ -540,7 +540,7 @@ export default function PuliziePage() {
           </div>
           </div>
           {/* Acquisti: il materiale comprato (carta igienica, prodotti…), con riepilogo per periodo */}
-          <AddettaPurchases structures={scopeStructures} canEdit={level("pulizie") === "edit"} activeStructureId={activeStructureId} />
+          <div className="grid gap-4 lg:grid-cols-2"><AddettaPurchases structures={scopeStructures} canEdit={level("pulizie") === "edit"} activeStructureId={activeStructureId} /></div> {/* stessa larghezza del box Prodotti */}
         </div>
       ) : (<>
 
