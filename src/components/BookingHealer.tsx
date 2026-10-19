@@ -43,6 +43,18 @@ export default function BookingHealer() {
   const hasData = raw.bookings.length > 0;
   const sessionCount = useRef(0);
   const running = useRef(false);
+  const nightFixed = useRef(new Set<string>());
+
+  // Totali arrotondati → somma delle notti: è un controllo solo locale (nessuna rete), quindi parte subito e a ogni cambio dei dati, senza aspettare il giro con Channex.
+  useEffect(() => {
+    if (!hasData) return;
+    try { if (localStorage.getItem("xn-collab") === "1") return; } catch { /* niente */ }
+    const t = setTimeout(() => {
+      const fix = healTotalsFromNights(ref.current.bookings).filter((f) => !nightFixed.current.has(f.id)); // una sola volta per prenotazione e sessione (mai in ciclo)
+      if (fix.length) { fix.forEach((f) => nightFixed.current.add(f.id)); ref.current.patch(fix); }
+    }, 2_000);
+    return () => clearTimeout(t);
+  }, [hasData, raw.bookings]);
 
   useEffect(() => {
     if (!hasData) return;
