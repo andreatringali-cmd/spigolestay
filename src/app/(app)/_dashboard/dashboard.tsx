@@ -17,7 +17,7 @@ import { contactReportCached } from "@/lib/contacts-check";
 import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
-  addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, diffDays, greetingFor, histogram, isLive, LEAD_LABELS, LEAD_UPPER,
+  addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, greetingFor, histogram, isLive, LEAD_LABELS, LEAD_UPPER,
   leadDays, monthStats, occupancyStrip, pickupDaily, rateSeries, splitDay, statusSentence, STAY_LABELS, STAY_UPPER, stayNights, todaySentence, topCountries,
   unassignedArrivals,
 } from "@/lib/dashboard";
@@ -126,9 +126,12 @@ export default function Dashboard2() {
   const monthStart = `${today.slice(0, 7)}-01`;
   const monthDays = new Date(Date.UTC(Number(today.slice(0, 4)), mIdx + 1, 0)).getUTCDate();
   const nextMonthStart = addDaysISO(monthStart, monthDays);
-  const prevStart = `${addDaysISO(monthStart, -1).slice(0, 7)}-01`;
+  // Ricavi: stessa cifra del riepilogo di Prenotazioni con «In corso e future» (chi parte oggi conta ancora; totale lordo = soggiorno + pulizia + extra).
+  const upcoming = useMemo(() => {
+    const list = live.filter((b) => b.checkOut >= today);
+    return { total: list.reduce((a, b) => a + bookingPaidTotal(b), 0), count: list.length, nights: list.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0) };
+  }, [live, today]);
   const cur = useMemo(() => monthStats(live, monthStart, nextMonthStart, today, nightlyRevenue), [live, monthStart, nextMonthStart, today]);
-  const prev = useMemo(() => monthStats(live, prevStart, monthStart, today, nightlyRevenue), [live, prevStart, monthStart, today]);
   const channelRows: ChannelRow[] = useMemo(() => cur.byChannel.filter((r) => r.revenue > 0 && r.channel in CHANNELS).slice(0, 5).map((r) => ({
     channel: r.channel as Channel, label: r.mixed ? "Altre OTA" : CHANNELS[r.channel as Channel].label, color: loadChannelColor(r.channel as Channel) || `var(${CHANNELS[r.channel as Channel].cssVar})`, // il colore scelto in Canali, altrimenti quello del portale
     revenue: Math.round(r.revenue), count: r.count, share: cur.total ? Math.round((r.revenue / cur.total) * 100) : 0, name: r.name,
@@ -215,7 +218,7 @@ export default function Dashboard2() {
         <div className="grid gap-4 lg:grid-cols-12">
           <div className={`order-4 lg:order-none ${hasPickup ? "lg:col-span-8" : "lg:col-span-12"} ${wrap}`}><Giorni cells={strip} delay={60} /></div>
           {hasPickup && <div className={`order-5 lg:order-none lg:col-span-4 ${wrap}`}><Pickup pickup={pickup} delay={120} /></div>}
-          <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi monthName={MESI[mIdx]} prevName={MESI[(mIdx + 11) % 12]} cur={cur} prev={prev} todayIdx={diffDays(today, monthStart)} adr={{ avg: rates.adrAvg, series: rates.adr }} revpar={{ avg: rates.revparAvg, series: rates.revpar }} delay={60} /></div>
+          <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} adr={{ avg: rates.adrAvg, series: rates.adr }} revpar={{ avg: rates.revparAvg, series: rates.revpar }} delay={60} /></div>
           {channelRows.length > 0 && <div className={`order-7 lg:order-none ${SPAN[rowC]} ${wrap}`}><Canali rows={channelRows} total={cur.total} monthName={MESI[mIdx]} delay={120} /></div>}
           {countries.rows.length > 0 && <div className={`order-8 lg:order-none ${SPAN[rowC]} ${wrap}`}><Provenienza rows={countries.rows} known={countries.known} delay={180} /></div>}
           {hasPren && <div className={`order-9 lg:order-none lg:col-span-12 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
