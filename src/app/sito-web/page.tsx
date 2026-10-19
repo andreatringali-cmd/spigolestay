@@ -83,6 +83,18 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "Sito creato dal gruppo": { en: "Website by the", fr: "Site créé par le groupe", de: "Website vom Team", es: "Sitio creado por el grupo" },
   "notte": { en: "night", fr: "nuit", de: "Nacht", es: "noche" },
   "notti": { en: "nights", fr: "nuits", de: "Nächte", es: "noches" },
+  "Bimbo": { en: "Child", fr: "Enfant", de: "Kind", es: "Niño" },
+  "Prenotazione online sicura": { en: "Secure online booking", fr: "Réservation en ligne sécurisée", de: "Sichere Online-Buchung", es: "Reserva online segura" },
+  "da": { en: "from", fr: "à partir de", de: "ab", es: "desde" },
+  "Tutte": { en: "All", fr: "Toutes", de: "Alle", es: "Todas" },
+  "Valida per soggiorni": { en: "Valid for stays", fr: "Valable pour les séjours", de: "Gültig für Aufenthalte", es: "Válido para estancias" },
+  "dal": { en: "from", fr: "du", de: "vom", es: "desde el" },
+  "al": { en: "to", fr: "au", de: "bis", es: "hasta el" },
+  "Prenota entro il": { en: "Book by", fr: "Réservez avant le", de: "Buchen bis", es: "Reserva antes del" },
+  "Usiamo solo cookie tecnici necessari al funzionamento del sito.": { en: "We only use technical cookies required for the site to work.", fr: "Nous utilisons uniquement des cookies techniques nécessaires au fonctionnement du site.", de: "Wir verwenden nur technische Cookies, die für den Betrieb der Website nötig sind.", es: "Usamos solo cookies técnicas necesarias para el funcionamiento del sitio." },
+  "Informativa privacy": { en: "Privacy notice", fr: "Politique de confidentialité", de: "Datenschutzerklärung", es: "Política de privacidad" },
+  "Accetta": { en: "Accept", fr: "Accepter", de: "Akzeptieren", es: "Aceptar" },
+  "Culla": { en: "Cot", fr: "Lit bébé", de: "Babybett", es: "Cuna" },
 };
 
 interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
@@ -356,22 +368,22 @@ export function Site() {
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
             <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
-              <label className="block text-[11px] font-medium text-dim">Arrivo<DateField lang={lang} value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
-              <label className="block text-[11px] font-medium text-dim">Partenza<DateField lang={lang} value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
-              <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
-              <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
-              <button onClick={() => go()} className="mt-auto rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
+              <label className="block text-[11px] font-medium text-dim">{T("Arrivo")}<DateField lang={lang} value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-[11px] font-medium text-dim">{T("Partenza")}<DateField lang={lang} value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-[11px] font-medium text-dim">{T("Adulti")}<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
+              <label className="block text-[11px] font-medium text-dim">{T("Bambini")}<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
+              <button onClick={() => go()} className="mt-auto rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Verifica disponibilità")}</button>
             </div>
             {ch > 0 && (
               <div className="mt-2 w-full rounded-2xl bg-white/95 p-3 shadow-lg">
-                <div className="mb-1 text-[11px] font-medium text-dim">Età dei bambini <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></div>
+                <div className="mb-1 text-[11px] font-medium text-dim">{T("Età dei bambini")}{lang === "it" && <> <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></>}</div>
                 <div className="flex flex-wrap items-center gap-2">
                   {childAges.map((age, i) => (
-                    <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">Bimbo {i + 1}
+                    <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">{T("Bimbo")} {i + 1}
                       <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus max-sm:py-1.5" />
                     </label>
                   ))}
-                  <label className="ml-1 flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Culla <span className="text-faint">(gratuita, su richiesta)</span></label>
+                  <label className="ml-1 flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {T("Culla")} <span className="text-faint">({T("gratuita, su richiesta")})</span></label>
                 </div>
               </div>
             )}
@@ -403,10 +415,10 @@ export function Site() {
                     </div>
                   ); })()}
                   <div className="p-3">
-                    <div className="flex items-center justify-between"><span className="font-semibold text-txt">{rt.name}</span><span className="font-mono text-sm font-bold text-txt">da {eur(effectiveBase(rt, roomTypes))}</span></div>
-                    <div className="mt-0.5 text-xs text-dim">{rt.beds} letti · fino a {rt.maxOccupancy ?? rt.beds} ospiti{rt.size ? ` · ${rt.size} m²` : ""}{rt.bedConfig ? ` · ${rt.bedConfig}` : ""}</div>
+                    <div className="flex items-center justify-between"><span className="font-semibold text-txt">{rt.name}</span><span className="font-mono text-sm font-bold text-txt">{T("da")} {eur(effectiveBase(rt, roomTypes))}</span></div>
+                    <div className="mt-0.5 text-xs text-dim">{rt.beds} {rt.beds === 1 && lang === "it" ? "letto" : T("letti")} · {T("fino a")} {rt.maxOccupancy ?? rt.beds} {(rt.maxOccupancy ?? rt.beds) === 1 && lang === "it" ? "ospite" : T("ospiti")}{rt.size ? ` · ${rt.size} m²` : ""}{rt.bedConfig ? ` · ${rt.bedConfig}` : ""}</div>
                     {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-2 text-dim">{(rt.amenities ?? []).slice(0, 8).map((a) => <span key={a} title={a} aria-label={a}>{amenityIcon(a)}</span>)}</div>}
-                    <div className="mt-2 text-xs font-medium" style={{ color: accent }}>Prenota →</div>
+                    <div className="mt-2 text-xs font-medium" style={{ color: accent }}>{T("Prenota")} →</div>
                   </div>
                 </button>
               ))}
@@ -446,7 +458,7 @@ export function Site() {
           if (!cards.length) return null;
           return (
             <section className="mt-10">
-              <h2 className="mb-3 font-display text-xl font-bold text-txt">Informazioni utili</h2>
+              <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Informazioni utili")}</h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map(([l, v]) => (
                   <div key={l} className="rounded-xl border border-line bg-surface p-3">
@@ -558,9 +570,9 @@ export function Site() {
         </section>
 
         <div className="mt-12 flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface p-6 text-center">
-          <div className="font-display text-lg font-bold text-txt">Prenota direttamente e risparmia</div>
-          <p className="max-w-md text-sm text-dim">Prenotando da qui eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.</p>
-          <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
+          <div className="font-display text-lg font-bold text-txt">{T("Prenota direttamente e risparmia")}</div>
+          <p className="max-w-md text-sm text-dim">{T("Prenotando da qui eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.")}</p>
+          <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Verifica disponibilità")}</button>
         </div>
 
         {/* Recensioni: UNA sola sezione "Dicono di noi" — recensioni degli ospiti
@@ -751,7 +763,7 @@ export function Site() {
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
             <span>© {new Date().getFullYear()} {name}. {T("Tutti i diritti riservati.")} · <button onClick={() => setShowPrivacy(true)} className="underline hover:text-dim">Privacy</button></span>
-            <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
+            <span>{T("Sito creato dal gruppo")} <b className="text-dim">Xenora</b> · {T("Prenotazione online sicura")}</span>
           </div>
         </div>
       </footer>
@@ -772,8 +784,8 @@ export function Site() {
       {!cookieOk && (
         <div className="fixed inset-x-0 bottom-16 z-50 mx-auto max-w-3xl px-4 md:bottom-4">
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-xl">
-            <span className="min-w-0 flex-1 text-xs text-dim">Usiamo solo cookie tecnici necessari al funzionamento del sito. <button onClick={() => setShowPrivacy(true)} className="font-semibold underline" style={{ color: accent }}>Informativa privacy</button>.</span>
-            <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white max-sm:py-3" style={{ backgroundColor: accent }}>Accetta</button>
+            <span className="min-w-0 flex-1 text-xs text-dim">{T("Usiamo solo cookie tecnici necessari al funzionamento del sito.")} <button onClick={() => setShowPrivacy(true)} className="font-semibold underline" style={{ color: accent }}>{T("Informativa privacy")}</button>.</span>
+            <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white max-sm:py-3" style={{ backgroundColor: accent }}>{T("Accetta")}</button>
           </div>
         </div>
       )}

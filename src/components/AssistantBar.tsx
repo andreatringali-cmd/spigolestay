@@ -82,7 +82,7 @@ export default function AssistantBar() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) { e.preventDefault(); void askAi(); } }}
-                placeholder="Chiedimi qualsiasi cosa…"
+                placeholder={t("Chiedimi qualsiasi cosa…")}
                 className="w-full bg-transparent text-[15px] text-txt outline-none placeholder:text-faint"
               />
               {q

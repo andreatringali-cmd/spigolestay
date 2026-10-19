@@ -40,7 +40,7 @@ export default function RiepilogoImport({ report, bookings, guests, structureNam
     a.href = URL.createObjectURL(blob);
     a.download = `riepilogo-importazione-${ymdRome(new Date())}.csv`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    const u = a.href; setTimeout(() => URL.revokeObjectURL(u), 4000); // non subito: il download deve fare in tempo a partire
   };
 
   const cell = (label: string, value: string | number, tone?: string, hint?: string) => (

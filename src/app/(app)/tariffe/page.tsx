@@ -56,7 +56,8 @@ export default function TariffePage() {
   const { t } = useLang();
   const [allPlans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
   // Solo i piani della struttura in vista (+ quelli per tutte, senza structureId).
-  const plans = allPlans.filter((p) => inScope(p.structureId, effStructure));
+  // (i piani sospesi non si offrono più: niente anteprima per loro)
+  const plans = allPlans.filter((p) => p.enabled !== false && inScope(p.structureId, effStructure));
   const [weekendPct, setWeekendPct] = useState(25);
   const [weekendOn, setWeekendOnState] = useState(true);
   const [planId, setPlanId] = useState("flex");
@@ -314,7 +315,7 @@ export default function TariffePage() {
         <Card>
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1"><input type="number" value={weekendPct} disabled={!weekendOn} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20 disabled:opacity-40`} /><span className="text-dim">%</span></span>
-            <span className="text-xs text-faint">{weekendOn ? t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario") : t("spenta: nessuna maggiorazione applicata nel weekend")}</span>
+            <span className="text-xs text-faint">{weekendOn ? t("su sab/dom, se non c'è un prezzo forzato dal calendario") : t("spenta: nessuna maggiorazione applicata nel weekend")}</span>
             <button type="button" onClick={() => setWeekendOn(!weekendOn)} aria-pressed={weekendOn} title={weekendOn ? t("Disattiva la maggiorazione weekend") : t("Attiva la maggiorazione weekend")} className="relative ml-auto h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: weekendOn ? "var(--ok)" : "var(--line)" }}>
               <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
             </button>

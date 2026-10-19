@@ -23,6 +23,7 @@ import {
 } from "@/lib/dashboard";
 import Hero from "./_hero";
 import { useAuth } from "@/lib/authsync";
+import { useAccess } from "@/lib/access";
 import Adempimenti from "./_adempimenti";
 import Oggi, { type MoveRow } from "./_oggi";
 import Giorni from "./_giorni";
@@ -191,7 +192,9 @@ export default function Dashboard2() {
   const controlliOnTop = controlli.length > 0;
   const wrap = "min-w-0 [&>section]:h-full";
   const { user: authUser } = useAuth();
-  const firstName = ((authUser?.user_metadata as Record<string, unknown> | undefined)?.full_name as string | undefined)?.trim().split(/\s+/)[0] || "";
+  const authMd = authUser?.user_metadata as Record<string, unknown> | undefined; // il nome arriva da «full_name» (registrazione) o da «first_name» (configurazione guidata)
+  const { user: localUser } = useAccess();
+  const firstName = (localUser?.firstName?.trim() || (authMd?.first_name as string | undefined) || (authMd?.full_name as string | undefined) || "").trim().split(/\s+/)[0];
   const SPAN: Record<number, string> = { 1: "lg:col-span-12", 2: "lg:col-span-6", 3: "lg:col-span-4" };
   const hasPickup = pickup.total > 0;
   const hasPren = leadHisto.total > 0 || stayHisto.total > 0;

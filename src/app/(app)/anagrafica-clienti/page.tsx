@@ -27,6 +27,7 @@ export default function AnagraficaClientiPage() {
   const [kind, setKind] = useState("all");
   const [edit, setEdit] = useState<ReturnType<typeof emptyForm> | null>(null);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(""); // errore di salvataggio mostrato nel pannello
   // Sincronizzazione con Fatture in Cloud (visibile solo se è il provider fatture ed è collegato).
   const [ficOn, setFicOn] = useState(false);
   const [sync, setSync] = useState<{ open: boolean; busy: boolean; msg: string; prev: SyncPreview | null; send: Set<string>; imp: Set<string> }>({ open: false, busy: false, msg: "", prev: null, send: new Set(), imp: new Set() });
@@ -68,15 +69,19 @@ export default function AnagraficaClientiPage() {
 
   const filtered = useMemo(() => list.filter((c) => (kind === "all" || c.kind === kind) && (!q.trim() || `${c.name} ${c.vat ?? ""} ${c.tax_code ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()))), [list, q, kind]);
 
-  const openEdit = (c: CP) => setEdit({ id: c.id, kind: c.kind, name: c.name, vat: c.vat ?? "", tax_code: c.tax_code ?? "", address: c.address ?? "", city: c.city ?? "", cap: c.cap ?? "", province: c.province ?? "", country: c.country ?? "IT", sdi_code: c.sdi_code ?? "", pec: c.pec ?? "", email: c.email ?? "" });
+  const openEdit = (c: CP) => { setErr(""); setEdit({ id: c.id, kind: c.kind, name: c.name, vat: c.vat ?? "", tax_code: c.tax_code ?? "", address: c.address ?? "", city: c.city ?? "", cap: c.cap ?? "", province: c.province ?? "", country: c.country ?? "IT", sdi_code: c.sdi_code ?? "", pec: c.pec ?? "", email: c.email ?? "" }); };
   const save = async () => {
-    if (!supabase || !user || !edit || !edit.name.trim()) return;
-    setSaving(true);
+    if (!edit) return;
+    if (!edit.name.trim()) { setErr(edit.kind === "privato" ? "Inserisci nome e cognome." : "Inserisci la ragione sociale."); return; }
+    if (!supabase || !user) { setErr("Salvataggio non disponibile: accedi con il tuo account."); return; }
+    setErr(""); setSaving(true);
     const row = { tenant_id: tenantId ?? user.id, kind: edit.kind, name: edit.name.trim(), vat: edit.vat || null, tax_code: edit.tax_code || null, address: edit.address || null, city: edit.city || null, cap: edit.cap || null, province: edit.province || null, country: edit.country || "IT", sdi_code: edit.sdi_code || null, pec: edit.pec || null, email: edit.email || null };
     const res = edit.id ? await supabase.from("counterparts").update(row).eq("id", edit.id) : await supabase.from("counterparts").insert(row);
-    setSaving(false); if (!res.error) { setEdit(null); load(); }
+    setSaving(false);
+    if (res.error) { setErr(`Non è stato possibile salvare: ${res.error.message}`); return; }
+    setEdit(null); load();
   };
-  const del = async () => { if (!supabase || !edit?.id) return; if (!(await ask({ message: "Eliminare questo intestatario?", danger: true, confirmLabel: "Elimina" }))) return; await supabase.from("counterparts").delete().eq("id", edit.id); setEdit(null); load(); };
+  const del = async () => { if (!supabase || !edit?.id) return; if (!(await ask({ message: "Eliminare questo intestatario?", danger: true, confirmLabel: "Elimina" }))) return; const r = await supabase.from("counterparts").delete().eq("id", edit.id); if (r.error) { setErr(`Non è stato possibile eliminare: ${r.error.message}`); return; } setEdit(null); load(); };
 
   const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:min-h-10";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -89,7 +94,7 @@ export default function AnagraficaClientiPage() {
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" className="w-full sm:w-72" />
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={sel}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-          <button onClick={() => setEdit(emptyForm())} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">+ Nuovo</button>
+          <button onClick={() => { setErr(""); setEdit(emptyForm()); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">+ Nuovo</button>
           {ficOn && <button onClick={openSync} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Sincronizza con Fatture in Cloud</button>}
         </div>
       </Card>
@@ -167,6 +172,7 @@ export default function AnagraficaClientiPage() {
               <label className={lbl}>PEC<input value={edit.pec} onChange={(e) => setEdit({ ...edit, pec: e.target.value })} className={inp} /></label>
               <label className={`${lbl} sm:col-span-2`}>Email<input value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} className={inp} /></label>
             </div>
+            {err && <p role="alert" className="mt-2 rounded-lg bg-paper px-3 py-2 text-xs text-[color:var(--err)]">{err}</p>}
             <div className="mt-3 flex items-center gap-2">
               <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{saving ? "Salvo…" : "Salva"}</button>
               {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)] max-sm:min-h-11">Elimina</button>}

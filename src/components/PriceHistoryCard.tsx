@@ -9,6 +9,7 @@ import { useData } from "@/lib/store";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { eur } from "@/lib/format";
+import { plural } from "@/lib/plural";
 import { Card, SectionTitle } from "@/components/ui";
 import { loadHistory, subscribeHistory, planUndo, markUndone, SOURCE_LABEL, type PriceBatch, type RevenueSource } from "@/lib/revenue-history";
 
@@ -33,15 +34,15 @@ export default function PriceHistoryCard({ structureId, sources, onUndone }: { s
     const sName = structures.find((s) => s.id === b.structureId)?.name ?? "";
     const ok = await ask({
       title: "Annulla applicazione tariffe",
-      message: `Ripristino ${n} tariffe${sName ? ` di ${sName}` : ""} al valore di prima.${plan.skipped ? ` ${plan.skipped} tariffe sono state ritoccate dopo e restano come sono.` : ""}`,
+      message: `Ripristino ${plural(n, "tariffa", "tariffe")}${sName ? ` di ${sName}` : ""} al valore di prima.${plan.skipped ? ` ${plural(plan.skipped, "tariffa è stata ritoccata", "tariffe sono state ritoccate")} dopo e ${plan.skipped === 1 ? "resta com'è" : "restano come sono"}.` : ""}`,
       confirmLabel: "Ripristina",
     });
     if (!ok) return;
     if (Object.keys(plan.restore).length) setDayRates(plan.restore);
     if (plan.clear.length) clearDayRates(plan.clear);
     markUndone(b.id);
-    addActivity("rate", `Annullata applicazione tariffe (${SOURCE_LABEL[b.source]}, ${fmtTs(b.ts)}): ripristinate ${n} tariffe.`, b.structureId);
-    toast(`Ripristinate ${n} tariffe${plan.skipped ? ` · ${plan.skipped} lasciate (modificate dopo)` : ""}.`, "success");
+    addActivity("rate", `Annullata applicazione tariffe (${SOURCE_LABEL[b.source]}, ${fmtTs(b.ts)}): ripristinate ${plural(n, "tariffa", "tariffe")}.`, b.structureId);
+    toast(`Ripristinate ${plural(n, "tariffa", "tariffe")}${plan.skipped ? ` · ${plan.skipped} lasciate (modificate dopo)` : ""}.`, "success");
     onUndone?.(b);
   };
 
@@ -63,7 +64,7 @@ export default function PriceHistoryCard({ structureId, sources, onUndone }: { s
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-txt">{SOURCE_LABEL[b.source]} <span className="font-normal text-faint">· {fmtTs(b.ts)}</span>{structureId === "all" && structures.length > 1 && <span className="font-normal text-faint"> · {structures.find((s) => s.id === b.structureId)?.name ?? ""}</span>}</div>
-                  <div className="text-[11px] text-dim">{b.changes.length} tariffe · variazione media {avg > 0 ? "+" : ""}{avg}%{sample ? ` · es. ${sample.typeName} ${fmtDM(sample.iso)}: ${eur(sample.effBefore)} → ${eur(sample.after)}` : ""}</div>
+                  <div className="text-[11px] text-dim">{plural(b.changes.length, "tariffa", "tariffe")} · variazione media {avg > 0 ? "+" : ""}{avg}%{sample ? ` · es. ${sample.typeName} ${fmtDM(sample.iso)}: ${eur(sample.effBefore)} → ${eur(sample.after)}` : ""}</div>
                 </div>
                 {stillOn
                   ? <button onClick={() => void undo(b)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">Annulla</button>

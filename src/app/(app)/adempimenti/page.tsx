@@ -38,6 +38,8 @@ const expectedPaxOf = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children 
 const primaryDoneOf = (b: Booking) => b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
 // Un ospite conta come "dichiarato" solo se ha davvero dei dati (nome/cognome): un ospite
 // vuoto aggiunto come segnaposto NON conta (altrimenti risulterebbe "2/2" con 1 solo compilato).
+// Nome mostrato: chi ha fatto il check-in di QUESTA prenotazione (nei gruppi ogni camera ha il suo capocamera), poi l'anagrafica — come in Adempimenti 2.
+const shownName = (b: Booking, g?: Guest) => [b.primaryGuest?.firstName, b.primaryGuest?.lastName].filter(Boolean).join(" ") || g?.fullName || "Ospite";
 const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0);
 
 // Scheda di uno step in ordine cronologico: badge numerato (la sequenza è informativa),
@@ -131,7 +133,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
   return (
     <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{rooms && rooms > 1 ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {rooms} camere</span> : b.groupId ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span> : null}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
+        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {shownName(b, g)}{rooms && rooms > 1 ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {rooms} camere</span> : b.groupId ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span> : null}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
         <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
           {partial ? `Incompleto ${declared}/${expected}` : declared === 0 ? "Check-in mancante" : "Da fare"}
         </span>
@@ -298,7 +300,6 @@ export default function AdempimentiPage() {
   // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dati ospite non validi),
   // CHECK-IN FATTI (completi e validi). Lo stato dipende dai DATI della prenotazione, non dalla schedina.
   const arrivalsToday = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b)), [bookings, t]);
-  const arrivalsCheckedIn = arrivalsToday.filter((b) => isComplete(b) && bookingDataValid(b));
   // COLLASSO PER GRUPPO (solo visualizzazione PASSO 1): le prenotazioni con lo stesso groupId
   // diventano UNA voce (rappresentante = codice più basso, poi arrivo). Quelle senza groupId
   // restano individuali. Lo stato del gruppo è aggregato su TUTTE le sue prenotazioni.
@@ -347,7 +348,8 @@ export default function AdempimentiPage() {
   const weekAgo = addDaysYmd(t, -7); // aritmetica di calendario: niente toISOString (UTC), che sfasava di un giorno
   const needsTransfer = bookings.filter((b) => isActiveArrival(b) && isComplete(b) && (b.checkIn || "") >= weekAgo && !schedBookingIds.has(b.id));
   // Tra i "check-in fatti" (completi e validi), quali non hanno ancora la schedina generata → da trasferire.
-  const toTransfer = arrivalsCheckedIn.filter((b) => !schedBookingIds.has(b.id));
+  // Conteggio PER GRUPPO (come la lista «Check-in fatti» sopra): un gruppo non ancora completo non è tra i fatti, quindi non va contato.
+  const toTransfer = groupsCheckedIn.filter((gr) => !gr.members.every((m) => schedBookingIds.has(m.id)));
   // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
   // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
   type SchedRow = typeof sched[number];
@@ -367,7 +369,7 @@ export default function AdempimentiPage() {
   // Etichetta prenotazione: numero · ospite (· struttura solo se non già selezionata in alto).
   const bookingLabel = (bookingId: string | null, structureId: string | null) => {
     const b = bookingId ? bookings.find((x) => x.id === bookingId) : null;
-    const nm = b ? (getGuest(b.guestId)?.fullName || "Ospite") : "Prenotazione";
+    const nm = b ? shownName(b, getGuest(b.guestId)) : "Prenotazione";
     const code = b ? bkNo(b) : "";
     const stn = showStruct ? (getStructure(structureId || b?.structureId || "")?.name || "") : "";
     return `${code ? code + " · " : ""}${nm}${stn ? " · " + stn : ""}`;
@@ -502,7 +504,7 @@ export default function AdempimentiPage() {
                     const openCheckin = () => { const u = `${origin}/checkin?b=${b.id}`; const w = window.open(u, "_blank"); if (!w) window.location.href = u; };
                     return (
                       <button key={gr.key} onClick={openCheckin} title="Apri il check-in online per completare/correggere i dati" className="flex w-full items-center justify-between gap-2 rounded-lg border bg-paper px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-wash" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" }}>
-                        <span className="truncate text-dim"><span className="font-mono text-faint">{bkNo(b)}</span> · {g?.fullName || "Ospite"}{gr.rooms > 1 && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {gr.rooms} camere</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
+                        <span className="truncate text-dim"><span className="font-mono text-faint">{bkNo(b)}</span> · {shownName(b, g)}{gr.rooms > 1 && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {gr.rooms} camere</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
                         <span className="shrink-0 font-semibold" style={{ color: "var(--err)" }}>⚠ correggi →</span>
                       </button>
                     );
@@ -516,7 +518,7 @@ export default function AdempimentiPage() {
                     const b = gr.rep; const g = getGuest(b.guestId);
                     const allTransferred = gr.members.every((m) => schedBookingIds.has(m.id));
                     const roomsLabel = gr.rooms > 1 ? ` · ${gr.rooms} cam.` : "";
-                    return <DoneRow key={gr.key} left={`${bkNo(b)} · ${g?.fullName || "Ospite"}${roomsLabel}${structPart(b.structureId)}`} right={allTransferred ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${omini(gr.expected)}` : "↪ da trasferire"} />;
+                    return <DoneRow key={gr.key} left={`${bkNo(b)} · ${shownName(b, g)}${roomsLabel}${structPart(b.structureId)}`} right={allTransferred ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${omini(gr.expected)}` : "↪ da trasferire"} />;
                   })}
                   {toTransfer.length > 0
                     ? <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {toTransfer.length} da trasferire alle schedine — premi «Trasferisci».</div>

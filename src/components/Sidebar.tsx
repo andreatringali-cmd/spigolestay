@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Icon from "./Icon";
@@ -46,6 +46,8 @@ export default function Sidebar({
   const activeHref = visible.reduce((best, n) => (isActive(n.href, pathname) && n.href.length > best.length ? n.href : best), "");
   const activeGroup = visible.find((n) => n.href === activeHref)?.group ?? GROUPS[0];
   const [open, setOpen] = useState<Record<string, boolean>>({ [activeGroup]: true });
+  // Si cambia pagina da un link interno (assistente, scorciatoie, pulsanti): il gruppo della voce attiva si apre da solo, così la voce evidenziata si vede.
+  useEffect(() => { if (activeGroup) setOpen({ [activeGroup]: true }); }, [activeGroup]);
   // Accordion: aprendo un gruppo si chiude quello precedente (uno solo aperto per volta).
   // Somma dei badge delle voci di un gruppo (si vede sull'intestazione quando il gruppo è chiuso).
   const groupBadge = (g: string) => visible.filter((n) => n.group === g && !locked(n)).reduce((a, n) => a + badgeOf(n.href), 0);

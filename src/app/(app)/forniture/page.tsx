@@ -1,7 +1,7 @@
 "use client";
 
 import { fmtDate } from "@/lib/dates";
-import { csvCell } from "@/lib/invoicing/csv";
+import { csvCell, centsToCsv } from "@/lib/invoicing/csv";
 import { ymdRome } from "@/lib/dates-rome";
 import { friendlyError } from "@/lib/friendly-error";
 import { Fragment, useEffect, useMemo, useState } from "react";
@@ -58,19 +58,21 @@ export default function ForniturePage() {
   const [msg, setMsg] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [catFilter, setCatFilter] = useState<string>("");
+  const [catLoaded, setCatLoaded] = useState(false); // catalogo letto (anche se vuoto): serve per mostrare lo stato vuoto solo a caricamento finito
 
   // Con "Tutte le strutture" serve sceglierne una (checkout/riordino/scorte sono per singola struttura): niente ripiego silenzioso sulla prima.
   const structId = activeStructureId !== "all" ? activeStructureId : localStruct;
 
   useEffect(() => {
     (async () => {
-      if (!supabase) return;
+      if (!supabase) { setCatLoaded(true); return; }
       const [cRes, pRes] = await Promise.all([
         supabase.from("supply_categories").select("*").order("sort_order"),
         supabase.from("supply_products").select("*"),
       ]);
       setCats((cRes.data as Category[]) ?? []);
       setProds((pRes.data as Product[]) ?? []);
+      setCatLoaded(true);
     })();
     loadOrders();
     setCart(getCart());
@@ -313,8 +315,8 @@ export default function ForniturePage() {
   const exportOrdersCsv = () => {
     const head = ["Data", "Struttura", "Tipo", "Stato", "Imponibile", "IVA", "Totale", "Consegna"];
     const q = csvCell;
-    const rows = shownOrders.map((o) => [fmtDate(new Date(o.created_at)), structOf(o.structure_id), o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale", STATUS_LABEL[o.status] ?? o.status, ((o.subtotal_cents ?? 0) / 100).toFixed(2), ((o.vat_cents ?? 0) / 100).toFixed(2), (o.total_cents / 100).toFixed(2), o.delivery_date ?? ""].map(q).join(","));
-    const blob = new Blob(["﻿" + [head.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+    const rows = shownOrders.map((o) => [fmtDate(new Date(o.created_at)), structOf(o.structure_id), o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale", STATUS_LABEL[o.status] ?? o.status, centsToCsv(o.subtotal_cents), centsToCsv(o.vat_cents), centsToCsv(o.total_cents), o.delivery_date ? fmtDate(o.delivery_date) : ""].map(q).join(";")); // Excel italiano: separatore ";" e decimali con la virgola
+    const blob = new Blob(["﻿" + [head.map(q).join(";"), ...rows].join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "ordini-forniture.csv"; a.click(); URL.revokeObjectURL(a.href);
   };
 
@@ -360,6 +362,7 @@ export default function ForniturePage() {
               ))}
             </div>
 
+            {catLoaded && shownCats.length === 0 && <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-dim">Nessun prodotto disponibile a catalogo.</div>}
             {shownCats.map((cat) => (
               <div key={cat.id} className="mb-6">
                 <SectionTitle>{cat.name}</SectionTitle>

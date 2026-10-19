@@ -417,6 +417,28 @@ async function translateContent(content: GContent, to: string): Promise<GContent
   return { home, sections };
 }
 
+// Schermo del telefono nell'anteprima: la guida viene disegnata alla larghezza REALE di un telefono (390px) e poi scalata per entrare nella colonna,
+// altrimenti nel riquadro stretto (150-250px) la guida si "rompe" (scorre di lato) e non rispecchia quello che vede l'ospite.
+function PhoneScreen({ frameRef, frameKey, src, title }: { frameRef?: React.RefObject<HTMLIFrameElement | null>; frameKey: string; src: string; title: string }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+  useEffect(() => {
+    const el = boxRef.current; if (!el) return;
+    const upd = () => setScale(Math.max(0.2, Math.min(1, el.clientWidth / 390, (window.innerHeight * 0.8) / 844)));
+    upd();
+    const ro = new ResizeObserver(upd); ro.observe(el);
+    window.addEventListener("resize", upd);
+    return () => { ro.disconnect(); window.removeEventListener("resize", upd); };
+  }, []);
+  return (
+    <div ref={boxRef} className="w-full">
+      <div className="mx-auto overflow-hidden rounded-[1.6rem] bg-black" style={{ width: 390 * scale, height: 844 * scale }}>
+        <iframe ref={frameRef} key={frameKey} src={src} title={title} style={{ border: 0, width: 390, height: 844, transform: `scale(${scale})`, transformOrigin: "0 0" }} />
+      </div>
+    </div>
+  );
+}
+
 export default function GuidaOspitiPage() {
   const { structures, units, roomTypes, activeStructureId, updateStructure, bookings, getUnit, getGuest, addActivity } = useData();
   // Registra nel "Registro attività" una voce per sessione di modifica della guida (non a ogni tasto).
@@ -512,7 +534,7 @@ export default function GuidaOspitiPage() {
   // IMPORTANTE: non tocca nulla finché i dati salvati non sono stati caricati, altrimenti
   // al primo render (all ancora vuoto) sovrascriverebbe la guida salvata azzerando i contenuti.
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !sid) return; // senza struttura (arrivano dopo il primo render) non si crea un record guida con id vuoto
     const cur = all[sid];
     const base = cur ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "");
     // Lo scaffold delle sezioni è sempre presente: così le operative (contatti, WiFi, recensioni)
@@ -1347,21 +1369,19 @@ export default function GuidaOspitiPage() {
             // Mockup telefono: la guida è resa alla larghezza REALE di un telefono (390px) e poi
             // scalata, così tasti e proporzioni sono identici a uno smartphone vero (non "stirati").
             // Due telefoni affiancati: a sinistra l'esempio pronto (riferimento), a destra la TUA guida in tempo reale.
-            <div className="flex items-start justify-center gap-3">
+            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:items-start">
               {[
                 { url: exampleUrl, lab: "Esempio", live: false },
                 { url: previewUrl, lab: "Le tue modifiche", live: true },
               ].map((ph) => (
-                <div key={ph.lab} className="min-w-0 flex-1">
+                <div key={ph.lab} className="min-w-0 flex-1 max-sm:w-full max-sm:max-w-[360px] max-sm:flex-none">
                   <div className="mb-2 flex items-center justify-center gap-1.5">
                     <span className={`text-xs font-semibold ${ph.live ? "text-focus" : "text-faint"}`}>{ph.lab}</span>
                     {ph.live && savedThis && <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--ok)" }}><span className="inline-block h-1.5 w-1.5 rounded-full bg-white" /> Live</span>}
                   </div>
                   <div className="relative mx-auto rounded-[2rem] border border-line bg-[#111318] px-1.5 pb-1.5 pt-4 shadow-xl">
                     <div className="absolute left-1/2 top-1.5 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-white/25" />
-                    <div className="overflow-hidden rounded-[1.6rem] bg-black" style={{ aspectRatio: "390 / 844", maxHeight: "80vh" }}>
-                      <iframe ref={ph.live ? previewRef : undefined} key={ph.lab + previewKey} src={ph.url} title={"Anteprima · " + ph.lab} style={{ border: 0 }} className="h-full w-full" />
-                    </div>
+                    <PhoneScreen frameRef={ph.live ? previewRef : undefined} frameKey={ph.lab + previewKey} src={ph.url} title={"Anteprima · " + ph.lab} />
                   </div>
                 </div>
               ))}

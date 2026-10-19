@@ -156,6 +156,12 @@ export default function PromozioniPage() {
   const limitReached = usedThisYear >= 4;
 
   const [promoSending, setPromoSending] = useState(false);
+  // Esc chiude la finestra di invio (non mentre sta inviando).
+  useEffect(() => {
+    if (!sending || promoSending) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setSending(null); };
+    window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
+  }, [sending, promoSending]);
   // Invio automatico dal server (Resend): una email personalizzata per ogni destinatario.
   const doSend = async () => {
     if (!sending || audience.length === 0 || limitReached || promoSending) return;
@@ -233,7 +239,7 @@ export default function PromozioniPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="col-span-2 block text-xs font-medium text-dim">Nome promo *<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Es. Promo primavera" className={`${inp} mt-1`} /></label>
             <label className="col-span-2 block text-xs font-medium text-dim">Oggetto email<input value={subject} onChange={(e) => setSubject(e.target.value)} className={`${inp} mt-1`} /></label>
-            <label className="block text-xs font-medium text-dim">Sconto %<input type="number" min={0} max={90} value={discount} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))} className={`${inp} mt-1`} /></label>
+            <label className="block text-xs font-medium text-dim">Sconto %<input type="number" min={0} max={90} value={discount} onChange={(e) => setDiscount(Math.min(90, Math.max(0, Math.floor(Number(e.target.value)) || 0)))} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Codice promo<input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className={`${inp} mt-1`} /></label>
             <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta <span className="font-normal text-faint">· ultimo giorno per prenotare</span><DateField value={validUntil} onChange={(v) => setValidUntil(v)} className={`${inp} mt-1 text-left`} /></label>
             <label className="block text-xs font-medium text-dim">Valida per soggiorni dal<DateField value={validFrom} onChange={(v) => setValidFrom(v)} className={`${inp} mt-1 text-left`} /></label>

@@ -58,6 +58,14 @@ export default function NewBookingModal() {
     setStep(rtId ? "results" : "search");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newBooking]);
+  // Esc chiude il modale (come le altre finestre).
+  const isOpen = !!newBooking;
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("body > div[role=dialog]")) closeNewBooking(); }; // con una tendina aperta (calendario date) Esc chiude solo quella
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, closeNewBooking]);
 
   const nightsN = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000));
   const party = adults + children;
@@ -112,7 +120,7 @@ export default function NewBookingModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 max-sm:p-2">
+    <div role="dialog" aria-modal="true" aria-label={t("Nuova prenotazione")} className="fixed inset-0 z-50 flex items-center justify-center p-4 max-sm:p-2">
       <button aria-label={t("Chiudi")} onClick={closeNewBooking} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
       <div className="relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
         {/* Header — banda colorata in stile widget */}

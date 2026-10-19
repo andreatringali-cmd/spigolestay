@@ -23,7 +23,7 @@ import { collectRuleOf, effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PA
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO, fmtDate as fmtDateIt, fmtDM, fmtDateTime } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { isNetPayout, otaAcceleratorFee, commissionIsEstimate, COMMISSION_ESTIMATE_HINT, cityTaxOfBooking, cityTaxOfBookingRaw, nightlyRevenue, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
+import { isNetPayout, otaAcceleratorFee, commissionIsEstimate, COMMISSION_ESTIMATE_HINT, cityTaxOfBooking, cityTaxOfBookingRaw, cityTaxPayers, nightlyRevenue, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, otaAdjustmentOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -103,8 +103,9 @@ export default function BookingDrawer() {
 
   const router = useRouter();
   const ask = useConfirm();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { moduleOn } = useAccess();
+  const adW = (n: number) => (n === 1 && lang === "it" ? "adulto" : t("adulti")); const chW = (n: number) => (n === 1 && lang === "it" ? "bambino" : t("bambini")); // singolare in italiano ("1 adulto · 1 bambino")
   const booking = bookings.find((b) => b.id === selectedBookingId) ?? null;
 
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -133,6 +134,14 @@ export default function BookingDrawer() {
   const tabsRef = useRef<HTMLDivElement>(null);
   // Su telefono le schede scorrono: la scheda attiva si porta in vista (altrimenti "Gestione" resta fuori schermo).
   useEffect(() => { (tabsRef.current?.querySelector('[aria-selected="true"]') as HTMLElement | null)?.scrollIntoView({ inline: "center", block: "nearest" }); }, [tab, selectedBookingId]);
+  // Esc chiude la scheda (se non c'è sopra un calendario/menu aperto; la conferma gestisce da sé il suo Esc).
+  const hasBooking = !!booking;
+  useEffect(() => {
+    if (!hasBooking) return;
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector("body > [role=dialog]")) closeBooking(); };
+    document.addEventListener("keydown", k);
+    return () => document.removeEventListener("keydown", k);
+  }, [hasBooking, closeBooking]);
   const voucherPdfRef = useRef<HTMLDivElement>(null); const lastSendRef = useRef<Record<string, number>>({}); const sendOnce = (k: string) => { const n = Date.now(); if (n - (lastSendRef.current[k] ?? 0) < 3000) return false; lastSendRef.current[k] = n; return true; }; // anti-doppio-clic (3 s): evita invii/registrazioni duplicate, un nuovo invio dopo 3 s resta possibile
 
   const loadForm = () => {
@@ -468,7 +477,7 @@ export default function BookingDrawer() {
       )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         <div><div className="text-[11px] font-medium text-dim">{t("Camera")}</div><div className="truncate text-sm text-txt">{roomType?.name ?? "—"}{unitV?.name ? ` · ${unitV.name}` : ""}</div></div>
-        <div><div className="text-[11px] font-medium text-dim">{t("Ospiti")}</div><div className="text-sm text-txt">{booking.adults} {t("adulti")}{booking.children ? ` · ${booking.children} ${t("bambini")}` : ""}</div></div>
+        <div><div className="text-[11px] font-medium text-dim">{t("Ospiti")}</div><div className="text-sm text-txt">{booking.adults} {adW(booking.adults)}{booking.children ? ` · ${booking.children} ${chW(booking.children)}` : ""}</div></div>
         <div><div className="text-[11px] font-medium text-dim">{t("Check-in")}</div><div className="text-sm text-txt">{fmtDate(booking.checkIn)}</div></div>
         <div><div className="text-[11px] font-medium text-dim">{t("Check-out")}</div><div className="text-sm text-txt">{fmtDate(booking.checkOut)}</div></div>
       </div>
@@ -630,7 +639,7 @@ export default function BookingDrawer() {
         <Row label={t("Unità")} value={unitV?.name ?? t("Da assegnare")} />
         {effBedConfig && <Row label={t("Letti")} value={effBedConfig} />}
         {effSize ? <Row label={t("Superficie")} value={`${effSize} m²`} mono /> : null}
-        <Row label={t("Ospiti")} value={`${booking.adults} ${t("adulti")} · ${booking.children} ${t("bambini")}`} />
+        <Row label={t("Ospiti")} value={`${booking.adults} ${adW(booking.adults)} · ${booking.children} ${chW(booking.children)}`} />
       </Section>
 
       <Section title={t("Conto")}>
@@ -993,8 +1002,8 @@ export default function BookingDrawer() {
         </div>
         <div className="text-xs text-dim">{t("Durata")}: <b className="font-mono text-txt">{nEdit}</b> {nEdit === 1 ? t("notte") : t("notti")}</div>
         <div className="grid grid-cols-2 gap-2">
-          <Field label={t("Adulti")}><input type="number" min={0} className={inputCls} value={form.adults} onChange={(e) => set({ adults: Math.max(0, +e.target.value) })} /></Field>
-          <Field label={t("Bambini")}><input type="number" min={0} className={inputCls} value={form.children} onChange={(e) => set({ children: Math.max(0, +e.target.value) })} /></Field>
+          <Field label={t("Adulti")}><input type="number" min={1} className={inputCls} value={form.adults} onChange={(e) => set({ adults: Math.max(1, Math.floor(+e.target.value) || 1) })} /></Field>
+          <Field label={t("Bambini")}><input type="number" min={0} className={inputCls} value={form.children} onChange={(e) => set({ children: Math.max(0, Math.floor(+e.target.value) || 0) })} /></Field>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Field label={t("Canale")}>
@@ -1036,7 +1045,7 @@ export default function BookingDrawer() {
             <span className="font-mono text-sm font-semibold text-txt">{eur(taxEdit)}</span>
           </div>
           <div className="mt-1 text-[11px] text-faint">{t("Non rientra nel totale: si riscuote in struttura")}</div>
-          <div className="mt-1 text-xs text-dim">{form.cityTaxExempt ? t("Esente") : (structure?.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% ${t("del totale soggiorno")}` : `${form.adults} ${t("adulti")} × ${Math.min(nEdit, structure?.cityTaxMaxNights ?? 3)} ${t("notti")} × € ${structure?.cityTaxAmount ?? 2}`)}</div>
+          <div className="mt-1 text-xs text-dim">{form.cityTaxExempt ? t("Esente") : !structure?.cityTax ? t("Non attiva per questa struttura (si imposta in Strutture)") : (structure?.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% ${t("del totale soggiorno")}` : (() => { const pp = cityTaxPayers(structure, { adults: form.adults, childAges: booking.childAges }); return `${pp} ${pp === 1 && lang === "it" ? "persona" : t("persone")} × ${Math.min(nEdit, structure?.cityTaxMaxNights ?? 3)} ${t("notti")} × € ${structure?.cityTaxAmount ?? 2}`; })())}</div>
           <div className="mt-2 flex flex-wrap gap-3">
             <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.cityTaxExempt} onChange={(e) => set({ cityTaxExempt: e.target.checked })} /> {t("Esente")}</label>
             <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.cityTaxPaid} onChange={(e) => set({ cityTaxPaid: e.target.checked })} /> {t("Incassata")}</label>

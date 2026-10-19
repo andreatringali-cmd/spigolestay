@@ -34,6 +34,9 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
     return () => { alive = false; };
   }, [structureId]);
 
+  // Esc chiude il pannello.
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+
   useEffect(() => {
     setCfg(loadAutoShareCfg(structureId));
   }, [structureId]);
@@ -41,6 +44,8 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
   const [saveErr, setSaveErr] = useState("");
   const save = async () => {
     setSaveErr("");
+    // Invio attivo ma senza un indirizzo valido: non partirebbe mai, meglio dirlo subito.
+    if (cfg.enabled && !(cfg.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cfg.emailTo.trim()))) { setSaveErr(t("Per attivare l'invio inserisci un indirizzo email valido (e lascia la spunta sull'email).")); return; }
     try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify({ ...cfg, whatsapp: false })); } catch {} // solo email: WhatsApp resta spento
     // L'orario va anche nella tabella letta dal cron ogni 10 minuti: senza questo l'invio non parte all'ora scelta.
     try { await apiPost("pulizie/schedule", { structureId, enabled: cfg.enabled, time: cfg.time, email: cfg.email, emailTo: cfg.emailTo }); }

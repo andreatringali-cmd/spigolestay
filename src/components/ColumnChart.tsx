@@ -41,7 +41,8 @@ export default function ColumnChart({
   allLabels?: boolean; // mostra sempre tutte le etichette X (es. sigle paese)
 }) {
   const rawMax = Math.max(1, ...bars.map((b) => b.value));
-  const top = niceCeil(rawMax);
+  // Scale piccole (conteggi 0-8): massimo multiplo di 4, così le 5 tacche sono interi distinti (4,3,2,1,0) invece di "1 1 1 0 0" o 5/4/3/1/0.
+  const top = rawMax <= 8 && Number.isInteger(rawMax) ? Math.max(4, Math.ceil(rawMax / 4) * 4) : niceCeil(rawMax);
   const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => f * top); // dall'alto in basso
   // Mostra un'etichetta X ogni N per non affollare (ma sempre il giorno evidenziato).
   const everyX = allLabels ? 1 : bars.length > 10 ? 2 : 1;

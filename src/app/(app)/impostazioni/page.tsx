@@ -260,9 +260,9 @@ export default function ImpostazioniPage() {
             {aiConcierge.otaMode === "offhours" && (
               <div className="mt-2 flex items-center gap-2 text-xs text-dim">
                 <span>{t("Fuori orario: dalle")}</span>
-                <input type="number" min={0} max={23} value={aiConcierge.otaFrom} onChange={(e) => setAiConciergeOta({ otaFrom: Number(e.target.value) })} className="w-16 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                <input type="number" min={0} max={23} value={aiConcierge.otaFrom} onChange={(e) => setAiConciergeOta({ otaFrom: Math.max(0, Math.min(23, Math.round(Number(e.target.value) || 0))) })} className="w-16 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
                 <span>{t("alle")}</span>
-                <input type="number" min={0} max={23} value={aiConcierge.otaTo} onChange={(e) => setAiConciergeOta({ otaTo: Number(e.target.value) })} className="w-16 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                <input type="number" min={0} max={23} value={aiConcierge.otaTo} onChange={(e) => setAiConciergeOta({ otaTo: Math.max(0, Math.min(23, Math.round(Number(e.target.value) || 0))) })} className="w-16 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
                 <span>{t("(ora italiana)")}</span>
               </div>
             )}

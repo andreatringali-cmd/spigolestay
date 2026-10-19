@@ -257,6 +257,7 @@ export default function StrutturaSchedaPage() {
 
   // Acconto richiesto: PER STRUTTURA (Structure.depositPct, salvato con la scheda). Finché la struttura
   // non ne ha uno proprio si mostra la vecchia voce globale come valore di partenza.
+  const [depDraft, setDepDraft] = useState<string | null>(null); // testo digitato nel campo %: si può svuotare per riscrivere senza che salti subito a 1
   const [globalDeposit, setGlobalDeposit] = useState<DepositCfg>({ on: true, pct: 30 });
   useEffect(() => { setGlobalDeposit(loadDeposit()); }, []);
   const deposit: DepositCfg = typeof f.depositPct === "number" ? { on: f.depositPct > 0, pct: f.depositPct } : globalDeposit;
@@ -280,7 +281,7 @@ export default function StrutturaSchedaPage() {
     if (!valid) return;
     const patch: Partial<Structure> = { ...f };
     delete (patch as { id?: string }).id;
-    if (isNew) { const sid = addStructure({ name: f.name.trim(), groupName: (f.groupName || f.name).trim(), city: f.city, address: f.address }); updateStructure(sid, patch); }
+    if (isNew) { const sid = addStructure({ name: f.name.trim(), groupName: (f.groupName || f.name).trim(), city: f.city, address: f.address }); updateStructure(sid, { ...patch, name: f.name.trim(), groupName: (f.groupName || f.name).trim() }); } // il gruppo vuoto prende il nome della struttura anche dopo l'aggiornamento con il resto della scheda
     else {
       // Solo i campi cambiati rispetto alla baseline (non l'intera scheda).
       const changed = diffStructure(f, baseRef.current ?? initialOf(existing));
@@ -407,7 +408,7 @@ export default function StrutturaSchedaPage() {
                 <div className="text-[11px] text-faint">{t("Clicca il riquadro per caricarlo. Compare sui preventivi e sul PDF.")}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <span className="text-[11px] text-faint">{t("Colore identità:")}</span>
-                  <div className="flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} type="button" onClick={() => set("photoColor", c)} className={`h-4 w-4 rounded-full border-2 max-sm:h-9 max-sm:w-9 ${f.photoColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
+                  <div className="flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} type="button" aria-label={`${t("Colore")} ${c}`} aria-pressed={f.photoColor === c} onClick={() => set("photoColor", c)} className={`h-4 w-4 rounded-full border-2 max-sm:h-9 max-sm:w-9 ${f.photoColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
                   <label className="flex cursor-pointer items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[11px] text-dim hover:bg-wash" title={t("Scegli un colore personalizzato")}>
                     <span className="h-3.5 w-3.5 rounded-full border border-line" style={{ backgroundColor: f.photoColor ?? AV_COLORS[1] }} />
                     {t("Personalizzato")}
@@ -421,7 +422,7 @@ export default function StrutturaSchedaPage() {
             </div>
             <label className={lbl}>{t("Nome struttura")} *<input value={f.name} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Spigole House")} /></label>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className={lbl}>{t("Tipo")}<select value={f.type ?? ""} onChange={(e) => set("type", e.target.value)} className={`${inp} mt-1`}>{STRUCTURE_TYPES.map((st) => <option key={st} value={st}>{t(st)}</option>)}</select></label>
+              <label className={lbl}>{t("Tipo")}<select value={f.type ?? ""} onChange={(e) => set("type", e.target.value)} className={`${inp} mt-1`}>{!f.type && <option value="">—</option>}{STRUCTURE_TYPES.map((st) => <option key={st} value={st}>{t(st)}</option>)}</select></label>
               <label className={lbl}>{t("Gruppo / Network")}<input value={f.groupName} onChange={(e) => set("groupName", e.target.value)} list="grp" className={`${inp} mt-1`} placeholder={t("Es. Spigole")} /><datalist id="grp">{groups.map((g) => <option key={g} value={g} />)}</datalist></label>
             </div>
             <label className={`${lbl} mt-3`}>{t("Descrizione")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={5} className={`${inp} mt-1 min-h-[7rem] resize-y`} placeholder={t("Breve descrizione per il sito e il motore di prenotazione…")} /></label>
@@ -632,7 +633,7 @@ export default function StrutturaSchedaPage() {
               {deposit.on && (
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-xs text-dim">{t("Percentuale")}</span>
-                  <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={deposit.pct} onChange={(e) => updateDeposit({ pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
+                  <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={depDraft ?? deposit.pct} onChange={(e) => { setDepDraft(e.target.value); if (e.target.value !== "") updateDeposit({ pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }); }} onBlur={() => setDepDraft(null)} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
                 </div>
               )}
               <p className="mt-1.5 text-[11px] text-faint">{t("Vale solo per questa struttura (si salva con la scheda). Mostrata all'ospite alla prenotazione diretta.")}</p>

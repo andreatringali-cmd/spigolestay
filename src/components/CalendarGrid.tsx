@@ -329,6 +329,15 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Stessa chiave delle chiusure vendita (`${roomTypeId}|${iso}`); mappa Record<string, true> = solo giorni chiusi.
   const [cta, setCta] = useState<Record<string, true>>(() => readLS("spigolestay:calcta", {}));
   const [ctd, setCtd] = useState<Record<string, true>>({});
+  // Esc chiude la finestra aperta (scelta "Cosa vuoi inserire?", fuori servizio, tariffa, disponibilità, evento) o annulla la selezione di giorni in corso; non agisce se c'è un calendario/menu aperto sopra.
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector("body > [role=dialog]")) return;
+      if (pick) setPick(null); else if (oos) setOos(null); else if (rateEdit) setRateEdit(null); else if (availEdit) setAvailEdit(null); else if (evDraft) setEvDraft(null); else if (sel) { setSel(null); setSelHover(null); }
+    };
+    document.addEventListener("keydown", k);
+    return () => document.removeEventListener("keydown", k);
+  }, [pick, oos, rateEdit, availEdit, evDraft, sel]);
   // Rilegge chiusure/CTA/CTD dal localStorage al montaggio e quando la sincronizzazione (o un ritorno sulla pagina) li aggiorna da un altro dispositivo:
   // altrimenti una pagina rimasta aperta mostra dati vecchi e un "Applica" riscrive le chiusure vecchie sopra quelle nuove.
   useEffect(() => {
@@ -552,7 +561,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     if (unit.outOfService) return { valid: false, reason: "Fuori servizio" };
     const rt = typesRef.current.find((r) => r.id === unit.roomTypeId);
     const pax = b.adults + b.children;
-    if (rt && pax > rt.beds) return { valid: false, reason: `Max ${rt.beds} posti` };
+    const capMax = rt ? (rt.maxOccupancy ?? rt.beds) : 0; // stessa capienza usata in Nuova prenotazione (ospiti max, altrimenti posti letto)
+    if (rt && pax > capMax) return { valid: false, reason: `Max ${capMax} posti` };
     const newIn = shiftISO(b.checkIn, dxDays);
     const newOut = shiftISO(b.checkOut, dxDays);
     const conflict = bookingsRef.current.some(
@@ -742,7 +752,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const gaps: { unit: (typeof units)[number]; from: string; to: string; nights: number }[] = [];
   activeUnits.forEach((u) => {
     const ubk = bookings.filter((b) => b.unitId === u.id && b.channel !== "blocked" && b.status !== "cancelled" && b.checkOut > periodFrom && b.checkIn < periodTo).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-    for (let k = 0; k < ubk.length - 1; k++) { const end = ubk[k].checkOut, next = ubk[k + 1].checkIn; if (next > end) { const n = daysBetween(end, next); if (n >= 1 && n <= 2) gaps.push({ unit: u, from: end, to: next, nights: n }); } }
+    for (let k = 0; k < ubk.length - 1; k++) { const end = ubk[k].checkOut, next = ubk[k + 1].checkIn; if (next > end && end >= todayISO) { const n = daysBetween(end, next); if (n >= 1 && n <= 2) gaps.push({ unit: u, from: end, to: next, nights: n }); } }
   });
   const gapNights = gaps.reduce((a, g) => a + g.nights, 0);
   const gapValue = gaps.reduce((a, g) => { let dd = parseISO(g.from); const end = parseISO(g.to); let sum = 0; while (dd < end) { sum += rateFor(g.unit.roomTypeId, toISO(dd)); dd = addDays(dd, 1); } return a + sum; }, 0);
@@ -1018,7 +1028,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         <div className="flex border-b border-line bg-surface">
           <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3 uppercase tracking-wide" style={{ width: LABEL_W, height: 26 }}>
             <span className="truncate text-[11px] font-bold text-dim">{name}</span>
-            <span className="shrink-0 text-[9px] font-normal text-faint">{beds}p · Tariffa</span>
+            <span className="shrink-0 text-[9px] font-normal text-faint">{beds}p{isMobile ? "" : " · Tariffa"}</span>
           </div>
           <div className="flex" style={{ width: gridW, height: 26 }}>
             {gStrip.map((c, i) => {
@@ -1750,7 +1760,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <div className="mt-3 flex items-start gap-2 text-xs text-dim">
                   <input type="checkbox" className="mt-0.5 shrink-0" checked={rateEdit.weekendBoost} onChange={(e) => setRateEdit({ ...rateEdit, weekendBoost: e.target.checked })} />
                   <span>
-                    Applica comunque la maggiorazione weekend su ven/sab/dom, invece di appiattirli allo stesso prezzo dei feriali: +
+                    Applica comunque la maggiorazione weekend su sab/dom, invece di appiattirli allo stesso prezzo dei feriali: +
                     <input type="number" min={0} step={1} disabled={!rateEdit.weekendBoost} value={rateEdit.weekendPct} onChange={(e) => setRateEdit({ ...rateEdit, weekendPct: Math.max(0, Number(e.target.value)) })} className="mx-1 w-14 rounded-md border border-line bg-paper px-1.5 py-0.5 text-xs text-txt outline-none focus:border-focus disabled:opacity-50" />%
                   </span>
                 </div>
@@ -1950,7 +1960,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               )}
               <div className="my-3 flex flex-col gap-1.5 rounded-xl border border-line bg-paper p-3 text-sm">
                 <div className="flex items-center justify-between gap-2"><span className="text-faint">Camera</span><span className="min-w-0 text-right text-txt">{fromU?.name ?? "Da assegnare"} <span className="text-faint">→</span> <b>{toU?.name}</b>{toS ? <span className="text-faint"> · {toS.name}</span> : null}</span></div>
-                <div className="flex items-center justify-between gap-2"><span className="text-faint">Periodo</span><span className="font-mono text-txt">{fmtDMlib(moveConfirm.checkIn)} → {fmtDMlib(moveConfirm.checkOut)} <span className="text-faint">({nightsN} ntt)</span></span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-faint">Periodo</span><span className="font-mono text-txt">{fmtDMlib(moveConfirm.checkIn)} → {fmtDMlib(moveConfirm.checkOut)} <span className="text-faint">({nightsN} {nightsN === 1 ? "notte" : "notti"})</span></span></div>
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setMoveConfirm(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
@@ -1997,7 +2007,7 @@ function destinationLabel(view: DragView, bookings: { id: string; checkIn: strin
   if (!b || !u) return "";
   const newIn = shiftISO(b.checkIn, view.dxDays);
   const newOut = shiftISO(b.checkOut, view.dxDays);
-  return `${u.name} · ${fmtDMlib(newIn)}→${fmtDMlib(newOut)} (${nights(newIn, newOut)} ntt)`;
+  return `${u.name} · ${fmtDMlib(newIn)}→${fmtDMlib(newOut)} (${nights(newIn, newOut)} ${nights(newIn, newOut) === 1 ? "notte" : "notti"})`;
 }
 
 function MenuToggle({ label, on, onClick, disabled, title }: { label: string; on: boolean; onClick: () => void; disabled?: boolean; title?: string }) {

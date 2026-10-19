@@ -275,7 +275,7 @@ export default function PuliziePage() {
   // serve una struttura sola selezionata, non "tutte le strutture" senza filtro.
   const autoShareStructure = activeStructureId !== "all"
     ? structures.find((s) => s.id === activeStructureId)
-    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : undefined);
+    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : structures.length === 1 ? structures[0] : undefined); // con una sola struttura nell'account non serve sceglierla
 
   // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione
   // (calcolato per struttura, come nella pagina Camere — non fa parte della logica condivisa col cron).
@@ -609,7 +609,7 @@ export default function PuliziePage() {
         </div>
         <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>
         </div>
-        <div className="flex w-full items-center gap-2 sm:contents">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:contents">
         <div className="flex items-center rounded-lg border border-line p-0.5">
           <Seg v="cards" icon="grid" title={t("Vista card")} />
           <Seg v="rows" icon="menu" title={t("Vista lista")} />
@@ -719,7 +719,7 @@ export default function PuliziePage() {
         {scopedStructures.map((s) => {
           const list = rooms.filter((r) => r.structure.id === s.id && (r.oos ? actionFilter === "tutte" : matchAction(r.action)));
           if (actionFilter !== "tutte" && list.length === 0) return null;
-          const sToClean = list.filter((r) => !r.oos && r.action !== "niente").length;
+          const sToClean = list.filter((r) => !r.oos && r.action !== "niente" && !done[keyOf(r.unit.id)]).length; // scende quando una camera è segnata come fatta
           return (
             <div key={s.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
               <div className="flex items-center gap-2 border-b border-line bg-wash px-3 py-2">

@@ -38,9 +38,11 @@ interface Pos { left: number; top?: number; bottom?: number; width: number; maxH
 export default function Popover({ open, onClose, anchorRef, children, align = "start", width, maxHeight, className = "", label, ignoreAnchorClicks = true }: PopoverProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
+  const [dark, setDark] = useState(false); // tema scuro: è una classe su un contenitore dell'app, non su <body> dove la tendina viene disegnata
 
   const place = useCallback(() => {
     const a = anchorRef.current; if (!a) return;
+    setDark(!!a.closest(".dark"));
     const r = a.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = Math.min(width ?? Math.max(r.width, 200), vw - MARGIN * 2);
@@ -78,7 +80,7 @@ export default function Popover({ open, onClose, anchorRef, children, align = "s
   return createPortal(
     <div
       ref={popRef} role="dialog" aria-label={label}
-      className={`fixed z-[1000] overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-1 shadow-xl ${className}`}
+      className={`fixed z-[1000] overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-1 text-txt shadow-xl ${dark ? "dark" : ""} ${className}`}
       style={{ left: pos?.left ?? -9999, top: pos?.top, bottom: pos?.bottom, width: pos?.width, maxHeight: pos?.maxHeight, visibility: pos ? "visible" : "hidden" }}
     >
       {children}

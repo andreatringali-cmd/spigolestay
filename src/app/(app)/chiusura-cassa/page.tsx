@@ -13,7 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents, sumCents } from "@/lib/money";
 import { exportExcel } from "@/lib/export";
-import { type Mov, type Rule, type CashScope, computeAuto, computeScheduled, scopeVisible, cashScopeOf, scopeIds, loadCash, loadConti, contiKeysInScope, contoDisplayLabel, isCashConto, closingBalance, OPENING_CAT, type ContoDef } from "@/lib/cassa";
+import { type Mov, type Rule, type CashScope, computeAuto, computeScheduled, scopeVisible, cashScopeOf, scopeIds, loadCash, loadConti, contiKeysInScope, contoDisplayLabel, isCashConto, closingBalance, OPENING_CAT, type ContoDef, applyOverrides, loadOverrides } from "@/lib/cassa";
 import { parseDecimalIT } from "@/lib/num-it";
 import { useTenantId } from "@/lib/tenant";
 import { friendlyError } from "@/lib/friendly-error";
@@ -77,7 +77,7 @@ export default function ChiusuraCassaPage() {
   // Composizione movimenti (come Prima Nota) nello scope struttura scelto.
   const all = useMemo<Mov[]>(() => {
     const a = computeAuto(raw.bookings, guests, getStructure, scope);
-    const s = computeScheduled(rules, paidSet, scope, day);
+    const s = applyOverrides(computeScheduled(rules, paidSet, scope, day), loadOverrides()); // anche le scadenze modificate a mano nella Prima Nota, come nella Cassa
     const m = manual.filter((mv) => scopeVisible(mv.structureId, scope));
     return [...a, ...s, ...m];
   }, [raw.bookings, guests, getStructure, scopeKey, rules, paidSet, day, manual, allConti]); // eslint-disable-line react-hooks/exhaustive-deps

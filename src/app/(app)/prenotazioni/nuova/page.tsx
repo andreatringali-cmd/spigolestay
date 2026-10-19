@@ -12,7 +12,7 @@ import { shortenLink } from "@/lib/guestlink";
 import { loadWeekendPct, rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, nights, fmtDate } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { cityTaxOf } from "@/lib/booking";
+import { cityTaxOf, cityTaxPayers } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import NumInput from "@/components/NumInput";
 import { selectableExtras, extraUnitAmount, maxQtyOf } from "@/lib/booking-extras";
@@ -140,7 +140,9 @@ export default function NuovaPrenotazionePage() {
   const roomInstances = selected.flatMap((rt) => Array<typeof rt>(qty[rt.id] ?? 0).fill(rt));
   const nInst = Math.max(1, roomInstances.length);
   const distAdults = (i: number) => nInst > 1 ? Math.floor(adults / nInst) + (i < adults % nInst ? 1 : 0) : adults;
-  const cityTax = roomInstances.reduce((sum, rt, i) => sum + cityTaxOf(getStructure(rt.structureId), distAdults(i), nightsN, linePrice(rt), false, distAdults(i) + (nInst > 1 ? Math.floor(children / nInst) + (i < children % nInst ? 1 : 0) : children)), 0);
+  // Paganti = adulti + minori sopra la soglia d'età della struttura (le età vanno alle camere nello stesso ordine della creazione), come sulla prenotazione salvata.
+  let taxPayers = 0; // paganti totali (per l'etichetta del riepilogo)
+  const cityTax = (() => { let ci = 0; return roomInstances.reduce((sum, rt, i) => { const kids = nInst > 1 ? Math.floor(children / nInst) + (i < children % nInst ? 1 : 0) : children; const ages = childAges.slice(ci, ci + kids); ci += kids; const st = getStructure(rt.structureId); const pay = cityTaxPayers(st, { adults: distAdults(i), childAges: ages }); taxPayers += pay; return sum + cityTaxOf(st, pay, nightsN, linePrice(rt), false, distAdults(i) + kids); }, 0); })();
   const grandFinal = grandWithExtras + parkingPriceN + cityTax;
 
   const doSearch = () => {
@@ -555,7 +557,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                             <td className="px-3 py-2.5 text-center font-bold text-txt">{qty[rt.id]}</td>
                             <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <NumInput value={linePrice(rt)} onChange={(v) => setPriceOv((o) => ({ ...o, [rt.id]: v ?? 0 }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
                             <td className="px-4 py-2.5 text-right font-bold text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td>
-                            <td className="px-3 py-2.5 text-right"><button onClick={() => setQ(rt.id, 0)} title="Rimuovi" className="px-2 py-1 text-faint hover:text-[color:var(--err)] max-sm:px-3 max-sm:py-2.5">✕</button></td>
+                            <td className="px-3 py-2.5 text-right"><button onClick={() => { setQ(rt.id, 0); if (totalRooms - (qty[rt.id] ?? 0) < 1) setPhase("rooms"); }} title="Rimuovi" className="px-2 py-1 text-faint hover:text-[color:var(--err)] max-sm:px-3 max-sm:py-2.5">✕</button></td>
                           </tr>
                         );
                       })}
@@ -599,7 +601,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                   ))}
                   <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Colazione</span><span className="shrink-0 text-[color:var(--ok)]">inclusa</span></div>
                   <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Parcheggio</span>{parking ? (parkingPriceN > 0 ? <span className="shrink-0 font-mono text-dim">{eur(parkingPriceN)}</span> : <span className="shrink-0 text-[color:var(--ok)]">incluso</span>) : <span className="shrink-0 text-faint">non richiesto</span>}</div>
-                  {cityTax > 0 && <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Tassa di soggiorno{taxStruct?.cityTaxMode !== "percent" ? ` (${adults}×${Math.min(nightsN, taxStruct?.cityTaxMaxNights ?? 3)})` : ""}</span><span className="shrink-0 font-mono text-dim">{eur(cityTax)}</span></div>}
+                  {cityTax > 0 && <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Tassa di soggiorno{taxStruct?.cityTaxMode !== "percent" ? ` (${taxPayers}×${Math.min(nightsN, taxStruct?.cityTaxMaxNights ?? 3)})` : ""}</span><span className="shrink-0 font-mono text-dim">{eur(cityTax)}</span></div>}
                 </div>
                 <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span></div>
                 {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}

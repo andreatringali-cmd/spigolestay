@@ -30,6 +30,7 @@
 
 /* ─────────── Token di design (Scuro) — blu notte, non nero ─────────── */
 .dark {
+  color-scheme: dark; /* barre di scorrimento e controlli nativi in scuro (prima restavano bianchi) */
   --paper: #141518;   /* carbone neutro, più morbido del nero */
   --surface: #1D1E22;
   --wash: #26272C;

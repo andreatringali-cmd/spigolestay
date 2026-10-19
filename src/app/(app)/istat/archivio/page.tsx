@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtDate, fmtDateTime } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -19,6 +20,7 @@ export default function IstatArchivioPage() {
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -27,9 +29,9 @@ export default function IstatArchivioPage() {
 
   const load = useCallback(async () => {
     if (!sid) return;
-    setLoading(true);
+    setLoading(true); setMsg("");
     try { const r = await apiPost<{ items: Item[] }>("istat/submissions", { structureId: sid }); setItems(r.items ?? []); }
-    catch { setItems([]); } finally { setLoading(false); }
+    catch (e) { setItems([]); setMsg(e instanceof Error ? e.message : "Impossibile caricare l'archivio."); } finally { setLoading(false); }
   }, [sid]);
   useEffect(() => { load(); }, [load]);
 
@@ -37,7 +39,7 @@ export default function IstatArchivioPage() {
   const fmtDay = (d: string | null) => (d ? fmtDate(d) : "—");
   const okStato = (s: string) => s === "sent";
   const shown = items.filter((it) => {
-    const d = (it.day || it.created_at.slice(0, 10));
+    const d = (it.day || ymdRome(it.created_at));
     if (from && d < from) return false;
     if (to && d > to) return false;
     return true;
@@ -90,6 +92,7 @@ export default function IstatArchivioPage() {
             </table>
           </div>
         )}
+        {msg && <p className="mt-3 rounded-lg bg-wash px-3 py-2 text-xs font-medium text-dim">{msg}</p>}
       </Card>
     </div>
   );

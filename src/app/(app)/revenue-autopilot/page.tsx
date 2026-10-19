@@ -21,10 +21,23 @@ import { rateForDay, loadWeekendPct, effectiveMinStay } from "@/lib/pricing";
 import { simulateImpact } from "@/lib/revenue-impact";
 import { buildChanges, recordBatches, type RevenueSource } from "@/lib/revenue-history";
 import { scanGaps } from "@/lib/revenue-gaps";
+import { plural } from "@/lib/plural";
 import ImpactPreview from "@/components/ImpactPreview";
 import PriceHistoryCard from "@/components/PriceHistoryCard";
 
 const fmtDay = (iso: string) => `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
+
+// Campo numerico con bozza locale: mentre scrivi non viene "corretto" a ogni tasto (es. "150" nel tetto passava da "1"→100),
+// il valore valido si applica subito, quello fuori limite si porta nei limiti quando esci dal campo.
+function NumInput({ value, min, max, fallback, onCommit, className }: { value: number; min: number; max: number; fallback: number; onCommit: (n: number) => void; className?: string }) {
+  const [txt, setTxt] = useState(String(value));
+  useEffect(() => { setTxt(String(value)); }, [value]);
+  return (
+    <input type="number" inputMode="numeric" min={min} max={max} value={txt} className={className}
+      onChange={(e) => { setTxt(e.target.value); const n = Number(e.target.value); if (e.target.value !== "" && Number.isFinite(n) && n >= min && n <= max) onCommit(n); }}
+      onBlur={() => { const n = Number(txt); const v = Math.min(max, Math.max(min, txt === "" || !Number.isFinite(n) || n === 0 ? fallback : n)); setTxt(String(v)); if (v !== value) onCommit(v); }} />
+  );
+}
 
 export default function RevenueAutopilotPage() {
   const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, activeStructureId, getStructure, addActivity } = useData();
@@ -124,8 +137,8 @@ export default function RevenueAutopilotPage() {
     const toApply = scopeSid ? suggestions : suggestions.filter((s) => loadAutopilot(s.structureId).on);
     if (toApply.length) {
       commit(toApply, "autopilot-auto", "Autopilot");
-      toast(`Autopilot: applicati ${toApply.length} aggiustamenti prezzo.`, "success");
-      addActivity("rate", `Autopilot: ${toApply.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(toApply)}`, scopeSid);
+      toast(`Autopilot: ${toApply.length === 1 ? "applicato 1 aggiustamento" : `applicati ${toApply.length} aggiustamenti`} prezzo.`, "success");
+      addActivity("rate", `Autopilot: ${plural(toApply.length, "tariffa aggiornata", "tariffe aggiornate")} automaticamente. ${summarizeAppliedSuggestions(toApply)}`, scopeSid);
     }
     auto.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,8 +168,8 @@ export default function RevenueAutopilotPage() {
     if (!suggestions.length) return;
     const n = commit(suggestions, "autopilot-manuale", "Autopilot · applica tutti");
     setPreview(false);
-    toast(`Applicati ${n} aggiustamenti.`, "success");
-    addActivity("rate", `Applicati manualmente ${n} aggiustamenti prezzo. ${summarizeAppliedSuggestions(suggestions)}`, scopeSid);
+    toast(`${n === 1 ? "Applicato 1 aggiustamento" : `Applicati ${n} aggiustamenti`}.`, "success");
+    addActivity("rate", `${n === 1 ? "Applicato manualmente 1 aggiustamento" : `Applicati manualmente ${n} aggiustamenti`} prezzo. ${summarizeAppliedSuggestions(suggestions)}`, scopeSid);
   };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -215,10 +228,10 @@ export default function RevenueAutopilotPage() {
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className={lbl}>Orizzonte (giorni)<input type="number" min={7} max={120} value={cfg.horizonDays} onChange={(e) => setCfgPersist({ horizonDays: Math.min(120, Math.max(1, Number(e.target.value) || 30)) })} className={inp} /></label>
-          <label className={lbl}>Variazione max ±%<input type="number" min={5} max={80} value={cfg.maxChangePct} onChange={(e) => setCfgPersist({ maxChangePct: Math.min(80, Math.max(1, Number(e.target.value) || 25)) })} className={inp} /></label>
-          <label className={lbl}>Pavimento (% base)<input type="number" min={30} max={100} value={cfg.floorPct} onChange={(e) => setCfgPersist({ floorPct: Math.min(100, Math.max(10, Number(e.target.value) || 70)) })} className={inp} /></label>
-          <label className={lbl}>Tetto (% base)<input type="number" min={100} max={400} value={cfg.ceilPct} onChange={(e) => setCfgPersist({ ceilPct: Math.min(400, Math.max(100, Number(e.target.value) || 180)) })} className={inp} /></label>
+          <label className={lbl}>Orizzonte (giorni)<NumInput min={1} max={120} fallback={30} value={cfg.horizonDays} onCommit={(n) => setCfgPersist({ horizonDays: n })} className={inp} /></label>
+          <label className={lbl}>Variazione max ±%<NumInput min={1} max={80} fallback={25} value={cfg.maxChangePct} onCommit={(n) => setCfgPersist({ maxChangePct: n })} className={inp} /></label>
+          <label className={lbl}>Pavimento (% base)<NumInput min={10} max={100} fallback={70} value={cfg.floorPct} onCommit={(n) => setCfgPersist({ floorPct: n })} className={inp} /></label>
+          <label className={lbl}>Tetto (% base)<NumInput min={100} max={400} fallback={180} value={cfg.ceilPct} onCommit={(n) => setCfgPersist({ ceilPct: n })} className={inp} /></label>
         </div>
         <p className="mt-3 text-[11px] text-faint">Guardrail: su una tariffa base di € 100 il prezzo proposto resta sempre tra <b className="text-dim">€ {guardExample.lo}</b> e <b className="text-dim">€ {guardExample.hi}</b>. Rispetta anche il prezzo minimo della tipologia (se impostato in Camere). I giorni frenati da un limite sono segnati nella tabella.</p>
       </Card>
@@ -252,7 +265,7 @@ export default function RevenueAutopilotPage() {
             {gapScan.gaps.slice(0, 12).map((g) => (
               <li key={`${g.unitId}|${g.from}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <div className="min-w-0"><span className="font-medium text-txt">{g.unitName}</span> <span className="text-dim">· {g.typeName}</span>{structures.length > 1 && scope === "all" && <span className="text-faint"> · {getStructure(g.structureId)?.name ?? ""}</span>}
-                  <div className="text-[11px] text-faint">{fmtDay(g.from)} → {fmtDay(g.to)} · {g.nights} {g.nights === 1 ? "notte" : "notti"} libere{g.value > 0 ? ` · valgono ${eur(g.value)} a tariffa attuale` : ""}</div></div>
+                  <div className="text-[11px] text-faint">{fmtDay(g.from)} → {fmtDay(g.to)} · {g.nights} {g.nights === 1 ? "notte libera" : "notti libere"}{g.value > 0 ? ` · valgono ${eur(g.value)} a tariffa attuale` : ""}</div></div>
                 {g.unsellable
                   ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "var(--err)", background: "color-mix(in srgb,var(--err) 12%,transparent)" }} title="La tipologia richiede più notti del buco: oggi non è vendibile così com'è.">non vendibile · minimo {g.minStay} notti</span>
                   : <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">vendibile</span>}
@@ -301,7 +314,7 @@ export default function RevenueAutopilotPage() {
 
       <ImpactPreview
         open={preview}
-        title={`Applica ${suggestions.length} aggiustamenti`}
+        title={suggestions.length === 1 ? "Applica 1 aggiustamento" : `Applica ${suggestions.length} aggiustamenti`}
         subtitle={scopeSid ? `Solo su ${getStructure(scopeSid)?.name ?? "questa struttura"}` : structures.length > 1 ? "Su tutte le strutture, ciascuna con i propri limiti" : undefined}
         impact={impact}
         examples={suggestions.slice(0, 5).map((s) => ({ label: `${s.typeName} · ${fmtDay(s.iso)}`, from: s.current, to: s.suggested, note: s.limitedBy ? `Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}` : undefined }))}

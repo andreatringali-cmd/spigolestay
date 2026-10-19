@@ -58,7 +58,8 @@ export default function SitoPage() {
     if (sid) { try { localStorage.setItem(siteConfigKey(sid), JSON.stringify(n)); } catch {} }
     return n;
   });
-  const toggleLang = (l: string) => set({ lang: c.lang.includes(l) ? c.lang.filter((x) => x !== l) : [...c.lang, l] });
+  // Almeno una lingua resta sempre attiva (senza lingue il sito pubblico non avrebbe testi da mostrare).
+  const toggleLang = (l: string) => { if (c.lang.includes(l) && c.lang.length <= 1) return; set({ lang: c.lang.includes(l) ? c.lang.filter((x) => x !== l) : [...c.lang, l] }); };
   // Nome e link presi dalla struttura (fonte di verità = scheda struttura).
   const struct = structures.find((s) => s.id === sid);
   const siteName = struct?.name || "";

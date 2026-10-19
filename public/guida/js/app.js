@@ -184,16 +184,28 @@
     return "https://maps.apple.com/?q=" + encodeURIComponent(label || "");
   }
 
+  // Testi della scelta mappa nella lingua dell'ospite (prima erano sempre in italiano)
+  var MAP_TXT = {
+    it: { t: "Apri la mappa con…", apple: "Mappe di Apple", cancel: "Annulla" },
+    en: { t: "Open the map with…", apple: "Apple Maps", cancel: "Cancel" },
+    fr: { t: "Ouvrir la carte avec…", apple: "Plans d'Apple", cancel: "Annuler" },
+    de: { t: "Karte öffnen mit…", apple: "Apple Karten", cancel: "Abbrechen" },
+    es: { t: "Abrir el mapa con…", apple: "Mapas de Apple", cancel: "Cancelar" }
+  };
+
   function mapChooser(googleUrl) {
     var appleUrl = buildAppleMaps(googleUrl);
+    var ml = "it";
+    try { ml = localStorage.getItem("spigole_lang") || "it"; } catch (e) {}
+    var mt = MAP_TXT[ml] || MAP_TXT.it;
     var wrap = document.createElement("div");
     wrap.className = "map-sheet-backdrop";
     wrap.innerHTML =
-      '<div class="map-sheet" role="dialog" aria-label="Apri la mappa">' +
-        '<div class="map-sheet-title">Apri la mappa con…</div>' +
+      '<div class="map-sheet" role="dialog" aria-label="' + esc(mt.t) + '">' +
+        '<div class="map-sheet-title">' + esc(mt.t) + "</div>" +
         '<a class="map-sheet-btn" href="' + esc(googleUrl) + '" target="_blank" rel="noopener">' + icon("pin") + "<span>Google Maps</span></a>" +
-        '<a class="map-sheet-btn" href="' + esc(appleUrl) + '" target="_blank" rel="noopener">' + icon("pin") + "<span>Mappe di Apple</span></a>" +
-        '<button type="button" class="map-sheet-cancel">Annulla</button>' +
+        '<a class="map-sheet-btn" href="' + esc(appleUrl) + '" target="_blank" rel="noopener">' + icon("pin") + "<span>" + esc(mt.apple) + "</span></a>" +
+        '<button type="button" class="map-sheet-cancel">' + esc(mt.cancel) + "</button>" +
       "</div>";
     document.body.appendChild(wrap);
     function close() { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
@@ -235,13 +247,18 @@
   }
 
   // ---------- Stato ----------
+  // Se il browser dell'ospite blocca la memoria del sito (alcuni browser dentro le app, modalità privata rigida) la lingua resta
+  // almeno per la sessione: prima la pagina restava bianca perché localStorage lanciava un errore.
+  var memLang = null;
   function getLang() {
-    var l = localStorage.getItem("spigole_lang");
+    var l = memLang;
+    try { l = localStorage.getItem("spigole_lang") || memLang; } catch (e) {}
     return LANGS.indexOf(l) >= 0 ? l : null;
   }
 
   function setLang(l) {
-    localStorage.setItem("spigole_lang", l);
+    memLang = l;
+    try { localStorage.setItem("spigole_lang", l); } catch (e) {}
     render();
   }
 
@@ -772,7 +789,8 @@
 
     if (e.target.closest("#brandHome")) {
       // Il logo riporta alla schermata iniziale di scelta della lingua
-      localStorage.removeItem("spigole_lang");
+      memLang = null;
+      try { localStorage.removeItem("spigole_lang"); } catch (e) {}
       location.hash = "";
       render();
       return;
@@ -782,15 +800,21 @@
       var lang = getLang();
       var msg = (I18N[lang] && I18N[lang].ui.copied) || "OK";
       var pass = P.wifiPassword || "";
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(pass).then(function () { toast(msg); });
-      } else {
+      // Copia con ripiego: se la Clipboard API è negata (permessi, pagina non sicura) si prova il vecchio metodo
+      var legacyCopy = function () {
         var ta = document.createElement("textarea");
         ta.value = pass;
+        ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
         document.body.appendChild(ta);
         ta.select();
-        try { document.execCommand("copy"); toast(msg); } catch (err) {}
+        try { if (document.execCommand("copy")) toast(msg); } catch (err) {}
         document.body.removeChild(ta);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pass).then(function () { toast(msg); }, legacyCopy);
+      } else {
+        legacyCopy();
       }
     }
   });
@@ -800,14 +824,17 @@
   // Branding della struttura corrente (nome e logo su welcome + topbar)
   function applyBranding() {
     var name = P.guideName || P.name || "";
+    // Senza logo nella scheda struttura NON si mostra quello di un'altra struttura (prima ripiegava su quello di Spigole House): le immagini restano nascoste.
+    var hasLogo = !!P.guideLogo;
     var logo = P.guideLogo || "assets/logo-trasparente.png";
     var wn = document.querySelector(".welcome-name"); if (wn && name) wn.textContent = name;
     var ws = document.querySelector(".welcome-sub"); if (ws) ws.textContent = "Bed & Breakfast " + (P.city || "Siracusa");
-    var wl = document.querySelector(".welcome-logo"); if (wl) wl.src = logo;
-    var bl = document.querySelector(".brand-logo"); if (bl) bl.src = logo;
+    var wl = document.querySelector(".welcome-logo"); if (wl) { if (hasLogo) wl.src = logo; else wl.style.display = "none"; }
+    var bl = document.querySelector(".brand-logo"); if (bl) { if (hasLogo) bl.src = logo; else bl.style.display = "none"; }
     // Il logo può essere un file del sito (percorso) oppure un'immagine incorporata (data:) caricata nella scheda struttura.
-    var wmUrl = /^(data:|https?:)/.test(logo) || logo.charAt(0) === "/" ? logo : "/" + logo;
-    document.documentElement.style.setProperty("--welcome-watermark", "url(\"" + wmUrl + "\")");
+    // Un percorso relativo ("assets/…") è relativo a questa pagina (/guida/), non alla radice del sito: prima dava 404 e il filigrana spariva.
+    var wmUrl = /^(data:|https?:)/.test(logo) || logo.charAt(0) === "/" ? logo : "/guida/" + logo.replace(/^\.?\//, "");
+    document.documentElement.style.setProperty("--welcome-watermark", hasLogo ? "url(\"" + wmUrl + "\")" : "none");
     if (name) document.title = name + " · Guest Guide";
   }
   applyBranding();

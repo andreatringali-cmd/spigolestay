@@ -75,6 +75,8 @@ export default function ModelliPanel() {
   const saveTpl = () => { if (!editing || !editing.name.trim()) return; unmarkSeedDeleted(editing.id); setTemplates((prev) => (prev.some((t) => t.id === editing.id) ? prev.map((t) => (t.id === editing.id ? editing : t)) : [...prev, editing])); setEditing(null); };
   const insertVar = (token: string) => setEditing((e) => (e ? { ...e, texts: { ...e.texts, [editLang]: `${e.texts[editLang] ?? ""}${token}` } } : e));
   const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) { markSeedDeleted(tpl.id); setTemplates((p) => p.filter((x) => x.id !== tpl.id)); } };
+  // Struttura a cui appartiene un modello nuovo: quella selezionata, oppure l'unica struttura dell'account (con una sola struttura la selezione resta sempre «Tutte»).
+  const newTplStructure = activeStructureId !== "all" ? activeStructureId : allStructures.length === 1 ? allStructures[0].id : "";
   const isAuto = (tp: MsgTemplate) => tp.trigger !== "manual"; // "automatico" = ha un orario/trigger (a prescindere se è in pausa)
   const shown = [...templates]
     .sort((a, b) =>
@@ -101,7 +103,7 @@ export default function ModelliPanel() {
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button type="button" disabled={activeStructureId === "all"} title={activeStructureId === "all" ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(activeStructureId !== "all" ? [activeStructureId] : undefined)); setEditLang("it"); }} className="inline-flex disabled:cursor-not-allowed disabled:opacity-50 items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
+        <button type="button" disabled={!newTplStructure} title={!newTplStructure ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(newTplStructure ? [newTplStructure] : undefined)); setEditLang("it"); }} className="inline-flex disabled:cursor-not-allowed disabled:opacity-50 items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
         <button type="button" onClick={() => setShowSettings((v) => !v)} aria-pressed={showSettings} aria-label={t("Impostazioni")} title={t("Impostazioni (link recensioni…)")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${showSettings ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
@@ -136,6 +138,8 @@ export default function ModelliPanel() {
           </section>
         ))}
       </div>
+
+      {ready && groups.length === 0 && <p className="rounded-xl border border-dashed border-line py-8 text-center text-sm text-faint">{search.trim() ? t("Nessun modello trovato.") : t("Nessun modello.")}</p>}
 
       {/* Editor */}
       {editing && (

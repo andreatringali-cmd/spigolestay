@@ -243,7 +243,8 @@ export default function RevenuePage() {
             <tbody>
               {rows.map((r) => {
                 const s = revenueSuggestion(r.occ, r.hasEvent, signal);
-                const nuovo = Math.round(r.base * (1 + s.pct / 100));
+                // Già applicato: il prezzo attuale È già quello consigliato (niente +22% composto sopra l'applicato).
+                const nuovo = applied.has(`${activeStructureId}|${r.iso}`) ? r.base : (() => { const pl = planDay(r.iso, s.pct); return pl.length ? Math.round(pl.reduce((a, x) => a + x.next, 0) / pl.length) : Math.round(r.base * (1 + s.pct / 100)); })(); // stessa matematica di "Applica" (arrotondamento per tipologia + prezzo minimo)
                 return (
                   <tr key={r.iso} className="border-b border-line last:border-0">
                     <td className="px-2 py-2 font-medium text-txt">

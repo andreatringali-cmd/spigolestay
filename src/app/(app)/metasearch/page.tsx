@@ -157,12 +157,12 @@ export default function MetaSearchPage() {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-txt">{t("Due modi, scegli quello che preferisci")}</div>
             <p className="mt-1 text-xs text-dim">
-              <b className="text-txt">{t("Mini-sito Xenora")}</b> — {t("pubblicalo una volta in \"Sito web\", è sempre pronto, nessuna configurazione extra.")}<br />
+              <b className="text-txt">{t("Mini-sito Xenora")}</b> — {t("pubblicalo una volta in \"Xenosite\", è sempre pronto, nessuna configurazione extra.")}<br />
               <b className="text-txt">{t("Il tuo sito ufficiale")}</b> — {t("se ne hai uno, incorpora il widget di prenotazione (pagina \"Widget\") e l'ospite resta sul tuo dominio.")}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Link href="/sito" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Sito web")}</Link>
+            <Link href="/sito" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Xenosite")}</Link>
             <Link href="/widget" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Widget")}</Link>
           </div>
         </div>
@@ -190,7 +190,7 @@ export default function MetaSearchPage() {
                         <option value="cpc">{t("Costo per clic")}</option>
                         <option value="commission">{t("Commissione")}</option>
                       </select>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Number(e.target.value) })} className="w-14 bg-transparent text-center font-semibold text-txt outline-none" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Math.max(0, Number(e.target.value) || 0) })} className="w-14 bg-transparent text-center font-semibold text-txt outline-none" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
                     </div>
                   </div>
                 )}

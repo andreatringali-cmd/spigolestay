@@ -27,7 +27,10 @@ import { useBulkGuard } from "@/components/useBulkGuard";
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 const fmtD = (iso: string) => fmtDate(iso);
 
-type SortKey = "name" | "stays" | "nights" | "avg" | "spent" | "comm" | "last";
+// Nomi leggibili dei campi che l'unione aggiunge alla scheda che resta (nell'anteprima non si mostrano i nomi tecnici).
+const PATCH_LABELS: Record<string, string> = { email: "Email", phone: "Telefono", country: "Paese", notes: "Note interne", preferences: "Preferenze", tags: "Etichette", vip: "VIP", marketingConsent: "Consenso marketing", firstName: "Nome", lastName: "Cognome", fullName: "Nome", sex: "Sesso", birthDate: "Data di nascita", birthPlace: "Luogo di nascita", citizenship: "Cittadinanza", docType: "Tipo documento", docNumber: "Numero", docPlace: "Luogo di rilascio", docExpiry: "Scadenza documento", docPhotoFront: "Foto documento", docPhotoBack: "Foto documento", address: "Residenza", streetNumber: "Numero civico", province: "Provincia", city: "Città", zip: "CAP", language: "Lingua", source: "Provenienza" };
+
+type SortKey ="name" | "stays" | "nights" | "avg" | "spent" | "comm" | "last";
 
 export default function OspitiPage() {
   const router = useRouter();
@@ -58,6 +61,14 @@ export default function OspitiPage() {
   const [pickPromo, setPickPromo] = useState(false);
   useEffect(() => { setPromos(promosForStructure(loadPromos(), activeStructureId)); }, [activeStructureId]);
   const [confirmClearNl, setConfirmClearNl] = useState(false);
+  const [exportPick, setExportPick] = useState(false);
+  // Esc chiude i pannelli aperti (unione doppioni, esportazione, scelta promo).
+  useEffect(() => {
+    if (!mergeOpen && !exportPick && !pickPromo) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { setMergeOpen(false); setExportPick(false); setPickPromo(false); } };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [mergeOpen, exportPick, pickPromo]);
   const [openReg, setOpenReg] = useState({ ospiti: true, nl: true });
   const PAGE = 100;
   const [regLim, setRegLim] = useState({ ospiti: PAGE, nl: PAGE });
@@ -100,7 +111,8 @@ export default function OspitiPage() {
     return tokens.length ? rowsScope.filter((r) => tokens.every((tk) => r.hay.includes(tk))) : rowsScope;
   }, [rowsScope, dq]);
   // Anagrafiche visibili nella struttura attiva (ospiti con prenotazioni lì + contatti senza prenotazioni), senza ricerca.
-  const totalVisible = rowsScope.length;
+  // Conta solo quelle che compaiono davvero nei registri (ospiti, inseriti a mano, iscritti newsletter): i contatti orfani restano nascosti.
+  const totalVisible = rowsScope.filter((r) => r.anyBookings || r.guest.source === "manuale" || (Array.isArray(r.guest.tags) && r.guest.tags.includes("newsletter"))).length;
 
 
   const sorted = [...rows].sort((a, b) => {
@@ -124,7 +136,7 @@ export default function OspitiPage() {
   );
 
   // Statistiche riepilogo (in cima)
-  const totGuests = rows.length;
+  const totGuests = rows.filter((r) => r.anyBookings || r.guest.source === "manuale").length; // solo ospiti con prenotazioni: gli iscritti newsletter sono contatti, non ospiti
   const totRevenue = rows.reduce((a, r) => a + r.spent, 0);
   const avgAll = (() => { const nt = rows.reduce((a, r) => a + r.nightsTot, 0); return nt > 0 ? Math.round(totRevenue / nt) : 0; })();
   const repeat = rows.filter((r) => r.stays > 1).length;
@@ -146,8 +158,10 @@ export default function OspitiPage() {
   // (es. da import o da prenotazioni cancellate) che poi "ricomparivano" dopo lo svuotamento.
   // Se un iscritto newsletter prenota, ha "anyBookings" → passa automaticamente agli ospiti.
   const isNewsletterLead = (g: { tags?: string[] }) => Array.isArray(g.tags) && g.tags.includes("newsletter");
-  const guestSorted = sorted.filter((r) => r.anyBookings && segMatch(r));
-  const nlSorted = sorted.filter((r) => !r.anyBookings && isNewsletterLead(r.guest));
+  // Un ospite inserito a mano ("Nuovo ospite") non ha ancora prenotazioni ma deve restare visibile tra gli ospiti.
+  const isManual = (g: { source?: string }) => g.source === "manuale";
+  const guestSorted = sorted.filter((r) => (r.anyBookings || isManual(r.guest)) && segMatch(r));
+  const nlSorted = sorted.filter((r) => !r.anyBookings && !isManual(r.guest) && isNewsletterLead(r.guest));
   // Svuota il registro newsletter: elimina gli iscritti dal sito (conferma in due passi).
   // Con 20 o più iscritti: conferma forte (si scrive ELIMINA) e copia JSON scaricata prima di cancellare.
   const bulkGuard = useBulkGuard();
@@ -179,7 +193,6 @@ export default function OspitiPage() {
     { key: "canale", label: t("Canale"), get: (r) => (r.topCh ? CHANNELS[r.topCh].label : "") },
     { key: "tag", label: "Tag", get: (r) => (r.guest.tags ?? []).join(", ") },
   ];
-  const [exportPick, setExportPick] = useState(false);
   const [exportCols, setExportCols] = useState<Set<string>>(new Set(EXPORT_COLUMNS.map((c) => c.key)));
   const toggleExportCol = (k: string) => setExportCols((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const doExportExcel = () => {
@@ -415,7 +428,7 @@ export default function OspitiPage() {
                         </div>
                       ))}
                     </div>
-                    {Object.keys(p.patch).length > 0 && <div className="mt-2 text-[11px] text-faint">{t("Si aggiunge alla scheda che resta")}: {Object.keys(p.patch).join(", ")}</div>}
+                    {Object.keys(p.patch).length > 0 && <div className="mt-2 text-[11px] text-faint">{t("Si aggiunge alla scheda che resta")}: {[...new Set(Object.keys(p.patch).map((k) => t(PATCH_LABELS[k] ?? k)))].join(", ")}</div>}
                   </div>
                 );
               })}

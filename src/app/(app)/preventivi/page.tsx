@@ -679,6 +679,13 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
   // ── Conferma prenotazione dal preventivo (con anticipo 0/50/100%) ──
   const [confirming, setConfirming] = useState<{ q: Preventivo; pct: number } | null>(null);
   const [confMail, setConfMail] = useState<{ ok?: boolean; sending?: boolean; msg?: string }>({});
+  // Esc chiude la finestra di conferma.
+  useEffect(() => {
+    if (!confirming) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setConfirming(null); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [confirming]);
   const CONF: Record<Lang, { hi: string; ok: string; struct: string; ci: string; co: string; nt: string; pax: string; tot: string; pay: string; dep: string; bal: string; atc: string; none: string; full: string; bye: string }> = {
     it: { hi: "Gentile", ok: "la sua prenotazione è confermata! ✅", struct: "Struttura", ci: "Check-in", co: "Check-out", nt: "Notti", pax: "Ospiti", tot: "Totale", pay: "Pagamento", dep: "Anticipo", bal: "Saldo", atc: "al check-in", none: "Nessun anticipo · saldo di", full: "Importo intero da versare", bye: "La aspettiamo!" },
     en: { hi: "Dear", ok: "your booking is confirmed! ✅", struct: "Property", ci: "Check-in", co: "Check-out", nt: "Nights", pax: "Guests", tot: "Total", pay: "Payment", dep: "Deposit", bal: "Balance", atc: "at check-in", none: "No deposit · balance of", full: "Full amount to be paid", bye: "See you soon!" },
@@ -855,7 +862,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 ); })}
               </div>
             </div>
-            <Field label={`${t("Totale complessivo")} (${n} ${t("notti")})`}><div className="rounded-lg bg-wash px-3 py-2 font-mono text-sm font-bold text-txt">{eur(total)}</div></Field>
+            <Field label={`${t("Totale complessivo")} (${n} ${n === 1 ? t("notte") : t("notti")})`}><div className="rounded-lg bg-wash px-3 py-2 font-mono text-sm font-bold text-txt">{eur(total)}</div></Field>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-4 rounded-lg border border-line bg-paper px-3 py-2">
               <label className="flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Parcheggio")}</label>
               {parking && (
@@ -1025,7 +1032,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                   <div className="min-w-0">
                     <div className="truncate font-medium text-txt">{p.name}</div>
                     <div className="truncate text-xs text-dim"><span className="font-mono font-semibold text-txt">{p.number ? `${p.number}/${new Date(p.createdAt).getFullYear()}` : "—"}</span> · {p.structure}</div>
-                    <div className="text-xs text-dim"><span className="font-mono">{fmt(p.checkIn)} → {fmt(p.checkOut)}</span> · {nights(p.checkIn, p.checkOut)} {t("Notti")}</div>
+                    <div className="text-xs text-dim"><span className="font-mono">{fmt(p.checkIn)} → {fmt(p.checkOut)}</span> · {nights(p.checkIn, p.checkOut)} {nights(p.checkIn, p.checkOut) === 1 ? t("notte") : t("notti")}</div>
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-mono text-sm font-semibold text-txt">{eur(p.total)}</div>

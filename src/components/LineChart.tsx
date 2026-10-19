@@ -25,7 +25,8 @@ export default function LineChart({
   const y = (v: number) => H - pad - (v / max) * (H - pad * 2);
 
   const line = points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.value).toFixed(1)}`).join(" ");
-  const area = `${line} L ${x(n - 1).toFixed(1)} ${H - pad} L ${x(0).toFixed(1)} ${H - pad} Z`;
+  // Senza punti il tracciato resta vuoto (un percorso che inizia con "L" è invalido e il browser lo segnala in console).
+  const area = n ? `${line} L ${x(n - 1).toFixed(1)} ${H - pad} L ${x(0).toFixed(1)} ${H - pad} Z` : "";
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" style={{ height: 150 }}>

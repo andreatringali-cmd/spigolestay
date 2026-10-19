@@ -57,6 +57,9 @@ export default function ProductPage() {
     return p.customizable && p.customization_min_qty > 0 ? Math.max(p.min_order_qty, p.customization_min_qty) : Math.max(1, p.min_order_qty);
   }, [p]);
 
+  // La quantità mostrata non può stare sotto il minimo effettivo (con personalizzazione conta anche il minimo di personalizzazione): prima il campo diceva 1 e il prezzo era calcolato su più pezzi.
+  useEffect(() => { setQty((q) => Math.max(q, minQty)); }, [minQty]);
+
   const onLogo = (f?: File) => {
     if (!f) return;
     if (f.size > 2 * 1024 * 1024) return; // max 2MB anteprima

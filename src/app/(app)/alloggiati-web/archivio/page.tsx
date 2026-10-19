@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtDateTime } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -30,9 +31,9 @@ export default function AlloggiatiArchivioPage() {
 
   const load = useCallback(async () => {
     if (!sid) return;
-    setLoading(true);
+    setLoading(true); setMsg("");
     try { const r = await apiPost<{ items: Item[] }>("alloggiati/submissions", { structureId: sid, action: "list" }); setItems(r.items ?? []); }
-    catch { setItems([]); } finally { setLoading(false); }
+    catch (e) { setItems([]); setMsg(e instanceof Error ? e.message : "Impossibile caricare l'archivio."); } finally { setLoading(false); }
   }, [sid]);
   useEffect(() => { load(); }, [load]);
 
@@ -48,7 +49,7 @@ export default function AlloggiatiArchivioPage() {
   const download = async (it: Item) => {
     setBusy(it.id + "d"); setMsg("");
     const b64 = await getPdf(it);
-    if (b64) { const url = b64ToBlobUrl(b64); const a = document.createElement("a"); a.href = url; a.download = `ricevuta-alloggiati-${it.created_at.slice(0, 10)}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); load(); }
+    if (b64) { const url = b64ToBlobUrl(b64); const a = document.createElement("a"); a.href = url; a.download = `ricevuta-alloggiati-${ymdRome(it.created_at)}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); load(); }
     setBusy("");
   };
   const print = async (it: Item) => {
@@ -67,7 +68,7 @@ export default function AlloggiatiArchivioPage() {
   const fmt = (iso: string) => fmtDateTime(iso);
   const okStato = (s: string) => s === "sent";
   const shown = items.filter((it) => {
-    const d = it.created_at.slice(0, 10);
+    const d = ymdRome(it.created_at); // giorno italiano dell'invio (non UTC: dopo mezzanotte sfasava di un giorno)
     if (from && d < from) return false;
     if (to && d > to) return false;
     if (stato === "sent" && !okStato(it.stato)) return false;

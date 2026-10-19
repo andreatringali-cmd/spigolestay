@@ -54,7 +54,7 @@ export default function SupportWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t("Assistenza")}
         title={t("Assistenza")}
-        className="no-print fixed bottom-24 max-sm:bottom-20 right-0 z-50 flex h-14 w-9 items-center justify-center overflow-hidden rounded-l-xl bg-focus text-white shadow-lg transition hover:w-11 max-sm:h-16 max-sm:w-5 max-sm:hover:w-5"
+        className="no-print fixed bottom-24 max-sm:bottom-20 right-0 z-30 flex h-14 w-9 items-center justify-center overflow-hidden rounded-l-xl bg-focus text-white shadow-lg transition hover:w-11 max-sm:h-16 max-sm:w-5 max-sm:hover:w-5"
       >
         <svg className="shrink-0 max-sm:h-[14px] max-sm:w-[14px]" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

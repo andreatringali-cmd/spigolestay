@@ -95,7 +95,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
   );
 
   const g = primaryOf();
-  const declared = ((g?.lastName || g?.fullName) ? 1 : 0) + cosOf().filter((c) => !!(c.lastName || c.firstName)).length;
+  const declared = ((b.webCheckin || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber)) ? 1 : 0) + cosOf().filter((c) => !!(c.lastName || c.firstName)).length;
   const pax = (b.adults ?? 1) + (b.children ?? 0);
 
   return (

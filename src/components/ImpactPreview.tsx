@@ -3,6 +3,8 @@
 // Anteprima dell'impatto in € di una variazione di tariffe, mostrata PRIMA di applicarla.
 // Usata da Revenue, Autopilot e Nèttare. I numeri arrivano da lib/revenue-impact.ts e sono
 // calcolati sulle camere ancora libere (le prenotazioni già confermate non cambiano prezzo).
+import { useEffect } from "react";
+import { plural } from "@/lib/plural";
 import { eur } from "@/lib/format";
 import type { ImpactSummary } from "@/lib/revenue-impact";
 
@@ -12,6 +14,13 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
   open: boolean; title: string; subtitle?: string; impact: ImpactSummary; examples?: ImpactExample[]; notes?: string[];
   confirmLabel?: string; onConfirm: () => void; onCancel: () => void;
 }) {
+  // Esc chiude l'anteprima (come clic fuori).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onCancel]);
   if (!open) return null;
   const net = impact.net;
   const cell = "rounded-lg border border-line bg-paper px-3 py-2";
@@ -53,7 +62,7 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
                     {e.note && <span className="w-full text-[10px] text-faint">{e.note}</span>}
                   </li>
                 ))}
-                {impact.changes > Math.min(5, examples.length) && <li className="px-1 text-[11px] text-faint">…e altre {impact.changes - Math.min(5, examples.length)} tariffe.</li>}
+                {impact.changes > Math.min(5, examples.length) && <li className="px-1 text-[11px] text-faint">…e {impact.changes - Math.min(5, examples.length) === 1 ? "un'altra tariffa" : `altre ${impact.changes - Math.min(5, examples.length)} tariffe`}.</li>}
               </ul>
             )}
           </>

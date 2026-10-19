@@ -47,7 +47,7 @@ export const MODULES: Module[] = [
   { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi; in arrivo i prezzi dinamici locali basati sulla domanda reale della Rete città.", href: "/revenue" },
   { key: "ratecheck", name: "Rate checker", desc: "Confronto tariffe con i competitor.", href: "/rate-checker" },
   { key: "team", name: "Utenti & permessi", desc: "Multi-utente con permessi granulari, ruoli, turni e limiti operativi.", href: "/utenti" },
-  { key: "sharing", name: "Gestione condivisa (soci)", desc: "Co-gestisci una struttura in società: inviti un socio via email, entrambi gestite calendario, tariffe e prenotazioni; le tue altre strutture restano private. Vista 'Tutte' per l'aggregato.", href: "/strutture" },
+  { key: "sharing", name: "Gestione condivisa (soci)", desc: "Co-gestisci una struttura in società: inviti un socio via email e in due gestite calendario, tariffe e prenotazioni; le tue altre strutture restano private. Vista 'Tutte' per l'aggregato.", href: "/strutture" },
   { key: "market", name: "Rete città · intelligence di mercato", desc: "Confronta occupazione, prezzo medio (ADR) e RevPAR con la media anonima dei B&B della tua città. Reciprocità 'dai per ricevere' + soglia di anonimato. Base per i prezzi dinamici locali.", href: "/mercato" },
 ];
 

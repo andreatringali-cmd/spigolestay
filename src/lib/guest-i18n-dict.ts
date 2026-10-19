@@ -7,7 +7,6 @@ import type { GuestDict } from "./guest-i18n";
 export const GUEST_DICT: GuestDict = {
   // ── Comuni ──
   "Lingua": ["Language", "Langue", "Sprache", "Idioma"],
-  "Carico la prenotazione…": ["Loading your booking…", "Chargement de votre réservation…", "Ihre Buchung wird geladen…", "Cargando tu reserva…"],
   "Prenotazione non trovata": ["Booking not found", "Réservation introuvable", "Buchung nicht gefunden", "Reserva no encontrada"],
   "Prenotazione non trovata.": ["Booking not found.", "Réservation introuvable.", "Buchung nicht gefunden.", "Reserva no encontrada."],
   "Impossibile caricare la prenotazione.": ["Unable to load the booking.", "Impossible de charger la réservation.", "Die Buchung konnte nicht geladen werden.", "No se puede cargar la reserva."],
@@ -366,7 +365,6 @@ export const GUEST_DICT: GuestDict = {
   "Preventivo non trovato: chiedi alla struttura un nuovo link.": ["Quote not found: ask the property for a new link.", "Devis introuvable : demandez un nouveau lien à l'établissement.", "Angebot nicht gefunden: Bitten Sie die Unterkunft um einen neuen Link.", "Presupuesto no encontrado: pide un nuevo enlace al alojamiento."],
   "Preventivo non valido: chiedi alla struttura un nuovo link.": ["Invalid quote: ask the property for a new link.", "Devis non valide : demandez un nouveau lien à l'établissement.", "Ungültiges Angebot: Bitten Sie die Unterkunft um einen neuen Link.", "Presupuesto no válido: pide un nuevo enlace al alojamiento."],
   "Impossibile avviare il pagamento.": ["Unable to start the payment.", "Impossible de démarrer le paiement.", "Die Zahlung konnte nicht gestartet werden.", "No se ha podido iniciar el pago."],
-  "Caricamento…": ["Loading…", "Chargement…", "Wird geladen…", "Cargando…"],
   "Rivedi e conferma la tua prenotazione": ["Review and confirm your booking", "Vérifiez et confirmez votre réservation", "Prüfen und bestätigen Sie Ihre Buchung", "Revisa y confirma tu reserva"],
   "Controlla i dati, aggiungi eventuali servizi e conferma con il pagamento in fondo alla pagina.": ["Check the details, add any services and confirm with the payment at the bottom of the page.", "Vérifiez les informations, ajoutez d'éventuels services et confirmez par le paiement en bas de page.", "Prüfen Sie die Angaben, fügen Sie ggf. Services hinzu und bestätigen Sie mit der Zahlung am Ende der Seite.", "Comprueba los datos, añade servicios si lo deseas y confirma con el pago al final de la página."],
   "Il tuo soggiorno": ["Your stay", "Votre séjour", "Ihr Aufenthalt", "Tu estancia"],

@@ -25,7 +25,7 @@ export default function PublicSitePage() {
     return (
       <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/xenora-mark.png" alt="Xenora" width={64} height={64} style={{ width: 64, height: 64, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+        <img src="/xenora-mark.png" alt="Xenora" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
         <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
       </div>
     );

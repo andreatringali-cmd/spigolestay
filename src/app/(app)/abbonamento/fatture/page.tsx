@@ -31,7 +31,7 @@ export default function FatturePage() {
   // Esito del caricamento: "loading" | "ok" | "notconfigured" (Stripe non collegato) | "err" (errore di rete o di Stripe).
   const [invState, setInvState] = useState<"loading" | "ok" | "notconfigured" | "err">("loading");
   useEffect(() => {
-    const email = user?.email; if (!email) return;
+    const email = user?.email; if (!email) { setInvState("ok"); return; } // senza account non c'è nulla da caricare: niente "Caricamento…" all'infinito
     setInvState("loading");
     fetch(`/api/stripe/invoices?email=${encodeURIComponent(email)}`).then((r) => r.json()).then((j) => {
       if (Array.isArray(j.invoices)) setRealInv(j.invoices);

@@ -93,7 +93,7 @@ export default function TassaSoggiornoPage() {
     for (const b of inPeriod) {
       const key = guestCountry(b.guestId);
       const cur = map.get(key) ?? { arrivi: 0, presenze: 0 };
-      cur.arrivi += 1;
+      cur.arrivi += b.adults + b.children; // arrivi = ospiti (persone), come dice la nota sotto e come le presenze
       cur.presenze += (b.adults + b.children) * nights(b.checkIn, b.checkOut);
       map.set(key, cur);
     }
@@ -193,7 +193,7 @@ export default function TassaSoggiornoPage() {
       <Card className="mb-5">
         <SectionTitle>{t("Regole")} ({comuneLabel})</SectionTitle>
         {!single && <p className="mb-2 text-xs text-dim">{t("Con «Tutte le strutture» ogni soggiorno è calcolato con le regole della propria struttura (Strutture → Tassa di soggiorno). Seleziona una struttura in alto a destra per vederle e simularne di diverse.")}</p>}
-        {single && !taxOn && <p className="mb-2 text-xs text-[color:var(--warn)]">{t("Tassa di soggiorno non attiva per questa struttura: attivala in Strutture per calcolarla.")}</p>}
+        {!taxOn && <p className="mb-2 text-xs text-[color:var(--warn)]">{single ? t("Tassa di soggiorno non attiva per questa struttura: attivala in Strutture per calcolarla.") : t("Tassa di soggiorno non attiva per nessuna struttura: attivala in Strutture per calcolarla.")}</p>}
         <div className={single ? "" : "pointer-events-none opacity-50"}>
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex items-center rounded-lg border border-line p-0.5">

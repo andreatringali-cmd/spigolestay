@@ -154,7 +154,7 @@
     var hello = interp(home.welcomeTitle || T().hello);
     if (TV.showGuest !== false && guest && guest.name) hello = /[,–-]\s*$/.test(hello) ? hello + " " + guest.name : hello + ", " + guest.name;
     document.getElementById("welcome").innerHTML = esc(hello);
-    var sub = TV.welcome || (home.welcome && home.welcome.join("<br>")) || "";
+    var sub = TV.welcome || (home.welcome && home.welcome.join("\n")) || "";
     document.getElementById("welcomesub").innerHTML = esc(interp(sub)).replace(/\n/g, "<br>");
     document.getElementById("heronote").innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="12" height="18" rx="2"/><path d="M8 3h4M10 18h.01"/><path d="M19 8l2 2-2 2"/></svg><span>' + T().note + "</span>";
 
@@ -164,7 +164,9 @@
     document.getElementById("wvNet").textContent = P.wifiNetwork || "—";
     document.getElementById("wvPw").textContent = P.wifiPassword || "—";
     var wifiQr = document.getElementById("qrwifi");
-    if (P.wifiNetwork) wifiQr.innerHTML = qrImg("WIFI:T:WPA;S:" + P.wifiNetwork + ";P:" + (P.wifiPassword || "") + ";;", 78);
+    // Nel QR Wi-Fi \ ; , : " nel nome o nella password vanno preceduti da una barra, altrimenti il telefono legge dati sbagliati
+    var wq = function (s) { return String(s).replace(/([\\;,:"])/g, "\\$1"); };
+    if (P.wifiNetwork) wifiQr.innerHTML = qrImg("WIFI:T:WPA;S:" + wq(P.wifiNetwork) + ";P:" + wq(P.wifiPassword || "") + ";;", 78);
     else wifiQr.innerHTML = "";
 
     // selettore lingua

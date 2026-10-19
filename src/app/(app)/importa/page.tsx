@@ -1,6 +1,9 @@
 "use client";
 
 import { fmtDate } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
+import { eur } from "@/lib/format";
+import { friendlyError } from "@/lib/friendly-error";
 import { useEffect, useMemo, useState } from "react";
 import type { ImportOutcome, ImportReport } from "@/lib/import/reconcile";
 import RiepilogoImport from "./_riepilogo";
@@ -65,7 +68,9 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp; strict?: 
 function autoMap(headers: string[]): Record<string, number> {
   const auto: Record<string, number> = {};
   FIELDS.forEach((f) => { if (f.strict) { const i = headers.findIndex((h) => f.strict!.test((h || "").trim())); if (i >= 0) auto[f.key] = i; } });
-  headers.forEach((h, i) => { FIELDS.forEach((f2) => { if (auto[f2.key] === undefined && f2.kw.test(h)) auto[f2.key] = i; }); });
+  // Le colonne già riconosciute col nome esatto non si riusano per altri campi (es. "Nome della struttura" non deve diventare l'ospite, "Importo incassato" non il totale).
+  const claimed = new Set(Object.values(auto));
+  headers.forEach((h, i) => { if (claimed.has(i)) return; FIELDS.forEach((f2) => { if (auto[f2.key] === undefined && f2.kw.test(h)) auto[f2.key] = i; }); });
   return auto;
 }
 
@@ -198,7 +203,11 @@ export default function ImportaPage() {
     setErr(""); setDone(null); setFetching(true);
     try {
       const res = await fetch(`/api/ical?url=${encodeURIComponent(url)}`, { cache: "no-store" });
-      if (!res.ok) { const msg = await res.text().catch(() => ""); setErr(msg || `${t("Download fallito")} (HTTP ${res.status})`); return; }
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        let m: unknown = msg; try { const j = JSON.parse(msg); m = j?.message || j?.error || msg; } catch { /* testo semplice: già una frase italiana della route */ } // le risposte JSON ({"error":"codice"}) non vanno a schermo grezze
+        setErr(msg ? friendlyError(m) : `${t("Download fallito")} (HTTP ${res.status})`); return;
+      }
       const text = await res.text();
       loadIcsText(text, url);
     } catch {
@@ -223,7 +232,7 @@ export default function ImportaPage() {
   };
 
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
-  const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const todayLocal = ymdRome(new Date()); // "oggi" nel fuso italiano (taglio dello storico)
   // Strutture presenti nel file (se c'è la colonna): serve a non mescolare, per esempio, Spigolehouse e Central Perk.
   const propIdx = map.property;
   const propertyOptions = useMemo(() => {
@@ -313,6 +322,8 @@ export default function ImportaPage() {
   // Quante righe (su TUTTO il file, non solo l'anteprima) hanno una data non riconosciuta:
   // se il conteggio è alto, l'import sembrerebbe "non fare nulla" (0 importate) senza questo avviso.
   const dateIssues = useMemo(() => dataRows.filter((r) => !toISO(val(r, "checkIn")) || !toISO(val(r, "checkOut")) || !val(r, "guest")).length, [dataRows, map]);
+  // Righe con date riconosciute ma check-out non dopo il check-in: anche queste vengono scartate all'importazione.
+  const orderIssues = useMemo(() => dataRows.filter((r) => { const a = toISO(val(r, "checkIn")), b = toISO(val(r, "checkOut")); return !!a && !!b && !!val(r, "guest") && a >= b; }).length, [dataRows, map]);
   // Cosa contiene il file, PRIMA di importare: quante future/passate, quante prenotazioni di più camere, quante ci sono già in Xenora.
   const preStats = useMemo(() => {
     const seen = new Set(bookings.filter((b) => b.structureId === structureId && b.extId).map((b) => b.extId as string));
@@ -490,7 +501,7 @@ export default function ImportaPage() {
     const multiGroups = [...grpCount.values()].filter((c) => c >= 2);
     if (multiGroups.length) msgs.push(`${multiGroups.length} ${t("prenotazioni di più camere riconosciute")} (${multiGroups.reduce((a, c) => a + c, 0)} ${t("camere in tutto")}).`);
     if (relinked) msgs.push(`${relinked} ${t("prenotazioni senza ospite sono state ricollegate al loro ospite.")}`);
-    if (skipped) msgs.push(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
+    if (skipped) msgs.push(`${skipped} ${t("righe saltate (date non valide, nome mancante o check-out non dopo il check-in).")}`);
     if (dup) msgs.push(`${dup} ${t("doppioni ignorati (già presenti).")}`);
     if (fixed) msgs.push(`${fixed} ${t("prenotazioni già importate hanno cambiato camera.")}`);
     setErr(msgs.join(" "));
@@ -729,7 +740,7 @@ export default function ImportaPage() {
                         <td className="px-2 py-2 text-dim">{p.room || "—"}</td>
                         <td className="px-2 py-2 font-medium text-txt">{p.roomResolved}</td>
                         <td className="px-2 py-2 text-dim">{p.channel}</td>
-                        <td className="px-2 py-2 font-mono text-xs text-dim">{p.total !== undefined ? `€${p.total}` : "—"}</td>
+                        <td className="px-2 py-2 font-mono text-xs text-dim">{p.total !== undefined ? eur(p.total) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -741,13 +752,18 @@ export default function ImportaPage() {
                   ⚠️ {dateIssues} {t("righe su")} {dataRows.length} {t("hanno una data non riconosciuta o l'ospite mancante e NON verranno importate. Controlla il formato delle colonne Check-in/Check-out nel file (atteso GG/MM/AAAA o AAAA-MM-GG).")}
                 </div>
               )}
+              {orderIssues > 0 && (
+                <div className="mt-3 rounded-lg border p-2.5 text-[12px] font-medium" style={{ borderColor: "var(--err)", color: "var(--err)", backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}>
+                  ⚠️ {orderIssues} {t("righe su")} {dataRows.length} {t("hanno il check-out uguale o precedente al check-in e NON verranno importate.")}
+                </div>
+              )}
               <div className="mt-3 rounded-lg border border-line bg-wash/50 px-3 py-2.5 text-[12px] text-dim">
                 <b className="text-txt">{t("Nel file")}:</b> {dataRows.length} {t("righe")} · {preStats.fut} {t("future")} · {preStats.past} {t("passate")}
                 {preStats.groups > 0 && <> · {preStats.groups} {t("prenotazioni di più camere")} ({preStats.rooms} {t("camere")})</>}
                 {preStats.already > 0 && <> · <span style={{ color: "var(--ok)" }}>{preStats.already} {t("sono già in Xenora e non verranno duplicate")}</span></>}
                 <div className="mt-1 text-faint">{t("A fine importazione vedrai un riepilogo che confronta il file con Xenora, riga per riga.")}</div>
               </div>
-              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {dataRows.length - dateIssues} {t("prenotazioni")}</button>
+              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {Math.max(0, dataRows.length - dateIssues - orderIssues)} {t("prenotazioni")}</button>
             </Card>
           )}
         </div>

@@ -65,7 +65,11 @@ export default function RateCheckerPage() {
   const addCompetitor = () => {
     const name = draft.name.trim();
     if (!name) return;
-    persist([...competitors, { name: name.slice(0, 120), url: draft.url.trim() || undefined, id: draft.id.trim() || undefined }]);
+    // Link: senza schema ("www.booking.com/…") si aggiunge https://; schemi diversi da http(s) si scartano.
+    let url = draft.url.trim();
+    if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = `https://${url}`;
+    if (url && !/^https?:\/\//i.test(url)) url = "";
+    persist([...competitors, { name: name.slice(0, 120), url: url || undefined, id: draft.id.trim() || undefined }]);
     setDraft({ name: "", url: "", id: "" });
   };
   const removeCompetitor = (i: number) => persist(competitors.filter((_, idx) => idx !== i));

@@ -37,6 +37,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Cambiata pagina (anche da un link che non è nel menu) il cassetto del telefono si richiude.
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
   // Sotto i 768px il menu è un cassetto: "compresso" vale solo dal tablet in su (piegando un telefono il cassetto restava a sole icone) e il cassetto si chiude da solo.
   const [isMd, setIsMd] = useState(() => (typeof window === "undefined" ? true : window.matchMedia("(min-width: 768px)").matches));
   useEffect(() => {

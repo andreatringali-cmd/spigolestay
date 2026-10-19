@@ -57,6 +57,8 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
 }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
+  // Esc chiude la finestra (come le altre modali dell'app).
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[5dvh]">
       <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
@@ -77,6 +79,7 @@ export default function PianiTariffariPage() {
   const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
   const [view, setView] = useState<"list" | "cards">("cards");
   const [editId, setEditId] = useState<string | null>(null);
+  const [newPlan, setNewPlan] = useState<RatePlan | null>(null); // piano appena creato: entra nell'elenco solo al Salva (Annulla/Esc non lascia un "Nuovo piano" vuoto)
   useEffect(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY); if (v === "list" || v === "cards") setView(v);
@@ -113,7 +116,7 @@ export default function PianiTariffariPage() {
     savePlans(plans.filter((p) => p.id !== id));
     if (p) addActivity("rateplan", `Piano tariffario eliminato — ${p.name}`);
   };
-  const addPlan = () => { const sid = newItemStructureId(effStructure); const p: RatePlan = { id: uid(), name: t("Nuovo piano"), adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none", ...(sid ? { structureId: sid } : {}) }; upsert(p); setEditId(p.id); };
+  const addPlan = () => { const sid = newItemStructureId(effStructure); const p: RatePlan = { id: uid(), name: t("Nuovo piano"), adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none", ...(sid ? { structureId: sid } : {}) }; setNewPlan(p); setEditId(p.id); };
   // Si salva SEMPRE l'elenco completo (tutte le strutture); la vista mostra solo i piani della struttura + quelli per tutte.
   const shownPlans = plans.filter((p) => inScope(p.structureId, effStructure));
   const structName = (id?: string) => (id ? structures.find((s) => s.id === id)?.name ?? "?" : t("Tutte le strutture"));
@@ -121,7 +124,7 @@ export default function PianiTariffariPage() {
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
   const refBase = types.length ? effectiveBase(types[0], roomTypes) : 100;
   const roomName = (id: string) => roomTypes.find((r) => r.id === id)?.name ?? "?";
-  const editing = editId ? plans.find((p) => p.id === editId) ?? null : null;
+  const editing = editId ? plans.find((p) => p.id === editId) ?? (newPlan?.id === editId ? newPlan : null) : null;
 
   return (
     <div>
@@ -212,7 +215,7 @@ export default function PianiTariffariPage() {
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t(p.board)}</span>
                   <span className="rounded-full px-2 py-0.5 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{depositLabel(p, t)}</span>
-                  <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t("min")} {p.minStay} {t("notti")}</span>
+                  <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t("min")} {p.minStay} {p.minStay === 1 ? t("notte") : t("notti")}</span>
                   {structures.length > 1 && <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{structName(p.structureId)}</span>}
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5 text-xs">
@@ -230,7 +233,7 @@ export default function PianiTariffariPage() {
 
       <p className="mt-4 text-xs text-faint">{t("Vedi l'effetto dei piani giorno per giorno nell'Anteprima prezzi della pagina")} <a href="/tariffe" className="font-semibold text-focus hover:underline">{t("Tariffe")}</a>.</p>
 
-      {editing && <PlanModal plan={editing} allTypes={roomTypes} structures={structures} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
+      {editing && <PlanModal plan={editing} allTypes={roomTypes} structures={structures} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); setNewPlan(null); }} onDelete={async () => { if (newPlan?.id === editing.id) { setEditId(null); setNewPlan(null); return; } await delPlan(editing.id); setEditId(null); }} onClose={() => { setEditId(null); setNewPlan(null); }} />}
     </div>
   );
 }
@@ -299,9 +302,9 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
           {(f.dateFrom || f.dateTo) && <button onClick={() => setF((p) => ({ ...p, dateFrom: undefined, dateTo: undefined }))} className="text-[11px] font-medium text-focus hover:underline">{t("Azzera")}</button>}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <DateField value={f.dateFrom ?? ""} onChange={(v) => set("dateFrom", v || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
+          <DateField value={f.dateFrom ?? ""} max={f.dateTo || undefined} onChange={(v) => set("dateFrom", v || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
           <span className="text-dim">→</span>
-          <DateField value={f.dateTo ?? ""} onChange={(v) => set("dateTo", v || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
+          <DateField value={f.dateTo ?? ""} min={f.dateFrom || undefined} onChange={(v) => set("dateTo", v || undefined)} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
         </div>
       </div>
 

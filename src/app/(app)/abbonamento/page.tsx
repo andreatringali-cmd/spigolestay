@@ -148,7 +148,9 @@ export default function AbbonamentoPage() {
   };
   const toggleAddon = (key: string) => {
     if (MODULES.find((m) => m.key === key)?.core || tier.includes.includes(key)) return;
-    setActive((prev) => { const next = { ...prev, [key]: !prev[key] }; persistModules(next); return next; });
+    // persistModules lancia un evento che aggiorna AccessProvider: va fatto FUORI dalla funzione di aggiornamento dello stato (altrimenti React segnala un setState durante il render).
+    const next = { ...active, [key]: !active[key] };
+    setActive(next); persistModules(next);
   };
 
   // Stripe: cliente salvato + gestione del ritorno dal pagamento.

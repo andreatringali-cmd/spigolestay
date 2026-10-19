@@ -12,11 +12,13 @@ export type IcsEvent = {
 
 // ── Helper date/numeri/canali ──
 const MESI_IT: Record<string, string> = { gen: "01", feb: "02", mar: "03", apr: "04", mag: "05", giu: "06", lug: "07", ago: "08", set: "09", ott: "10", nov: "11", dic: "12" };
+// Giorno di calendario esistente (31/02, mese 13, ecc. NON lo sono): una data impossibile non va scritta nelle prenotazioni.
+const calOk = (y: string, mo: string, d: string) => { const Y = +y, M = +mo, D = +d; const t = new Date(Date.UTC(Y, M - 1, D)); return M >= 1 && M <= 12 && D >= 1 && t.getUTCFullYear() === Y && t.getUTCMonth() === M - 1 && t.getUTCDate() === D; };
 export function toISO(s: string): string {
   s = (s || "").trim(); if (!s) return "";
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
-  if (m) { let [, d, mo, y] = m; if (y.length === 2) y = "20" + y; return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`; }
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return calOk(m[1], m[2], m[3]) ? `${m[1]}-${m[2]}-${m[3]}` : "";
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})(?!\d)/);
+  if (m) { let [, d, mo, y] = m; if (y.length === 2) y = "20" + y; return calOk(y, mo, d) ? `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}` : ""; }
   // Numero seriale Excel (es. "45923" = giorni dal 30/12/1899): capita quando un export perde
   // la formattazione data della cella e la colonna arriva come numero puro.
   if (/^\d{4,6}(\.\d+)?$/.test(s)) {

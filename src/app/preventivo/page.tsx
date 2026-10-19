@@ -245,7 +245,11 @@ export default function PreventivoPubblico() {
             <p className="py-8 text-center text-sm text-dim">{t("Questo preventivo risulta già confermato e pagato.")}</p>
           </div>
         ) : !data ? (
-          <div className={card}><p className="py-8 text-center text-sm text-faint">{shownMsg || t("Caricamento…")}</p></div>
+          <div className={card}>
+            {shownMsg
+              ? <p className="py-8 text-center text-sm text-faint">{shownMsg}</p>
+              : <div className="grid place-items-center py-10" role="status" aria-busy="true">{/* Solo la farfalla che pulsa, niente testo durante il caricamento. */}{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/xenora-mark.png" alt="" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} /><style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style></div>}
+          </div>
         ) : (
           <>
             <h1 className="px-1 font-display text-2xl font-bold text-txt">{t("Rivedi e conferma la tua prenotazione")}</h1>

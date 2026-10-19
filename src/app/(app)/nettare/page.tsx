@@ -131,6 +131,7 @@ export default function NettarePage() {
   const published = (rtId: string, iso: string): number | undefined => rateOverrides[cellKey(rtId, iso)] ?? rateOverrides[iso];
   const stats = useMemo(() => {
     let sum = 0, n = 0, potential = 0, pending = 0;
+    const wk = loadWeekendPct();
     // Nessun valore inventato: la stima usa la TUA occupazione storica reale; senza storico non si stima.
     const occ = my.occ;
     for (const rt of sTypes) {
@@ -138,12 +139,12 @@ export default function NettarePage() {
       for (const d of next30) {
         const c = res.cells[cellKey(rt.id, d)]; if (!c) continue;
         sum += c.final; n++; potential += (c.final - c.base) * occ * rtUnits;
-        if (published(rt.id, d) !== c.final) pending++;
+        if (rateForDay(rt.id, d, roomTypes, rateOverrides, wk) !== c.final) pending++; // come l'anteprima "Applica": conta solo le tariffe che cambierebbero davvero
       }
     }
     return { avg: n ? Math.round(sum / n) : basePrice, potential: occ > 0 ? Math.round(potential) : null as number | null, pending };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [res.cells, sTypes, sUnits, next30, my.occ, basePrice, rateOverrides]);
+  }, [res.cells, sTypes, sUnits, next30, my.occ, basePrice, rateOverrides, roomTypes]);
 
   // Piano di applicazione: SOLO le tipologie della struttura in vista, solo le tariffe che cambiano davvero
   // rispetto a quelle effettive oggi nel calendario.
@@ -174,6 +175,7 @@ export default function NettarePage() {
   if (!struct) return (<div><PageHeader title="Nèttare" subtitle={t("Prezzi dinamici")} /><div className="rounded-2xl border border-line p-4 text-sm text-dim" style={{ background: "var(--surface)" }}>{t("Aggiungi prima una struttura.")}</div></div>);
 
   const COL = 74, LABEL = 188;
+  const wkPct = loadWeekendPct();
   // righe tipologie: madri, con le derivate raccolte in una tendina sotto la madre
   const typeIds = new Set(sTypes.map((r) => r.id));
   const kidsOf = (id: string) => sTypes.filter((r) => r.deriveFrom === id && r.id !== id);
@@ -452,7 +454,7 @@ export default function NettarePage() {
                     </td>
                     {gridDates.map((d) => {
                       const k = cellKey(rt.id, d), c = res.cells[k]; if (!c) return <td key={d} className="border-b border-line" />;
-                      const pub = published(rt.id, d), pending = pub !== c.final;
+                      const pending = rateForDay(rt.id, d, roomTypes, rateOverrides, wkPct) !== c.final;
                       const pct = c.base ? Math.round((c.final / c.base - 1) * 100) : 0;
                       const sel = panel === k || hover?.key === k;
                       return (

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
+import { useAccess } from "@/lib/access";
 import Icon from "@/components/Icon";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
@@ -149,7 +150,9 @@ export default function AssistentePage() {
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
-  const firstName = ((user?.user_metadata as Record<string, unknown> | undefined)?.full_name as string | undefined)?.split(" ")[0] || "";
+  const userMd = user?.user_metadata as Record<string, unknown> | undefined;
+  const { user: localUser } = useAccess();
+  const firstName = (localUser?.firstName?.trim() || (userMd?.first_name as string | undefined) || (userMd?.full_name as string | undefined) || "").trim().split(" ")[0];
   const briefing = useMemo(() => {
     const parts: string[] = [];
     parts.push(`${answers.arrivalsToday.length} arriv${answers.arrivalsToday.length === 1 ? "o" : "i"}`);
@@ -223,12 +226,14 @@ export default function AssistentePage() {
 
     // Nome ospite nella domanda → narrazione diretta di quella prenotazione.
     if (!/arriv|partenz|check|incass|ricav|fornitor|mese|prossim/.test(s)) {
-      const named = active.find((b) => {
+      const namedAll = active.filter((b) => {
         const nm = (getGuest(b.guestId)?.fullName || "").toLowerCase(); if (!nm) return false;
         const parts = nm.split(/\s+/).filter((w) => w.length > 2);
         const matches = parts.filter((w) => s.includes(w)).length;
         return matches >= 2 || (matches >= 1 && /info|dimmi|parla|prenotaz|ospite|chi è/.test(s));
       });
+      // Più prenotazioni dello stesso ospite: prima quella in corso o la prossima in arrivo, altrimenti la più recente già conclusa.
+      const named = namedAll.length > 1 ? [...namedAll].sort((x, y) => { const fx = x.checkOut >= t, fy = y.checkOut >= t; if (fx !== fy) return fx ? -1 : 1; return fx ? x.checkIn.localeCompare(y.checkIn) : y.checkIn.localeCompare(x.checkIn); })[0] : namedAll[0];
       if (named) { const nb = narrate(named); return { title: nb.title, detail: nb.text, speech: nb.text, go: { label: "Apri in Prenotazioni", href: "/prenotazioni" } }; }
     }
 
@@ -241,7 +246,7 @@ export default function AssistentePage() {
     const weekEndISO = new Date(Date.parse(t) + 7 * 86400000).toISOString().slice(0, 10);
     const weekArrList = active.filter((b) => b.checkIn > t && b.checkIn <= weekEndISO);
     const inHouseList = active.filter((b) => b.checkIn <= t && t < b.checkOut);
-    const cityTaxDue = active.filter((b) => b.checkOut >= t && !b.cityTaxPaid).length;
+    const cityTaxDue = active.filter((b) => b.checkOut >= t && !b.cityTaxPaid && !b.cityTaxExempt).length;
     const totUnits = units.filter((u) => !u.outOfService).length;
     const occToday = active.filter((b) => b.checkIn <= t && t < b.checkOut && b.unitId).length;
     const occPct = totUnits > 0 ? Math.round((occToday / totUnits) * 100) : 0;
@@ -309,9 +314,9 @@ export default function AssistentePage() {
     }
   }, [answers, active, dueCents, firstName, getGuest, narrate, subOf, units, t, activeStructureId, allBookings, guests, structures, allUnits, roomTypes]);
 
-  const ask = useCallback(async (text: string) => {
+  const ask = useCallback(async (text: string, shown?: string) => {
     if (!text.trim()) return;
-    setSent(text.trim());
+    setSent((shown ?? text).trim()); // per i pulsanti rapidi si mostra la loro etichetta, non la parola chiave interna
     setAns({ title: "Sto guardando i tuoi dati…", detail: "" });
     const a = await answer(text);
     setAns(a);
@@ -474,7 +479,7 @@ export default function AssistentePage() {
       {/* Domande rapide */}
       <div className="mt-3 flex max-w-3xl flex-wrap gap-1.5">
         {CHIPS.map((c) => (
-          <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-dim transition max-sm:min-h-10 hover:border-focus hover:text-focus">{c.label}</button>
+          <button key={c.q} onClick={() => { setQ(c.label); ask(c.q, c.label); }} className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-dim transition max-sm:min-h-10 hover:border-focus hover:text-focus">{c.label}</button>
         ))}
       </div>
 

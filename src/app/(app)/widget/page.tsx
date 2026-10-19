@@ -13,6 +13,7 @@ import { useLang } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { supabase } from "@/lib/supabase";
 import { slugify } from "@/lib/publicdata";
+import { effectiveBase } from "@/lib/pricing";
 
 const ACCENTS = ["#4F46E5", "#0E7C66", "#B4531F", "#B3453A", "#0891B2", "#DB2777"];
 const FONTS: [string, string][] = [
@@ -327,9 +328,11 @@ export default function WidgetPage() {
   // ═══════════ EDITOR ═══════════
   // Simulatore: se la struttura non ha tipologie NON si inventa un prezzo (prima ricadeva su 100 €).
   const hasPrice = !!rt && typeof rt.basePrice === "number";
-  const raw = hasPrice ? (rt!.basePrice as number) * n : 0;
+  // Prezzo base EFFETTIVO: una tariffa derivata segue la madre (rt.basePrice è solo il valore di partenza alla creazione).
+  const baseEff = hasPrice ? effectiveBase(rt!, roomTypes) : 0;
+  const raw = hasPrice ? baseEff * n : 0;
   const price = c.adjMode === "fixed" ? Math.max(0, raw + c.adjValue) : c.adjMode === "percent" ? Math.max(0, Math.round(raw * (1 + c.adjValue / 100))) : raw;
-  const depositAmt = !hasPrice ? 0 : c.deposit === "firstNight" ? (rt!.basePrice as number) : c.deposit === "percent" ? Math.round(price * c.depositPct / 100) : 0;
+  const depositAmt = !hasPrice ? 0 : c.deposit === "firstNight" ? baseEff : c.deposit === "percent" ? Math.round(price * c.depositPct / 100) : 0;
   const priceTxt = hasPrice ? eur(price) : "—";
 
   // Anteprima: SIMULA la prenotazione (mostra la conferma) SENZA creare dati reali.

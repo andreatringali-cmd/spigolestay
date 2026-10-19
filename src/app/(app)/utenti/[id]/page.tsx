@@ -17,6 +17,7 @@ import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import MfaSetup from "@/components/MfaSetup";
+import NumInput from "@/components/NumInput";
 import { fmtDateTime } from "@/lib/dates";
 import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
@@ -24,9 +25,9 @@ import { isValidEmail, structuresToShare, humanInviteError } from "@/lib/user-ac
 import { friendlyError } from "@/lib/friendly-error";
 
 // --- Micro-componenti ---------------------------------------------------------
-function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
+function Toggle({ on, onClick, disabled, color = "var(--focus)", label }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string; label?: string }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} aria-pressed={on}
+    <button type="button" disabled={disabled} onClick={onClick} aria-pressed={on} aria-label={label}
       className={`relative h-6 w-11 shrink-0 rounded-full transition ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
       style={{ backgroundColor: on ? color : "var(--line)" }}>
       <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} />
@@ -252,7 +253,7 @@ export default function UserSchedaPage() {
                 {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
                 <div className="mt-0.5 text-[11px] text-faint">{t("Clicca il tondino per caricare la foto. In alternativa scegli un colore:")}</div>
-                <div className="mt-1 flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 max-sm:h-9 max-sm:w-9 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} aria-label={`${t("Colore")} ${c}`} aria-pressed={u.avatarColor === c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 max-sm:h-9 max-sm:w-9 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -281,7 +282,7 @@ export default function UserSchedaPage() {
             </div>
             <div className="flex items-center justify-between py-1.5">
               <span className="text-sm text-txt">{t("Utente attivo")}</span>
-              <Toggle on={u.active} onClick={() => set("active", !u.active)} color="var(--ok)" />
+              <Toggle label={t("Utente attivo")} on={u.active} onClick={() => set("active", !u.active)} color="var(--ok)" />
             </div>
             <label className="mt-2 block text-xs font-medium text-dim">{t("Username")} *
               <input value={u.username} onChange={(e) => set("username", e.target.value)} className={`${inp} mt-1`} placeholder={t("es. mario.rossi")} />
@@ -369,15 +370,15 @@ export default function UserSchedaPage() {
               </label>
               {u.payType && u.payType !== "none" && (
                 <label className="block text-xs font-medium text-dim">{t("Importo")} €{u.payType === "hourly" ? t("/ora") : u.payType === "monthly" ? t("/mese") : t("/intervento")}
-                  <input inputMode="decimal" value={u.payAmount ?? ""} onChange={(e) => set("payAmount", e.target.value === "" ? undefined : Number(e.target.value))} className={`${inp} mt-1`} placeholder="0" />
+                  <NumInput allowNull value={u.payAmount ?? null} onChange={(v) => set("payAmount", v ?? undefined)} className={`${inp} mt-1`} placeholder="0" aria-label={t("Importo")} />
                 </label>
               )}
             </div>
             {u.payType === "monthly" && (
-              <button onClick={() => set("payToCassa", !u.payToCassa)} className="mt-3 flex w-full items-center justify-between rounded-lg border border-line px-3 py-2 text-left hover:bg-wash">
+              <div role="button" tabIndex={0} onClick={() => set("payToCassa", !u.payToCassa)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); set("payToCassa", !u.payToCassa); } }} className="mt-3 flex w-full cursor-pointer items-center justify-between rounded-lg border border-line px-3 py-2 text-left hover:bg-wash">
                 <span className="text-sm text-txt">{t("Registra come uscita ricorrente in Cassa")} <span className="block text-[11px] text-faint">{t("Voce «Personale», ogni mese")}</span></span>
-                <Toggle on={!!u.payToCassa} onClick={() => set("payToCassa", !u.payToCassa)} color="var(--ok)" />
-              </button>
+                <Toggle label={t("Registra come uscita ricorrente in Cassa")} on={!!u.payToCassa} color="var(--ok)" />
+              </div>
             )}
             {u.payType && u.payType !== "none" && u.payAmount ? <div className="mt-2 text-[11px] text-faint">{t("Costo indicativo:")} <b className="text-dim">{u.payType === "monthly" ? `${eur(u.payAmount)}${t("/mese")}` : u.payType === "hourly" ? `${eur(u.payAmount)}${t("/ora")}` : `${eur(u.payAmount)}${t("/intervento")}`}</b>.</div> : null}
           </Card>
@@ -389,12 +390,12 @@ export default function UserSchedaPage() {
               {([["managerCheckin", "Gestore check-in"], ["managerCheckout", "Gestore check-out"], ["managerHousekeeping", "Gestore housekeeping"]] as [keyof User, string][]).map(([k, label]) => (
                 <div key={k} className="flex items-center justify-between py-1.5">
                   <span className="text-sm text-txt">{t(label)}</span>
-                  <Toggle on={u[k] as boolean} onClick={() => set(k, !(u[k] as boolean) as never)} />
+                  <Toggle label={t(label)} on={u[k] as boolean} onClick={() => set(k, !(u[k] as boolean) as never)} />
                 </div>
               ))}
               <div className="mt-1 flex items-center justify-between border-t border-line py-2">
                 <span className="text-sm font-medium text-txt">{t("Accesso a tutte le strutture")}</span>
-                <Toggle on={u.allStructures} onClick={() => set("allStructures", !u.allStructures)} />
+                <Toggle label={t("Accesso a tutte le strutture")} on={u.allStructures} onClick={() => set("allStructures", !u.allStructures)} />
               </div>
             </div>
             {u.allStructures ? (

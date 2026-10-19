@@ -23,8 +23,8 @@ import { DIAL_CODES, parsePhone, combinePhone } from "../_phone";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
+function Toggle({ on, onClick, color = "var(--focus)", label }: { on: boolean; onClick?: () => void; color?: string; label?: string }) {
+  return <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
 }
 const nights = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
 
@@ -109,7 +109,9 @@ export default function OspiteSchedaPage() {
     if (!valid) return;
     const fullName = `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim();
     const patch: Partial<Guest> = { ...g, fullName }; delete (patch as { id?: string }).id;
-    if (isNew) { const id = addGuest({ firstName: g.firstName, lastName: g.lastName, email: g.email, phone: g.phone, country: g.country }); updateGuest(id, patch); }
+    // Numero valido: si salva già scritto in modo uniforme (+39 333 123 4567), senza lasciarlo poi tra quelli "da uniformare".
+    if (cr.phone.status === "ok" && cr.phone.pretty && g.phone) patch.phone = cr.phone.pretty;
+    if (isNew) { const id = addGuest({ firstName: g.firstName, lastName: g.lastName, email: g.email, phone: patch.phone, country: g.country }); updateGuest(id, { ...patch, source: "manuale" }); }
     else updateGuest(params.id, patch);
     router.push("/ospiti");
   };
@@ -255,8 +257,8 @@ export default function OspiteSchedaPage() {
           <Card>
             <SectionTitle>{t("CRM & preferenze")}</SectionTitle>
             <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between py-1.5"><span className="text-sm text-txt">{t("Ospite VIP")}</span><Toggle on={!!g.vip} onClick={() => set("vip", !g.vip)} color="#D4A017" /></div>
-              <div className="flex items-center justify-between py-1.5"><span className="text-sm text-txt">{t("Consenso marketing")} <span className="text-[11px] text-faint">{t("(newsletter/offerte)")}</span></span><Toggle on={!!g.marketingConsent} onClick={() => set("marketingConsent", !g.marketingConsent)} color="var(--ok)" /></div>
+              <div className="flex items-center justify-between py-1.5"><span className="text-sm text-txt">{t("Ospite VIP")}</span><Toggle label={t("Ospite VIP")} on={!!g.vip} onClick={() => set("vip", !g.vip)} color="#D4A017" /></div>
+              <div className="flex items-center justify-between py-1.5"><span className="text-sm text-txt">{t("Consenso marketing")} <span className="text-[11px] text-faint">{t("(newsletter/offerte)")}</span></span><Toggle label={t("Consenso marketing")} on={!!g.marketingConsent} onClick={() => set("marketingConsent", !g.marketingConsent)} color="var(--ok)" /></div>
             </div>
             <div className="mb-1 mt-2 text-xs font-medium text-dim">{t("Etichette")}</div>
             <div className="flex flex-wrap gap-1.5">{GUEST_TAGS.map((tag) => <button key={tag} onClick={() => toggleTag(tag)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:py-2 ${(g.tags ?? []).includes(tag) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(tag)}</button>)}</div>

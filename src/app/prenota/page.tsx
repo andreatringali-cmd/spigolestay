@@ -126,8 +126,13 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const today = toISO(new Date());
   // Accetta sia gli alias brevi (?ci/?co, mini-sito) sia quelli lunghi (?checkin/?checkout,
   // deep link dei comparatori Meta Search).
-  const [checkIn, setCheckIn] = useState(() => qp("ci") || qp("checkin") || today);
-  const [checkOut, setCheckOut] = useState(() => qp("co") || qp("checkout") || addDays(today, 1));
+  // Date dal link: un formato strano, una data già passata o una partenza non dopo l'arrivo (link vecchio o scritto a mano) tornano a valori sensati.
+  const isoOk = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v).getTime());
+  const [checkIn, setCheckIn] = useState(() => { const v = qp("ci") || qp("checkin"); return isoOk(v) && (v as string) >= today ? (v as string) : today; });
+  const [checkOut, setCheckOut] = useState(() => {
+    const ci0 = qp("ci") || qp("checkin"); const ci = isoOk(ci0) && (ci0 as string) >= today ? (ci0 as string) : today;
+    const v = qp("co") || qp("checkout"); return isoOk(v) && (v as string) > ci ? (v as string) : addDays(ci, 1);
+  });
   // Le camere compaiono SOLO dopo "Verifica disponibilità" (come Octorate). Se il link porta
   // già date esplicite (?ci&co o ?checkin&checkout) o una tipologia (?rt, deep link
   // metasearch), mostra subito i risultati.
@@ -141,10 +146,11 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   // Ritorno da Stripe: "checking" = sto verificando il pagamento col server, "error" = la verifica non è riuscita (mai la conferma senza esito positivo).
   const [ret, setRet] = useState<null | { phase: "checking" } | { phase: "error"; ref: string; err: string }>(null);
   const [canceledNotice, setCanceledNotice] = useState(false);
-  const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
-  const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
+  // Numeri dal link ripuliti: un ?ad=-5 o ?ch=999 non deve creare ospiti negativi o centinaia di caselle età.
+  const [adults, setAdults] = useState(() => Math.min(20, Math.max(1, Math.round(Number(qp("ad")) || 2))));
+  const [children, setChildren] = useState(() => Math.min(10, Math.max(0, Math.round(Number(qp("ch")) || 0))));
   const [childAges, setChildAges] = useState<number[]>(() => {
-    const n = Number(qp("ch")) || 0;
+    const n = Math.min(10, Math.max(0, Math.round(Number(qp("ch")) || 0)));
     const raw = (qp("ages") || "").split(",").map((x) => Number(x)).filter((x) => !isNaN(x));
     return Array.from({ length: n }, (_, i) => (raw[i] ?? 8));
   });

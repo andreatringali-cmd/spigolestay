@@ -3,7 +3,7 @@
 // Dialog di conferma dell'app (centrato, grafica del gestionale) al posto del confirm() del browser.
 // Uso: const confirm = useConfirm(); if (await confirm({ title, message, danger })) { ... }
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { isConfirmWordOk, CONFIRM_WORD } from "@/lib/bulk-guard";
 
 // typeToConfirm: conferma forte per le cancellazioni di massa: il pulsante resta spento finché non si scrive ELIMINA.
@@ -21,7 +21,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   };
   const [typed, setTyped] = useState("");
   const wordOk = !state?.typeToConfirm || isConfirmWordOk(typed);
-  const close = (v: boolean) => { if (v && !wordOk) return; state?.resolve(v); setState(null); setTyped(""); };
+  const close = (v: boolean) => { if (v && !wordOk) return; state?.resolve(v); setState(null); setTyped(""); }; useEffect(() => { if (!state) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); state.resolve(false); setState(null); setTyped(""); } }; window.addEventListener("keydown", k, true); return () => window.removeEventListener("keydown", k, true); }, [state]); // Esc = Annulla (e non chiude anche la scheda sotto)
 
   return (
     <Ctx.Provider value={confirm}>

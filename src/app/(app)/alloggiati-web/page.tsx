@@ -24,7 +24,7 @@ export default function AlloggiatiWebPage() {
   const [sched, setSched] = useState<Sched[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  const [filterDate, setFilterDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }); // filtro lista schedine: default = oggi
+  const [filterDate, setFilterDate] = useState(() => ymdRome(new Date())); // filtro lista schedine: default = oggi (fuso italiano, come le altre pagine Adempimenti)
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo (ogni minuto)
   const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
@@ -51,8 +51,10 @@ export default function AlloggiatiWebPage() {
   const runAuto = useCallback(async () => {
     if (!sid) return;
     setAutoBusy(true); setMsg("");
-    try { await apiPost("alloggiati/sync", { structureId: sid }); } catch {}
-    try { const r = await apiPost<{ message?: string }>("alloggiati/check", { structureId: sid }); if (r?.message) setMsg(r.message); } catch {}
+    let err = ""; // se la verifica non riesce lo si dice (altrimenti resterebbe "Nessun errore rilevato", falso)
+    try { await apiPost("alloggiati/sync", { structureId: sid }); } catch (e) { err = e instanceof Error ? e.message : "errore"; }
+    try { const r = await apiPost<{ message?: string }>("alloggiati/check", { structureId: sid }); if (r?.message) { setMsg(r.message); err = ""; } } catch (e) { err = err || (e instanceof Error ? e.message : "errore"); }
+    if (err) setMsg(`Verifica non riuscita: ${err}`);
     try { await load(); } catch {}
     setAutoBusy(false);
   }, [sid, load]);
@@ -78,12 +80,12 @@ export default function AlloggiatiWebPage() {
 
   // Registro sempre allineato alle prenotazioni: annullate/no-show/sparite non compaiono.
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
-  const declaredOf = (b: typeof bookings[number]) => ((b.webCheckin || !!(b.primaryGuest?.docNumber && b.primaryGuest?.lastName)) ? 1 : 0) + (b.extraGuests?.length ?? 0);
+  const declaredOf = (b: typeof bookings[number]) => ((b.webCheckin || !!(b.primaryGuest?.docNumber && b.primaryGuest?.lastName)) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0); // un co-ospite vuoto (segnaposto) non conta: stessa regola di Adempimenti
   const expectedOf = (b: typeof bookings[number]) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
   const completeBookingIds = new Set(bookings.filter((b) => activeBookingIds.has(b.id) && declaredOf(b) >= expectedOf(b)).map((b) => b.id));
   const bookingComplete = (id: string | null) => !id || completeBookingIds.has(id);
   const visibleSched = sched.filter((x) => x.stato === "inviata" || !x.booking_id || activeBookingIds.has(x.booking_id));
-  const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const todayLocal = ymdRome(new Date(now)); // "oggi" nel fuso italiano (si aggiorna col countdown)
   const isFuture = (arrivalISO?: string) => (arrivalISO || "") > todayLocal;
   const readyCount = visibleSched.filter((x) => x.stato === "pronta" && !isFuture(x.arrival) && bookingComplete(x.booking_id)).length;
   const toValidate = visibleSched.filter((x) => !isFuture(x.arrival) && x.stato !== "inviata" && !(x.stato === "pronta" && bookingComplete(x.booking_id))).length;
@@ -254,7 +256,7 @@ export default function AlloggiatiWebPage() {
                         return (
                         <div key={x.id} className={`py-2 ${ri > 0 ? "border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)]" : ""}`}>
                           <div className="mb-1.5 flex items-center justify-between gap-2">
-                            <div className="truncate text-[13px] font-semibold text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="font-normal text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
+                            <div className="truncate text-[13px] font-semibold text-txt">{`${x.guest?.cognome ?? ""} ${x.guest?.nome ?? ""}`.trim() || "—"} <span className="font-normal text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                             <RF label="Sesso" v={g.sesso === "F" ? "F" : g.sesso === "M" ? "M" : ""} />
@@ -278,7 +280,7 @@ export default function AlloggiatiWebPage() {
               );
             });
           })()}
-          {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Le schedine appaiono qui dopo il check-in." />}
+          {listSched.length === 0 && !filterDate && <EmptyState title="Nessuna schedina" sub="Le schedine appaiono qui dopo il check-in." />}
           </>}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3 text-sm">

@@ -226,9 +226,10 @@ export default function CassaPage() {
   const [to, setTo] = useState<string>("");
   const applyPreset = (p: Preset) => { setPreset(p); if (p !== "custom") { const r = presetRange(p, today); setFrom(r.from); setTo(r.to); } };
   const futureView = !!from && from >= today;       // si guarda da oggi in avanti: previsione
-  // Periodo «Personalizzato» con il solo «Dal» (senza «Al»): si legge IN ORDINE, dalla data scelta in avanti (prima il più vicino al «Dal»), non dal futuro più lontano a ritroso.
-  const openFrom = preset === "custom" && !!from && !to && !futureView;
-  const ascending = futureView || openFrom;
+  // Con una data «Dal» (scritta a mano o di un periodo predefinito, con o senza «Al») il registro si legge IN ORDINE, dalla data scelta in avanti (prima il più vicino al «Dal»);
+  // solo senza «Dal» (tutto lo storico, o solo «Al») si legge dal più recente a ritroso.
+  const rangeInverted = !!from && !!to && from > to; // «Dal» dopo «Al»: nessun movimento può rientrarci
+  const ascending = !!from;
   const inPeriod = (iso: string) => (!from || iso >= from) && (!to || iso <= to);
   const periodWord = futureView ? t("previste") : preset === "all" ? t("totali") : t("del periodo");
   // Previsione a 6 mesi: dal mese in corso fino a fine del sesto mese (es. oggi 14.10 → 31.03).
@@ -717,9 +718,9 @@ export default function CassaPage() {
             <option value="prevYear">{t("Anno scorso")}</option>
             <option value="custom">{t("Personalizzato")}</option>
           </select>
-          <DateField value={from} onChange={(v) => { setFrom(v); setPreset("custom"); }} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
+          <DateField value={from} onChange={(v) => { setFrom(v); if (v && to && v > to) setTo(""); setPreset("custom"); }} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
           <span className="text-xs text-faint">→</span>
-          <DateField value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
+          <DateField value={to} onChange={(v) => { setTo(v); if (v && from && v < from) setFrom(""); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
         </div>
         <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
           <option value="all">{t("Tutti i movimenti")}</option>
@@ -744,7 +745,7 @@ export default function CassaPage() {
       <div className="flex flex-col gap-4">
           <Card>
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
-            {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
+            {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} sub={rangeInverted ? t("L'intervallo è al contrario: la data «Dal» è dopo la data «Al».") : undefined} /> : (
               <div className="-mx-1 max-h-[70dvh] overflow-auto px-1 md:max-h-[640px]">
               <div className="md:min-w-[920px]">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 max-md:hidden sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
@@ -943,18 +944,23 @@ export default function CassaPage() {
                           ))}
                         </div>
                 );
-                // «Oggi»: sempre la PRIMA riga del registro (poi tutto il resto), con il dettaglio dei saldi dei conti
-                let oggiPlaced = false; // «Dal» scelto nel passato: la riga «Oggi» sta tra i movimenti fino a oggi e quelli dopo
+                // «Oggi»: sta al suo posto nel tempo, con il dettaglio dei saldi dei conti. Da oggi in avanti è la PRIMA riga; con un «Dal» nel passato sta tra i movimenti fino a oggi e quelli dopo;
+                // letto a ritroso (senza «Dal») sta sotto i movimenti futuri e sopra quelli di oggi e passati. Se il periodo finisce prima di oggi non c'è.
+                const oggiIdx = (() => {
+                  if (to && to < today) return -2; // periodo tutto nel passato: oggi è fuori
+                  const i = listRows.findIndex((x) => (ascending ? (futureView ? rowDate(x) >= today : rowDate(x) > today) : rowDate(x) <= today)); // da oggi in avanti i movimenti di oggi stanno sotto la riga «Oggi»; il saldo di partenza (passato) resta sopra
+                  return i < 0 ? listRows.length : i;
+                })();
                 const withDividers = els.flatMap((el, i) => {
                   const parts: React.ReactNode[] = [];
                   const d = rowDate(listRows[i]);
-                  if (openFrom && !oggiPlaced && d > today) { oggiPlaced = true; parts.push(oggiNode("oggi")); }
+                  if (i === oggiIdx) parts.push(oggiNode("oggi"));
                   const y = d.slice(0, 4);
                   if (i > 0 && y !== rowDate(listRows[i - 1]).slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
                   parts.push(el);
                   return parts;
                 });
-                if (listRows.length > 0) { if (openFrom) { if (!oggiPlaced) withDividers.push(oggiNode("oggi")); } else withDividers.unshift(oggiNode("oggi")); }
+                if (listRows.length > 0 && oggiIdx === listRows.length) withDividers.push(oggiNode("oggi"));
                 return withDividers;
                 })()}
               </div>

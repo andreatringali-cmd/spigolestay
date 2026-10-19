@@ -19,6 +19,12 @@ function dayLabel(iso: string): string {
   return `${WEEKDAY_LONG[d.getDay()]} ${fmtDMY(iso)}`; // con mese e anno: "lunedì 27.10.2026", non solo "lunedì 27"
 }
 
+// Preposizioni davanti a una percentuale: "dell'8%", "dell'11%", "dell'85%" (otto/undici/ottanta... iniziano per vocale)
+// ma "del 12%", "del 100%"; "all'85%" ma "al 12%", "al 100%", "allo 0%".
+const vowelPct = (n: number) => { const a = Math.abs(Math.round(n)); return a === 8 || a === 11 || (a >= 80 && a < 90); };
+const delPct = (n: number) => `${vowelPct(n) ? "dell'" : "del "}${Math.abs(Math.round(n))}%`;
+const aPct = (n: number) => (Math.round(n) === 0 ? "allo 0%" : `${vowelPct(n) ? "all'" : "al "}${Math.round(n)}%`);
+
 // Unisce le frasi con la punteggiatura italiana ("a, b e c").
 function joinIt(parts: string[]): string {
   if (parts.length === 0) return "";
@@ -59,9 +65,9 @@ export function explainSuggestion(s: Suggestion): string {
   const pct = Math.abs(s.deltaPct);
 
   const clauses: string[] = [];
-  if (signals.occBand === "alta") clauses.push(`l'occupazione di questa tipologia in quel giorno è all'${s.occ}%, un livello considerato di alta domanda`);
-  else if (signals.occBand === "media-alta") clauses.push(`l'occupazione è al ${s.occ}%, in crescita`);
-  else if (signals.occBand === "bassa") clauses.push(`l'occupazione è ferma al ${s.occ}%, per favorire nuove prenotazioni`);
+  if (signals.occBand === "alta") clauses.push(`l'occupazione di questa tipologia in quel giorno è ${aPct(s.occ)}, un livello considerato di alta domanda`);
+  else if (signals.occBand === "media-alta") clauses.push(`l'occupazione è ${aPct(s.occ)}, in crescita`);
+  else if (signals.occBand === "bassa") clauses.push(`l'occupazione è ferma ${aPct(s.occ)}, per favorire nuove prenotazioni`);
   if (signals.weekend && (signals.occBand === "alta" || signals.occBand === "media-alta")) clauses.push("il giorno è un weekend, tipicamente ad alta domanda nel listino");
   if (signals.lastMinute) clauses.push("mancano pochi giorni al check-in e la tipologia è ancora in gran parte libera");
   if (signals.gap) clauses.push('è un giorno più libero di quelli immediatamente prima e dopo (un "buco" tra le prenotazioni)');
@@ -70,7 +76,7 @@ export function explainSuggestion(s: Suggestion): string {
 
   const why = clauses.length ? joinIt(clauses) : "l'andamento delle prenotazioni rilevato dal motore prezzi";
   const note = hasDemoZone(signals.zoneReasons) ? ` (${DEMO_NOTE})` : "";
-  return `Ho ${verb} il prezzo di ${s.typeName} per ${day} del ${pct}% perché ${why}${note}.${guardNote(s)}`;
+  return `Ho ${verb} il prezzo di ${s.typeName} per ${day} ${delPct(pct)} perché ${why}${note}.${guardNote(s)}`;
 }
 
 /**
@@ -84,9 +90,9 @@ export function explainSuggestionCompact(s: Suggestion): string {
   const verb = s.suggested > s.current ? "alza" : "abbassa";
 
   const clauses: string[] = [];
-  if (signals.occBand === "alta") clauses.push(`occupazione all'${s.occ}% (alta domanda)`);
-  else if (signals.occBand === "media-alta") clauses.push(`occupazione al ${s.occ}%, in crescita`);
-  else if (signals.occBand === "bassa") clauses.push(`occupazione ferma al ${s.occ}%`);
+  if (signals.occBand === "alta") clauses.push(`occupazione ${aPct(s.occ)} (alta domanda)`);
+  else if (signals.occBand === "media-alta") clauses.push(`occupazione ${aPct(s.occ)}, in crescita`);
+  else if (signals.occBand === "bassa") clauses.push(`occupazione ferma ${aPct(s.occ)}`);
   if (signals.weekend && (signals.occBand === "alta" || signals.occBand === "media-alta")) clauses.push("weekend, giorno tipicamente forte");
   if (signals.lastMinute) clauses.push("last-minute ancora scarico");
   if (signals.gap) clauses.push("buco tra due prenotazioni");
@@ -95,7 +101,7 @@ export function explainSuggestionCompact(s: Suggestion): string {
 
   const why = clauses.length ? joinIt(clauses) : "andamento prenotazioni";
   const note = hasDemoZone(signals.zoneReasons) ? ` (${DEMO_NOTE})` : "";
-  return `${verb === "alza" ? "Alza" : "Abbassa"} del ${pct}% perché ${why}${note}.${guardNote(s)}`;
+  return `${verb === "alza" ? "Alza" : "Abbassa"} ${delPct(pct)} perché ${why}${note}.${guardNote(s)}`;
 }
 
 /**

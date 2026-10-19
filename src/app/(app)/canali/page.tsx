@@ -148,6 +148,13 @@ export default function CanaliPage() {
   const [, setColorTick] = useState(0); // il colore sta nel browser: dopo ogni scelta si ridisegna la pagina (evidenziazione e pallino in tabella)
   const [channelDetail, setChannelDetail] = useState<{ sid: string; c: { id: string; channel: string; title: string; active: boolean } } | null>(null);
   const [chartsOn, setChartsOn] = useState(true); // grafici dell'andamento: si possono nascondere (vale per questa visita)
+  // Esc chiude la finestra aperta (pannello collegamento canali o impostazioni del canale).
+  useEffect(() => {
+    if (!channelDetail && !channelPanel.open) return;
+    const h = (e: KeyboardEvent) => { if (e.key !== "Escape") return; if (channelPanel.open) closeChannelPanel(); else setChannelDetail(null); };
+    window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelDetail, channelPanel.open]);
 
   const syncToChannex = async () => {
     const sid = effStructure;
@@ -268,9 +275,9 @@ export default function CanaliPage() {
           <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t("annullate")}` : ""}`} />
+          <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t(scope.totals.cancelled === 1 ? "annullata" : "annullate")}` : ""}`} />
           <StatCard label={t("Ricavo lordo")} value={eur(scope.totals.gross)} hint={scope.totals.avgNight ? `${eur(scope.totals.avgNight)} ${t("a notte")}` : undefined} />
-          <StatCard label={t("Commissioni")} value={eur(scope.totals.commission)} color={scope.totals.commission > 0 ? "var(--err)" : undefined} hint={scope.totals.commissionPct != null ? `${scope.totals.commissionPct}% ${t("del lordo")}` : undefined} />
+          <StatCard label={t("Commissioni")} value={eur(scope.totals.commission)} color={scope.totals.commission > 0 ? "var(--err)" : undefined} hint={scope.totals.commissionPct != null ? `${String(scope.totals.commissionPct).replace(".", ",")}% ${t("del lordo")}` : undefined} />
           <StatCard label={t("Netto")} value={eur(scope.totals.net)} color={scope.totals.net > 0 ? "var(--ok)" : undefined} hint={scope.totals.gross > 0 ? `${Math.round((scope.totals.net / scope.totals.gross) * 100)}% ${t("del lordo")}` : undefined} />
         </div>
         {chartsOn && <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -391,7 +398,7 @@ export default function CanaliPage() {
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           const st = gs?.rows.find((r) => r.channel === chKey);
                           const dash = <span className="text-faint">—</span>;
-                          const commTip = `${commInfo.source === "stima" ? "~" : ""}${commPct}% · ${commInfo.source === "stima" ? "percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "percentuale impostata da te" : "percentuale standard: non ci sono abbastanza dati reali per stimarla"}`;
+                          const commTip = `${commInfo.source === "stima" ? "~" : ""}${String(commPct).replace(".", ",")}% · ${commInfo.source === "stima" ? "percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "percentuale impostata da te" : "percentuale standard: non ci sono abbastanza dati reali per stimarla"}`;
                           return (
                             <tr
                               key={c.id || c.channel + i}
@@ -435,7 +442,7 @@ export default function CanaliPage() {
                           <tr className="border-t border-line bg-wash text-xs font-semibold text-txt">
                             <td className="px-3 py-2" colSpan={3}>{t("Totale canali")}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums">{eur(tot.gross)}</td>
-                            <td className="px-3 py-2 text-right font-mono tabular-nums" title={tot.gross > 0 ? `${Math.round((tot.comm / tot.gross) * 1000) / 10}% del lordo` : undefined}>{eur(tot.comm)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums" title={tot.gross > 0 ? `${String(Math.round((tot.comm / tot.gross) * 1000) / 10).replace(".", ",")}% del lordo` : undefined}>{eur(tot.comm)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums" style={{ color: "var(--ok)" }}>{eur(tot.net)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums text-dim">{tot.nights > 0 && tot.gross > 0 ? eur(Math.round(tot.gross / tot.nights)) : "—"}</td>
                             <td colSpan={2} />

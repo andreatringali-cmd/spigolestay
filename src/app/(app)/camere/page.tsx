@@ -29,6 +29,7 @@ const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLO
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k); }, [onClose]); // Esc chiude la finestra
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
       <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
@@ -256,10 +257,10 @@ export default function CamerePage() {
                           <div className="shrink-0 whitespace-nowrap font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
                         </div>
                         <div className="mt-1.5 flex flex-wrap gap-1">
-                          <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.beds} {t("letti")}</span>
-                          {rt.maxOccupancy ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{t("max")} {rt.maxOccupancy} {t("ospiti")}</span> : null}
+                          <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.beds} {rt.beds === 1 ? t("letto") : t("letti")}</span>
+                          {rt.maxOccupancy ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{t("max")} {rt.maxOccupancy} {rt.maxOccupancy === 1 ? t("ospite") : t("ospiti")}</span> : null}
                           {rt.size ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.size} m²</span> : null}
-                          <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{n} {t("camere")}</span>
+                          <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{n} {n === 1 ? t("camera") : t("camere")}</span>
                         </div>
                         {rt.bedConfig && <div className="mt-1.5 text-[11px] text-faint">{rt.bedConfig}</div>}
                         {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5 text-dim">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} title={t(a)} aria-label={t(a)} className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>)}{(rt.amenities ?? []).length > 6 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 6}</span>}</div>}
@@ -290,7 +291,7 @@ export default function CamerePage() {
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                             <span className="truncate font-display text-base font-bold text-txt">{rt.name}</span>
                             <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{g.length} {g.length === 1 ? t("camera") : t("camere")}</span>
-                            <span className="hidden shrink-0 text-[11px] text-faint sm:inline">{rt.beds} {t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
+                            <span className="hidden shrink-0 text-[11px] text-faint sm:inline">{rt.beds} {rt.beds === 1 ? t("letto") : t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
                           </button>
                           <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="shrink-0 whitespace-nowrap text-[11px] font-medium text-focus hover:underline max-sm:-my-2 max-sm:ml-auto max-sm:py-2.5 max-sm:pl-2">{t("Apri tipologia")} →</button>
                         </div>
@@ -317,6 +318,7 @@ export default function CamerePage() {
                       </div>
                     );
                   })}
+                  {q && !sUnits.some((u) => { const rt = types.find((x) => x.id === u.roomTypeId); return rt ? typeMatchQ(rt) || unitMatchQ(u) : unitMatchQ(u); }) && <div className="rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna camera trovata")} /></div>}
                   {(() => {
                     const orphans = sortUnits(sUnits.filter((u) => !types.some((rt) => rt.id === u.roomTypeId) && unitMatchQ(u)), types);
                     if (!orphans.length) return null;
@@ -380,7 +382,7 @@ export default function CamerePage() {
 }
 
 function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?: Unit; onClose: () => void }) {
-  const { roomTypes, units, addUnit, updateUnit, deleteUnit, setActiveStructure, addActivity } = useData();
+  const { roomTypes, units, bookings, addUnit, updateUnit, deleteUnit, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const toast = useToast();
@@ -418,6 +420,8 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
 
   const save = () => {
     if (!f.name?.trim() || !f.roomTypeId) return;
+    // Due camere con lo stesso nome nella stessa struttura si confondono in calendario, prenotazioni e pulizie.
+    if ((!unit || (unit.name || "").trim().toLowerCase() !== f.name.trim().toLowerCase()) && units.some((x) => x.structureId === structureId && x.id !== unit?.id && (x.name || "").trim().toLowerCase() === f.name!.trim().toLowerCase())) { toast(t("Esiste già una camera con questo nome in questa struttura.")); return; }
     const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: codeOf(f.name, f.roomTypeId), floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined, photos: f.photos, amenities: f.amenities, bedConfig: f.bedConfig, size: f.size };
     if (unit) { updateUnit(unit.id, patch); addActivity("config", `Camera modificata — ${patch.name}`); }
     else { const id = addUnit({ structureId, roomTypeId: f.roomTypeId, name: patch.name! }); updateUnit(id, patch); }
@@ -483,7 +487,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
         {f.outOfService && <input value={f.oosReason ?? ""} onChange={(e) => set("oosReason", e.target.value)} className={`${inp} mt-2`} placeholder={t("Motivo (es. ristrutturazione)")} />}
       </div>
       <div className="mt-4 flex items-center gap-2">
-        {unit && <button onClick={async () => { if (await ask({ title: t("Elimina camera"), message: `${t("Eliminare")} "${unit.name}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteUnit(unit.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+        {unit && <button onClick={async () => { if (await ask({ title: t("Elimina camera"), message: `${t("Eliminare")} "${unit.name}"?${(() => { const today = new Date().toLocaleDateString("sv-SE"); const nb = bookings.filter((x) => x.unitId === unit.id && x.channel !== "blocked" && x.status !== "cancelled" && x.checkOut >= today).length; return nb ? ` ${nb} ${nb === 1 ? t("prenotazione in corso o futura resterà") : t("prenotazioni in corso o future resteranno")} ${t("senza camera (da assegnare).")}` : ""; })()}`, danger: true, confirmLabel: t("Elimina") })) { deleteUnit(unit.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
         <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
         <button onClick={save} disabled={!f.name?.trim() || !f.roomTypeId} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{unit ? t("Salva") : t("Crea")}</button>
       </div>

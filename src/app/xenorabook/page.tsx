@@ -9,6 +9,7 @@
 // esattamente quelle — niente riempitivo finto per sembrare più popolato.
 import { useMemo, useState, useEffect, useRef } from "react";
 import { ymdRome } from "@/lib/dates-rome";
+import { shiftISO } from "@/lib/dates";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
@@ -53,7 +54,7 @@ export default function XenoraBookPublicPage() {
   const [moreOpen, setMoreOpen] = useState(false);
   const today = ymdRome(new Date());
   const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
+  const [to, setTo] = useState(() => shiftISO(today, 1)); // partenza = domani: con la stessa data dell'arrivo il soggiorno sarebbe di 0 notti
   const guestsBtnRef = useRef<HTMLButtonElement>(null); // ancora della tendina ospiti (Popover): chiusura fuori/Esc la gestisce lei
 
   // Vocabolari dei filtri: calcolati dalle strutture REALI caricate, non da liste fisse
@@ -141,16 +142,16 @@ export default function XenoraBookPublicPage() {
               </label>
               <div className="rounded-xl px-3 py-2 hover:bg-wash">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-in</div>
-                <DateField value={from} min={today} onChange={(v) => setFrom(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
+                <DateField value={from} min={today} onChange={(v) => { setFrom(v); if (to <= v) setTo(shiftISO(v, 1)); }} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
               </div>
               <div className="rounded-xl px-3 py-2 hover:bg-wash">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-out</div>
-                <DateField value={to} min={from} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
+                <DateField value={to} min={shiftISO(from, 1)} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
               </div>
               <div className="relative">
                 <button ref={guestsBtnRef} onClick={() => setGuestsOpen((o) => !o)} className="h-full w-full rounded-xl px-3 py-2 text-left hover:bg-wash">
                   <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Ospiti</div>
-                  <div className="text-sm font-semibold text-txt">{adults + children} ospiti · {rooms} {rooms > 1 ? "camere" : "camera"}</div>
+                  <div className="text-sm font-semibold text-txt">{adults + children} {adults + children === 1 ? "ospite" : "ospiti"} · {rooms} {rooms > 1 ? "camere" : "camera"}</div>
                 </button>
                 <Popover open={guestsOpen} anchorRef={guestsBtnRef} onClose={() => setGuestsOpen(false)} align="end" width={256} label="Ospiti">
                   <div className="p-2">

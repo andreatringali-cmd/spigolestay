@@ -49,7 +49,12 @@ export default function AccettaInvito() {
         </div>
 
         {state === "loading" || state === "accepting" ? (
-          <p style={{ color: "#6b7280", fontSize: 14, padding: "24px 0", textAlign: "center" }}>Verifica dell'invito…</p>
+          <div role="status" aria-busy="true" style={{ display: "grid", placeItems: "center", padding: "28px 0" }}>
+            {/* Solo la farfalla che pulsa, niente testo durante il caricamento. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/xenora-mark.png" alt="" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+            <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
+          </div>
         ) : state === "need-login" ? (
           <>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1f2430", margin: "0 0 8px" }}>Accedi per accettare</h1>

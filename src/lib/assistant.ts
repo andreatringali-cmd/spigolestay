@@ -89,6 +89,12 @@ export function answer(raw: string, ctx: AssistantCtx): Answer {
   const hasDog = (id: string) => (ctx.guests.find((g) => g.id === id)?.tags ?? []).includes("Animali");
   const bItem = (b: Booking, sub?: string): AnswerItem => ({ label: guestName(b.guestId), sub: sub ?? `${unitName(b.unitId)} · ${structName(b.structureId)}`, badge: hasDog(b.guestId) ? "🐾" : undefined, bookingId: b.id });
 
+  // ── Codice prenotazione (es. XEN-2026-0005): una sola parola con numeri → cerca per codice ──
+  if (q.length >= 4 && !/\s/.test(q) && /\d/.test(q) && /[a-z]/.test(q)) {
+    const byCode = scoped.filter((b) => (b.code ?? "").toLowerCase().includes(q)).slice(0, 8);
+    if (byCode.length) return { kind: "answer", icon: "clipboard", title: byCode.length === 1 ? "Prenotazione " + byCode[0].code : byCode.length + " prenotazioni con questo codice", items: byCode.map((b) => bItem(b, `${b.code ?? ""} · ${fmtD(b.checkIn)} → ${fmtD(b.checkOut)}${b.status === "cancelled" ? " · annullata" : ""}`)) };
+  }
+
   // ── Incassi / ricavi ──
   if (/incass|ricav|fattur|guadagn|entrat|introit/.test(q) && !/da\s+incass|devo|ancora|resid|saldo|manca/.test(q)) {
     const p = parsePeriod(q, today) ?? { from: `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`, to: iso(new Date(today.getFullYear(), today.getMonth() + 1, 0)), label: "questo mese" };

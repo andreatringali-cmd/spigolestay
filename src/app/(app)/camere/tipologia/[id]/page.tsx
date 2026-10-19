@@ -78,7 +78,10 @@ function TipologiaScheda() {
   const valid = !!f.name?.trim();
   const save = () => {
     if (!valid) return;
-    const patch: Partial<RoomType> = { ...f, basePrice: f.basePrice ?? 0, beds: f.beds ?? 1 };
+    // I campi numerici accettano anche valori negativi digitati a mano: qui si riportano ai minimi sensati (prezzi e conteggi >= 0, posti letto/ospiti/notti minime >= 1).
+    const nn = (v?: number) => (v === undefined || !Number.isFinite(v) ? undefined : Math.max(0, v));
+    const n1 = (v?: number) => (v === undefined || !Number.isFinite(v) ? undefined : Math.max(1, v));
+    const patch: Partial<RoomType> = { ...f, basePrice: nn(f.basePrice) ?? 0, beds: n1(f.beds) ?? 1, minPrice: nn(f.minPrice), minStay: n1(f.minStay), maxOccupancy: n1(f.maxOccupancy), maxAdults: n1(f.maxAdults), maxChildren: nn(f.maxChildren), infants: nn(f.infants), extraBeds: nn(f.extraBeds), extraBedPrice: nn(f.extraBedPrice), size: nn(f.size) };
     delete (patch as { id?: string }).id;
     if (isNew) {
       const id = addRoomType({ structureId, name: f.name!.trim(), beds: f.beds ?? 1, basePrice: f.basePrice ?? 0 });
@@ -103,7 +106,7 @@ function TipologiaScheda() {
       await ask({ title: t("Tipologia con prenotazioni"), message: `"${existing.name}" ${t("ha")} ${nBookings} ${t("prenotazioni (anche passate o pagate")}${nDerived > 0 ? `, ${t("comprese quelle delle tariffe derivate")}` : ""}${t("): eliminarla le cancellerebbe tutte. Sposta le prenotazioni su un'altra tipologia, oppure disattiva la tipologia dalla vendita.")}`, confirmLabel: t("Ho capito") });
       return;
     }
-    if ((await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere")}${nDerived > 0 ? ` ${t("e")} ${nDerived} ${t("tariffe derivate")}` : ""}?`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); }
+    if ((await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${nUnits === 1 ? t("e la sua") : t("e le sue")} ${nUnits} ${nUnits === 1 ? t("camera") : t("camere")}${nDerived > 0 ? ` ${t("e")} ${nDerived} ${t("tariffe derivate")}` : ""}?`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); }
   };
 
   // Imposta il numero esatto di camere della tipologia: crea o rimuove le unità per arrivare al totale.
@@ -131,7 +134,7 @@ function TipologiaScheda() {
         const id = addUnit({ structureId: existing.structureId, roomTypeId: existing.id, name: String(n) });
         updateUnit(id, { code: `${prefix}${n}`, amenities: inheritAmenities });
       }
-      setRoomMsg(`${t("Aggiunte")} ${add} ${t("camere")} · ${t("totale")} ${target}.`);
+      setRoomMsg(`${add === 1 ? t("Aggiunta") : t("Aggiunte")} ${add} ${add === 1 ? t("camera") : t("camere")} · ${t("totale")} ${target}.`);
     } else {
       // Riduzione: apri il selettore così l'utente sceglie QUALI camere rimuovere.
       // Suggerisco già le ultime rimovibili (senza prenotazioni) fino a raggiungere il target.
@@ -156,7 +159,7 @@ function TipologiaScheda() {
     setRemoveSel(new Set());
     const remaining = units.filter((u) => u.roomTypeId === existing.id).length - ids.length;
     setTargetRooms(String(Math.max(0, remaining)));
-    setRoomMsg(`${t("Rimosse")} ${ids.length} ${t("camere")}. ${t("Totale")}: ${Math.max(0, remaining)}.`);
+    setRoomMsg(`${ids.length === 1 ? t("Rimossa") : t("Rimosse")} ${ids.length} ${ids.length === 1 ? t("camera") : t("camere")}. ${t("Totale")}: ${Math.max(0, remaining)}.`);
   };
 
   return (
@@ -185,9 +188,9 @@ function TipologiaScheda() {
                 </select>
               </label>
             )}
-            <div className="mb-3 flex items-center gap-3">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
               <div className="h-11 w-11 shrink-0 rounded-lg" style={{ backgroundColor: f.color }} />
-              <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} aria-label={`${t("Colore")} ${c}`} aria-pressed={f.color === c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
+              <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} aria-label={`${t("Colore")} ${c}`} aria-pressed={f.color === c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
               {!isNew && <span className="ml-auto rounded-full bg-wash px-2.5 py-1 text-xs text-dim">{nUnits} {t("camere di questa tipologia")}</span>}
             </div>
             <label className={lbl}>{t("Nome tipologia")} *
@@ -343,7 +346,7 @@ function TipologiaScheda() {
                 })}
               </div>
               <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-dim">{t("Rimarranno")}: <b className="text-txt">{myUnits.length - selCount}</b> {t("camere")}</span>
+                <span className="text-xs text-dim">{myUnits.length - selCount === 1 ? t("Rimarrà") : t("Rimarranno")}: <b className="text-txt">{myUnits.length - selCount}</b> {myUnits.length - selCount === 1 ? t("camera") : t("camere")}</span>
                 <div className="flex gap-2">
                   <button onClick={() => setPickerOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
                   <button onClick={confirmRemove} disabled={selCount === 0} className="rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Rimuovi")} {selCount > 0 ? `(${selCount})` : ""}</button>

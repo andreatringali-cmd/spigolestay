@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import Popover from "./Popover";
 import { useLang } from "@/lib/i18n";
@@ -38,6 +38,8 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   const [open, setOpen] = useState(false);
   const [picker, setPicker] = useState<Set<string> | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const pickerOpen = picker !== null;
+  useEffect(() => { if (!pickerOpen) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setPicker(null); }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k); }, [pickerOpen]); // Esc chiude la scelta dei dati
   const openExcel = () => {
     setOpen(false);
     if (!excelFields) { onExcel(); return; }

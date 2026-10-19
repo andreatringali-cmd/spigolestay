@@ -508,7 +508,7 @@ function Engine() {
     </div>
   );
 
-  if (loading) return <div className="min-h-full bg-wash">{header}<div className="mx-auto max-w-5xl px-4 py-16 text-center text-sm text-dim">{t("Carico la prenotazione…")}</div></div>;
+  if (loading) return (<div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }} role="status" aria-busy="true">{/* Solo la farfalla che pulsa (come il resto di Xenora): niente testo durante il caricamento. */}{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/xenora-mark.png" alt="" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} /><style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style></div>);
 
   if (!info) return (
     <div className="min-h-full bg-wash">{header}

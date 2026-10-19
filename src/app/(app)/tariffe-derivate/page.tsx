@@ -35,7 +35,7 @@ function loadPlanNames(structureIds: string[] = []): string[] {
   } catch {}
   return DEFAULT_PLAN_NAMES;
 }
-const scartoOf = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "amount" ? `${sign}${v} €` : `${sign}${v}%`; };
+const scartoOf = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "percent" ? `${sign}${v}%` : `${sign}${v} €`; };
 // Colore dei connettori della mappa (via di mezzo: accento smorzato)
 const CONN = "color-mix(in srgb, var(--focus) 55%, var(--line))";
 
@@ -68,6 +68,8 @@ function Catena() {
 // Modale creazione/modifica tariffa derivata (stile Octorate)
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
+  // Esc chiude la finestra (come le altre modali dell'app).
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
       <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
@@ -138,6 +140,8 @@ export default function TariffeDerivatePage() {
           const sUnits = units.filter((u) => u.structureId === s.id);
           const masters = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
           const kidsOf = (id: string) => types.filter((x) => x.deriveFrom === id);
+          // Tutte le discendenti (anche derivate di derivate) con il livello, per l'elenco: guardia anti-ciclo con `seen`.
+          const descOf = (id: string, depth = 1, seen: string[] = [id]): { k: RoomType; depth: number }[] => kidsOf(id).filter((k) => !seen.includes(k.id)).flatMap((k) => [{ k, depth }, ...descOf(k.id, depth + 1, [...seen, k.id])]);
           const hasAnyDeriv = types.some((rt) => rt.deriveFrom);
           return (
             <div key={s.id}>
@@ -152,7 +156,7 @@ export default function TariffeDerivatePage() {
                   onAdd={(pid) => setDerivModal({ structureIds: [s.id], parentId: pid })}
                   onEdit={(id) => setDerivModal({ structureIds: [s.id], editId: id })}
                   onOpenType={(id) => router.push(`/camere/tipologia/${id}`)}
-                  onDelete={async (id, name) => { if (await blockedByBookings(ask, t, id, name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
+                  onDelete={async (id, name) => { if (await blockedByBookings(ask, t, id, name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"? ${roomTypeCascadeIds(id, roomTypes).length > 1 ? `${t("Verranno eliminate anche le sue tariffe derivate")} (${roomTypeCascadeIds(id, roomTypes).length - 1}).` : ""}`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
                 />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
@@ -218,10 +222,10 @@ export default function TariffeDerivatePage() {
                                   </div>
                                 </td>
                               </tr>
-                              {open && kids.map((k) => { const kMin = effectiveMinStay(k, roomTypes); const kClosed = effectiveClosed(k, roomTypes); return (
+                              {open && descOf(rt.id).map(({ k, depth }) => { const kMin = effectiveMinStay(k, roomTypes); const kClosed = effectiveClosed(k, roomTypes); return (
                                 <tr key={k.id} onClick={() => setDerivModal({ structureIds: [s.id], editId: k.id })} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_9%,transparent)]">
                                   <td className="px-3 py-2.5">
-                                    <div className="flex min-w-0 items-center gap-2 pl-6">
+                                    <div className="flex min-w-0 items-center gap-2 pl-6" style={depth > 1 ? { paddingLeft: `${depth * 1.5}rem` } : undefined}>
                                       <span className="shrink-0 text-focus" title={t("Condivide le camere della tipologia madre")}><Catena /></span>
                                       <span className="truncate font-medium text-txt">{k.name}</span>
                                     </div>
@@ -502,7 +506,7 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
           </div>
 
           <div className="mt-4 flex items-center gap-2">
-            {editing && <button onClick={async () => { if (await blockedByBookings(ask, t, editing.id, editing.name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${editing.name}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteRoomType(editing.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+            {editing && <button onClick={async () => { if (await blockedByBookings(ask, t, editing.id, editing.name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${editing.name}"? ${roomTypeCascadeIds(editing.id, roomTypes).length > 1 ? `${t("Verranno eliminate anche le sue tariffe derivate")} (${roomTypeCascadeIds(editing.id, roomTypes).length - 1}).` : ""}`, danger: true, confirmLabel: t("Elimina") })) { deleteRoomType(editing.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{editing ? t("Salva") : t("Crea derivata")}</button>
           </div>

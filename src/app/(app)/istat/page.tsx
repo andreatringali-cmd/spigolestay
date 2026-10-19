@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtDate } from "@/lib/dates";
+import { ymdRome } from "@/lib/dates-rome";
 import DateField from "@/components/DateField";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -22,7 +23,7 @@ export default function IstatPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  const [filterDate, setFilterDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
+  const [filterDate, setFilterDate] = useState(() => ymdRome(new Date())); // default = oggi (fuso italiano)
   const [openG, setOpenG] = useState<Record<string, boolean>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<string | null>(null);
@@ -47,7 +48,7 @@ export default function IstatPage() {
   const runAuto = useCallback(async () => {
     if (!sid) return;
     setAutoBusy(true); setMsg("");
-    try { await apiPost("istat/sync", { structureId: sid }); } catch {}
+    try { await apiPost("istat/sync", { structureId: sid }); } catch (e) { setMsg(`Aggiornamento non riuscito: ${e instanceof Error ? e.message : "errore"}`); } // altrimenti resterebbe "Movimento in regola", falso
     try { await load(); } catch {}
     setAutoBusy(false);
   }, [sid, load]);
@@ -56,7 +57,7 @@ export default function IstatPage() {
 
   // Movimento sempre allineato alle prenotazioni; gli arrivi futuri non sono "da inviare".
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
-  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const todayIso = ymdRome(new Date()); // "oggi" nel fuso italiano, come le altre pagine Adempimenti
   const isFuture = (arrivalISO?: string) => (arrivalISO || "") > todayIso;
   // rowsAll: tutto il movimento attivo, navigabile (anche arrivi futuri, es. self check-in in anticipo).
   // rowsVisible: solo ciò che è davvero "da inviare oggi" — resta il gate per chiudiGiornata/dayPending.
@@ -114,7 +115,7 @@ export default function IstatPage() {
     const st = structures.find((x) => x.id === sid);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `movimento-istat-${(st?.name || "struttura").replace(/[^A-Za-z0-9_-]/g, "_")}-${filterDate || "tutto"}.csv`;
-    a.click(); URL.revokeObjectURL(a.href);
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
 
   const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
@@ -264,7 +265,7 @@ export default function IstatPage() {
                 );
               });
             })()}
-            {rowsAll.length === 0 && <EmptyState title="Nessun movimento" sub="Il movimento si genera dagli arrivi delle prenotazioni." />}
+            {rowsAll.length === 0 && !filterDate && <EmptyState title="Nessun movimento" sub="Il movimento si genera dagli arrivi delle prenotazioni." />}
           </>}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3 text-sm">

@@ -10,6 +10,7 @@
 // feed Metasearch, con le stesse tariffe/disponibilità.
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { ymdRome } from "@/lib/dates-rome";
+import { shiftISO } from "@/lib/dates";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
@@ -49,8 +50,9 @@ function Engine() {
   }, [slug]);
 
   const today = ymdRome(new Date());
-  const [from, setFrom] = useState(qp.get("from") || today);
-  const [to, setTo] = useState(qp.get("to") || today);
+  // Date dal link: arrivo non nel passato e partenza sempre DOPO l'arrivo (prima, senza ?to, arrivo e partenza coincidevano: 0 notti).
+  const [from, setFrom] = useState(() => { const v = qp.get("from"); return v && /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= today ? v : today; });
+  const [to, setTo] = useState(() => { const v = qp.get("from"); const ci = v && /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= today ? v : today; const t = qp.get("to"); return t && /^\d{4}-\d{2}-\d{2}$/.test(t) && t > ci ? t : shiftISO(ci, 1); });
   const [adults, setAdults] = useState(Number(qp.get("adults")) || 2);
   const [children, setChildren] = useState(Number(qp.get("children")) || 0);
 
@@ -73,7 +75,14 @@ function Engine() {
     </div>
   );
 
-  if (status === "loading") return shell(<div className="py-10 text-center text-sm text-dim">Carico la struttura…</div>);
+  if (status === "loading") return shell(
+    <div className="grid place-items-center py-16" role="status" aria-busy="true">
+      {/* Solo la farfalla che pulsa, niente testo durante il caricamento. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/xenora-mark.png" alt="" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+      <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
+    </div>,
+  );
   if (status === "error") return shell(
     <div className="py-10 text-center">
       <div className="text-sm text-dim">Struttura momentaneamente non disponibile. Riprova tra poco.</div>
@@ -145,7 +154,7 @@ function Engine() {
                   <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4">
                     <div className="min-w-0 flex-1">
                       <div className="text-[15px] font-bold text-txt">{r.name}</div>
-                      <div className="mt-0.5 text-xs text-dim">Fino a {r.occ} ospiti · {r.refundable ? "Cancellazione gratuita" : "Vedi condizioni sul motore di prenotazione"}</div>
+                      <div className="mt-0.5 text-xs text-dim">Fino a {r.occ} {r.occ === 1 ? "ospite" : "ospiti"} · {r.refundable ? "Cancellazione gratuita" : "Vedi condizioni sul motore di prenotazione"}</div>
                     </div>
                     <div className="text-right"><div className="text-lg font-extrabold text-txt">{c(r.price)}</div><div className="text-[11px] text-faint">/ notte</div></div>
                     <a href={bookHref(r.id)} className="rounded-lg bg-focus px-4 py-2 text-sm font-bold text-white hover:opacity-90">Prenota</a>
@@ -159,8 +168,8 @@ function Engine() {
         <div>
           <Card className="sticky top-4">
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-in</div><DateField value={from} min={today} onChange={(v) => setFrom(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" /></div>
-              <div className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-out</div><DateField value={to} min={from} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" /></div>
+              <div className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-in</div><DateField value={from} min={today} onChange={(v) => { setFrom(v); if (to <= v) setTo(shiftISO(v, 1)); }} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" /></div>
+              <div className="rounded-lg border border-line px-2.5 py-1.5"><div className="text-[10px] font-bold uppercase text-faint">Check-out</div><DateField value={to} min={shiftISO(from, 1)} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" /></div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
               <div className="flex items-center justify-between rounded-lg border border-line px-2.5 py-1.5"><span className="text-dim">Adulti</span><span className="flex items-center gap-2"><button onClick={() => setAdults(Math.max(1, adults - 1))} className="text-dim">−</button><b>{adults}</b><button onClick={() => setAdults(adults + 1)} className="text-dim">+</button></span></div>

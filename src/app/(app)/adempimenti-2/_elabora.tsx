@@ -39,7 +39,7 @@ export function useElabora({ structureIds, bookings, getStructure, reload }: {
     const startM = Math.floor(now.getMonth() / 3) * 3;
     const start = `${y}-${p2(startM + 1)}-01`;
     const end = startM + 3 >= 12 ? `${y + 1}-01-01` : `${y}-${p2(startM + 4)}-01`;
-    const list = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn >= start && b.checkIn < end);
+    const list = bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn >= start && b.checkIn < end);
     const { total, count } = cityTaxTotalByStructure(list, getStructure);
     return {
       key: "tassa", label: "Tassa di soggiorno", status: count > 0 ? "fatto" : "niente", count,

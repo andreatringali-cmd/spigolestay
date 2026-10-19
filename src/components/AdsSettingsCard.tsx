@@ -14,18 +14,18 @@ type St = { id: string; name: string; googleAdsId?: string; googleAdsLabel?: str
 export default function AdsSettingsCard() {
   const { structures, activeStructureId } = useData();
   const [pick, setPick] = useState("");
+  const [savedId, setSavedId] = useState(""); // struttura appena salvata: sta qui (non nel form) perché il form si rimonta (key) quando i valori salvati cambiano e perderebbe la conferma
   // Struttura in modifica: quella del selettore globale; con "Tutte" la scelta locale (o la prima). Nessun effetto: si ricava a ogni disegno.
   const sid = activeStructureId !== "all" ? activeStructureId : structures.some((s) => s.id === pick) ? pick : structures[0]?.id ?? "";
   const st = structures.find((s) => s.id === sid);
-  return <AdsForm key={`${st?.id}|${st?.googleAdsId ?? ""}|${st?.googleAdsLabel ?? ""}`} st={st} showPicker={activeStructureId === "all" && structures.length > 1} structures={structures} sid={sid} onPick={setPick} />;
+  return <AdsForm key={`${st?.id}|${st?.googleAdsId ?? ""}|${st?.googleAdsLabel ?? ""}`} st={st} showPicker={activeStructureId === "all" && structures.length > 1} structures={structures} sid={sid} onPick={setPick} saved={!!st && savedId === st.id} setSaved={(v) => setSavedId(v && st ? st.id : "")} />;
 }
 
-function AdsForm({ st, showPicker, structures, sid, onPick }: { st: St | undefined; showPicker: boolean; structures: St[]; sid: string; onPick: (id: string) => void }) {
+function AdsForm({ st, showPicker, structures, sid, onPick, saved, setSaved }: { st: St | undefined; showPicker: boolean; structures: St[]; sid: string; onPick: (id: string) => void; saved: boolean; setSaved: (v: boolean) => void }) {
   const { updateStructure } = useData();
   const { t } = useLang();
   const [id, setId] = useState(st?.googleAdsId ?? "");
   const [label, setLabel] = useState(st?.googleAdsLabel ?? "");
-  const [saved, setSaved] = useState(false);
 
   // Se si incolla l'intero codice di Google (tag o snippet evento) si riempiono i due campi.
   const onPaste = (text: string): boolean => {

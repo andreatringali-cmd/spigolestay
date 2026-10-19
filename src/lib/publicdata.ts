@@ -42,6 +42,11 @@ export const RESERVED_SLUGS = new Set<string>([
   "pagamenti", "piani-tariffari", "prenotazioni", "preventivi", "promozioni", "pulizie", "rate-checker",
   "recensioni", "registro", "revenue", "sito", "statistiche", "strutture", "tariffe-derivate", "tariffe",
   "tassa-soggiorno", "upselling", "utenti", "widget",
+  // altre route pubbliche e dell'app che mancavano (uno slug uguale resterebbe irraggiungibile)
+  "embed", "gestisci", "xenorabook", "privacy", "termini", "cookie", "adempimenti", "adempimenti-2", "alloggiati-web",
+  "anagrafica-clienti", "assistente", "booking-engine", "chiusura-cassa", "dashboard-2", "disponibilita-gruppo",
+  "documenti", "fascicolo-fiscale", "fatture-passive", "forniture", "impostazioni-fattura", "istat", "provenienza",
+  "registro-bollo", "revenue-autopilot", "salute", "scadenzario-incassi", "manifest.webmanifest", "icon.png", "apple-icon.png",
   // asset/riservati vari
   "favicon.ico", "robots.txt", "sitemap.xml", "_next", "static", "public", "assets", "index",
 ]);

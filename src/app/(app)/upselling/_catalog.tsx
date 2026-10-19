@@ -101,7 +101,7 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
                     <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{e.name}
                       <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-faint">{KIND_LABEL[kind]}</span>
                       {hasSeason(e) && <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">{seasonLabel(e)}</span>}
-                      {e.minNights ? <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">min {e.minNights} notti</span> : null}
+                      {e.minNights ? <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">min {e.minNights} {e.minNights === 1 ? "notte" : "notti"}</span> : null}
                       {unv && <span className="rounded bg-[color:color-mix(in_srgb,var(--warn,#b7791f)_18%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold text-[color:var(--warn,#b7791f)]">prezzo di esempio</span>}
                       {e.free && <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">gratuito</span>}
                       {!(e.price > 0) && !e.free && <span className="rounded bg-[color:color-mix(in_srgb,var(--err)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold text-[color:var(--err)]">prezzo da impostare</span>}
