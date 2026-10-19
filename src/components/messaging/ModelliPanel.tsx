@@ -91,7 +91,10 @@ export default function ModelliPanel() {
       (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
     );
   // Modelli raggruppati per fase del ciclo ospite (solo le fasi non vuote), nell'ordine cronologico.
-  const groups: { ph: Trigger; items: MsgTemplate[] }[] = shown.length ? [{ ph: "manual", items: shown }] : []; // un solo elenco: i messaggi si mandano a mano
+  // Con «Tutte le strutture» i modelli sono DIVISI per struttura (una sezione ciascuna, nell'ordine delle strutture); con una struttura selezionata, un solo elenco.
+  const groups: { key: string; title: string; items: MsgTemplate[] }[] = activeStructureId === "all"
+    ? allStructures.map((st) => ({ key: st.id, title: st.name, items: shown.filter((tp) => tp.structureIds?.[0] === st.id) })).filter((g) => g.items.length > 0)
+    : (shown.length ? [{ key: "uno", title: "", items: shown }] : []);
 
   return (
     <div>
@@ -110,8 +113,8 @@ export default function ModelliPanel() {
       {/* Modelli raggruppati per fase del ciclo ospite, in ordine cronologico */}
       <div className="space-y-6">
         {groups.map((g) => (
-          <section key={g.ph}>
-            <SectionTitle>{t(PHASE_LABEL[g.ph])}</SectionTitle>
+          <section key={g.key}>
+            {g.title && <SectionTitle>{g.title}</SectionTitle>}
             <div className="grid gap-3 md:grid-cols-2">
               {g.items.map((tpl) => (
                 <Card key={tpl.id}>
