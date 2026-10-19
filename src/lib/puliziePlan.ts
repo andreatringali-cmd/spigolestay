@@ -170,7 +170,7 @@ export function buildPuliziePlanText(opts: {
       for (const r of oos) lines.push(`• ${r.unit.name}${r.oosNote ? ` — ${r.oosNote}` : ""}${noteOf(r)}`);
     }
     const nothing = list.filter((r) => !r.oos && r.action === "niente");
-    if (nothing.length) lines.push("", `${t(ACT_LABEL.niente)}: ${nothing.map((r) => r.unit.name).join(", ")}`);
+    if (nothing.length) lines.push("", bold(t(ACT_LABEL.niente)), ...nothing.map((r) => `• ${r.unit.name}`)); // come gli altri gruppi: titolo in grassetto e una camera per riga
   }
   if (lines.length === 1) lines.push("", t("Nessuna pulizia in programma."));
   const intro = (opts.intro ?? "").trim(), outro = (opts.outro ?? "").trim();

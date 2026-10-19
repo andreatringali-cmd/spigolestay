@@ -25,7 +25,7 @@ test("il testo è ordinato per lavoro, con le camere in ordine naturale e le vuo
   assert.ok(t.indexOf("Partenza + Arrivo") < t.indexOf("\nPartenza\n"));
   assert.ok(t.indexOf("\nPartenza\n") < t.indexOf("\nRiassetto\n"));
   assert.match(t, /• 1 — esce SUN HE · entra Karl Josef \(2 pers\., fino al 13\.10\)/);
-  assert.match(t, /\nNiente: 2/);
+  assert.match(t, /\nNiente\n• 2/);
   assert.match(t, /FUORI SERVIZIO\n• 5 — perdita d'acqua/);
   assert.match(t, /3 camere da fare/);
 });
