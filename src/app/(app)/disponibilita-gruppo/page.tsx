@@ -78,14 +78,13 @@ export default function GruppoPage() {
   const sharedRooms = families.reduce((a, f) => a + f.real, 0);
   return (
     <div>
-      <PageHeader title="Gruppo (beta)" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
+      <PageHeader title="Gruppo" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
 
       {/* 1 · Il gruppo */}
       <Card className="anim-in">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <SectionTitle>Le strutture del gruppo</SectionTitle>
-            <p className="max-w-2xl text-xs leading-relaxed text-dim">Scegli le strutture che hanno camere in comune, per esempio nello stesso edificio. Ogni struttura del gruppo offre tutte le camere libere della sua tipologia (anche quelle fisicamente di un&apos;altra struttura): una richiesta di più camere la trova ovunque, e la prenotazione la sposti tu nella struttura dove sta la camera. Su Booking ed Expedia il numero di camere di quella tipologia deve essere almeno pari a quelle che vuoi offrire. Quando una camera viene prenotata in una, la disponibilità delle altre scende da sola: su Booking, Expedia, HotelBeds, sul sito diretto e nel Calendario.</p>
           </div>
           <div className="flex items-center gap-2.5 rounded-full border border-line bg-wash/60 py-1 pl-3 pr-1.5 text-xs font-semibold" style={{ color: cfg.enabled ? "var(--ok)" : "var(--dim)" }}>
             <span className="flex items-center gap-1.5"><span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.enabled ? "var(--ok)" : "var(--faint)" }} />{cfg.enabled ? "Gruppo attivo" : "Gruppo spento"}</span>

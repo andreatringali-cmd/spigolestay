@@ -125,6 +125,26 @@ const HELP: Record<string, Guide> = {
       ] },
     ],
   },
+  "/disponibilita-gruppo": {
+    title: "Gruppo",
+    intro: "Per le strutture che hanno camere in comune, per esempio nello stesso edificio: le tieni sincronizzate così non vendi due volte la stessa camera.",
+    sections: [
+      { h: "Cosa puoi fare", icon: "🧩", items: [
+        "Scegli le strutture che hanno camere in comune e attiva o spegni il gruppo con l'interruttore \"Gruppo attivo\".",
+        "Vedi quali camere sono condivise e come risulta la disponibilità dei prossimi giorni.",
+      ] },
+      { h: "Come funziona", icon: "⚙️", items: [
+        "Ogni struttura del gruppo offre tutte le camere libere della sua tipologia, anche quelle fisicamente di un'altra struttura.",
+        "Una richiesta di più camere la trova ovunque. La prenotazione la sposti tu nella struttura dove sta la camera.",
+      ] },
+      { h: "Disponibilità sincronizzata", icon: "🔄", items: [
+        "Quando una camera viene prenotata in una struttura, la disponibilità delle altre scende da sola: su Booking, Expedia, HotelBeds, sul sito diretto e nel Calendario.",
+      ] },
+      { h: "Sui portali", icon: "🌐", items: [
+        "Su Booking ed Expedia il numero di camere di quella tipologia deve essere almeno pari a quelle che vuoi offrire.",
+      ] },
+    ],
+  },
   "/pulizie": {
     title: "Planning pulizie",
     intro: "Cosa fare in ogni camera nel giorno scelto, pronto da inviare a chi pulisce. In alto puoi passare tra Pulizie e Scorte & spesa.",
