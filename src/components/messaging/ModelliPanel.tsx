@@ -122,13 +122,6 @@ export default function ModelliPanel() {
             </div>
           </section>
         ))}
-        {/* Card "aggiungi" tratteggiata, stessa dimensione dei modelli */}
-        <div className="grid gap-3 md:grid-cols-2">
-          <button onClick={() => { setEditing(emptyTpl(activeStructureId !== "all" ? [activeStructureId] : undefined)); setEditLang("it"); }} className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus" style={{ background: "var(--surface)" }}>
-            <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-current text-2xl font-light leading-none">+</span>
-            <span className="text-sm font-semibold">{t("Nuovo modello")}</span>
-          </button>
-        </div>
       </div>
 
       {/* Editor */}
