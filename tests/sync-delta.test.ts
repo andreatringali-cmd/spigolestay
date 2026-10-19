@@ -94,7 +94,7 @@ test("delta: nuova prenotazione + nuovo ospite", () => {
 
 test("delta: cancellare una prenotazione (con lapide) la toglie dall'archivio e registra la lapide; le altre restano", () => {
   const { after, delta } = roundTrip((w) => { const d = parse(w); d.bookings = d.bookings.filter((b: any) => b.id !== "recent"); d._deleted = { bookings: ["gone1", "recent"] }; w[KEY] = JSON.stringify(d); return w; });
-  assert.deepEqual(delta.colls.bookings.del, ["recent"]); assert.deepEqual(delta.tombs.bookings, ["recent"]);
+  assert.deepEqual(delta.colls.bookings.del, ["recent"]); assert.deepEqual(delta.tombs.bookings, ["gone1", "recent"]); // elenco completo
   assert.ok(!after.bookings.some((b: any) => b.id === "recent"));
   assert.equal(after.bookings.length, 5);
   assert.deepEqual(after._deleted.bookings, ["gone1", "recent"]);
@@ -169,4 +169,13 @@ test("applicare due volte lo stesso delta dà lo stesso risultato (idempotente)"
 
 test("blocco dati illeggibile sul server: nessuna modifica applicata", () => {
   assert.throws(() => D.applyDelta({ [KEY]: "{rotto" }, D.emptyDelta()), (e: any) => e.code === "bad_data");
+});
+
+test("compatibilità: un browser con la versione vecchia manda solo lapidi da aggiungere (senza v): il server le UNISCE e non cancella quelle esistenti", () => {
+  const full = fullRow();
+  const legacy: any = { colls: {}, tombs: { bookings: ["nuova-lapide"] }, fields: {}, flat: {} };   // niente «v»
+  const after = parse(D.applyDelta(full, legacy).row);
+  assert.deepEqual(after._deleted.bookings, ["gone1", "nuova-lapide"]);
+  const v2 = D.emptyDelta(); v2.tombs.bookings = ["gone1", "altra"];                                 // v2: elenco completo
+  assert.deepEqual(parse(D.applyDelta(full, v2).row)._deleted.bookings, ["gone1", "altra"]);
 });

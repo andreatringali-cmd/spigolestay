@@ -23,10 +23,11 @@ export const MAX_DEL_OTHER = 25;
 export interface CollDelta { upsert: Json[]; del: string[] }
 export interface Delta {
   colls: Record<string, CollDelta>;
-  tombs: Record<string, string[]>;          // lapidi da aggiungere per collezione
+  tombs: Record<string, string[]>;          // lapidi: l'elenco COMPLETO voluto per collezione (sostituisce quello del server; il tetto di 3000 rende l'«aggiungi» non convergente)
   fields: Record<string, unknown>;          // altri campi del blocco dati (rateOverrides, activities, …)
   flat: Record<string, string>;             // altre chiavi della riga (impostazioni, conversazioni…): valore intero
   confirm?: boolean;                        // consenso esplicito a cancellazioni oltre soglia
+  v?: number;                               // versione del formato: 2 = «tombs» è l'elenco completo (sostituisce); assente = vecchio formato (solo lapidi da aggiungere)
 }
 /** Riassunto leggibile di un delta (per i log: quante voci per tipo, SENZA dati personali). */
 export function describeDelta(d: Delta): string {
@@ -37,7 +38,8 @@ export function describeDelta(d: Delta): string {
   if (Object.keys(d.flat).length) parts.push("chiavi:" + Object.keys(d.flat).join(","));
   return parts.join(" ") || "vuoto";
 }
-export const emptyDelta = (): Delta => ({ colls: {}, tombs: {}, fields: {}, flat: {} });
+export const DELTA_VERSION = 2;
+export const emptyDelta = (): Delta => ({ colls: {}, tombs: {}, fields: {}, flat: {}, v: DELTA_VERSION });
 
 export function stableStringify(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v);
@@ -95,12 +97,13 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
       for (const id of sMap.keys()) if (!mMap.has(id)) del.push(id);
       if (upsert.length || del.length) delta.colls[coll] = { upsert, del };
     }
-    // lapidi: quelle del fuso che il server non ha ancora
+    // lapidi: se l'elenco del fuso è diverso da quello del server (come INSIEME) si invia per intero. Il fuso parte già dalle lapidi del server (autorevoli) più le locali,
+    // con lo stesso tetto: così il server converge e non rimanda le stesse voci a ogni ciclo.
     const sTomb = asObj(sData._deleted), mTomb = asObj(mData._deleted);
     for (const coll of Object.keys(mTomb)) {
-      const have = new Set(asArr(sTomb[coll]).map(String));
-      const add = asArr(mTomb[coll]).map(String).filter((id) => !have.has(id));
-      if (add.length) delta.tombs[coll] = add;
+      const sList = asArr(sTomb[coll]).map(String), mList = asArr(mTomb[coll]).map(String);
+      const sSet = new Set(sList);
+      if (mList.length !== sSet.size || mList.some((id) => !sSet.has(id))) delta.tombs[coll] = mList;
     }
     // altri campi del blocco dati (non finestrati: confronto diretto col server)
     for (const k of Object.keys(mData)) {
@@ -139,8 +142,11 @@ export function applyDelta(row: Record<string, string> | null, delta: Delta): { 
   // soglie sulle cancellazioni
   // (una cancellazione conta una volta, sia che arrivi come «del» sia come lapide)
   let delBookings = 0, delOther = 0;
+  const curTombs = asObj(d._deleted);
+  const replaceTombs = delta.v === DELTA_VERSION; // un browser con la versione vecchia della pagina manda solo le lapidi da AGGIUNGERE: si uniscono, mai si sostituisce
+  const newTombs = (coll: string): string[] => { const have = new Set(asArr(curTombs[coll]).map(String)); return (delta.tombs[coll] ?? []).map(String).filter((id) => !have.has(id)); };
   for (const coll of new Set([...Object.keys(delta.colls), ...Object.keys(delta.tombs)])) {
-    const n = new Set([...(delta.colls[coll]?.del ?? []), ...(delta.tombs[coll] ?? [])].map(String)).size;
+    const n = new Set([...(delta.colls[coll]?.del ?? []), ...newTombs(coll)].map(String)).size;
     if (coll === "bookings") delBookings += n; else if (COLL_SET.has(coll)) delOther += n;
   }
   if (!delta.confirm && (delBookings > MAX_DEL_BOOKINGS || delOther > MAX_DEL_OTHER)) {
@@ -177,7 +183,7 @@ export function applyDelta(row: Record<string, string> | null, delta: Delta): { 
       const set = new Set(cur);
       const add = ids.map(String).filter((id) => !set.has(id));
       tombCount += add.length;
-      tomb[coll] = [...cur, ...add].slice(-MAX_TOMBS);
+      tomb[coll] = (replaceTombs ? ids.map(String) : [...cur, ...add]).slice(-MAX_TOMBS); // v2: l'elenco del browser SOSTITUISCE quello del server (vedi buildDelta)
       // una lapide è una cancellazione: l'entità sparisce anche dall'archivio completo (anche se era fuori dalla finestra del browser)
       if (add.length && COLL_SET.has(coll)) {
         const gone = new Set(add);

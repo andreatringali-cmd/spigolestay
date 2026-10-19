@@ -206,3 +206,19 @@ test("conflitto di versione (due scritture quasi insieme): la seconda viene rifi
   assert.equal(final.bookings.find((q: any) => q.id === x).notes, "A");
   assert.equal(final.bookings.find((q: any) => q.id === y).notes, "B");
 });
+
+test("lapidi al tetto (3000): non si rimandano le stesse a ogni ciclo, converge entro due cicli", () => {
+  const srv = makeServer();
+  const d = parse(srv.row); d._deleted = { bookings: Array.from({ length: 3000 }, (_, i) => "t" + i), guests: Array.from({ length: 3000 }, (_, i) => "tg" + i) };
+  srv.row[KEY] = JSON.stringify(d);
+  const dev = new DeltaDevice(); dev.cycle(srv);
+  // il dispositivo ha in locale alcune lapidi che il server non ha (es. cancellazioni fatte offline)
+  dev.edit((x) => { x._deleted = { bookings: [...x._deleted.bookings, ...Array.from({ length: 17 }, (_, i) => "loc" + i)], guests: [...x._deleted.guests, "locg"] }; });
+  dev.cycle(srv);
+  let writes = 0;
+  for (let i = 0; i < 4; i++) if (dev.cycle(srv).wrote) writes++;
+  assert.equal(writes, 0, "dopo il primo invio non si rimanda più nulla");
+  assert.ok(parse(srv.row)._deleted.bookings.length <= 3000);
+  assert.ok(parse(srv.row)._deleted.bookings.includes("loc3"));          // le lapidi locali sono arrivate
+  assert.equal(parse(srv.row).bookings.length, 300);
+});
