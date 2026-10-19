@@ -226,6 +226,9 @@ export default function CassaPage() {
   const [to, setTo] = useState<string>("");
   const applyPreset = (p: Preset) => { setPreset(p); if (p !== "custom") { const r = presetRange(p, today); setFrom(r.from); setTo(r.to); } };
   const futureView = !!from && from >= today;       // si guarda da oggi in avanti: previsione
+  // Periodo «Personalizzato» con il solo «Dal» (senza «Al»): si legge IN ORDINE, dalla data scelta in avanti (prima il più vicino al «Dal»), non dal futuro più lontano a ritroso.
+  const openFrom = preset === "custom" && !!from && !to && !futureView;
+  const ascending = futureView || openFrom;
   const inPeriod = (iso: string) => (!from || iso >= from) && (!to || iso <= to);
   const periodWord = futureView ? t("previste") : preset === "all" ? t("totali") : t("del periodo");
   // Previsione a 6 mesi: dal mese in corso fino a fine del sesto mese (es. oggi 14.10 → 31.03).
@@ -238,7 +241,7 @@ export default function CassaPage() {
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
-    .sort((a, b) => (futureView ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi: dal più vicino; storico: dal più recente
+    .sort((a, b) => (ascending ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi o dal «Dal» scelto: dal più vicino; storico: dal più recente
   const catsInRegister = new Set([...all, ...forecastView].map((m) => m.cat)); // categorie presenti nel registro (filtro Categoria: solo quelle attive)
   const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
   const entrate = sumCents(rowsStat.filter((m) => m.kind === "in").map((m) => m.amount));
@@ -279,7 +282,7 @@ export default function CassaPage() {
   // Commissioni trattenute dal portale TUTTE INSIEME (modalità mensile): sulla riga dell'incasso restano solo come nota informativa, il movimento vero è l'aggregato mensile.
   const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? raw.bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
   const infoText = (i: { amount: number; pct: number; date: string }) => `${t("commissione")} − ${eur(i.amount)} (${String(i.pct).replace(".", ",")}%) · ${t("trattenuta il")} ${fmtDMY(i.date)}`;
-  const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
+  const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return ascending ? d : -d; });
   // I saldi di partenza non sono righe del registro: contano nel saldo e si vedono nel dettaglio della riga «Oggi» (si modificano dalla card «Saldo attuale»).
   const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout)).filter((r) => r.type !== "opening" && !(r.type === "mov" && r.mov.cat === OPENING_CAT));
   // cella "saldo conti" (riusata dalle voci bonifico)
@@ -940,15 +943,17 @@ export default function CassaPage() {
                         </div>
                 );
                 // «Oggi»: sempre la PRIMA riga del registro (poi tutto il resto), con il dettaglio dei saldi dei conti
+                let oggiPlaced = false; // «Dal» scelto nel passato: la riga «Oggi» sta tra i movimenti fino a oggi e quelli dopo
                 const withDividers = els.flatMap((el, i) => {
                   const parts: React.ReactNode[] = [];
                   const d = rowDate(listRows[i]);
+                  if (openFrom && !oggiPlaced && d > today) { oggiPlaced = true; parts.push(oggiNode("oggi")); }
                   const y = d.slice(0, 4);
                   if (i > 0 && y !== rowDate(listRows[i - 1]).slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
                   parts.push(el);
                   return parts;
                 });
-                if (listRows.length > 0) withDividers.unshift(oggiNode("oggi"));
+                if (listRows.length > 0) { if (openFrom) { if (!oggiPlaced) withDividers.push(oggiNode("oggi")); } else withDividers.unshift(oggiNode("oggi")); }
                 return withDividers;
                 })()}
               </div>
