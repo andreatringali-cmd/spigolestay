@@ -224,7 +224,7 @@ export default function BookingDrawer() {
   const stayV = accV + cleanV;
   // OTA che paga già il NETTO (Expedia con carta virtuale): il totale è il netto; il lordo si ricostruisce con le trattenute dichiarate e l'Accelerator Fee.
   const netPayV = isNetPayout(booking);
-  const dedV = booking.otaDeductions ?? 0;
+  const dedV = netPayV ? (booking.otaDeductions ?? booking.commissionAmount ?? 0) : (booking.otaDeductions ?? 0); // righe importate prima del flag: la commissione di Expedia è in commissionAmount
   const accelV = netPayV ? otaAcceleratorFee(booking) : 0;
   const grossV = netPayV && stayV > 0 ? roundCents(stayV + dedV + accelV) : stayV;
   const nettoStayV = netPayV ? stayV : stayV > 0 ? Math.max(0, roundCents(stayV - commTotV)) : 0;
@@ -458,13 +458,13 @@ export default function BookingDrawer() {
             <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(grossV)}</span>
           </span>
         </div>
-        {!noPrice && (commV > 0 || payFeeV > 0 || adjV > 0 || (booking.otaDeductions ?? 0) > 0) && (
+        {!noPrice && (commV > 0 || payFeeV > 0 || adjV > 0 || dedV > 0 || accelV > 0) && (
           <div className="mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5 text-sm text-dim">
             {commV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Commissione OTA")}{commissionIsEstimate(booking) ? ` (${t("stima")})` : ""}{payFeeV <= 0 && adjV <= 0 ? ` · ${String(commPctStayV).replace(".", ",")}%` : ""}</span><span className="font-mono tabular-nums">−{eur(commV)}</span></div>}
             {payFeeV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Costo d'incasso")}</span><span className="font-mono tabular-nums">−{eur(payFeeV)}</span></div>}
             {adjV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Sconti OTA (carta virtuale)")}</span><span className="font-mono tabular-nums">−{eur(adjV)}</span></div>}
             {accelV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Acceleratore")}</span><span className="font-mono tabular-nums">−{eur(accelV)}</span></div>}
-            {(booking.otaDeductions ?? 0) > 0 && <div className="flex items-baseline justify-between gap-4"><span>{netPayV ? t("Commissione OTA") : t("Trattenute dichiarate dall'OTA")}</span><span className="font-mono tabular-nums">−{eur(booking.otaDeductions)}</span></div>}
+            {dedV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{netPayV ? t("Commissione OTA") : t("Trattenute dichiarate dall'OTA")}</span><span className="font-mono tabular-nums">−{eur(dedV)}</span></div>}
             {commTotV > 0 && (payFeeV > 0 || adjV > 0) && <div className="flex items-baseline justify-between gap-4 text-[11px]"><span>{t("Totale costi")} ({String(commPctStayV).replace(".", ",")}%)</span><span className="font-mono tabular-nums">−{eur(commTotV)}</span></div>}
           </div>
         )}
