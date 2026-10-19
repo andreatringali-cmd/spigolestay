@@ -873,10 +873,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
           })}
           {people.length === 0 && <div className="px-3 py-10 text-center text-sm text-faint">{t("Nessun ospite.")}</div>}
         </div>
-        {/* Accesso agli invii programmati, in fondo alla colonna conversazioni */}
-        <button onClick={() => { setSel(null); setShowInvii(true); }} className={`flex items-center justify-center gap-2 border-t border-line px-3 py-2.5 text-xs font-semibold transition ${!current && showInvii ? "bg-wash text-focus" : "text-focus hover:bg-wash"}`}>
-          📤 {t("Invii programmati")}{queue.length ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-bold">{queue.length}</span> : null}
-        </button>
+        {/* «Invii programmati»: nascosto, i messaggi automatici sono spenti (si manda tutto a mano dalla scheda della prenotazione) */}
       </div>
 
       {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}

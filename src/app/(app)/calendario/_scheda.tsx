@@ -13,6 +13,7 @@ import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { type JourneyStep, type StepState, type journeyOf } from "@/lib/booking-journey";
 import { BookingChannelWordmark } from "@/components/BookingChannelLogo";
+import BookingMessageButtons from "@/components/BookingMessageButtons";
 
 export type Journey = ReturnType<typeof journeyOf>;
 export interface Avviso { key: string; label: string; tone: "err" | "warn" | "info"; title?: string; href?: string }
@@ -106,6 +107,8 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
             {steps.map((s) => <StepButton key={s.key} s={s} onStep={onStep} />)}
           </div>
         )}
+
+        {b.status !== "cancelled" && b.channel !== "blocked" && <BookingMessageButtons booking={b} structure={structure} className="mt-2.5" />}
 
         {chips.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-1.5">

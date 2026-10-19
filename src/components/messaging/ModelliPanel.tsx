@@ -26,7 +26,7 @@ const PHASE_LABEL: Record<Trigger, string> = { before_arrival: "Prima dell'arriv
 // Ordine cronologico interno alla fase: "giorni prima" più alti = più presto; "giorni dopo" più alti = più tardi.
 const chronoKey = (tp: MsgTemplate) => (tp.trigger === "before_arrival" ? -tp.days : tp.trigger === "after_arrival" || tp.trigger === "after_checkout" ? tp.days : 0);
 
-interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number; waTemplate?: string; structureIds?: string[] /* assente/vuoto = vale per tutte le strutture */ }
+interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number; waTemplate?: string; showInBooking?: boolean /* spunta: compare come pulsante nella scheda della prenotazione */; structureIds?: string[] /* assente/vuoto = vale per tutte le strutture */ }
 const emptyTpl = (structureIds?: string[]): MsgTemplate => ({ ...(structureIds?.length ? { structureIds } : {}), id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
 const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
   if (tpl.trigger === "manual") return tr("Invio manuale");
@@ -50,7 +50,7 @@ export default function ModelliPanel() {
     try {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
       const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
-      setTemplates(mergeSeedTemplates(base));
+      setTemplates(mergeSeedTemplates(base).map((tp) => (tp.trigger === "manual" && !tp.active ? tp : { ...tp, trigger: "manual" as Trigger, active: false }))); // messaggi automatici spenti: tutti i modelli sono manuali
     } catch {}
     setReady(true);
   }, []);
@@ -84,11 +84,6 @@ export default function ModelliPanel() {
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <div className="flex items-center overflow-hidden rounded-lg border border-line">
-          {([["all", t("Tutti")], ["auto", t("Automatici")], ["manual", t("Manuali")]] as [typeof flt, string][]).map(([k, lab], i) => (
-            <button key={k} onClick={() => setFlt(k)} className={`px-3 py-2 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${flt === k ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{lab}</button>
-          ))}
-        </div>
       </div>
 
       {/* Richiesta di recensione: link ai portali e regole di esclusione (lette dal cron dei messaggi automatici) */}
@@ -106,14 +101,9 @@ export default function ModelliPanel() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
-                      <div className="mt-0.5 text-xs text-dim">{triggerDesc(tpl, t)}{tpl.structureIds?.length ? ` · ${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
+                      <div className="mt-0.5 text-xs text-dim">{tpl.structureIds?.length ? ` · ${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
                     </div>
-                    {(() => {
-                      const auto = tpl.trigger !== "manual";
-                      const col = auto ? (tpl.active ? "var(--ok)" : "var(--warn)") : "var(--faint)";
-                      const label = auto ? (tpl.active ? t("Automatico") : `${t("Automatico")} · ${t("in pausa")}`) : t("Manuale");
-                      return <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${col} 18%, transparent)`, color: col }}>{label}</span>;
-                    })()}
+                    {tpl.showInBooking && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Nella scheda")}</span>}
                   </div>
                   <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
                   <div className="mt-2 flex gap-2">
@@ -169,51 +159,12 @@ export default function ModelliPanel() {
               <div className="mt-2"><VarLegend vars={MSG_VARS} onInsert={insertVar} /></div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-line p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Invio automatico")}</span>
-                <label className="flex items-center gap-2 text-xs text-dim">{t("Attivo")}<input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <label className="col-span-3 block text-xs font-medium text-dim sm:col-span-1">{t("Quando")}
-                  <select value={editing.trigger} onChange={(e) => setEditing({ ...editing, trigger: e.target.value as Trigger })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{TRIGGERS.map(([v, n]) => (<option key={v} value={v}>{t(n)}</option>))}</select>
-                </label>
-                {needsDays(editing.trigger) && (
-                  <label className="block text-xs font-medium text-dim">{t("Giorni")}<input type="number" min={0} value={editing.days} onChange={(e) => setEditing({ ...editing, days: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-                )}
-                {editing.trigger !== "manual" && (
-                  <label className="block text-xs font-medium text-dim">{t("Orario")}<input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-                )}
-              </div>
-              {editing.trigger !== "manual" && (
-                <p className="mt-1.5 text-[11px] text-faint">{t("L'invio automatico parte una volta al giorno, la mattina (tra le 9:00 e le 10:00 ora italiana): l'orario qui sopra è indicativo e non sposta l'invio.")}</p>
-              )}
-              {editing.trigger !== "manual" && (
-                <label className="mt-2 block text-xs font-medium text-dim">{t("Collega a un'attività del «Da fare oggi»")} <span className="font-normal text-faint">{t("(mostra lì la spunta automatica con l'orario)")}</span>
-                  <select value={editing.srcId ?? ""} onChange={(e) => setEditing({ ...editing, srcId: e.target.value || undefined })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
-                    {LINKABLE.map(([v, n]) => <option key={v} value={v}>{t(n)}</option>)}
-                  </select>
-                </label>
-              )}
-              {editing.trigger !== "manual" && (
-                <label className="mt-2 block text-xs font-medium text-dim">{t("Template WhatsApp approvato")} <span className="font-normal text-faint">{t("(facoltativo · nome del template Meta per l'invio automatico WhatsApp; senza, WhatsApp parte solo entro 24h)")}</span>
-                  <input value={editing.waTemplate ?? ""} onChange={(e) => setEditing({ ...editing, waTemplate: e.target.value || undefined })} placeholder={t("es. benvenuto_prearrivo")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" />
-                  {(() => {
-                    const d = waTemplateFrom(editing.texts[editLang] ?? "");
-                    if (!d.body) return null;
-                    return (
-                      <div className="mt-2 rounded-lg border border-line bg-wash px-2.5 py-2 text-[11px] font-normal text-dim">
-                        <div className="mb-1 font-semibold text-txt">{t("Per scrivere per primo a un ospite WhatsApp richiede un modello approvato da Meta. Crealo (categoria Utility) con questo testo, lingua")} {editLang.toUpperCase()}:</div>
-                        <pre className="whitespace-pre-wrap break-words font-sans text-txt">{d.body}</pre>
-                        {d.tokens.length > 0 && <div className="mt-1">{t("Le variabili sono, in ordine")}: {d.tokens.map((k, i) => `{{${i + 1}}} = {${k}}`).join(" · ")}</div>}
-                        {d.warnings.map((w) => <div key={w} className="mt-1" style={{ color: "var(--warn)" }}>⚠ {w}</div>)}
-                        <button type="button" onClick={() => { try { void navigator.clipboard.writeText(d.body); } catch {} }} className="mt-1.5 rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-semibold text-txt hover:bg-paper">{t("Copia il testo")}</button>
-                      </div>
-                    );
-                  })()}
-                </label>
-              )}
-            </div>
+            <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3">
+              <input type="checkbox" checked={!!editing.showInBooking} onChange={(e) => setEditing({ ...editing, showInBooking: e.target.checked })} className="mt-0.5 h-4 w-4" />
+              <span className="text-sm text-txt">{t("Mostra nella scheda della prenotazione")}
+                <span className="mt-0.5 block text-xs text-dim">{t("Compare come pulsante: lo premi e si apre WhatsApp con il messaggio già pronto per l'ospite. Senza la spunta il modello resta qui e non compare nelle prenotazioni.")}</span>
+              </span>
+            </label>
 
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>

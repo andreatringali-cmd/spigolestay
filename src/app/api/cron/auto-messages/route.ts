@@ -82,7 +82,12 @@ async function shorten(admin: SupabaseClient, fullUrl: string): Promise<string> 
   } catch { return fullUrl; }
 }
 
+// Messaggi automatici agli ospiti SPENTI (decisione del titolare, ottobre 2026): i messaggi li manda lui, a mano, dalla scheda della prenotazione.
+// Il cron non è più programmato in vercel.json e, se qualcuno lo chiama lo stesso, non invia nulla. Per riaccenderlo: rimettere la riga in vercel.json e questa costante a true.
+const GUEST_AUTO_MESSAGES_ENABLED = false;
+
 export async function GET(req: Request) {
+  if (!GUEST_AUTO_MESSAGES_ENABLED) return NextResponse.json({ ok: true, skipped: "messaggi_automatici_disattivati" });
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
   const url = new URL(req.url);

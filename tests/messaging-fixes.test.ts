@@ -133,7 +133,7 @@ test("modelli d'esempio: nessuna affermazione sulla reception; i testi vecchi no
   const seedNow = DEFAULT_TEMPLATES.find((d) => d.id === "seed-benvenuto-guida")!;
   // le altre lingue della vecchia versione sono nella tabella interna: qui si verifica solo che un modello MODIFICATO a mano non venga toccato
   const edited = { id: "seed-benvenuto-guida", texts: { ...seedNow.texts, it: prevIt + " (modificato)" } };
-  const out = mergeSeedTemplates([edited], []);
+  const out = mergeSeedTemplates([edited], [], true);
   assert.equal(out.find((t) => t.id === "seed-benvenuto-guida")!.texts!.it, prevIt + " (modificato)");
 });
 

@@ -17,6 +17,7 @@ import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { directOriginLabel, directOriginOf } from "@/lib/direct-origin";
 import BookingExtrasPicker from "@/components/booking/BookingExtrasPicker";
 import BookingBillActions from "@/components/booking-panel/BookingBillActions";
+import BookingMessageButtons from "@/components/BookingMessageButtons";
 import { entriesTotal } from "@/lib/booking-extras";
 import { collectRuleOf, effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
@@ -504,6 +505,7 @@ export default function BookingDrawer() {
           </details>
         )}
       </div>
+      {booking.status !== "cancelled" && booking.channel !== "blocked" && <BookingMessageButtons booking={booking} guest={guest} structure={structure} />}
       <div className="rounded-xl border border-line">
         <button type="button" onClick={() => setPayOpen((v) => !v)} aria-expanded={payOpen} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left">
           <span className="flex items-center gap-2 text-sm font-semibold text-txt">

@@ -101,14 +101,14 @@ test("pre-arrivo: check-in online + guida + come entrare (nessuna reception, Wha
 
 test("aggiornamento dei modelli d'esempio: solo se mai modificati, e si aggiungono quelli mancanti", () => {
   const legacy = { id: "seed-review", name: "Richiesta recensione", active: false, days: 5, texts: { it: "Grazie {ospite} per aver soggiornato a {struttura}! Se ti sei trovato bene, una recensione ci aiuterebbe tantissimo. A presto! 🙏", en: "Thank you {ospite} for staying at {struttura}! If you enjoyed it, a review would help us a lot. See you soon! 🙏", fr: "Merci {ospite} d'avoir séjourné à {struttura} ! Si vous avez apprécié, un avis nous aiderait beaucoup. À bientôt ! 🙏", de: "Danke {ospite} für Ihren Aufenthalt in {struttura}! Wenn es Ihnen gefallen hat, würde uns eine Bewertung sehr helfen. Bis bald! 🙏", es: "¡Gracias {ospite} por alojarte en {struttura}! Si te ha gustado, una reseña nos ayudaría mucho. ¡Hasta pronto! 🙏" } };
-  const out = mergeSeedTemplates([legacy]);
+  const out = mergeSeedTemplates([legacy], undefined, true);
   const r = out.find((x) => x.id === "seed-review")!;
   assert.match(r.texts.it, /\{link_recensioni\}/); assert.equal(r.active, false); assert.equal(r.days, 5); // cambiano solo i testi
   assert.equal(out.length, DEFAULT_TEMPLATES.length);                                                    // i mancanti si aggiungono
   const edited = { ...legacy, texts: { ...legacy.texts, it: "Il mio testo personale" } };
-  assert.equal(mergeSeedTemplates([edited]).find((x) => x.id === "seed-review")!.texts.it, "Il mio testo personale");
+  assert.equal(mergeSeedTemplates([edited], undefined, true).find((x) => x.id === "seed-review")!.texts.it, "Il mio testo personale");
   const crlf = { ...legacy, texts: { ...legacy.texts, it: legacy.texts.it.replace(/\n/g, "\r\n") + "\r\n" } };
-  assert.match(mergeSeedTemplates([crlf]).find((x) => x.id === "seed-review")!.texts.it, /\{link_recensioni\}/);
+  assert.match(mergeSeedTemplates([crlf], undefined, true).find((x) => x.id === "seed-review")!.texts.it, /\{link_recensioni\}/);
 });
 
 test("link personale della guida costruito sul server (come guestlink.ts)", () => {

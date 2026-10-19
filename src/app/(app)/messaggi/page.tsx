@@ -57,8 +57,8 @@ function MessaggiInner() {
   }, [bookings, activeStructureId]);
 
   const TABS: { id: Tab; label: string; icon: string; hint: string }[] = [
-    { id: "conversazioni", label: t("Conversazioni"), icon: "💬", hint: t("Un unico posto per chattare con gli ospiti · messaggi e invii programmati") },
-    { id: "modelli", label: t("Modelli"), icon: "📝", hint: t("Modelli & automazioni · crea i messaggi riutilizzabili e decidi se e quando inviarli in automatico") },
+    { id: "conversazioni", label: t("Conversazioni"), icon: "💬", hint: t("Un unico posto per chattare con gli ospiti") },
+    { id: "modelli", label: t("Modelli"), icon: "📝", hint: t("Crea i tuoi messaggi e scegli quali mostrare come pulsante nella scheda della prenotazione") },
     { id: "concierge", label: t("Concierge AI"), icon: "🤖", hint: t("Risponde da solo agli ospiti h24, dalla tua base di conoscenza") },
   ];
   const active = TABS.find((x) => x.id === tab)!;

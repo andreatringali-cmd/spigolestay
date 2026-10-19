@@ -83,11 +83,14 @@ export function whatsappWindowOpen(guestId: string, now = Date.now()): boolean {
 }
 
 /** WhatsApp: se la Cloud API è collegata invia davvero (e registra in chat); altrimenti apre wa.me col testo pronto. */
+/** WhatsApp Business API messa da parte (ottobre 2026): ogni invio apre WhatsApp col testo pronto (wa.me) e lo manda il titolare dal proprio telefono. */
+export const WHATSAPP_API_ENABLED = false;
+
 export async function sendWhatsAppToGuest(g: Guest | undefined, text: string, meta?: SendMeta): Promise<SendResult> {
   const digits = waDigits(g?.phone, g?.country); // con il prefisso del Paese anche se il numero è stato scritto senza
   if (!g || !digits) return { ok: false, how: "none", message: "L'ospite non ha un numero di telefono." };
   const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-  if (await whatsappConnected()) {
+  if (WHATSAPP_API_ENABLED && (await whatsappConnected())) {
     // Finestra chiusa: la Cloud API non consegnerebbe il testo libero. Meglio dirlo subito e aprire WhatsApp col testo pronto (da lì parte dal tuo telefono e arriva).
     if (!whatsappWindowOpen(g.id)) {
       window.open(wa, "_blank", "noopener");

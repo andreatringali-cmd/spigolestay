@@ -144,7 +144,10 @@ const norm = (s: unknown) => (typeof s === "string" ? s.replace(/\r\n/g, "\n").t
  * Modelli salvati + modelli d'esempio: aggiunge quelli d'esempio mancanti (per id) e aggiorna i modelli d'esempio MAI MODIFICATI
  * (testi identici ai vecchi) alla versione nuova. Sostituisce solo i testi: attivazione, giorni, orario e strutture restano quelli dell'host.
  */
-export function mergeSeedTemplates<T extends { id: string; texts?: Record<string, string> }>(saved: T[], deletedSeedIds: string[] = loadDeletedSeedIds()): T[] {
+/** Se false i modelli d'esempio NON si aggiungono più da soli: i modelli li crea il titolare (ottobre 2026). */
+export const SEED_TEMPLATES_ENABLED = false;
+export function mergeSeedTemplates<T extends { id: string; texts?: Record<string, string> }>(saved: T[], deletedSeedIds: string[] = loadDeletedSeedIds(), enabled: boolean = SEED_TEMPLATES_ENABLED): T[] {
+  if (!enabled) return saved;
   const have = new Set(saved.map((x) => x.id));
   for (const id of deletedSeedIds) have.add(id); // un modello d'esempio eliminato dall'host non torna più (tombstone)
   const upgraded = saved.map((tp) => {

@@ -56,7 +56,12 @@ function itDatePlus(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Messaggi automatici agli ospiti SPENTI (decisione del titolare, ottobre 2026): i messaggi li manda lui, a mano, dalla scheda della prenotazione.
+// Il cron non è più programmato in vercel.json e, se qualcuno lo chiama lo stesso, non invia nulla. Per riaccenderlo: rimettere la riga in vercel.json e questa costante a true.
+const GUEST_AUTO_MESSAGES_ENABLED = false;
+
 export async function GET(req: Request) {
+  if (!GUEST_AUTO_MESSAGES_ENABLED) return NextResponse.json({ ok: true, skipped: "messaggi_automatici_disattivati" });
   // 1) Autorizzazione: header Bearer (inviato da Vercel Cron) oppure ?secret= (test manuale).
   const secret = process.env.CRON_SECRET;
   if (!secret) {
