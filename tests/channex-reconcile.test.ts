@@ -48,8 +48,8 @@ test("summarizeRevision: più camere → commissione ripartita con splitCommissi
   assert.deepEqual(s.rooms!.map((r: any) => r.total), [100, 200]);
   assert.equal(s.total, 300);
 });
-test("summarizeRevision: solo Booking.com (Expedia è un importo netto, Airbnb ha altre regole)", () => {
-  assert.equal(summarizeRevision(rev({ ota_name: "Expedia" })).ok, false);
+test("summarizeRevision: Booking.com ed Expedia (commissione informativa), Airbnb no", () => {
+  assert.equal(summarizeRevision(rev({ ota_name: "Expedia" })).ok, true);
   assert.equal(summarizeRevision(rev({ ota_name: "Airbnb" })).error, "canale_non_supportato");
 });
 

@@ -22,12 +22,12 @@ export function revisionCommission(r: { ota_commission?: unknown; commission?: u
 
 /**
  * Cifre esatte di una revision, una voce per camera (come l'import): totale con i centesimi, quota di commissione e di costo d'incasso.
- * Solo per Booking.com: per le altre OTA (es. Expedia, importo già netto) la commissione ha un significato diverso e non si tocca.
+ * Per Booking.com ed Expedia. Su Expedia (importo già netto) la commissione è un dato informativo (trattenute già tolte dal totale): chi applica le cifre la scrive in otaDeductions.
  */
 export function summarizeRevision(r: ChxRevision): ReconcileResult {
   const channel = channelFromOta(r.ota_name);
   const id = String(r.booking_id || r.id);
-  if (channel !== "booking") return { id, ok: false, status: r.status, error: "canale_non_supportato" };
+  if (channel !== "booking" && channel !== "expedia") return { id, ok: false, status: r.status, error: "canale_non_supportato" };
   const roomsArr = r.rooms && r.rooms.length ? r.rooms : [{}];
   const raw = r as unknown as Record<string, unknown>;
   const roomTotals = roomsArr.map((room, i) => readRevisionGuestData(raw, room as unknown as Record<string, unknown>, i === 0).total ?? 0);

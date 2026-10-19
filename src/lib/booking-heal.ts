@@ -15,6 +15,8 @@ export interface BookingPatch { id: string; patch: Partial<Booking> }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const isActive = (b: { status?: string; channel?: string }) => b.status !== "cancelled" && b.channel !== "blocked";
+/** Prenotazioni Channex di cui si possono rileggere le cifre esatte: Booking.com ed Expedia. */
+const isReconcilable = (b: Booking) => (b.channel === "booking" || b.channel === "expedia") && typeof b.extId === "string" && b.extId.startsWith("channex:");
 const isChannexBooking = (b: Booking) => b.channel === "booking" && typeof b.extId === "string" && b.extId.startsWith("channex:");
 
 /** Id Channex (senza il prefisso "channex:") di una prenotazione importata da Channex. */
@@ -209,12 +211,14 @@ export function needsChannexCheck(bookings: Booking[], todayIso: string, checked
   const from = isoMinusDays(todayIso, CHECK_WINDOW_DAYS);
   const cand = new Map<string, { noComm: boolean; co: string }>();
   for (const b of bookings) {
-    if (!isChannexBooking(b) || !isActive(b) || b.netTotal || b.checkOut < from) continue;
+    if (!isReconcilable(b) || !isActive(b) || (b.netTotal && b.channel !== "expedia") || b.checkOut < from) continue;
     const id = channexIdOf(b); if (!id) continue;
     if (nowMs - (checked[id] ?? 0) < CHECK_RETRY_MS) continue;
-    const noComm = !(Number(b.commissionAmount) > 0);
+    const curComm = Number(b.otaDeductions ?? b.commissionAmount);
+    const noComm = !(curComm > 0);
+    const intComm = b.channel === "expedia" && curComm > 0 && Number.isInteger(curComm); // Expedia importata con commissione tonda: forse arrotondata, si rilegge
     const intTotal = Number.isFinite(Number(b.total)) && Number(b.total) > 0 && Number.isInteger(Number(b.total));
-    if (!noComm && !intTotal) continue;
+    if (!noComm && !intTotal && !intComm) continue;
     const prev = cand.get(id);
     cand.set(id, { noComm: (prev?.noComm ?? false) || noComm, co: prev && prev.co < b.checkOut ? prev.co : b.checkOut });
   }
@@ -233,13 +237,23 @@ export function reconcilePatches(bookings: Booking[], results: ReconcileResult[]
   const out: BookingPatch[] = [];
   for (const r of results) {
     if (!r.ok || !r.rooms?.length || String(r.status ?? "").toLowerCase() === "cancelled") continue;
-    const rows = bookings.filter((b) => isChannexBooking(b) && isActive(b) && channexIdOf(b) === r.id);
+    const rows = bookings.filter((b) => isReconcilable(b) && isActive(b) && channexIdOf(b) === r.id);
     if (!rows.length || rows.length !== r.rooms.length) continue;
     if (!rows.every((row, i) => row.checkIn === r.rooms![i].checkIn && row.checkOut === r.rooms![i].checkOut)) continue;
     rows.forEach((row, i) => {
       const room = r.rooms![i];
       const patch: Partial<Booking> = {};
-      if (!(Number(row.commissionAmount) > 0) && room.commissionAmount != null && room.commissionAmount > 0) patch.commissionAmount = round2(room.commissionAmount);
+      if (room.commissionAmount != null && room.commissionAmount > 0) {
+        const exact = round2(room.commissionAmount);
+        const net = row.channel === "expedia" && row.netTotal !== false; // importo già netto: la commissione è un dato informativo (otaDeductions)
+        const cur = Number(net ? (row.otaDeductions ?? row.commissionAmount) : row.commissionAmount);
+        const missing = !(cur > 0);
+        const rounded = cur > 0 && Number.isInteger(cur) && !Number.isInteger(exact) && Math.abs(exact - cur) < 1;
+        if (missing || rounded) {
+          if (net) { patch.otaDeductions = exact; if (Number(row.commissionAmount) > 0) patch.commissionAmount = exact; }
+          else patch.commissionAmount = exact;
+        }
+      }
       if (!(Number(row.paymentFee) > 0) && room.paymentFee != null && room.paymentFee > 0) patch.paymentFee = round2(room.paymentFee);
       const rt = room.total, ct = Number(row.total);
       if (rt != null && rt > 0 && rt !== ct && (!(ct > 0) || (Number.isInteger(ct) && Math.abs(rt - ct) < 1))) patch.total = round2(rt);

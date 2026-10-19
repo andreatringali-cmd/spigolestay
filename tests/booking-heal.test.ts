@@ -212,3 +212,14 @@ test("healTotalsFromNights: non tocca totali già esatti, differenze ≥ 1 €, 
   assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 153, status: "cancelled" })]), []);
   assert.deepEqual(healTotalsFromNights([bk({ ...base, total: 153, extId: "octorate:1" })]), []);
 });
+
+test("Expedia: commissione tonda (80) → quella esatta di Channex in otaDeductions e commissionAmount; netto invariato", () => {
+  const { reconcilePatches: rp, needsChannexCheck: nc } = H;
+  const b = bk({ id: "E1", channel: "expedia", extId: "channex:EX1", total: 381.4, commissionAmount: 80, checkIn: "2026-10-20", checkOut: "2026-10-23" });
+  assert.deepEqual(nc([{ ...b, checkOut: "2026-12-01" }], today, {}, T0), ["EX1"]); // commissione tonda: da rileggere
+  const patches = rp([b], [{ id: "EX1", ok: true, status: "modified", rooms: [{ checkIn: "2026-10-20", checkOut: "2026-10-23", commissionAmount: 80.37 }] }]);
+  assert.deepEqual(patches, [{ id: "E1", patch: { otaDeductions: 80.37, commissionAmount: 80.37 } }]);
+  // già esatta: nessun cambiamento e non si rilegge
+  const ok = bk({ id: "E2", channel: "expedia", extId: "channex:EX2", total: 381.4, otaDeductions: 80.37, checkOut: "2026-12-01" });
+  assert.deepEqual(nc([ok], today, {}, T0), []);
+});
