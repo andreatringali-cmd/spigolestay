@@ -31,7 +31,7 @@ const eurRound = (n: number) => eur(n); // sempre 2 decimali e migliaia separate
 const fmtShort = (iso: string) => fmtDM(iso);
 
 /** Nota interna della prenotazione, senza la dicitura "Importato da…" messa dall'importazione. Vuota se resta solo quella. Non è una nota dell'ospite: quelle sono le richieste (guestRequests). */
-export const internalNote = (note?: string) => (note ?? "").replace(/^s*Importato da (Octorate|CSV)s*·?s*/i, "").trim();
+export const internalNote = (note?: string) => (note ?? "").replace(/^\s*Importato da (Octorate|CSV)\s*·?\s*/i, "").trim();
 
 export const isLiveBooking = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
 
@@ -121,6 +121,9 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   // Sollecito già inviato (anche a mano): il passaggio resta da fare ma "in attesa" dell'ospite, non "fermo": in arancione.
   const NOTE_OF: Record<string, "checkin" | "pay" | "tax" | "guide" | "review" | "checkout"> = { checkin: "checkin", pay: "pay", tax: "tax", guide: "guide", review: "review", checkout: "checkout" };
   for (const st of steps) if ((st.state === "todo" || st.state === "late") && NOTE_OF[st.key] && c.reminderNotes?.[NOTE_OF[st.key]]) st.sent = true;
+  // I messaggi li manda il titolare a mano: per Check-in e Check-out, una volta mandato il messaggio il compito è fatto (pallino verde con la spunta).
+  // Il dettaglio continua a dire cosa manca ("L'ospite non ha ancora compilato · inviato 2 volte").
+  for (const st of steps) if ((st.key === "checkin" || st.key === "checkout") && st.sent && st.state !== "done") { st.state = "done"; st.sent = false; }
 
   // Invii automatici: sotto il passaggio ancora da fare, se ne esiste uno programmato, quando parte.
   if (c.auto) {
