@@ -39,8 +39,8 @@ test("traduzione: chiave italiana → lingua; mancante → italiano; segnaposto 
   assert.equal(translate(GUEST_DICT, "de", "Indietro"), "Zurück");
   assert.equal(translate(GUEST_DICT, "es", "Indietro"), "Atrás");
   assert.equal(translate(GUEST_DICT, "en", "Testo che non esiste"), "Testo che non esiste");
-  assert.equal(translate(GUEST_DICT, "it", "Paga ora {amount}", { amount: "€ 50" }), "Paga ora € 50");
-  assert.equal(translate(GUEST_DICT, "de", "Paga ora {amount}", { amount: "€ 50" }), "Jetzt € 50 bezahlen");
+  assert.equal(translate(GUEST_DICT, "it", "Ciao {name}!", { name: "Anna" }), "Ciao Anna!");
+  assert.equal(translate(GUEST_DICT, "de", "Ciao {name}!", { name: "Anna" }), "Hallo Anna!");
   assert.equal(fillVars("a {x} b {y}", { x: 1 }), "a 1 b {y}");
   assert.equal(dateLocale("en"), "en-GB");
 });
