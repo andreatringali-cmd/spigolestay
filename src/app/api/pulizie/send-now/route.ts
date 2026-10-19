@@ -40,11 +40,13 @@ export async function POST(req: Request) {
     const st = arr(data.structures).find((x) => x.id === structureId) as unknown as Structure | undefined;
     if (!st) continue;
     let cfg: { enabled?: boolean; email?: boolean; emailTo?: string; whatsapp?: boolean; whatsappTo?: string; intro?: string; outro?: string; subject?: string } = {};
-    try { cfg = JSON.parse(blob[CFG_PREFIX + structureId] || "{}"); } catch { cfg = {}; }
+    // Impostazioni e note stanno nei dati personali dell'utente, anche se la struttura vive in un'organizzazione condivisa (prima: «Nessun destinatario salvato»).
+    const personalBlob = (personal?.data ?? {}) as Record<string, string>;
+    try { cfg = JSON.parse(personalBlob[CFG_PREFIX + structureId] || blob[CFG_PREFIX + structureId] || "{}"); } catch { cfg = {}; }
     const wantsEmail = !!cfg.email && !!cfg.emailTo, wantsWa = false; // il planning parte solo per email
     if (!wantsEmail && !wantsWa) return NextResponse.json({ ok: false, error: "Nessun destinatario salvato: scegli l'email in Invio automatico, poi premi Salva." });
     let notes: Record<string, string> = {};
-    try { notes = JSON.parse(blob[NOTES_KEY] || "{}") as Record<string, string>; } catch { notes = {}; }
+    try { notes = JSON.parse(personalBlob[NOTES_KEY] || blob[NOTES_KEY] || "{}") as Record<string, string>; } catch { notes = {}; }
     const results = await deliverPuliziePlan({
       admin: auth.admin, tenantId: auth.tenantId, origin: siteOrigin(req), structure: st,
       cfg: { email: !!cfg.email, emailTo: cfg.emailTo ?? "", whatsapp: false, whatsappTo: "", intro: cfg.intro, outro: cfg.outro, subject: cfg.subject },

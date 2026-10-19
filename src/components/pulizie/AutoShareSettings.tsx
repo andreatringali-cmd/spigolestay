@@ -102,18 +102,10 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
 
         </div>
 
-        {/* Testo del messaggio: solo apertura e chiusura; l'elenco delle camere lo compone il programma. Vale per WhatsApp, Copia e l'email automatica. */}
-        <div className="mt-3 flex flex-col gap-2">
-          <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Testo del messaggio")}</div>
-          <input type="text" value={cfg.subject} onChange={(e) => setCfg((c) => ({ ...c, subject: e.target.value }))} placeholder={t("Oggetto email (vuoto = Planning pulizie · struttura · data)")} maxLength={120} className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-          <textarea value={cfg.intro} onChange={(e) => setCfg((c) => ({ ...c, intro: e.target.value }))} placeholder={t("Riga iniziale (es. Buongiorno, ecco il planning di oggi)")} rows={2} maxLength={300} className="resize-none rounded-xl border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-          <textarea value={cfg.outro} onChange={(e) => setCfg((c) => ({ ...c, outro: e.target.value }))} placeholder={t("Riga finale (es. Scrivimi se c'è qualcosa che non torna. Grazie!)")} rows={2} maxLength={300} className="resize-none rounded-xl border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        </div>
-
         {log && log.length > 0 && (
-          <div className="mt-3 rounded-xl border border-line bg-paper px-3 py-2">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Ultimi invii")}</div>
-            <ul className="flex flex-col gap-1">
+          <details className="group mt-3 rounded-xl border border-line bg-paper px-3 py-2">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Ultimi invii")} <span className="text-xs transition group-open:rotate-180">▾</span></summary>
+            <ul className="mt-1 flex flex-col gap-1">
               {log.slice(0, 6).map((e, i) => {
                 const why = e.ok ? "" : spiegaErroreWa(e.detail);
                 return (
@@ -125,7 +117,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
                 );
               })}
             </ul>
-          </div>
+          </details>
         )}
 
         <div className="mt-3 rounded-xl border border-line bg-paper px-3 py-2.5">

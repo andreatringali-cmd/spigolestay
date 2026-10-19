@@ -2,7 +2,8 @@
   "crons": [
     { "path": "/api/cron/alloggiati-auto", "schedule": "0 21 * * *" },
     { "path": "/api/channex/cron", "schedule": "30 6 * * *" },
-    { "path": "/api/cron/pulizie-plan", "schedule": "*/10 4-20 * * *" },
+    { "path": "/api/cron/pulizie-plan", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/pulizie-plan", "schedule": "20 19 * * *" },
     { "path": "/api/cron/sdi-status", "schedule": "30 7 * * *" },
     { "path": "/api/cron/entities-verify", "schedule": "15 3 * * *" }
   ]

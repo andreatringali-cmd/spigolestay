@@ -33,19 +33,26 @@ const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
 
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (bearer !== secret && (url.searchParams.get("secret") || "") !== secret) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
-
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supaUrl || !service) return NextResponse.json({ ok: false, skipped: "supabase_not_configured" });
   const admin = createClient(supaUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  // Chi chiama: Vercel Cron (Bearer CRON_SECRET), una prova a mano (?secret=) oppure il pianificatore del database ogni 10 minuti (intestazione x-cron-token = chiave
+  // salvata nella tabella cron_tokens: Vercel Hobby non permette cron più frequenti di uno al giorno, quindi l'orario scelto è garantito da pg_cron).
+  const secret = process.env.CRON_SECRET;
+  const url = new URL(req.url);
+  const authHeader = req.headers.get("authorization") || "";
+  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  let authorized = !!secret && (bearer === secret || (url.searchParams.get("secret") || "") === secret);
+  if (!authorized) {
+    const tok = req.headers.get("x-cron-token") || "";
+    if (tok) {
+      const { data: row } = await admin.from("cron_tokens").select("token").eq("name", "pulizie-plan").maybeSingle();
+      authorized = !!row?.token && row.token === tok;
+    }
+  }
+  if (!authorized) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   // Indirizzo FISSO del sito: l'origine della richiesta del cron è quella del deployment (…vercel.app), protetta da autenticazione → "Protected deployment 401".
   const origin = siteOrigin(req);
