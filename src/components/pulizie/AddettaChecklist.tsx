@@ -62,10 +62,17 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
     setChecks((prev) => toggleCheck(prev, { taskId: task.id, targetId, structureId, todayISO: n.today, nowISO: n.iso, nowMs: n.ms, newId: newId() }));
   };
 
+  // Voce da fare più volte e già spuntata oggi: «+» aggiunge un'altra spunta di oggi (es. l'hai fatta due volte nello stesso giorno). Toccando la riga si annullano le spunte di oggi.
+  const tickAgain = (task: CleanTask, targetId: string, structureId: string) => {
+    if (!canEdit) return;
+    const n = stamp();
+    setChecks((prev) => [...prev, { id: newId(), taskId: task.id, targetId, structureId, date: n.today, at: n.iso, updatedAt: n.ms }]);
+  };
+
   const sub = (s: TaskState): string => {
     if (!isCurrent) return s.last ? `${s.done}/${s.required} · ultima ${fmtDMY(s.last.date).slice(0, 5)} ${hhmm(s.last.at)}` : `${s.done}/${s.required}`;
     if (s.state === "later" && s.nextDay) return `${s.done}/${s.required} · prossima ${WEEKDAY_LONG[s.nextDay - 1].toLowerCase()}`;
-    if (s.today) return `${s.done}/${s.required} questa settimana · fatta oggi alle ${hhmm(s.today.at)}`;
+    if (s.today) return `${s.done}/${s.required} questa settimana · fatta oggi alle ${hhmm(s.today.at)} · tocca per annullare`;
     if (s.last) return `${s.done}/${s.required} questa settimana · ultima ${fmtDMY(s.last.date).slice(0, 5)} ${hhmm(s.last.at)}`;
     return `${s.done}/${s.required} questa settimana`;
   };
@@ -90,6 +97,7 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
         </span>
         {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{isCurrent && s.overdue ? "In ritardo" : chip.label}</span>}
       </button>
+      {canEdit && isCurrent && ticked && s.done < s.required && <button onClick={() => tickAgain(task, target.id, target.structureId)} aria-label="Segna un'altra volta oggi" title="Fatta un'altra volta oggi" className="grid w-11 shrink-0 place-items-center text-base font-bold text-focus hover:bg-wash">+</button>}
       {isManager && <button onClick={() => setEditing(task)} aria-label={`Modifica la voce «${task.name}»`} title="Modifica la voce" className="grid w-11 shrink-0 place-items-center text-dim hover:bg-wash hover:text-txt"><Icon name="settings" size={15} /></button>}
       </div>
     );
@@ -129,11 +137,13 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
             </div>
             <div className="mt-1.5 flex items-center gap-2 text-[11px] text-dim">
               <span className="h-1.5 w-24 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--ok)" }} /></span>
-              <span>{week.done}/{week.required} spunte · {week.completed}/{week.targets} voci complete</span>
+              <span title="Ogni voce va fatta un certo numero di volte a settimana: «spunte» sono le volte già fatte su quelle richieste in tutto.">{week.done} spunte fatte su {week.required} richieste · {week.completed} voci complete su {week.targets}</span>
             </div>
           </div>
-          <label className="flex min-h-[40px] cursor-pointer items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={onlyTodo} onChange={(e) => setOnlyTodo(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Solo da fare</label>
-          {isManager && <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="ml-auto flex min-h-[40px] items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>}
+          <div className="ml-auto flex items-center gap-2">
+            <button type="button" onClick={() => setOnlyTodo((v) => !v)} aria-pressed={onlyTodo} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${onlyTodo ? "border-transparent bg-focus text-white" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>Solo da fare</button>
+  {isManager && <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="flex h-9 items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>}
+          </div>
         </div>
       </Card>
 
