@@ -170,13 +170,13 @@ export const MANDATORY_TEMPLATES: (MsgTemplateSeed & { srcId: string })[] = [
     },
   },
   {
-    id: "mand-checkout", srcId: "checkout", name: "Check-out", trigger: "manual", days: 0, time: "10:00", active: false,
+    id: "mand-checkout", srcId: "checkout", name: "Check-out e recensione", trigger: "manual", days: 0, time: "10:00", active: false,
     texts: {
-      it: "Ciao {ospite}, il check-out è previsto il {checkout}. Per qualsiasi esigenza (ad esempio il deposito bagagli) scrivici pure qui. Grazie per aver scelto {struttura}, è stato un piacere ospitarti!",
-      en: "Hi {ospite}, check-out is on {checkout}. If you need anything (for example luggage storage), just reply here. Thank you for choosing {struttura}, it was a pleasure to host you!",
-      fr: "Bonjour {ospite}, le check-out est prévu le {checkout}. Pour toute demande (par exemple la consigne à bagages), répondez simplement ici. Merci d'avoir choisi {struttura}, ce fut un plaisir de vous accueillir !",
-      de: "Hallo {ospite}, der Check-out ist am {checkout}. Bei Fragen (zum Beispiel zur Gepäckaufbewahrung) schreiben Sie uns einfach hier. Vielen Dank, dass Sie sich für {struttura} entschieden haben, es war uns eine Freude!",
-      es: "Hola {ospite}, el check-out es el {checkout}. Para cualquier necesidad (por ejemplo, consigna de equipaje), escríbenos aquí. Gracias por elegir {struttura}, ¡ha sido un placer recibirte!",
+      it: "Ciao {ospite}, speriamo che tu abbia passato un bel soggiorno a {struttura}! 😊\n\nTi ricordiamo che il check-out è previsto il {checkout}. Se ti serve qualcosa (ad esempio il deposito bagagli), scrivici pure qui.\n\nSe ti è piaciuto, ci aiuteresti tantissimo lasciando una breve recensione sincera: bastano 30 secondi.\n👉 {link_recensioni}\n\nGrazie di cuore e a presto! 🌊",
+      en: "Hi {ospite}, we hope you had a lovely stay at {struttura}! 😊\n\nA reminder that check-out is on {checkout}. If you need anything (for example luggage storage), just reply here.\n\nIf you enjoyed your stay, a short, honest review would help us a lot: it only takes 30 seconds.\n👉 {link_recensioni}\n\nThank you so much, and see you soon! 🌊",
+      fr: "Bonjour {ospite}, nous espérons que vous avez passé un excellent séjour chez {struttura} ! 😊\n\nPetit rappel : le check-out est prévu le {checkout}. Pour toute demande (par exemple la consigne à bagages), répondez simplement ici.\n\nSi vous avez apprécié votre séjour, un court avis sincère nous aiderait énormément : cela ne prend que 30 secondes.\n👉 {link_recensioni}\n\nMerci de tout cœur et à bientôt ! 🌊",
+      de: "Hallo {ospite}, wir hoffen, Sie hatten einen schönen Aufenthalt bei {struttura}! 😊\n\nZur Erinnerung: Der Check-out ist am {checkout}. Bei Fragen (zum Beispiel zur Gepäckaufbewahrung) schreiben Sie uns einfach hier.\n\nWenn es Ihnen gefallen hat, würde uns eine kurze, ehrliche Bewertung sehr helfen: Es dauert nur 30 Sekunden.\n👉 {link_recensioni}\n\nHerzlichen Dank und bis bald! 🌊",
+      es: "Hola {ospite}, ¡esperamos que hayas disfrutado de tu estancia en {struttura}! 😊\n\nTe recordamos que el check-out es el {checkout}. Si necesitas algo (por ejemplo, consigna de equipaje), escríbenos aquí.\n\nSi te ha gustado, una breve reseña sincera nos ayudaría muchísimo: solo tardas 30 segundos.\n👉 {link_recensioni}\n\n¡Muchas gracias y hasta pronto! 🌊",
     },
   },
 ];
@@ -185,6 +185,33 @@ export const MANDATORY_TEMPLATES: (MsgTemplateSeed & { srcId: string })[] = [
 export function ensureMandatoryTemplates<T extends { srcId?: string }>(saved: T[]): T[] {
   const have = new Set(saved.map((x) => x.srcId).filter(Boolean));
   return [...saved, ...(MANDATORY_TEMPLATES.filter((m) => !have.has(m.srcId)) as unknown as T[])];
+}
+
+/**
+ * OGNI STRUTTURA È A SÉ: un modello appartiene a UNA sola struttura (structureIds = [id]). I modelli «per tutte le strutture» (senza structureIds) o per più strutture
+ * vengono divisi in una copia per struttura, ciascuna indipendente: cambiare un testo in una struttura non tocca le altre. Le copie tengono lo stesso nome e collegamento (srcId).
+ * La prima struttura mantiene l'id originale, le altre ricevono "<id>@<struttura>". Non fa nulla se i modelli sono già tutti di una sola struttura.
+ */
+export function splitTemplatesPerStructure<T extends { id: string; structureIds?: string[] }>(saved: T[], structureIds: string[]): T[] {
+  const known = new Set(structureIds);
+  const out: T[] = [];
+  for (const tp of saved) {
+    const own = (tp.structureIds ?? []).filter((id) => known.has(id));
+    if ((tp.structureIds?.length ?? 0) === 1 && own.length === 1) { out.push(tp); continue; }
+    const targets = tp.structureIds?.length ? own : structureIds; // senza struttura = tutte; con strutture non più esistenti si scartano
+    targets.forEach((sid, i) => out.push({ ...tp, id: i === 0 ? tp.id : `${tp.id}@${sid.slice(0, 8)}`, structureIds: [sid] }));
+  }
+  return out;
+}
+
+/** Per OGNI struttura, i modelli dei passaggi obbligatori mancanti (Pagamento, Tassa, Check-out e recensione). */
+export function ensureMandatoryPerStructure<T extends { srcId?: string; structureIds?: string[] }>(saved: T[], structureIds: string[]): T[] {
+  const out = [...saved];
+  for (const sid of structureIds) {
+    const have = new Set(saved.filter((x) => x.structureIds?.length === 1 && x.structureIds[0] === sid).map((x) => x.srcId).filter(Boolean));
+    for (const m of MANDATORY_TEMPLATES) if (!have.has(m.srcId)) out.push({ ...m, id: `${m.id}@${sid.slice(0, 8)}`, structureIds: [sid] } as unknown as T);
+  }
+  return out;
 }
 
 /** Se false i modelli d'esempio NON si aggiungono più da soli: i modelli li crea il titolare (ottobre 2026). */

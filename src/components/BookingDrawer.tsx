@@ -550,7 +550,7 @@ export default function BookingDrawer() {
       </div>
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
-        const rmsg = (modelTextNow("recensione") ?? renderSystemMessage("reviewQuick", guestLangOf(guest), { nome: first, struttura: structure?.name ?? "noi", link: reviewUrl ?? "" })).trim();
+        const rmsg = renderSystemMessage("reviewQuick", guestLangOf(guest), { nome: first, struttura: structure?.name ?? "noi", link: reviewUrl ?? "" }).trim();
         const rwa = phoneDigits ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(rmsg)}` : "";
         return (
           <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--ok) 32%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 6%, transparent)" }}>

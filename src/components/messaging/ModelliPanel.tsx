@@ -5,7 +5,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
-import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, ensureMandatoryTemplates } from "@/lib/msg-templates";
+import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, splitTemplatesPerStructure, ensureMandatoryPerStructure } from "@/lib/msg-templates";
 import ReviewSettingsCard from "@/components/messaging/ReviewSettingsCard";
 import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
@@ -17,7 +17,7 @@ const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival",
 // I trigger "il giorno di…" non usano il conteggio giorni (sono ancorati esattamente a check-in/check-out).
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
 // Ordine dei passaggi obbligatori della prenotazione (Check-in, Pagamento, Guida ospiti, … Check-out, recensione): i modelli collegati vengono per primi, in quest'ordine; poi quelli aggiunti dal titolare.
-const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, tax: 5, checkout: 8, recensione: 8 };
+const STEP_RANK: Record<string, number> = { selfcheckin: 0, pay: 1, guida: 2, info: 3, tax: 5, checkout: 8 };
 const stepRank = (tp: { srcId?: string }) => (tp.srcId && tp.srcId in STEP_RANK ? STEP_RANK[tp.srcId] : 100);
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
@@ -52,10 +52,20 @@ export default function ModelliPanel() {
     try {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
       const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
-      setTemplates(ensureMandatoryTemplates(mergeSeedTemplates(base)).map((tp) => (tp.trigger === "manual" && !tp.active ? tp : { ...tp, trigger: "manual" as Trigger, active: false }))); // messaggi automatici spenti: tutti i modelli sono manuali
+      // Il vecchio modello collegato alla recensione diventa un modello normale (eliminabile): check-out e recensione sono UN solo messaggio.
+      setTemplates(mergeSeedTemplates(base).map((tp) => (tp.srcId === "recensione" ? { ...tp, srcId: undefined } : tp)).map((tp) => (tp.trigger === "manual" && !tp.active ? tp : { ...tp, trigger: "manual" as Trigger, active: false }))); // messaggi automatici spenti: tutti i modelli sono manuali
     } catch {}
     setReady(true);
   }, []);
+  // Ogni struttura è a sé: i modelli per «tutte» si dividono in una copia per struttura e ogni struttura ha i suoi modelli obbligatori (una volta, appena le strutture sono note).
+  useEffect(() => {
+    if (!ready || !structures.length) return;
+    const ids = structures.map((x) => x.id);
+    setTemplates((prev) => {
+      const next = ensureMandatoryPerStructure(splitTemplatesPerStructure(prev, ids), ids);
+      return next.length === prev.length && next.every((x, i) => x === prev[i]) ? prev : next;
+    });
+  }, [ready, structures]);
   useEffect(() => { if (!ready) return; try { localStorage.setItem("spigolestay:msgtemplates", JSON.stringify(templates)); } catch {} }, [templates, ready]);
 
   const [showSettings, setShowSettings] = useState(false); // ingranaggio: impostazioni (link recensioni…)
@@ -88,7 +98,7 @@ export default function ModelliPanel() {
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button type="button" onClick={() => { setEditing(emptyTpl(activeStructureId !== "all" ? [activeStructureId] : undefined)); setEditLang("it"); }} className="inline-flex items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
+        <button type="button" disabled={activeStructureId === "all"} title={activeStructureId === "all" ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(activeStructureId !== "all" ? [activeStructureId] : undefined)); setEditLang("it"); }} className="inline-flex disabled:cursor-not-allowed disabled:opacity-50 items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
         <button type="button" onClick={() => setShowSettings((v) => !v)} aria-pressed={showSettings} aria-label={t("Impostazioni")} title={t("Impostazioni (link recensioni…)")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${showSettings ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
@@ -108,14 +118,14 @@ export default function ModelliPanel() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
-                      <div className="mt-0.5 text-xs text-dim">{tpl.structureIds?.length ? ` · ${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
+                      <div className="mt-0.5 text-xs text-dim">{tpl.structureIds?.length ? `${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
                     </div>
                     {(tpl.showInBooking || tpl.srcId) && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Nella scheda")}</span>}
                   </div>
                   <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
                   <div className="mt-2 flex gap-2">
                     <button onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
-                    {!tpl.srcId && <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+                    {!(tpl.srcId && templates.filter((x) => x.srcId === tpl.srcId).length <= 1) && <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
                   </div>
                 </Card>
               ))}

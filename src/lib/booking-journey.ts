@@ -102,17 +102,12 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
 
   // 8 · Check-out
   steps.push({
-    key: "checkout", label: "Check-out", href: "/pulizie",
+    key: "checkout", label: "Check-out e recensione", href: "/pulizie",
     state: departed ? "done" : b.checkOut === c.today ? "todo" : "na",
     detail: `${departed ? "Partito" : b.checkOut === c.today ? "Parte oggi" : `Il ${fmtShort(b.checkOut)}`}${note("checkout")}`,
   });
 
-  // 9 · Recensione (dopo la partenza)
-  if (departed || b.checkOut === c.today) steps.push({
-    key: "review", label: "Recensione", href: "/recensioni",
-    state: b.reviewRequestedAt ? "done" : departed ? "todo" : "na",
-    detail: b.reviewRequestedAt ? "Richiesta inviata" : departed ? `Da richiedere${note("review")}` : "Dopo la partenza",
-  });
+  // 9 · Recensione: non è più un passaggio a parte. Check-out e richiesta di recensione sono UN solo messaggio (modello «Check-out e recensione»).
 
   // Ordine di lettura voluto: check-in, pagamento, guida, schedina, osservatorio, tassa, fattura, check-out (recensione per ultima).
   const ORDER = ["checkin", "pay", "guide", "alloggiati", "istat", "tax", "invoice", "checkout", "review"];

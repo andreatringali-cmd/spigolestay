@@ -40,3 +40,25 @@ test("modelli dei passaggi obbligatori: si aggiungono solo quelli mancanti (Paga
   assert.equal(out.find((x) => x.srcId === "pay").id, "mio-pagamento"); // il modello esistente non si tocca
   assert.ok(out.find((x) => x.srcId === "tax").texts.it.includes("{link_pagamento}"));
 });
+
+test("ogni struttura è a sé: i modelli per tutte si dividono in una copia per struttura", async () => {
+  const { splitTemplatesPerStructure, ensureMandatoryPerStructure } = await import("../src/lib/msg-templates.ts");
+  const S = ["aaaaaaaa-1", "bbbbbbbb-2", "cccccccc-3"];
+  const saved: any[] = [
+    { id: "g", name: "Globale", srcId: "selfcheckin", texts: { it: "Ciao" } },
+    { id: "uno", name: "Solo A", structureIds: ["aaaaaaaa-1"], texts: { it: "A" } },
+    { id: "due", name: "A e B", structureIds: ["aaaaaaaa-1", "bbbbbbbb-2"], texts: { it: "AB" } },
+  ];
+  const out = splitTemplatesPerStructure(saved, S) as any[];
+  assert.deepEqual(out.map((x) => [x.id, x.structureIds]), [
+    ["g", ["aaaaaaaa-1"]], ["g@bbbbbbbb", ["bbbbbbbb-2"]], ["g@cccccccc", ["cccccccc-3"]],
+    ["uno", ["aaaaaaaa-1"]],
+    ["due", ["aaaaaaaa-1"]], ["due@bbbbbbbb", ["bbbbbbbb-2"]],
+  ]);
+  assert.equal(out[1].texts.it, "Ciao"); // stesso testo, ma ora indipendente
+  assert.equal(splitTemplatesPerStructure(out, S).length, out.length); // già diviso: nessun cambiamento
+  // modelli obbligatori: uno per passaggio e per struttura, senza duplicare quelli già collegati
+  const full = ensureMandatoryPerStructure(out, S) as any[];
+  for (const sid of S) assert.deepEqual(full.filter((x) => x.structureIds[0] === sid && x.id.startsWith("mand-")).map((x) => x.srcId).sort(), ["checkout", "pay", "tax"]);
+  assert.equal(full.filter((x) => x.srcId === "selfcheckin").length, 3); // già presenti, non si aggiunge
+});
