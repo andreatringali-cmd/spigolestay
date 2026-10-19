@@ -227,7 +227,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
 
   return (
     <div>
-      <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} />
+      <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} phone={phone} onStepDay={stepDay} />
 
       {/* Riga dei filtri: stessa del calendario a griglia (cerca, mese, data con frecce, scelta della vista) + periodo e badge di questa vista; a destra Importa e Nuova.
           Telefono: [cerca][Filtri][+ Nuova] e sotto la scelta della vista; mese, data e importa stanno nella tendina «Filtri» (montati una volta sola: ref/Popover). */}

@@ -19,7 +19,7 @@ export function KindIcon({ k }: { k: Kind }): ReactNode {
 }
 
 
-export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSelect, onShift, onToday }: {
+export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSelect, onShift, onToday, phone, onStepDay }: {
   days: { iso: string; stats: DayStats }[];
   sel: string;
   mode: Modo;
@@ -28,7 +28,11 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
   onSelect: (iso: string) => void;
   onShift: (dir: -1 | 1) => void;
   onToday: () => void;
+  /** Telefono: si vede UN giorno alla volta (quello scelto, di partenza oggi) con frecce ‹ › di un giorno, invece dei 7 giorni in colonne strettissime. */
+  phone?: boolean;
+  onStepDay?: (n: number) => void;
 }) {
+  if (phone && onStepDay) return <GiornoTelefono days={days} sel={sel} today={today} label={rangeLabel} onStep={onStepDay} onToday={onToday} />;
   const atToday = days[0]?.iso === today && (mode === "week" || sel === today);
   const nav = "grid h-8 w-8 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
   return (
@@ -94,4 +98,39 @@ function DayBody({ stats }: { stats: DayStats }) {
       <span className="inline-flex items-center gap-0.5" title={`Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}><KindIcon k="clean" /><b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b></span>
     </span>
   </>);
+}
+
+// Vista GIORNALIERA per telefono: il giorno scelto a tutta larghezza, con numeri grandi e leggibili (arrivi, partenze, in casa), occupazione, camere libere e pulizie.
+function GiornoTelefono({ days, sel, today, label, onStep, onToday }: { days: { iso: string; stats: DayStats }[]; sel: string; today: string; label: string; onStep: (n: number) => void; onToday: () => void }) {
+  const stats = days.find((d) => d.iso === sel)?.stats ?? days[0]?.stats;
+  const nav = "grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line bg-surface text-lg text-dim transition active:border-focus active:text-focus";
+  if (!stats) return null;
+  const total = stats.totalUnits, free = stats.free;
+  const occ = total > 0 ? Math.round(((total - free) / total) * 100) : 0;
+  const tile = (k: "arr" | "dep" | "stay", n: number, lab: string) => (
+    <div className="flex flex-col items-center rounded-xl py-2.5" style={{ background: tint(C[k]) }}>
+      <span className="font-mono text-3xl font-bold leading-none tabular-nums" style={{ color: C[k] }}>{n}</span>
+      <span className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold" style={{ color: C[k] }}><KindIcon k={k} />{lab}</span>
+    </div>
+  );
+  return (
+    <div className="rounded-2xl border border-line p-3 shadow-sm" style={{ background: "color-mix(in srgb, var(--wash) 70%, var(--surface))" }}>
+      <div className="mb-3 flex items-center gap-2">
+        <button onClick={() => onStep(-1)} className={nav} aria-label="Giorno prima">‹</button>
+        <button onClick={onToday} disabled={sel === today} className="min-w-0 flex-1 truncate rounded-lg px-1 text-center font-display text-base font-bold capitalize text-txt disabled:opacity-100" aria-label="Torna a oggi">{label}{sel === today ? <span className="ml-1.5 rounded-full bg-focus px-2 py-0.5 align-middle text-[10px] font-bold uppercase text-white">Oggi</span> : <span className="ml-1.5 align-middle text-[11px] font-semibold text-focus">→ Oggi</span>}</button>
+        <button onClick={() => onStep(1)} className={nav} aria-label="Giorno dopo">›</button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {tile("arr", stats.arrivals, "Arrivi")}
+        {tile("dep", stats.departures, "Partenze")}
+        {tile("stay", stats.stay, "In casa")}
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs">
+        <span className="font-semibold" style={free === 0 ? { color: "var(--err)" } : { color: "var(--txt)" }}>{free === 0 ? "Nessuna camera libera" : `${free} ${free === 1 ? "camera libera" : "camere libere"} su ${total}`}</span>
+        <span className="inline-flex items-center gap-1 text-faint" title="Pulizie"><KindIcon k="clean" /><b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b> pulizie</span>
+      </div>
+      <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-wash" title={`Camere occupate nella notte: ${total - free} su ${total} (${occ}%)`}><span className="block h-full rounded-full" style={{ width: `${occ}%`, background: free === 0 ? "var(--ok)" : "var(--focus)" }} /></span>
+      {stats.closed > 0 && <div className="mt-1.5 text-[11px] text-dim">{stats.closed} {stats.closed === 1 ? "camera chiusa o fuori servizio" : "camere chiuse o fuori servizio"}</div>}
+    </div>
+  );
 }
