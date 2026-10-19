@@ -180,17 +180,18 @@ const DEFAULT_CONTENT: GContent = {
 // Usa le immagini d'esempio già presenti in public/guida/assets.
 // Dati che appartengono alla STRUTTURA (vanno nelle Impostazioni struttura).
 const DEMO_STRUCT = {
-  address: "Corso Gelone 93", postalCode: "96100", province: "SR", city: "Siracusa",
-  phone: "+39 331 000 0000", email: "info@spigolehouse.it",
-  checkInFrom: "15:00", checkInTo: "00:00", checkOutBy: "10:30",
-  instagram: "https://instagram.com/spigolehouse", website: "https://spigolehouse.it",
+  // BUG fix: l esempio NON deve scrivere dati personali della struttura demo (indirizzo, telefono, email, social) nella struttura di un nuovo titolare.
+  address: "", postalCode: "", province: "", city: "",
+  phone: "", email: "",
+  checkInFrom: "15:00", checkInTo: "20:00", checkOutBy: "10:30",
+  instagram: "", website: "",
 };
-// Dati specifici della GUIDA (non della struttura).
+// Dati specifici della GUIDA (non della struttura). Nessuna credenziale/numero demo: WiFi, telefoni e link li inserisce il titolare.
 const DEMO_GUIDE = {
-  guideName: "Spigolehouse", phoneGreta: "+39 331 000 0001", whatsapp: "+39 331 000 0000", taxiPhone: "+39 0931 66666",
-  wifiNetwork: "Spigolehouse WiFi", wifiPassword: "benvenuti2026",
-  checkinTime: "15:00 – 00:00", checkoutTime: "entro le 10:30",
-  reviewUrl: "https://www.google.com/maps/search/?api=1&query=Spigolehouse+Siracusa",
+  guideName: "", phoneGreta: "", whatsapp: "", taxiPhone: "",
+  wifiNetwork: "", wifiPassword: "",
+  checkinTime: "15:00 - 20:00", checkoutTime: "entro le 10:30",
+  reviewUrl: "",
 };
 const DEMO_CONTENT: GContent = {
   home: { welcomeTitle: "Benvenuti a Siracusa,", welcomeSub: "siamo felici di ospitarvi", welcome: ["siamo davvero felici di accogliervi!", "Questa guida vi aiuterà a scoprire la città e a vivere al meglio il soggiorno.", "Buona permanenza!"] },

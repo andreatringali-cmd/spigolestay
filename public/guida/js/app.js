@@ -696,12 +696,15 @@
     main.innerHTML = html;
   }
 
+  // I link social/sito inseriti senza schema (es. instagram.com/xyz, www.sito.it) diventerebbero URL relativi e porterebbero a una pagina inesistente: aggiungo https://.
+  function fixUrl(u) { u = String(u || "").trim(); return u && !/^(https?:)?\/\/|^(mailto|tel):/i.test(u) ? "https://" + u : u; }
+
   function renderFooter(t) {
     var s = P.social || {};
     var links = [];
-    if (s.instagram) links.push('<a class="social-btn" href="' + esc(s.instagram) + '" target="_blank" rel="noopener" aria-label="Instagram">' + icon("instagram") + "</a>");
-    if (s.facebook) links.push('<a class="social-btn" href="' + esc(s.facebook) + '" target="_blank" rel="noopener" aria-label="Facebook">' + icon("facebook") + "</a>");
-    if (s.website) links.push('<a class="social-btn" href="' + esc(s.website) + '" target="_blank" rel="noopener" aria-label="Sito web">' + icon("globe") + "</a>");
+    if (s.instagram) links.push('<a class="social-btn" href="' + esc(fixUrl(s.instagram)) + '" target="_blank" rel="noopener" aria-label="Instagram">' + icon("instagram") + "</a>");
+    if (s.facebook) links.push('<a class="social-btn" href="' + esc(fixUrl(s.facebook)) + '" target="_blank" rel="noopener" aria-label="Facebook">' + icon("facebook") + "</a>");
+    if (s.website) links.push('<a class="social-btn" href="' + esc(fixUrl(s.website)) + '" target="_blank" rel="noopener" aria-label="Sito web">' + icon("globe") + "</a>");
 
     var bar = document.getElementById("socialBar");
     if (bar) bar.innerHTML = links.join("");

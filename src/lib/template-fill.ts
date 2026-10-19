@@ -7,13 +7,14 @@ import { messageBalance } from "./msg-balance";
 import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens } from "./auto-review";
 import { structureWhatsapp, WHATSAPP_FALLBACK } from "./auto-guide-link";
 import { guestLangOf } from "./guest-lang";
+import { restoreApprovedTexts } from "./msg-templates";
 import type { Booking, Guest, RoomType, Structure, Unit } from "./types";
 
 export const TEMPLATES_KEY = "spigolestay:msgtemplates";
 export type StoredTemplate = { id: string; name: string; texts: Record<string, string>; showInBooking?: boolean; srcId?: string; structureIds?: string[] };
 
 export function readTemplates(): StoredTemplate[] {
-  try { const p = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || "[]"); return Array.isArray(p) ? (p as StoredTemplate[]) : []; } catch { return []; }
+  try { const p = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || "[]"); return Array.isArray(p) ? restoreApprovedTexts(p as (StoredTemplate & { id: string })[]) : []; } catch { return []; }
 }
 
 /** Modello collegato a un passaggio obbligatorio della prenotazione (selfcheckin, guida, checkout, recensione), valido per la struttura; null se non c'è o è vuoto. */

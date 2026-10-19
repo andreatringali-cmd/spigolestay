@@ -181,10 +181,45 @@ export const MANDATORY_TEMPLATES: (MsgTemplateSeed & { srcId: string })[] = [
   },
 ];
 
+// ---- Testi APPROVATI dei 5 modelli obbligatori (19/10/2026) -------------------------------------------------------------------------
+// Il titolare li aveva riscritti con questi testi; una copia vecchia salvata da un altro dispositivo li ha poi sovrascritti con quelli di partenza.
+// Qui restano scritti nel codice: un modello che ha ANCORA un testo di partenza (cioè mai personalizzato dopo) passa al testo approvato; se il titolare ha
+// scritto qualcosa di suo non si tocca. Solo la lingua italiana: le altre lingue restano come sono.
+const APPROVED_IT: Record<string, string> = {
+  "seed-checkin-online": "Ciao {ospite}, grazie per aver scelto {struttura}! 😊\n\nPer rendere il tuo arrivo più semplice e veloce, ti chiediamo di completare il check-in online: bastano due minuti e servono i dati e un documento di identità di ogni ospite.\n\n👉 {link_checkin}\n\nCi serve perché la legge italiana ci impone di registrare gli ospiti che alloggiano da noi. Se lo fai in anticipo, all'arrivo non dovrai compilare nulla e potrai entrare subito.\n\nSe hai qualche difficoltà, rispondi pure a questo messaggio: ti aiutiamo volentieri. A presto!",
+  "seed-benvenuto-guida": "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\n\nVi condividiamo la guida per accedere alla struttura e vivere al meglio il soggiorno: check-in, Wi-Fi, consigli utili e contatti.\n\n👉 {link_guida}\n\nSe avete bisogno di qualsiasi cosa, scriveteci pure su WhatsApp: {whatsapp}.\n\nLo staff vi augura buon soggiorno!",
+  "mand-pay": "Ciao {ospite}, grazie ancora per aver scelto {struttura}! 😊\n\nPer saldare il soggiorno l'importo da pagare è {importo}. Puoi farlo in due modi:\n\n💳 con carta, dal telefono, in modo sicuro:\n👉 {link_pagamento}\n\n💶 oppure in contanti: lasciali pure sulla scrivania della camera prima della partenza.\n\nPer qualsiasi dubbio rispondi pure a questo messaggio. Grazie!",
+  "mand-tax": "Ciao {ospite}, grazie ancora per aver scelto {struttura}! 😊\n\nTi ricordiamo che per il soggiorno è prevista la tassa di soggiorno: l'importo da pagare è {importo}. Puoi farlo in due modi:\n\n💳 con carta, dal telefono, in modo sicuro:\n👉 {link_pagamento}\n\n💶 oppure in contanti: lasciali pure sulla scrivania della camera prima della partenza.\n\nPer qualsiasi dubbio rispondi pure a questo messaggio. Grazie!",
+  "mand-checkout": "Ciao {ospite}, speriamo che tu abbia passato un bel soggiorno a {struttura}! 😊\n\nTi ricordiamo che il check-out è previsto il {checkout}.\n\nPrima di partire, controlla di non lasciare nulla in camera. Le chiavi lasciale attaccate alla porta, come le hai trovate al tuo arrivo, e chiudi bene la porta uscendo. Se ti serve qualcosa (ad esempio il deposito bagagli), scrivici pure qui.\n\nSe ti è piaciuto il soggiorno, ci aiuteresti tantissimo lasciando una breve recensione sincera: bastano 30 secondi.\n👉 {link_recensioni}\n\nGrazie di cuore per aver scelto {struttura}: è stato un piacere ospitarti, a presto! 🌊",
+};
+// Testi di partenza che hanno preso il posto di quelli approvati (versione vecchia = salvata tale e quale).
+const OLD_IT: Record<string, string[]> = {
+  "seed-checkin-online": ["Ciao {ospite}, per velocizzare l'arrivo a {struttura} compila il check-in online (dati e documento): {link_checkin}. Bastano due minuti, grazie!"],
+  "seed-benvenuto-guida": [
+    "Buongiorno {{1}}, siamo lieti di accogliervi a {{2}}. Vi condividiamo la guida per accedere alla struttura e vivere al meglio il soggiorno, con check-in, Wi-Fi, consigli utili e contatti, a questo link: {{3}} Lo staff vi augura buon soggiorno!",
+    "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\nEcco tutto il necessario per un arrivo senza pensieri.\n\n1) Check-in online (2 minuti, dati e documento):\n👉 {link_checkin}\n2) Guida con accesso, Wi-Fi e consigli utili:\n👉 {link_guida}\n\nPer qualsiasi cosa siamo a disposizione su WhatsApp ({whatsapp}): quando siete in arrivo scriveteci e vi aiutiamo con l'ingresso. Il check-in è {checkin}.\n— {struttura}",
+  ],
+  "mand-pay": ["Ciao {ospite}, puoi pagare il saldo del soggiorno ({importo}) online con carta, in modo sicuro: {link_pagamento}"],
+  "mand-tax": ["Ciao {ospite}, puoi pagare la tassa di soggiorno ({importo}) online con carta, in modo sicuro: {link_pagamento}"],
+  "mand-checkout": ["Ciao {ospite}, speriamo che tu abbia passato un bel soggiorno a {struttura}! 😊\n\nTi ricordiamo che il check-out è previsto il {checkout}. Se ti serve qualcosa (ad esempio il deposito bagagli), scrivici pure qui.\n\nSe ti è piaciuto, ci aiuteresti tantissimo lasciando una breve recensione sincera: bastano 30 secondi.\n👉 {link_recensioni}\n\nGrazie di cuore e a presto! 🌊"],
+};
+
+/** Rimette i testi approvati nei 5 modelli obbligatori (anche nelle copie per struttura «<id>@<struttura>») che hanno ancora un testo di partenza. */
+export function restoreApprovedTexts<T extends { id: string; texts?: Record<string, string> }>(saved: T[]): T[] {
+  return saved.map((tp) => {
+    const base = tp.id.split("@")[0];
+    const approved = APPROVED_IT[base]; const olds = OLD_IT[base];
+    if (!approved || !olds || !tp.texts) return tp;
+    const cur = norm(tp.texts.it);
+    if (cur === norm(approved) || !olds.some((o) => norm(o) === cur)) return tp; // già approvato, oppure personalizzato dal titolare: non si tocca
+    return { ...tp, texts: { ...tp.texts, it: approved } } as T;
+  });
+}
+
 /** Aggiunge i modelli dei passaggi obbligatori mancanti (uno per passaggio). */
 export function ensureMandatoryTemplates<T extends { srcId?: string }>(saved: T[]): T[] {
   const have = new Set(saved.map((x) => x.srcId).filter(Boolean));
-  return [...saved, ...(MANDATORY_TEMPLATES.filter((m) => !have.has(m.srcId)) as unknown as T[])];
+  return restoreApprovedTexts([...saved, ...(MANDATORY_TEMPLATES.filter((m) => !have.has(m.srcId)) as unknown as T[])] as unknown as (T & { id: string })[]) as unknown as T[];
 }
 
 /**
@@ -209,7 +244,7 @@ export function ensureMandatoryPerStructure<T extends { srcId?: string; structur
     const have = new Set(saved.filter((x) => x.structureIds?.length === 1 && x.structureIds[0] === sid).map((x) => x.srcId).filter(Boolean));
     for (const m of MANDATORY_TEMPLATES) if (!have.has(m.srcId)) out.push({ ...m, id: `${m.id}@${sid.slice(0, 8)}`, structureIds: [sid] } as unknown as T);
   }
-  return out;
+  return restoreApprovedTexts(out as unknown as (T & { id: string })[]) as unknown as T[]; // anche i modelli già esistenti tornano ai testi approvati se hanno ancora quelli di partenza
 }
 
 /**
