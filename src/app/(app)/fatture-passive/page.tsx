@@ -13,6 +13,7 @@ import { commissionOf } from "@/lib/booking";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
+import FilterSheet from "@/components/FilterSheet";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
@@ -349,11 +350,23 @@ export default function FatturePassivePage() {
     catch (e) { setFic((p) => p && { ...p, msg: friendlyError(e) }); }
   };
 
-  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
   const totEur = (parseEur(edit?.taxableEur ?? "") ?? 0) + (parseEur(edit?.vatEur ?? "") ?? 0);
   const amountBad = !!edit && (parseEur(edit.taxableEur) === null || parseEur(edit.vatEur) === null);
+
+  // Filtri veri: scritti una volta, mostrati inline (tablet/desktop) e nella tendina «Filtri» (telefono)
+  const filterControls = (<>
+    <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+    <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={selCls}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+    <select value={pay} onChange={(e) => setPay(e.target.value)} className={selCls}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
+    <select value={scad} onChange={(e) => setScad(e.target.value as DueFilter)} className={selCls}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option><option value="week">In scadenza entro 7 giorni</option></select>
+    <select value={catF} onChange={(e) => setCatF(e.target.value)} className={selCls}><option value="all">Tutte le categorie</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}<option value="none">Senza categoria</option></select>
+    <select value={supF} onChange={(e) => setSupF(e.target.value)} className={`${selCls} max-w-[200px] max-sm:max-w-none`}><option value="all">Tutti i fornitori</option>{supplierNames.map((n) => <option key={n} value={n}>{n}</option>)}</select>
+  </>);
+  const sheetCount = (year !== new Date().getFullYear() ? 1 : 0) + [tipo, pay, scad, catF, supF].filter((v) => v !== "all").length;
+  const sheetReset = () => { setYear(new Date().getFullYear()); setTipo("all"); setPay("all"); setScad("all"); setCatF("all"); setSupF("all"); };
 
   return (
     <div>
@@ -361,7 +374,7 @@ export default function FatturePassivePage() {
 
       {/* Scadenzario: sempre sui documenti non pagati, a prescindere dai filtri. Clic = filtra l'elenco. */}
       {(due.overdue.count + due.week.count + due.later.count + due.noDate.count) > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 sm:grid-cols-4">
           {([
             ["Scadute", due.overdue, "var(--err)", "overdue"],
             ["Scadono entro 7 giorni", due.week, "var(--warn)", "week"],
@@ -373,38 +386,40 @@ export default function FatturePassivePage() {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 sm:grid-cols-4">
         {[["Imponibile", totals.imp, "var(--dim)"], ["IVA", totals.iva, "var(--dim)"], ["Totale", totals.tot, "var(--txt)"], ["Da pagare", totals.unpaid, totals.unpaid > 0 ? "var(--warn)" : "var(--ok)"]].map(([l, v, c]) => (
           <StatCard key={l as string} label={l as string} value={eur(cents(v as number))} color={c as string} />
         ))}
       </div>
 
-      <Card className="mb-4">
-        {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. */}
-        <div className="grid grid-cols-2 items-center gap-3 sm:grid-cols-4">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria, note…" className="col-span-2 w-full sm:col-span-1" />
-          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-3">
-            <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={selCls}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-            <select value={pay} onChange={(e) => setPay(e.target.value)} className={selCls}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
-            <select value={scad} onChange={(e) => setScad(e.target.value as DueFilter)} className={selCls}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option><option value="week">In scadenza entro 7 giorni</option></select>
-            <select value={catF} onChange={(e) => setCatF(e.target.value)} className={selCls}><option value="all">Tutte le categorie</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}<option value="none">Senza categoria</option></select>
-            <select value={supF} onChange={(e) => setSupF(e.target.value)} className={`${selCls} max-w-[200px]`}><option value="all">Tutti i fornitori</option>{supplierNames.map((n) => <option key={n} value={n}>{n}</option>)}</select>
+      <Card className="mb-4 max-sm:mb-3 max-sm:flex max-sm:flex-wrap max-sm:gap-2 max-sm:!p-3 sm:grid sm:grid-cols-4 sm:items-center sm:gap-3">
+        {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. Telefono: riga 1 = ricerca + «Filtri» + «+ Nuova», riga 2 = Elenco|Riepiloghi + conteggio; i filtri e le azioni stanno nella tendina «Filtri». */}
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria, note…" className="w-full max-sm:min-w-0 max-sm:flex-1 max-sm:basis-0" />
+          <FilterSheet count={sheetCount} onReset={sheetReset}>
+            {filterControls}
+            <div className="flex flex-col gap-2 border-t border-line pt-2">
+              <button onClick={view === "elenco" ? exportCsv : exportSummary} className="h-9 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
+              <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="h-9 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
+              <button onClick={openFic} className="h-9 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
+            </div>
+          </FilterSheet>
+          <button onClick={openNew} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-white hover:opacity-90 sm:hidden">+ Nuova</button>
+          <div className="flex flex-wrap items-center gap-2 max-sm:hidden sm:col-span-3">
+            {filterControls}
             {filtersActive ? <button onClick={resetFilters} className="text-xs font-semibold text-focus hover:underline">Azzera filtri</button> : null}
           </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:basis-full max-sm:flex-nowrap max-sm:justify-between sm:col-span-4">
+          <div className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:shrink-0">
             {(["elenco", "riepiloghi"] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold capitalize transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}</button>
+              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition max-sm:py-2 ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}</button>
             ))}
           </div>
-          <span className="text-xs text-faint">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
-            <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
-            <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
-            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
+          <span className="text-xs text-faint max-sm:shrink-0 max-sm:whitespace-nowrap">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
+            <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
+            <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
+            <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
+            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
           </div>
         </div>
       </Card>

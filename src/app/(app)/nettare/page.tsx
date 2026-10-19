@@ -16,6 +16,7 @@ import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { DEFAULT_STRAT, RISK_PRESET, MONTHS, cellKey, runNettare, applyMod, hasMod, normalizeStrategy, type Cell, type Mod, type Period, type Risk, type Strategy, type Step } from "@/lib/nettare";
 import { effBase, rateForDay, loadWeekendPct } from "@/lib/pricing";
 import ImpactPreview from "@/components/ImpactPreview";
+import FilterSheet from "@/components/FilterSheet";
 import PriceHistoryCard from "@/components/PriceHistoryCard";
 import { simulateImpact } from "@/lib/revenue-impact";
 import { buildChanges, recordBatches } from "@/lib/revenue-history";
@@ -214,12 +215,17 @@ export default function NettarePage() {
     { key: "pub", label: t("Prezzi applicati"), color: "var(--chart-2)", values: previewDates.map((d) => published(pvRt.id, d)) },
   ] : [];
 
+  const scopeChips = (<>
+    <Chip on={scope === "general"} onClick={() => setScope("general")}>{t("Strategia generale")}</Chip>
+    {strat.periods.map((p) => <Chip key={p.id} on={scope === p.id} onClick={() => setScope(p.id)}>{p.name}<span className="ml-1.5 font-normal opacity-70">{fmtShort(p.from)}–{fmtShort(p.to)}</span></Chip>)}
+  </>);
+
   return (
     <div>
       <style>{`:root{--chart-1:#2F6BB0;--chart-2:#C9751A}.dark{--chart-1:#6FA3DC;--chart-2:#D98A3A}`}</style>
       <PageHeader title="Nèttare" subtitle={`${t("Prezzi dinamici")}${city ? ` · ${city}` : ""}`} />
       {activeStructureId === "all" && structures.length > 1 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm max-sm:gap-x-2 max-sm:gap-y-1">
           <span className="text-xs font-semibold text-faint">{t("Struttura")}</span>
           <select value={struct?.id ?? ""} onChange={(e) => setLocalSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -229,18 +235,18 @@ export default function NettarePage() {
       )}
 
       {/* Riepilogo Nèttare */}
-      <div className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>
+      <div className="mt-4 rounded-2xl border border-line p-5 max-sm:mt-3 max-sm:p-4" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-xl border border-line text-xl" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
             <div><div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div><div className="font-display text-xl font-bold tracking-tight text-txt">Nèttare</div></div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div title={stats.potential == null ? t("Serve lo storico delle prenotazioni per stimare.") : `${t("Stima: differenza rispetto alla tariffa di partenza × la tua occupazione storica")} (${Math.round(my.occ * 100)}%)`}><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: (stats.potential ?? 0) > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential == null ? "—" : `${stats.potential > 0 ? "+" : ""}${eur(stats.potential)}`}</div><div className="text-[10px] text-faint">{stats.potential == null ? t("nessuno storico: stima non disponibile") : `${t("stima con occupazione storica")} ${Math.round(my.occ * 100)}%`}</div></div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 max-sm:grid max-sm:w-full max-sm:grid-cols-3 max-sm:gap-x-3 max-sm:gap-y-2">
+            <div className="max-sm:col-span-3" title={stats.potential == null ? t("Serve lo storico delle prenotazioni per stimare.") : `${t("Stima: differenza rispetto alla tariffa di partenza × la tua occupazione storica")} (${Math.round(my.occ * 100)}%)`}><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: (stats.potential ?? 0) > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential == null ? "—" : `${stats.potential > 0 ? "+" : ""}${eur(stats.potential)}`}</div><div className="text-[10px] text-faint">{stats.potential == null ? t("nessuno storico: stima non disponibile") : `${t("stima con occupazione storica")} ${Math.round(my.occ * 100)}%`}</div></div>
             <div><div className="text-[11px] text-faint">{t("Prezzo medio")}</div><div className="font-mono text-lg font-bold text-txt">{eur(stats.avg)}</div></div>
             <div><div className="text-[11px] text-faint">{t("Periodi")}</div><div className="font-mono text-lg font-bold text-txt">{strat.periods.length}</div></div>
             <div><div className="text-[11px] text-faint">{t("Da applicare")}</div><div className="font-mono text-lg font-bold" style={{ color: stats.pending ? "var(--warn)" : "var(--ok)" }}>{stats.pending}</div></div>
-            <button onClick={() => setPreview(true)} disabled={!sTypes.length} className="rounded-full px-5 py-2.5 disabled:opacity-50 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
+            <button onClick={() => setPreview(true)} disabled={!sTypes.length} className="rounded-full px-5 py-2.5 max-sm:col-span-3 max-sm:mt-1 disabled:opacity-50 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]">
@@ -300,18 +306,24 @@ export default function NettarePage() {
 
       {/* Strategia */}
       <Card title={t("Strategia")} desc={t("Una strategia generale e, se vuoi, periodi con regole diverse (es. agosto più aggressivo).")} open={openStrat} onToggle={() => setOpenStrat((v) => !v)}>
-        <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          <Chip on={scope === "general"} onClick={() => setScope("general")}>{t("Strategia generale")}</Chip>
-          {strat.periods.map((p) => <Chip key={p.id} on={scope === p.id} onClick={() => setScope(p.id)}>{p.name}<span className="ml-1.5 font-normal opacity-70">{fmtShort(p.from)}–{fmtShort(p.to)}</span></Chip>)}
+        {/* Strategia generale / periodi: chip inline da sm in su; su telefono dietro un unico pulsante (mostra la strategia attiva) + «Nuovo periodo» */}
+        <div className="mt-4 flex flex-wrap items-center gap-1.5 max-sm:hidden">
+          {scopeChips}
           <button onClick={addPeriod} className="rounded-full border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-dim hover:text-txt max-sm:min-h-10">+ {t("Nuovo periodo")}</button>
+        </div>
+        <div className="mt-4 flex items-center gap-2 sm:hidden">
+          <FilterSheet label={period ? period.name : t("Strategia generale")} count={period ? 1 : 0} onReset={() => setScope("general")} className="min-w-0 max-w-[60%] overflow-hidden">
+            <div className="flex flex-col items-stretch gap-1.5 [&>button]:text-left">{scopeChips}</div>
+          </FilterSheet>
+          <button onClick={addPeriod} className="h-9 shrink-0 rounded-full border border-dashed border-line px-3 text-xs font-semibold text-dim hover:text-txt">+ {t("Nuovo periodo")}</button>
         </div>
 
         {period && (
-          <div className="mt-4 grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-[1fr_auto_auto_auto]" style={{ background: "var(--wash)" }}>
-            <input value={period.name} onChange={(e) => updScope({ name: e.target.value })} className="rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} aria-label={t("Nome periodo")} />
-            <label className="flex items-center gap-1.5 text-xs text-dim">{t("dal")}<DateField value={period.from} onChange={(v) => updScope({ from: v })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt" /></label>
-            <label className="flex items-center gap-1.5 text-xs text-dim">{t("al")}<DateField value={period.to} min={period.from} onChange={(v) => updScope({ to: v })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt" /></label>
-            <button onClick={delPeriod} className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ color: "var(--err)" }}>{t("Elimina")}</button>
+          <div className="mt-4 grid gap-3 rounded-xl border border-line p-3 max-sm:flex max-sm:flex-wrap max-sm:gap-2 sm:grid-cols-[1fr_auto_auto_auto]" style={{ background: "var(--wash)" }}>
+            <input value={period.name} onChange={(e) => updScope({ name: e.target.value })} className="rounded-lg border border-line px-3 py-2 text-sm max-sm:w-[calc(100%-5.5rem)] max-sm:min-w-0" style={{ background: "var(--surface)", color: "var(--txt)" }} aria-label={t("Nome periodo")} />
+            <label className="flex items-center gap-1.5 text-xs text-dim max-sm:order-2 max-sm:w-[calc(50%-0.25rem)] max-sm:min-w-0">{t("dal")}<DateField value={period.from} onChange={(v) => updScope({ from: v })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt max-sm:min-w-0 max-sm:flex-1 max-sm:px-1.5 max-sm:text-[13px]" /></label>
+            <label className="flex items-center gap-1.5 text-xs text-dim max-sm:order-2 max-sm:w-[calc(50%-0.25rem)] max-sm:min-w-0">{t("al")}<DateField value={period.to} min={period.from} onChange={(v) => updScope({ to: v })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt max-sm:min-w-0 max-sm:flex-1 max-sm:px-1.5 max-sm:text-[13px]" /></label>
+            <button onClick={delPeriod} className="rounded-lg px-3 py-2 text-xs font-semibold max-sm:order-1" style={{ color: "var(--err)" }}>{t("Elimina")}</button>
           </div>
         )}
 

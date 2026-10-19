@@ -8,6 +8,7 @@ import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
+import FilterSheet from "@/components/FilterSheet";
 import EmptyState from "@/components/EmptyState";
 import { nights, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -179,6 +180,13 @@ export default function OspitiPage() {
   };
   const SEGMENTS: [string, string][] = [["all", t("Tutti")], ["repeat", t("Abituali")], ["vip", "VIP"], ["new", t("Nuovi")], ["ch:booking", "Booking"], ["ch:airbnb", "Airbnb"], ["ch:direct", t("Diretta")]];
   const selectSegment = () => setSel((prev) => { const n = new Set(prev); guestSorted.forEach((r) => n.add(r.guest.id)); return n; });
+  // Chip dei segmenti e «Seleziona segmento»: scritti una volta, mostrati inline da sm in su e nella tendina «Filtri» su telefono.
+  const segChips = SEGMENTS.map(([k, lab]) => (
+    <button key={k} onClick={() => setSeg(k)} className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition max-sm:h-9 max-sm:py-0 ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
+  ));
+  const segSelectBtn = seg !== "all" && guestSorted.length > 0 && (
+    <button onClick={selectSegment} className="whitespace-nowrap rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">{t("Seleziona segmento")} ({guestSorted.length})</button>
+  );
 
   // Esportazione Excel del registro ospiti con colonne a scelta (stesso segmento visibile).
   const EXPORT_COLUMNS: { key: string; label: string; get: (r: (typeof guestSorted)[number]) => string | number }[] = [
@@ -367,22 +375,26 @@ export default function OspitiPage() {
       )}
 
       {/* Ricerca + segmenti CRM + azioni, tutto in un'unica riga. Stessa griglia dei riepiloghi
-          sopra: la ricerca è larga quanto una card e allineata con essa. */}
-      <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-4">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="col-span-2 w-full sm:col-span-1" />
-        <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-3">
-          <div className="flex items-center gap-1.5 max-sm:-mx-1 max-sm:w-full max-sm:overflow-x-auto max-sm:px-1 max-sm:pb-1 sm:contents [&>button]:shrink-0 [&>button]:whitespace-nowrap">
-          {SEGMENTS.map(([k, lab]) => (
-            <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition max-sm:py-2 ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
-          ))}
-          {seg !== "all" && guestSorted.length > 0 && (
-            <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:py-2">{t("Seleziona segmento")} ({guestSorted.length})</button>
-          )}
-          </div>
-          <div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
-            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:py-0">+ {t("Nuovo ospite")}</button>
-            <button onClick={() => router.push("/promozioni")} aria-label={t("Promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="tag" size={14} /> <span className="max-sm:hidden">{t("Promozioni")}</span></button>
-            <button onClick={() => setExportPick(true)} aria-label="Excel" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="fileText" size={14} /> <span className="max-sm:hidden">Excel</span></button>
+          sopra: la ricerca è larga quanto una card e allineata con essa.
+          Telefono: UNA riga [ricerca][Filtri][+ Nuovo ospite]; segmenti, «Seleziona segmento», Promozioni ed Excel stanno nella tendina «Filtri». */}
+      <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex max-sm:gap-2 sm:grid-cols-4">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="col-span-2 w-full max-sm:min-w-0 max-sm:flex-1 sm:col-span-1" />
+        <FilterSheet count={seg !== "all" ? 1 : 0} onReset={() => setSeg("all")}>
+          {(close) => (<>
+            <div className="flex flex-wrap gap-1.5">{segChips}</div>
+            {segSelectBtn}
+            <div className="flex gap-2">
+              <button onClick={() => router.push("/promozioni")} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-sm font-semibold text-txt hover:bg-wash"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></button>
+              <button onClick={() => { close(); setExportPick(true); }} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-sm font-semibold text-txt hover:bg-wash"><Icon name="fileText" size={14} /> <span>Excel</span></button>
+            </div>
+          </>)}
+        </FilterSheet>
+        <div className="col-span-2 flex flex-wrap items-center gap-1.5 max-sm:contents sm:col-span-3">
+          <div className="contents max-sm:hidden">{segChips}{segSelectBtn}</div>
+          <div className="ml-auto flex items-center gap-2 max-sm:contents">
+            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]">+ {t("Nuovo ospite")}</button>
+            <button onClick={() => router.push("/promozioni")} aria-label={t("Promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:hidden"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></button>
+            <button onClick={() => setExportPick(true)} aria-label="Excel" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:hidden"><Icon name="fileText" size={14} /> <span>Excel</span></button>
           </div>
         </div>
       </div>

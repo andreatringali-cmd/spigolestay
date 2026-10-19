@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
+import FilterSheet from "@/components/FilterSheet";
 import ImpactPreview from "@/components/ImpactPreview";
 import PriceHistoryCard from "@/components/PriceHistoryCard";
 import { simulateImpact } from "@/lib/revenue-impact";
@@ -147,29 +148,32 @@ export default function RevenuePage() {
     );
   }
 
+  // Fonti dati: onesto su cosa è reale ora e cosa arriva (inline da sm in su; su telefono dietro il pulsante «Fonti dati»)
+  const sourceChips = (<>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--ok)" }} />{t("Dati tuoi · occupazione reale dalle prenotazioni")}</span>
+    {signal.hasZoneData
+      ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}{city ? ` · ${city}` : ""}</span>
+      : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
+    {signal.hasZoneData && pulseHasDemo(pulse) && (
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
+    )}
+  </>);
+
   return (
     <div>
       <PageHeader title={t("Revenue · prezzi dinamici")} subtitle={t("Suggerimenti di prezzo in base a occupazione ed eventi")} />
 
-      {/* Fonti dati: onesto su cosa è reale ora e cosa arriva */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px]">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ok)" }} />{t("Dati tuoi · occupazione reale dalle prenotazioni")}</span>
-        {signal.hasZoneData
-          ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}{city ? ` · ${city}` : ""}</span>
-          : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
-        {signal.hasZoneData && pulseHasDemo(pulse) && (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
-        )}
-      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] max-sm:hidden">{sourceChips}</div>
+      <div className="mb-3 flex items-center text-[11px] sm:hidden"><FilterSheet label={t("Fonti dati")}><div className="flex flex-col items-start gap-2 text-[11px]">{sourceChips}</div></FilterSheet></div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 max-sm:mb-3 max-sm:grid-cols-2 sm:grid-cols-3">
         <StatCard label={`${t("Occupazione media")} ${days} ${t("gg")}`} value={`${Math.round(avgOcc * 100)}%`} />
         <StatCard label={t("Camere attive")} value={totalUnits} />
-        <StatCard label={t("Effetto potenziale sulle camere libere")} value={`${impact.net >= 0 ? "+" : "−"}${eur(Math.abs(impact.net))}`} color={impact.net >= 0 ? "var(--ok)" : "var(--warn)"} hint={`${impact.freeNightRooms} ${t("notti-camera libere, se si vendessero tutte")}`} />
+        <div className="max-sm:col-span-2 [&>*]:h-full"><StatCard label={t("Effetto potenziale sulle camere libere")} value={`${impact.net >= 0 ? "+" : "−"}${eur(Math.abs(impact.net))}`} color={impact.net >= 0 ? "var(--ok)" : "var(--warn)"} hint={`${impact.freeNightRooms} ${t("notti-camera libere, se si vendessero tutte")}`} /></div>
       </div>
 
       {/* Confronto con lo stesso periodo dell'anno scorso (dati reali) */}
-      <Card className="mb-5">
+      <Card className="mb-5 max-sm:mb-3">
         <SectionTitle>Confronto con l&apos;anno scorso · stessi {days} giorni (52 settimane prima)</SectionTitle>
         {!yoy.hasHistory ? (
           <p className="text-sm text-faint">Nessuna prenotazione registrata per lo stesso periodo dell&apos;anno scorso: il confronto compare appena c&apos;è storico (importa le prenotazioni passate da Importa).</p>
@@ -203,7 +207,7 @@ export default function RevenuePage() {
       </Card>
 
       {/* Parità canali & vantaggio diretto */}
-      <Card className="mb-5">
+      <Card className="mb-5 max-sm:mb-3">
         <SectionTitle>{t("Parità canali · vantaggio della prenotazione diretta")}</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-3">
           {commissions.map(({ ch, label: name, pct: comm, isReal, n }) => {

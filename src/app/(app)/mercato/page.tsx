@@ -195,11 +195,11 @@ export default function MercatoPage() {
         <p className="mb-2 mt-0.5 text-xs text-dim">{t("Stessi giorni della settimana, 52 settimane prima. Solo dalle tue prenotazioni reali: non dipende dalla rete.")}</p>
         <div className="rounded-2xl border border-line p-4" style={{ background: "var(--surface)" }}>
           {yoyPast && yoyNext && (yoyPast.hasHistory || yoyNext.hasHistory) ? (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 max-sm:grid-cols-2 max-sm:gap-2 sm:grid-cols-3">
               {[{ label: t("Occupazione ultimi") + " " + WINDOW + " " + t("gg"), now: yoyPast.now.occ, ly: yoyPast.lastYear.occ, d: yoyPast.deltaOccPts, ok: yoyPast.hasHistory, kind: "occ" as const },
                 { label: "ADR " + WINDOW + " " + t("gg"), now: yoyPast.now.adr, ly: yoyPast.lastYear.adr, d: yoyPast.deltaAdrPct, ok: yoyPast.hasHistory && yoyPast.lastYear.adr > 0, kind: "adr" as const },
                 { label: t("Occupazione prossimi 30 gg (già a libro)"), now: yoyNext.now.occ, ly: yoyNext.lastYearAtSameDate?.occ ?? yoyNext.lastYear.occ, d: yoyNext.lastYearAtSameDate ? yoyNext.deltaPaceOccPts : yoyNext.deltaOccPts, ok: yoyNext.hasHistory, kind: "occ" as const, pace: !!yoyNext.lastYearAtSameDate }].map((c, i) => (
-                <div key={i} className="rounded-xl border border-line bg-paper p-3">
+                <div key={i} className={`rounded-xl border border-line bg-paper p-3 ${i === 2 ? "max-sm:col-span-2" : ""}`}>
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{c.label}</div>
                   <div className="font-mono text-xl font-bold text-txt">{c.kind === "occ" ? `${Math.round(c.now * 100)}%` : c.now ? eur(Math.round(c.now)) : "—"}</div>
                   {c.ok ? (
@@ -218,16 +218,16 @@ export default function MercatoPage() {
       <section className="mt-4">
         <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
         <p className="mb-2 mt-0.5 text-xs text-dim">{t("Il tuo dato (ultimi 90 giorni) a confronto con la media anonima della città.")}</p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 max-sm:grid-cols-2 max-sm:gap-2 sm:grid-cols-3">
           <StatCard label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} youW={my.occ}
             cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null} cityW={pulse?.occupancy ?? null}
             delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
           <StatCard label="ADR" youStr={my.adr ? eur(Math.round(my.adr)) : "—"} youW={my.adr / adrMax}
             cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null} cityW={pulse?.adr != null ? pulse.adr / adrMax : null}
             delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
-          <StatCard label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} youW={my.revpar / revMax}
+          <div className="max-sm:col-span-2 [&>*]:h-full"><StatCard label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} youW={my.revpar / revMax}
             cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null}
-            delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
+            delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} /></div>
         </div>
       </section>
 
@@ -334,12 +334,12 @@ function StatCard({ label, youStr, youW, cityStr, cityW, delta, unit, shared, en
   const show = shared && enough && cityStr != null;
   const up = (delta ?? 0) >= 0;
   return (
-    <div className="rounded-2xl border border-line p-4" style={{ background: "var(--surface)" }}>
-      <div className="flex items-center justify-between">
+    <div className="rounded-2xl border border-line p-4 max-sm:p-3" style={{ background: "var(--surface)" }}>
+      <div className="flex items-center justify-between gap-1">
         <span className="text-xs font-medium text-dim">{label}</span>
         {show && delta != null && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ color: up ? "var(--ok)" : "var(--err)", background: up ? "color-mix(in srgb,var(--ok) 12%,transparent)" : "color-mix(in srgb,var(--err) 12%,transparent)" }}>{up ? "▲ +" : "▼ "}{unit === "€" ? eur(delta) : `${Math.abs(delta)} pt`}</span>}
       </div>
-      <div className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-txt">{youStr}</div>
+      <div className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-txt max-sm:text-2xl">{youStr}</div>
       <div className="relative mt-3 h-2 rounded-full" style={{ background: "var(--wash)" }}>
         <div className="absolute left-0 top-0 h-2 rounded-full" style={{ width: `${clamp(youW, 0, 1) * 100}%`, background: "var(--focus)" }} />
         {show && cityW != null && <div className="absolute -top-1 h-4 w-0.5 rounded" style={{ left: `${clamp(cityW, 0, 1) * 100}%`, background: "var(--faint)" }} title={t("media città")} />}

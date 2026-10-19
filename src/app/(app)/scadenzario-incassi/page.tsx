@@ -93,7 +93,7 @@ export default function ScadenzarioIncassiPage() {
   const overdueTot = all.filter((r) => r.days > 0).reduce((a, r) => a + r.residuo, 0);
   const byBucket = (k: AgingKey) => all.filter((r) => r.bucket === k).reduce((a, r) => a + r.residuo, 0);
   const shownTot = rows.reduce((a, r) => a + r.residuo, 0);
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
 
   const nameOf = (r: Doc) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
   // Contatti: dall'ospite della prenotazione collegata (telefono) o dall'intestatario (email salvata nel documento).
@@ -173,9 +173,9 @@ export default function ScadenzarioIncassiPage() {
   return (
     <div>
       <PageHeader title="Scadenzario incassi" subtitle="Documenti emessi ancora da incassare, per scadenza"
-        actions={<button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Esporta CSV</button>} />
+        actions={<button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50 max-sm:hidden">Esporta CSV</button>} />
 
-      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-3 grid grid-cols-2 gap-3 max-sm:gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Totale da incassare" value={eur(cents(totalOpen))} hint={`${all.length} documenti`} onClick={() => setBucket("all")} active={bucket === "all"} />
         <StatCard label="Di cui scaduto" value={eur(cents(overdueTot))} color={overdueTot > 0 ? "var(--err)" : "var(--ok)"} onClick={() => setBucket("overdue")} active={bucket === "overdue"} />
         {BUCKETS.filter((k) => k !== "nodue" || byBucket("nodue") > 0).map((k) => (
@@ -183,14 +183,18 @@ export default function ScadenzarioIncassiPage() {
         ))}
       </div>
 
-      <Card className="mb-4">
+      <Card className="mb-4 max-sm:mb-3 max-sm:!p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, prenotazione…" />
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, prenotazione…" className="w-full sm:w-72 max-sm:w-[calc(100%-5rem)]" />
+          <button onClick={exportCsv} disabled={rows.length === 0} className="h-9 w-[4.5rem] shrink-0 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash disabled:opacity-50 sm:hidden">CSV</button>
+          {/* Telefono: un solo filtro (la select) resta inline accanto al conteggio, senza pulsante né scorrimento */}
+          <div className="contents">
           <select value={bucket} onChange={(e) => setBucket(e.target.value as AgingKey | "all" | "overdue")} className={sel}>
             <option value="all">Tutti da incassare</option><option value="overdue">Solo scaduti</option>
             {BUCKETS.map((k) => <option key={k} value={k}>{AGING_LABEL[k]}</option>)}
           </select>
-          <span className="ml-auto text-xs text-dim">{rows.length} documenti · <b className="font-mono text-txt">{eur(cents(shownTot))}</b></span>
+          <span className="ml-auto text-xs text-dim max-sm:shrink-0 max-sm:whitespace-nowrap">{rows.length} documenti · <b className="font-mono text-txt">{eur(cents(shownTot))}</b></span>
+          </div>
         </div>
         {err && <p className="mt-2 text-sm text-[color:var(--err)]">{err}</p>}
         {ficNote && <p className="mt-2 text-[11px] font-medium" style={{ color: ficNote.ok ? "var(--ok)" : "var(--dim)" }}>{ficNote.text}</p>}

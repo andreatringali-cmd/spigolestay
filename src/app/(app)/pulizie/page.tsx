@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
+import FilterSheet from "@/components/FilterSheet";
 import Icon from "@/components/Icon";
 import Popover from "@/components/Popover";
 import { WhatsAppIcon, MailIcon, PdfIcon } from "@/components/BrandIcons";
@@ -444,16 +445,16 @@ export default function PuliziePage() {
       {issueSaveErr && !issueDraft && <div role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-[color:var(--err)] px-3 py-2 text-xs text-[color:var(--err)]" style={{ backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}><span className="flex-1">{issueSaveErr}</span><button onClick={() => setIssueSaveErr("")} className="font-bold">✕</button></div>}
 
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:w-full">
+      <div className="mb-4 flex flex-wrap items-center gap-3 max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-2">
+        <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:min-w-0 max-sm:flex-1">
           {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["checklist", "Checklist"]] as ["planning" | "scorte" | "checklist", string][]).map(([v, lab]) => (
-            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:px-2 ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
-              <Icon name={v === "planning" ? "sparkles" : v === "checklist" ? "menu" : "clipboard"} size={15} /> {t(lab)}
+            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-[13px] ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
+              <span className="max-sm:hidden"><Icon name={v === "planning" ? "sparkles" : v === "checklist" ? "menu" : "clipboard"} size={15} /></span> {t(lab)}
               {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[10px] font-bold text-white">{shopList.length}</span>}
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-3 max-sm:w-full max-sm:justify-end"><WeatherWidget compact /><PageHelp /></div>
+        <div className="ml-auto flex shrink-0 items-center gap-3"><WeatherWidget compact /><PageHelp /></div>
       </div>
 
       {tab === "checklist" ? <AddettaView /> : tab === "scorte" ? (
@@ -506,19 +507,30 @@ export default function PuliziePage() {
             </div>
           </div>
           {/* Riga filtri Prodotti — riga 1 col sinistra (order 1) */}
-          <div className="order-1 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+          {(() => {
+            const segs = (cls: string, bcls: string) => (
+              <div className={cls}>
+                {([["all", "Tutti", stockCounts.all], ["ok", "Disponibili", stockCounts.ok], ["low", "In esaurimento", stockCounts.low], ["out", "Esauriti", stockCounts.out]] as ["all" | StockStatus, string, number][]).map(([k, lab, n], i) => (
+                  <button key={k} onClick={() => setProdFilter(k)} className={`${bcls} ${prodFilter === k ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(lab)} <span className={prodFilter === k ? "opacity-90" : "text-faint"}>{n}</span></button>
+                ))}
+              </div>
+            );
+            return (
+          <div className="order-1 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:flex-nowrap max-sm:gap-2 max-sm:p-2">
             <div className="relative min-w-0 flex-1 sm:max-w-xs">
               <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
               <input value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} placeholder={t("Cerca prodotto…")} className="w-full rounded-lg border border-line bg-paper py-1.5 pl-8 pr-7 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
               {prodSearch && <button onClick={() => setProdSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-dim hover:text-txt">✕</button>}
             </div>
-            <div className="flex items-center overflow-hidden rounded-lg border border-line">
-              {([["all", "Tutti", stockCounts.all], ["ok", "Disponibili", stockCounts.ok], ["low", "In esaurimento", stockCounts.low], ["out", "Esauriti", stockCounts.out]] as ["all" | StockStatus, string, number][]).map(([k, lab, n], i) => (
-                <button key={k} onClick={() => setProdFilter(k)} className={`px-3 py-1.5 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${prodFilter === k ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(lab)} <span className={prodFilter === k ? "opacity-90" : "text-faint"}>{n}</span></button>
-              ))}
-            </div>
-            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
+            {/* Desktop/tablet: segmenti inline come sempre · Telefono: nella tendina «Filtri» */}
+            {segs("flex items-center overflow-hidden rounded-lg border border-line max-sm:hidden", "px-3 py-1.5 text-xs font-semibold transition [&:not(:first-child)]:border-l [&:not(:first-child)]:border-line")}
+            <FilterSheet count={prodFilter !== "all" ? 1 : 0} onReset={() => setProdFilter("all")}>
+              {segs("grid grid-cols-2 gap-1.5", "h-9 rounded-lg border border-line px-2 text-xs font-semibold transition")}
+            </FilterSheet>
+            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:ml-0 max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
           </div>
+            );
+          })()}
 
           {/* Inventario prodotti — riga 2 col sinistra (order 2 mobile / 3 desktop) */}
           <div className="order-2 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-3 lg:flex lg:h-[34rem] lg:flex-col">
@@ -547,7 +559,7 @@ export default function PuliziePage() {
       ) : (<>
 
       {/* Card riepilogo — cliccabili per filtrare (stessa grafica delle altre pagine) */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:grid-cols-4 max-sm:gap-1.5 sm:grid-cols-4">
         {([
           { key: "dafare", label: "Da fare", count: toClean.length, color: "var(--txt)" },
           { key: "riassetto", label: "Riassetti", count: counts.riassetto, color: ACT.riassetto.color },
@@ -559,11 +571,11 @@ export default function PuliziePage() {
             <button
               key={c.key}
               onClick={() => setActionFilter((f) => (f === c.key ? "tutte" : c.key))}
-              className={`anim-in w-full rounded-xl border bg-surface p-4 text-left shadow-sm transition-transform hover:-translate-y-0.5 ${on ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line"}`}
+              className={`anim-in w-full rounded-xl border bg-surface p-4 text-left shadow-sm transition-transform hover:-translate-y-0.5 max-sm:min-w-0 max-sm:px-2 max-sm:py-2 ${on ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line"}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-dim">{t(c.label)}</span>
-                <Icon name={on ? "eye" : "chevron"} size={13} />
+                <span className="text-xs font-medium uppercase tracking-wide text-dim max-sm:text-[10px] max-sm:tracking-normal">{t(c.label)}</span>
+                <span className="max-sm:hidden"><Icon name={on ? "eye" : "chevron"} size={13} /></span>
               </div>
               <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color: c.color }}>{c.count}</div>
             </button>
@@ -572,7 +584,7 @@ export default function PuliziePage() {
       </div>
 
       {/* Carico biancheria del giorno + data e riepilogo a destra */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:gap-x-3 max-sm:gap-y-1 max-sm:p-2.5">
         {toClean.length > 0 && (
           <>
             <span className="flex items-center gap-1.5 text-sm font-bold text-txt"><Icon name="bed" size={16} /> {t("Carico biancheria")}</span>
@@ -582,63 +594,80 @@ export default function PuliziePage() {
             <span className="hidden self-stretch border-l border-line sm:block" />
             <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("di cui")}</span>
             {([["Matrimoniali", linen.matr], ["Singole", linen.sing], ["Federe", linen.federe], ["Asciugamani · set", linen.towels], ["Tappetini bagno", linen.mats]] as [string, number][]).map(([lab, v]) => (
-              <span key={lab} className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt">{v}</span><span className="text-xs text-dim">{t(lab)}</span></span>
+              <span key={lab} className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt max-sm:text-base">{v}</span><span className="text-xs text-dim">{t(lab)}</span></span>
             ))}
           </>
         )}
         {/* Data del giorno + contatore pulizie (spostati qui dalla riga filtri) */}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:order-first max-sm:ml-0 max-sm:w-full">
           <span className="text-sm font-semibold capitalize text-txt">{fmtLong(date)}</span>
           <span className="rounded-full bg-wash px-3 py-1 text-xs font-semibold text-txt">{toClean.length} {t("da fare")} · {remaining} {t("rimaste")}</span>
         </div>
       </div>
 
-      {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {activeStructureId === "all" && (
-          <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:w-full">
+      {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi.
+          Telefono: [‹ data ›] [Filtri] [Condividi]; struttura, Oggi, vista e invio programmato stanno nella tendina «Filtri». */}
+      {(() => {
+        const structSel = activeStructureId === "all" && (
+          <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
           </select>
-        )}
-        <div className="flex w-full items-center gap-2 sm:contents">
-        <div className="flex min-w-0 items-center gap-1 max-sm:flex-1">
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9">‹</button>
-          <div className="min-w-0 sm:flex-none max-sm:flex-1"><DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:w-full max-sm:justify-between max-sm:py-0" /></div>
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9">›</button>
-        </div>
-        <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:contents">
-        <div className="flex items-center rounded-lg border border-line p-0.5">
-          <Seg v="cards" icon="grid" title={t("Vista card")} />
-          <Seg v="rows" icon="menu" title={t("Vista lista")} />
-        </div>
-        {view === "rows" && (<>
+        );
+        const oggiBtn = <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>;
+        const vistaCtl = (<>
           <div className="flex items-center rounded-lg border border-line p-0.5">
-            {(["3", "7", "14"] as const).map((n) => (
-              <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
-            ))}
+            <Seg v="cards" icon="grid" title={t("Vista card")} />
+            <Seg v="rows" icon="menu" title={t("Vista lista")} />
           </div>
-          <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
-        </>)}
-        <div className="relative ml-auto flex items-center gap-2">
-          {copied && <span className="text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
-          <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+          {view === "rows" && (<>
+            <div className="flex items-center rounded-lg border border-line p-0.5">
+              {(["3", "7", "14"] as const).map((n) => (
+                <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
+              ))}
+            </div>
+            <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
+          </>)}
+        </>);
+        const nFilt = structFilter !== "all" ? 1 : 0;
+        return (
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:p-1.5">
+        <div className="contents max-sm:hidden">{structSel}</div>
+        <div className="flex min-w-0 items-center gap-1 max-sm:shrink-0 max-sm:gap-0.5">
+          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">‹</button>
+          <div className="min-w-0 sm:flex-none"><DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:justify-between max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px]" /></div>
+          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">›</button>
+        </div>
+        <div className="contents max-sm:hidden">{oggiBtn}{vistaCtl}</div>
+        <div className="ml-auto sm:hidden">
+          <FilterSheet count={nFilt} onReset={() => setStructFilter("all")} className="max-sm:px-2">
+            {structSel}
+            <div className="flex flex-wrap items-center gap-2">{oggiBtn}{vistaCtl}</div>
+            <button
+              onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
+              disabled={!autoShareStructure}
+              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-line text-sm text-dim hover:bg-wash disabled:opacity-40"
+            ><Icon name="clock" size={16} /> {t("Invio programmato")}</button>
+          </FilterSheet>
+        </div>
+        <div className="relative flex items-center gap-2 sm:ml-auto max-sm:shrink-0">
+          {copied && <span className="text-xs font-medium text-[color:var(--ok)] max-sm:hidden">{t("Copiato ✓")}</span>}
+          <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:px-2 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
           <button
             onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
             disabled={!autoShareStructure}
             aria-label={t("Invio programmato")}
             title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-sm:hidden"
           ><Icon name="clock" size={16} /></button>
           <Popover open={planShare} anchorRef={planShareBtnRef} onClose={() => setPlanShare(false)} align="end" width={176} label={t("Condividi")}>
             <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
             <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
           </Popover>
         </div>
-        </div>
       </div>
+        );
+      })()}
       {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} onClose={() => setAutoOpen(false)} />}
 
       {/* Segnalazioni aperte dalla signora */}
@@ -696,7 +725,7 @@ export default function PuliziePage() {
       )}
 
       {/* Didascalia colori: cosa significa ogni colore nel planning sotto. */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim">
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim max-sm:mb-3 max-sm:gap-x-3 max-sm:px-2.5 max-sm:py-1.5">
         {(Object.keys(ACT) as ActionKey[]).map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cleanBar(k) }} />

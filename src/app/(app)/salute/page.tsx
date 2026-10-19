@@ -58,7 +58,7 @@ export default function SalutePage() {
       {err && <Card className="mb-4"><p className="text-sm" style={{ color: "var(--err)" }}>{err}</p></Card>}
 
       {s && (
-        <div className="mb-5 flex items-center gap-4 rounded-xl border bg-surface p-4 shadow-sm sm:p-5" style={{ borderColor: COLOR[s.light], borderLeftWidth: 6 }}>
+        <div className="mb-5 flex items-center gap-4 rounded-xl border bg-surface p-4 shadow-sm max-sm:mb-3 max-sm:gap-3 max-sm:p-3 sm:p-5" style={{ borderColor: COLOR[s.light], borderLeftWidth: 6 }}>
           <Dot light={s.light} size={20} />
           <div className="min-w-0">
             <div className="font-display text-xl font-bold text-txt">{s.headline}</div>
@@ -69,7 +69,7 @@ export default function SalutePage() {
 
       {!s && !err && <Card><p className="text-sm text-dim">Controllo in corso…</p></Card>}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 max-sm:gap-3 lg:grid-cols-2">
         {data?.sections.map((sec) => (
           <Card key={sec.id}>
             <SectionTitle>{sec.title}</SectionTitle>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -13,6 +13,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import SearchInput from "@/components/SearchInput";
+import Popover from "@/components/Popover";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
@@ -37,6 +38,22 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
         {children}
       </div>
+    </div>
+  );
+}
+
+// Telefono: pulsante unico «+ Aggiungi» con tendina (Camera / Tipologia), ancorato al pulsante. Da sm in su non c'è (restano i due pulsanti nella barra).
+function AddMenu({ onRoom, onType }: { onRoom: () => void; onType: () => void }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="sm:hidden">
+      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-focus px-3 text-sm font-semibold text-white hover:opacity-90">+ {t("Aggiungi")}</button>
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align="end" width={200} label={t("Aggiungi")}>
+        <button type="button" onClick={() => { setOpen(false); onRoom(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Camera")}</button>
+        <button type="button" onClick={() => { setOpen(false); onType(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Tipologia")}</button>
+      </Popover>
     </div>
   );
 }
@@ -214,11 +231,13 @@ export default function CamerePage() {
           };
           // Filtri camere: ricerca + azioni, sempre sotto le card Tipologie.
           const filtriRow = () => (
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-              <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-auto sm:flex-1" />
-              <div className="ml-auto flex items-center gap-2">
-                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:min-h-10">{t("+ Tipologia")}</button>
-                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">{t("+ Camera")}</button>
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm max-sm:mb-2 max-sm:flex-nowrap">
+              <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-auto sm:flex-1 max-sm:min-w-0 max-sm:flex-1" />
+              <div className="ml-auto flex items-center gap-2 max-sm:shrink-0">
+                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:hidden">{t("+ Tipologia")}</button>
+                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 whitespace-nowrap max-sm:hidden">{t("+ Camera")}</button>
+                {/* Telefono: UN solo «+ Aggiungi» che apre la scelta Camera / Tipologia */}
+                <AddMenu onRoom={() => addRoom(s.id, sUnits.length)} onType={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} />
               </div>
             </div>
           );
@@ -232,7 +251,7 @@ export default function CamerePage() {
               </div>
 
               {/* Statistiche */}
-              <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mb-3 grid grid-cols-2 gap-3 max-sm:gap-2 sm:grid-cols-4">
                 {([["Camere", sUnits.length], ["Tipologie", types.filter((rt) => !rt.deriveFrom).length], ["Posti letto", beds], ["Fuori servizio", oos]] as [string, number][]).map(([k, v]) => (
                   <StatCard key={k} label={t(k)} value={v} />
                 ))}
@@ -243,7 +262,7 @@ export default function CamerePage() {
               {(<>
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
-              <div className="mb-4 grid grid-cols-1 gap-2 sm:auto-rows-fr sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mb-4 grid grid-cols-1 gap-2 sm:auto-rows-fr sm:grid-cols-2 lg:grid-cols-4 max-sm:mb-3 max-sm:grid-cols-2 max-sm:gap-2">
                 {types.map((rt, i) => {
                   if (rt.deriveFrom) return null; // le derivate stanno nella tabella "Tariffe derivate"
                   const color = typeColor(rt, colorIdx(rt));
@@ -251,8 +270,8 @@ export default function CamerePage() {
                   return (
                     <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} draggable onDragStart={(e) => { setDragTypeId(rt.id); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => { if (dragTypeId && dragTypeId !== rt.id) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); reorderType(types.filter((x) => !x.deriveFrom), rt.id); }} onDragEnd={() => setDragTypeId(null)} title={t("Trascina per cambiare l'ordine delle tipologie")} className={`${dragTypeId === rt.id ? "opacity-40 " : ""}cursor-grab group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}>
                       <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: color }} />
-                      <div className="flex flex-1 flex-col p-3">
-                        <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-1 flex-col p-3 max-sm:p-2.5">
+                        <div className="flex items-start justify-between gap-x-2 max-sm:flex-wrap">
                           <div className="font-semibold text-txt">{rt.name}</div>
                           <div className="shrink-0 whitespace-nowrap font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
                         </div>

@@ -39,7 +39,7 @@ export default function BookingEngineHub() {
   const childrenOk = types.some((rt) => rt.childrenAllowed !== false);
 
   const Tile = ({ icon, tint, title, desc, value, action, onClick }: { icon: string; tint: string; title: string; desc: string; value: string; action: string; onClick: () => void }) => (
-    <Card className="group flex flex-col">
+    <Card className="group flex flex-col max-sm:p-3">
       <div className="flex items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ backgroundColor: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint }}>
           <Icon name={icon} size={18} />
@@ -49,8 +49,8 @@ export default function BookingEngineHub() {
           <p className="mt-0.5 text-xs leading-snug text-dim">{desc}</p>
         </div>
       </div>
-      <div className="mt-3 flex-1 rounded-lg bg-wash px-3 py-2 text-sm text-txt">{value}</div>
-      <button onClick={onClick} className="mt-3 inline-flex items-center gap-1 self-start text-xs font-semibold transition group-hover:gap-1.5 max-sm:py-3" style={{ color: tint }}>
+      <div className="mt-3 flex-1 rounded-lg bg-wash px-3 py-2 text-sm text-txt max-sm:mt-2 max-sm:py-1.5">{value}</div>
+      <button onClick={onClick} className="mt-3 inline-flex items-center gap-1 self-start text-xs font-semibold transition group-hover:gap-1.5 max-sm:mt-0 max-sm:min-h-9 max-sm:py-2" style={{ color: tint }}>
         {action} <span aria-hidden>→</span>
       </button>
     </Card>
@@ -65,7 +65,7 @@ export default function BookingEngineHub() {
       {/* Ordine delle card = ordine delle voci "Booking Engine" nella sidebar (vedi nav.ts):
           Widget sito, Xenosite, Promozioni, Upselling, Guida ospiti prima; le due impostazioni
           che vivono altrove (Camere, Strutture) in coda, non essendo voci di questo gruppo. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-sm:gap-2.5">
         <Tile icon="eye" tint="#0E7C66" title="Widget del sito" desc="Il modulo di prenotazione da incollare sul tuo sito." value="Layout, tema, CSS" action="Apri Widget" onClick={() => router.push("/widget")} />
         <Tile icon="fileText" tint="#C08A3A" title="Testi e contenuti" desc="Sottotitolo, foto, sezioni e lingue del mini-sito." value={tagline ? `"${tagline}"` : "Sottotitolo non impostato"} action="Apri Xenosite" onClick={() => router.push("/sito")} />
         <Tile icon="tag" tint="#5B74E6" title="Sconti e offerte" desc="Codici sconto e promozioni mostrati nel motore e nel Xenosite." value={promoCount > 0 ? `${promoCount} offerte attive` : "Nessuna offerta attiva"} action="Gestisci promozioni" onClick={() => router.push("/promozioni")} />

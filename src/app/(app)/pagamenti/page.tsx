@@ -59,19 +59,19 @@ export default function PagamentiPage() {
 
   return (
     <div>
-      <PageHeader title={t("Incassi")} subtitle={t("Incassato, acconti e saldi in sospeso · sessione separata dagli statistici")} actions={<ExportMenu onExcel={doExcel} onPdf={exportPdf} />} />
+      <PageHeader title={t("Incassi")} subtitle={t("Incassato, acconti e saldi in sospeso · sessione separata dagli statistici")} actions={<span className="max-sm:hidden"><ExportMenu onExcel={doExcel} onPdf={exportPdf} /></span>} />
 
       {/* KPI */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 lg:grid-cols-4">
         <Kpi label={t("Totale atteso")} value={eur(sumDue)} color="var(--txt)" />
-        <Card className="!p-4">
+        <Card className="!p-4 max-sm:!p-3">
           <div className="text-xs font-medium uppercase tracking-wide text-dim">{t("Incassato")}</div>
           <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(sumPaid)}</div>
           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: "var(--ok)" }} /></div>
           <div className="mt-0.5 text-[11px] text-faint">{pct}% {t("del totale")}</div>
         </Card>
         <Kpi label={t("In sospeso")} value={eur(sumBalance)} color="var(--warn)" />
-        <button onClick={() => setFilter("overdue")} className="anim-in rounded-xl border p-4 text-left shadow-sm transition hover:shadow-md" style={{ borderColor: sumOverdue > 0 ? "var(--err)" : "var(--line)" }}>
+        <button onClick={() => setFilter("overdue")} className="anim-in rounded-xl border p-4 text-left shadow-sm transition hover:shadow-md max-sm:p-3" style={{ borderColor: sumOverdue > 0 ? "var(--err)" : "var(--line)" }}>
           <div className="text-xs font-medium uppercase tracking-wide text-dim">{t("Scaduti")}</div>
           <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color: sumOverdue > 0 ? "var(--err)" : "var(--txt)" }}>{eur(sumOverdue)}</div>
           <div className="mt-0.5 text-[11px] text-faint">{t("saldo non incassato, ospite già partito")}</div>
@@ -79,15 +79,16 @@ export default function PagamentiPage() {
       </div>
 
       {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. */}
-      <div className="mb-4 grid grid-cols-2 items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:grid-cols-4">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca ospite o codice…")} className="col-span-2 w-full lg:col-span-1" />
-        <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
-          <div className="flex items-center rounded-lg border border-line p-0.5">
+      <div className="mb-4 grid grid-cols-2 items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex max-sm:flex-wrap max-sm:gap-2 lg:grid-cols-4">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca ospite o codice…")} className="col-span-2 w-full max-sm:w-[calc(100%-3.5rem)] lg:col-span-1" />
+        <div className="shrink-0 sm:hidden"><ExportMenu onExcel={doExcel} onPdf={exportPdf} /></div>
+        <div className="col-span-2 flex flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-nowrap lg:col-span-3">
+          <div className="flex shrink-0 items-center rounded-lg border border-line p-0.5">
             {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
+              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 max-sm:px-2.5 max-sm:py-2.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
             ))}
           </div>
-          <span className="ml-auto text-xs text-faint">{rows.length} {t("prenotazioni")}</span>
+          <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-faint">{rows.length} {t("prenotazioni")}</span>
         </div>
       </div>
 
@@ -190,7 +191,7 @@ function PaidCell({ paid, due, onCommit, className = "w-24" }: { paid: number; d
 
 function Kpi({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="anim-in rounded-xl border border-line bg-surface p-4 shadow-sm">
+    <div className="anim-in rounded-xl border border-line bg-surface p-4 shadow-sm max-sm:p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-dim">{label}</div>
       <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color }}>{value}</div>
     </div>

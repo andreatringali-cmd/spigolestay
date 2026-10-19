@@ -8,6 +8,7 @@ import { CHANNELS } from "@/lib/types";
 import { RATEMODEL_DEF, RATEMODEL_KEY, parseRateModel, type RatePlanDef, type SingleDiscount } from "@/lib/rate-model";
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
+import { isSyncKey } from "@/lib/sync-core";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import AdsSettingsCard from "@/components/AdsSettingsCard";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -156,7 +157,7 @@ export default function ImpostazioniPage() {
   // Backup: esporta/importa tutte le chiavi "spigolestay:*".
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState("");
-  const keysOf = () => kvKeys().filter((k) => k.startsWith("spigolestay:"));
+  const keysOf = () => kvKeys().filter((k) => k.startsWith("spigolestay:") && isSyncKey(k)); // senza i marcatori per-dispositivo (proprietario dei dati locali, base di sync): non vanno nei backup né tornare da un backup
   const doExport = () => {
     const dump: Record<string, string> = {};
     keysOf().forEach((k) => { dump[k] = kvGet(k)!; });
@@ -171,7 +172,7 @@ export default function ImpostazioniPage() {
         const parsed = JSON.parse(String(r.result));
         const data = (parsed.data ?? parsed) as Record<string, unknown>;
         let n = 0;
-        Object.entries(data).forEach(([k, v]) => { if (k.startsWith("spigolestay:")) { kvSet(k, typeof v === "string" ? v : JSON.stringify(v)); n++; } });
+        Object.entries(data).forEach(([k, v]) => { if (k.startsWith("spigolestay:") && isSyncKey(k)) { kvSet(k, typeof v === "string" ? v : JSON.stringify(v)); n++; } });
         setMsg(`${t("Ripristinati")} ${n} ${t("blocchi di dati. Ricarico…")}`); setTimeout(() => { void kvFlush().then(() => location.reload()); }, 900);
       } catch { setMsg(t("File di backup non valido.")); }
     };

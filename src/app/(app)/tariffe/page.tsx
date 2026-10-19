@@ -224,7 +224,7 @@ export default function TariffePage() {
         title={t("Tariffe")}
         subtitle={t("Come si forma il prezzo e come lo vendi — prezzi base, regole e piani tariffari")}
         actions={activeStructureId === "all" ? (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:py-1 max-sm:text-[13px]">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
           </select>
@@ -233,15 +233,15 @@ export default function TariffePage() {
 
       {/* Come nasce il prezzo — catena essenziale, un colore diverso per passaggio invece di
           quattro pillole grigie identiche: si legge come un percorso, non come un elenco piatto. */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm">
-        <span className="mr-1 font-semibold uppercase tracking-wide text-faint">{t("Come nasce il prezzo")}</span>
+      <div className="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm max-sm:mb-3 max-sm:gap-x-1 max-sm:gap-y-1 max-sm:px-2.5 max-sm:py-1.5">
+        <span className="mr-1 shrink-0 font-semibold uppercase tracking-wide text-faint max-sm:hidden">{t("Come nasce il prezzo")}</span>
         {([
           [t("Prezzo base"), "#5B74E6"],
           [t("Regola weekend"), "#C08A3A"],
           [t("Prezzo del giorno"), "#4F8A5B"],
           [t("Piano tariffario"), "#B3453A"],
         ] as const).map(([h, col], i, arr) => (
-          <span key={h} className="flex items-center gap-1.5">
+          <span key={h} className="flex shrink-0 items-center gap-1.5">
             <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: col }}>{h}</span>
             {i < arr.length - 1 && <span className="text-faint">→</span>}
           </span>
@@ -250,7 +250,7 @@ export default function TariffePage() {
 
       {/* Prezzi base — un box per struttura quando la vista è "tutte le strutture", una tabella
           sola quando ne è selezionata una: evita di dover leggere l'etichetta struttura riga per riga. */}
-      <section className="mb-6">
+      <section className="mb-6 max-sm:mb-4">
         <SectionTitle>{t("Prezzi base")}</SectionTitle>
 
         {(() => {
@@ -310,7 +310,7 @@ export default function TariffePage() {
       </section>
 
       {/* Maggiorazione weekend */}
-      <section className="mb-6">
+      <section className="mb-6 max-sm:mb-4">
         <SectionTitle>{t("Maggiorazione weekend")}</SectionTitle>
         <Card>
           <div className="flex flex-wrap items-center gap-3">
@@ -328,12 +328,12 @@ export default function TariffePage() {
       <section>
         <SectionTitle>{t("Anteprima prezzi")}</SectionTitle>
         {/* Legenda + azioni: tutto in un'unica riga */}
-        <div className="mb-2.5 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm">
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
-          <span className="flex items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
+        <div className="mb-2.5 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm max-sm:gap-x-3 max-sm:gap-y-1.5 max-sm:px-2.5 max-sm:py-2">
+          <span className="flex shrink-0 items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
+          <span className="flex shrink-0 items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
+          <span className="flex shrink-0 items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
+          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2 max-sm:ml-0 max-sm:w-full max-sm:shrink">
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:w-full max-sm:py-1 max-sm:text-[13px]">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
           </div>
         </div>
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">

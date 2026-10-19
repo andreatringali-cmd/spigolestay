@@ -8,6 +8,7 @@ import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
 import SearchInput from "@/components/SearchInput";
+import FilterSheet from "@/components/FilterSheet";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
@@ -664,6 +665,40 @@ export default function RecensioniPage() {
   };
   const star = (rating: number) => "★".repeat(Math.round(rating / 2)) + "☆".repeat(5 - Math.round(rating / 2));
   const color = (b: string) => (b === "pos" ? "var(--ok)" : b === "neu" ? "var(--warn)" : "var(--err)");
+  // Ordina + conteggio + azzera + CSV: da sm in poi stanno sulla riga della ricerca; su telefono l'ordinamento e il CSV stanno nella tendina «Filtri»
+  const sortSelect = (
+    <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-faint">Ordina
+      <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-semibold text-txt outline-none focus:border-focus max-sm:h-9 max-sm:flex-1 max-sm:py-0 max-sm:text-[13px]">
+        <option value="new">Più recenti</option><option value="old">Più vecchie</option><option value="low">Voto più basso</option><option value="high">Voto più alto</option>
+      </select>
+    </label>
+  );
+  const filterTail = (<>
+    {sortSelect}
+    <span className="shrink-0 whitespace-nowrap text-[11px] text-faint">{shown.length} di {reviews.length}</span>
+    {filtersActive && <button onClick={resetFilters} className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-focus hover:underline">Azzera filtri</button>}
+    <button onClick={exportCsv} disabled={!shown.length} className="ml-auto shrink-0 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
+  </>);
+  // Chip dei filtri: scritti una volta, mostrati nella barra (da sm in poi) e nella tendina «Filtri» (telefono)
+  const fonteChips = (<>
+    <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
+    {connectedSources.map((c) => (
+      <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
+    ))}
+  </>);
+  const votoChips = (<>
+    {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
+      <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
+    ))}
+  </>);
+  const rispChips = (<>
+    {([["all", "Tutte"], ["todo", `Da rispondere (${unanswered})`], ["done", "Risposte"]] as const).map(([k, label]) => (
+      <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${replyFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
+    ))}
+  </>);
+  // Telefono: filtri attivi = fonte, voto, risposta, ordinamento diversi dal valore di partenza (la ricerca resta visibile in riga)
+  const phoneFilterCount = (filter !== "all" ? 1 : 0) + (ratingFilter !== "all" ? 1 : 0) + (replyFilter !== "all" ? 1 : 0) + (sortBy !== "new" ? 1 : 0);
+  const resetPhoneFilters = () => { setFilter("all"); setRatingFilter("all"); setReplyFilter("all"); setSortBy("new"); };
 
   return (
     <div>
@@ -920,34 +955,34 @@ export default function RecensioniPage() {
       )}
 
       {/* Filtro per fonte + aggiunta manuale */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+      {/* Telefono: UNA riga [ricerca][Filtri][+ Aggiungi]; fonte, voto, risposta, ordina ed Esporta CSV stanno nella tendina «Filtri» */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm max-sm:hidden">
         <span className="mr-1 text-xs font-semibold text-faint">Fonte:</span>
-        <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
-        {connectedSources.map((c) => (
-          <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
-        ))}
+        {fonteChips}
         <span className="mx-1 h-4 w-px bg-line" />
         <span className="mr-1 text-xs font-semibold text-faint">Voto:</span>
-        {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
-          <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
-        ))}
+        {votoChips}
         <span className="mx-1 h-4 w-px bg-line" />
         <span className="mr-1 text-xs font-semibold text-faint">Risposta:</span>
-        {([["all", "Tutte"], ["todo", `Da rispondere (${unanswered})`], ["done", "Risposte"]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${replyFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
-        ))}
-        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus max-sm:min-h-10 hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
+        {rispChips}
+        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput value={search} onChange={setSearch} placeholder="Cerca ospite o testo…" />
-        <label className="flex items-center gap-1.5 text-xs font-semibold text-faint">Ordina
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-semibold text-txt outline-none focus:border-focus">
-            <option value="new">Più recenti</option><option value="old">Più vecchie</option><option value="low">Voto più basso</option><option value="high">Voto più alto</option>
-          </select>
-        </label>
-        <span className="text-[11px] text-faint">{shown.length} di {reviews.length}</span>
-        {filtersActive && <button onClick={resetFilters} className="text-[11px] font-semibold text-focus hover:underline">Azzera filtri</button>}
-        <button onClick={exportCsv} disabled={!shown.length} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10 disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
+      <div className="mb-3 flex flex-wrap items-center gap-2 max-sm:flex-nowrap max-sm:gap-2">
+        <SearchInput value={search} onChange={setSearch} placeholder="Cerca ospite o testo…" className="w-full sm:w-72 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1" />
+        <FilterSheet count={phoneFilterCount} onReset={resetPhoneFilters}>
+          {(close) => (<>
+            <div><div className="mb-1 text-xs font-semibold text-faint">Fonte</div><div className="flex flex-wrap gap-1">{fonteChips}</div></div>
+            <div><div className="mb-1 text-xs font-semibold text-faint">Voto</div><div className="flex flex-wrap gap-1">{votoChips}</div></div>
+            <div><div className="mb-1 text-xs font-semibold text-faint">Risposta</div><div className="flex flex-wrap gap-1">{rispChips}</div></div>
+            {sortSelect}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-faint">{shown.length} di {reviews.length}</span>
+              <button onClick={() => { exportCsv(); close(); }} disabled={!shown.length} className="h-9 whitespace-nowrap rounded-lg border border-line px-3 text-[13px] font-semibold text-txt hover:bg-wash disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
+            </div>
+          </>)}
+        </FilterSheet>
+        <button onClick={() => setShowManual((v) => !v)} aria-label="Aggiungi a mano" className="flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-line px-2.5 text-xs font-semibold text-focus hover:bg-wash sm:hidden"><Icon name="plus" size={13} /> Aggiungi</button>
+        <div className="hidden sm:contents">{filterTail}</div>
       </div>
 
       {/* Form inserimento manuale */}

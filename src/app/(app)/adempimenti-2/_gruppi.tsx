@@ -6,6 +6,7 @@
 import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import Popover from "@/components/Popover";
+import FilterSheet from "@/components/FilterSheet";
 import { eur } from "@/lib/format";
 import { ENTE_META, ENTI, URGENCY_LABEL, nWord, type Ente, type Summary, type Task, type TaskAction, type Urgency } from "@/lib/adempimenti2";
 import { EmptyLine, IconTile, Pill, tint } from "../_ui";
@@ -36,23 +37,27 @@ export function Toolbar({ view, onView, filter, onFilter, summary, totalSoon }: 
     { key: "today", label: "Oggi", n: summary.today, color: URG_COLOR.today },
     { key: "soon", label: "Prossimi", n: totalSoon, color: URG_COLOR.soon },
   ];
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-      <div role="group" aria-label="Come raggruppare" className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-[11px] font-semibold">
-        {([["ente", "Per ente"], ["urgenza", "Per urgenza"]] as const).map(([k, l]) => (
-          <button key={k} type="button" aria-pressed={view === k} onClick={() => onView(k)} className={`min-h-7 rounded-md px-2.5 py-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)] ${view === k ? "bg-wash text-txt shadow-sm" : "text-dim hover:text-txt"}`}>{l}</button>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filtra per urgenza">
+  const chipsEl = (cls: string) => (
+      <div className={cls} role="group" aria-label="Filtra per urgenza">
         {chips.filter((c) => c.key === "all" || c.n > 0 || filter === c.key).map((c) => {
           const on = filter === c.key;
           return (
-            <button key={c.key} type="button" aria-pressed={on} onClick={() => onFilter(c.key)} className="inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]" style={on ? { backgroundColor: tint(c.color, 13), color: c.color, borderColor: tint(c.color, 30) } : { borderColor: "var(--line)", color: "var(--dim)" }}>
+            <button key={c.key} type="button" aria-pressed={on} onClick={() => onFilter(c.key)} className="inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)] max-sm:min-h-9" style={on ? { backgroundColor: tint(c.color, 13), color: c.color, borderColor: tint(c.color, 30) } : { borderColor: "var(--line)", color: "var(--dim)" }}>
               {c.label}<span className="font-mono tabular-nums opacity-80">{c.n}</span>
             </button>
           );
         })}
       </div>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 max-sm:flex-nowrap max-sm:gap-x-2">
+      <div role="group" aria-label="Come raggruppare" className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-[11px] font-semibold">
+        {([["ente", "Per ente"], ["urgenza", "Per urgenza"]] as const).map(([k, l]) => (
+          <button key={k} type="button" aria-pressed={view === k} onClick={() => onView(k)} className={`min-h-7 rounded-md px-2.5 py-0.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)] ${view === k ? "bg-wash text-txt shadow-sm" : "text-dim hover:text-txt"}`}>{l}</button>
+        ))}
+      </div>
+      {chipsEl("flex flex-wrap items-center gap-1 max-sm:hidden")}
+      <div className="ml-auto sm:hidden"><FilterSheet count={filter !== "all" ? 1 : 0} onReset={() => onFilter("all")}>{chipsEl("flex flex-wrap items-center gap-2")}</FilterSheet></div>
     </div>
   );
 }

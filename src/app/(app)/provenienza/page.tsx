@@ -55,7 +55,7 @@ export default function ProvenienzaPage() {
       <PageHeader title="Provenienza viaggiatori" subtitle="Arrivi e presenze per provenienza (movimento turistico)"
         actions={<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</select>} />
 
-      <div className="mb-4 grid grid-cols-2 gap-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3">
         <StatCard label={`Arrivi ${year}`} value={totals.arrivi} />
         <StatCard label={`Presenze ${year}`} value={totals.presenze} />
       </div>

@@ -3,6 +3,7 @@
 import { fmtDate } from "@/lib/dates";
 import { ymdRome } from "@/lib/dates-rome";
 import DateField from "@/components/DateField";
+import FilterSheet from "@/components/FilterSheet";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
@@ -118,7 +119,7 @@ export default function IstatPage() {
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
 
-  const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+  const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 max-sm:h-9 max-sm:py-0 max-sm:inline-flex max-sm:items-center text-sm text-txt outline-none focus:border-focus";
 
   const statusPills = (
     <div className="flex flex-wrap items-center gap-2">
@@ -153,7 +154,7 @@ export default function IstatPage() {
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
 
       {/* Chiusura giornaliera: situazione del giorno selezionato (come Turist@t) */}
-      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 max-sm:gap-2 lg:grid-cols-4">
         {[
           ["Ospiti arrivati", String(arrivati), "var(--ok)"],
           ["Ospiti partiti", String(partiti), "var(--dim)"],
@@ -165,23 +166,28 @@ export default function IstatPage() {
       </div>
 
       {/* Barra "Data corrente soggiorni" (come Turist@t): navigazione giornata + azioni */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      {(() => { const fc = (<>
         <span className="text-[11px] font-medium text-dim">Data corrente soggiorni:</span>
         <div className="inline-flex items-center overflow-hidden rounded-lg border border-line">
-          <button onClick={() => shiftDay(-1)} className="px-2 py-1.5 max-sm:px-3.5 max-sm:py-2.5 text-dim hover:bg-wash" title="Giorno precedente">‹</button>
-          <DateField value={filterDate || todayIso} onChange={(v) => setFilterDate(v)} className="border-x border-line bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none" />
-          <button onClick={() => shiftDay(1)} className="px-2 py-1.5 max-sm:px-3.5 max-sm:py-2.5 text-dim hover:bg-wash" title="Giorno successivo">›</button>
+          <button onClick={() => shiftDay(-1)} className="px-2 py-1.5 max-sm:h-9 max-sm:px-3 max-sm:py-0 text-dim hover:bg-wash" title="Giorno precedente">‹</button>
+          <DateField value={filterDate || todayIso} onChange={(v) => setFilterDate(v)} className="border-x border-line bg-paper px-2 py-1.5 max-sm:h-9 max-sm:py-0 text-sm text-txt outline-none" />
+          <button onClick={() => shiftDay(1)} className="px-2 py-1.5 max-sm:h-9 max-sm:px-3 max-sm:py-0 text-dim hover:bg-wash" title="Giorno successivo">›</button>
         </div>
         <button onClick={() => setFilterDate(todayIso)} className={`${fieldCls} font-semibold hover:bg-wash`}>Oggi</button>
         <button onClick={() => setFilterDate("")} className={`${fieldCls} hover:bg-wash ${filterDate ? "" : "opacity-40"}`} title="Mostra tutto il movimento">Tutte</button>
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Link href="/istat/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: storico delle chiusure giornaliere">📁 Archivio</Link>
         <button onClick={exportCsv} disabled={rowsAll.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
-        <button onClick={() => setConfirmClose(true)} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
-        <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 max-sm:h-11 max-sm:w-11 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
+      </>); return (
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:p-2">
+        <div className="contents max-sm:hidden">{fc}</div>
+        <div className="sm:hidden"><FilterSheet count={filterDate !== todayIso ? 1 : 0} onReset={() => setFilterDate(todayIso)}><div className="flex flex-col gap-2 [&>*]:shrink-0">{fc}</div></FilterSheet></div>
+        <button onClick={() => setConfirmClose(true)} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:ml-0 max-sm:h-9 max-sm:py-0 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
+        <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
         </button>
       </div>
+      ); })()}
 
       {/* Movimento turistico a tutta larghezza */}
       <Card>

@@ -92,7 +92,7 @@ export default function GruppoPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2 max-sm:mt-3">
           {structures.map((st) => {
             const on = cfg.structureIds.includes(st.id);
             return (

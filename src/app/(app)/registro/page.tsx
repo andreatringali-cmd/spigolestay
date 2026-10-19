@@ -45,14 +45,17 @@ export default function RegistroPage() {
       <PageHeader title={t("Registro attività")} subtitle={t("Storico delle azioni: prenotazioni, messaggi, accessi, tariffe e altro")} />
 
       {/* Riga filtri */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm max-sm:mb-3">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca…")} />
-        <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none focus:border-focus">
+        {/* Telefono: un solo filtro (la select) resta inline accanto al conteggio, senza pulsante né scorrimento */}
+        <div className="contents">
+        <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]">
           <option value="all">{t("Tutti gli eventi")}</option>
           {(Object.keys(META) as ActivityType[]).map((k) => <option key={k} value={k}>{t(META[k].label)}</option>)}
         </select>
-        {(q || type !== "all") && <button onClick={() => { setQ(""); setType("all"); }} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">✕ {t("Azzera")}</button>}
-        <span className="ml-auto text-xs text-faint">{rows.length} {rows.length === 1 ? t("evento") : t("eventi")}</span>
+        {(q || type !== "all") && <button onClick={() => { setQ(""); setType("all"); }} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:py-0">✕ {t("Azzera")}</button>}
+        <span className="ml-auto text-xs text-faint max-sm:shrink-0 max-sm:whitespace-nowrap">{rows.length} {rows.length === 1 ? t("evento") : t("eventi")}</span>
+        </div>
       </div>
 
       <Card>

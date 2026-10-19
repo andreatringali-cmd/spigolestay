@@ -16,6 +16,8 @@ import { toISO, shiftISO, parseISO, fmtDM, fmtDate } from "@/lib/dates";
 import { journeyOf, isLiveBooking, stepOpensModal, type JourneyStep } from "@/lib/booking-journey";
 import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
+import FilterSheet from "@/components/FilterSheet";
+import { usePhone } from "@/lib/usePhone";
 import DateField from "@/components/DateField";
 import Popover from "@/components/Popover";
 import { bookingCode } from "@/lib/bookingCode";
@@ -52,6 +54,7 @@ function Vuoto({ title, sub }: { title: string; sub?: string }) {
 }
 
 export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
+  const phone = usePhone();
   const router = useRouter();
   const { bookings, guests, units, roomTypes, structures, events, getStructure, openBooking, openNewBooking, activeStructureId } = useData();
   const dati = useDatiPercorso();
@@ -226,13 +229,12 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
     <div>
       <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} />
 
-      {/* Riga dei filtri: stessa del calendario a griglia (cerca, mese, data con frecce, scelta della vista) + periodo e badge di questa vista; a destra Importa e Nuova */}
-      <div className="no-print mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <div className="relative w-full sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:shrink-0">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full" />
-        </div>
+      {/* Riga dei filtri: stessa del calendario a griglia (cerca, mese, data con frecce, scelta della vista) + periodo e badge di questa vista; a destra Importa e Nuova.
+          Telefono: [cerca][Filtri][+ Nuova] e sotto la scelta della vista; mese, data e importa stanno nella tendina «Filtri» (montati una volta sola: ref/Popover). */}
+      {(() => {
+        const dateCtl = (<>
         <div className="relative">
-          <button ref={monthRef} onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+          <button ref={monthRef} onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition max-sm:h-9 max-sm:py-0 ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
             <Icon name="calendar" size={15} /> <span className="capitalize">{selDate.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</span> <span className="text-xs">▾</span>
           </button>
           <Popover open={monthOpen} anchorRef={monthRef} onClose={() => setMonthOpen(false)} align="start" width={208} maxHeight={288} label="Mese">
@@ -243,19 +245,32 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
           </Popover>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => stepDay(-1)} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>
-          <DateField value={sel} onChange={(v) => { if (v) pick(v); }} title="Salta a una data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
-          <button onClick={() => stepDay(1)} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
+          <button onClick={() => stepDay(-1)} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9">‹</button>
+          <DateField value={sel} onChange={(v) => { if (v) pick(v); }} title="Salta a una data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:py-0" />
+          <button onClick={() => stepDay(1)} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9">›</button>
         </div>
-        {viewSwitch}
-        {filtersOn && <button onClick={() => setQ("")} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera ricerca</button>}
-        <div className="ml-auto flex items-center gap-2">
+        </>);
+        const importBtn = (
           <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
           </Link>
-          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+        );
+        return (
+      <div className="no-print mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:gap-2 max-sm:p-2">
+        <div className="relative w-full sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:shrink-0 max-sm:order-1 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1">
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full" />
+        </div>
+        {phone && <div className="max-sm:order-2"><FilterSheet count={0}><div className="flex flex-wrap items-center gap-2">{dateCtl}{importBtn}</div></FilterSheet></div>}
+        {!phone && <div className="contents max-sm:hidden">{dateCtl}</div>}
+        {phone ? <div className="w-full max-sm:order-4 [&>div]:h-9 [&>div]:w-full [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap">{viewSwitch}</div> : viewSwitch}
+        {filtersOn && <button onClick={() => setQ("")} className="whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline max-sm:hidden">Azzera ricerca</button>}
+        <div className="ml-auto flex items-center gap-2 max-sm:contents">
+          <div className="max-sm:hidden">{importBtn}</div>
+          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:order-3 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:justify-center max-sm:whitespace-nowrap max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
         </div>
       </div>
+        );
+      })()}
 
       {/* Eventi segnalati nel periodo (sagre, ponti…) */}
       {evs.length > 0 && (

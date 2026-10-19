@@ -75,7 +75,7 @@ export default function Donut({
         </text>
       </svg>
 
-      <div className="flex min-w-[190px] flex-1 flex-col gap-1.5">
+      <div className="flex min-w-[130px] flex-1 flex-col gap-1.5 max-sm:min-w-[190px]">
         {data.map((d, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">
             <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: d.color }} />

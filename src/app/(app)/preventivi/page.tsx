@@ -757,7 +757,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
       <PageHeader title={t("Preventivi")} subtitle={t("Crea un preventivo e invialo su WhatsApp o via email")} />
 
       {/* Sezioni: Nuovo preventivo · Archivio */}
-      <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5">
+      <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:mb-3">
         <button onClick={() => { if (editingId) { setEditingId(null); setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setNote(""); const t0 = toISO(new Date()); setCheckIn(t0); setCheckOut(shiftISO(t0, 1)); } setTab("nuovo"); }} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
         <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
       </div>
@@ -767,17 +767,17 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         {/* Form */}
         <Card>
           <SectionTitle>{t("Dati preventivo")}</SectionTitle>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 max-sm:gap-x-2 max-sm:gap-y-2.5">
             <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder={t("Cognome")} /></Field>
             <Field label={t("Nome")}><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder={t("Nome")} /></Field>
             <Field label={t("Email")}><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder={t("opzionale")} /></Field>
             <Field label={t("Telefono")}><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="+39…" /></Field>
             {structures.length > 1 && !lockedStructure && (
-              <Field label={t("Struttura")}>
+              <div className="col-span-2 sm:col-span-1"><Field label={t("Struttura")}>
                 <select value={structureId} onChange={(e) => { const sid = e.target.value; setStructureId(sid); const rt0 = roomTypes.find((r) => r.structureId === sid); setRoomLines(rt0 ? [{ roomTypeId: rt0.id, qty: 1, price: autoPrice(rt0.id) }] : []); }} className={inp}>
                   {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </select>
-              </Field>
+              </Field></div>
             )}
             {structures.length > 1 && !lockedStructure && <div className="hidden sm:block" />}
             <Field label={t("Check-in")}><DateField value={checkIn} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(shiftISO(v, 1)); }} className={`${inp} text-left`} /></Field>
@@ -785,7 +785,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <Field label={t("Adulti")}><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} className={inp} /></Field>
             <Field label={t("Bambini")}><input type="number" min={0} value={children} onChange={(e) => { const v = Math.max(0, Number(e.target.value)); setChildren(v); setChildAges((prev) => { const next = prev.slice(0, v); while (next.length < v) next.push(8); return next; }); }} className={inp} /></Field>
             {children > 0 && (
-              <div className="sm:col-span-2">
+              <div className="col-span-2">
                 <div className="mb-1 text-xs font-medium text-dim">{t("Età dei bambini")} <span className="font-normal text-faint">({t("sotto i 15 anni esenti dalla tassa")})</span></div>
                 <div className="flex flex-wrap gap-2">
                   {childAges.map((age, i) => (
@@ -802,7 +802,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 </div>
               </div>
             )}
-            <div className="sm:col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm">
+            <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm">
               <span className="text-dim">{t("Persone soggette a tassa")} <span className="text-faint">({t("automatico")})</span></span>
               <b className="ml-auto font-mono text-txt">{taxPersons}</b>
               <span className="text-[11px] text-faint">= {adults} {t("adulti")}{taxKids > 0 ? ` + ${taxKids} ${t("bambini ≥15")}` : ""}</span>
@@ -810,7 +810,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
             {/* Piano tariffario: applica lo scarto al prezzo del calendario */}
             {plans.filter((p) => p.enabled !== false).length > 0 && (
-              <div className="sm:col-span-2">
+              <div className="col-span-2">
                 <div className="mb-1 text-xs font-medium text-dim">{t("Piano tariffario")} <span className="font-normal text-faint">({t("parte dal prezzo del calendario")})</span></div>
                 <div className="flex flex-wrap gap-2">
                   {plans.filter((p) => planApplies(p, { checkIn, nights: n, structureId })).map((p) => {
@@ -829,7 +829,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             )}
 
             {/* Camere del preventivo — multi-camera con disponibilità reale nel periodo */}
-            <div className="sm:col-span-2">
+            <div className="col-span-2">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Camere del preventivo")} · {roomsTotal}</span>
                 <button type="button" onClick={addLine} className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ {t("Aggiungi camera")}</button>
@@ -862,8 +862,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 ); })}
               </div>
             </div>
-            <Field label={`${t("Totale complessivo")} (${n} ${n === 1 ? t("notte") : t("notti")})`}><div className="rounded-lg bg-wash px-3 py-2 font-mono text-sm font-bold text-txt">{eur(total)}</div></Field>
-            <div className="sm:col-span-2 flex flex-wrap items-center gap-4 rounded-lg border border-line bg-paper px-3 py-2">
+            <div className="col-span-2 sm:col-span-1"><Field label={`${t("Totale complessivo")} (${n} ${n === 1 ? t("notte") : t("notti")})`}><div className="rounded-lg bg-wash px-3 py-2 font-mono text-sm font-bold text-txt">{eur(total)}</div></Field></div>
+            <div className="col-span-2 flex flex-wrap items-center gap-4 rounded-lg border border-line bg-paper px-3 py-2">
               <label className="flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Parcheggio")}</label>
               {parking && (
                 <label className="flex items-center gap-2 text-xs text-dim">{t("€/notte (0 = incluso)")}
@@ -878,12 +878,12 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               )}
             </div>
             {structExtras.length > 0 && (
-              <label className="sm:col-span-2 flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm font-medium text-txt">
+              <label className="col-span-2 flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm font-medium text-txt">
                 <input type="checkbox" checked={extrasPage} onChange={(e) => setExtrasPage(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />
                 {t("Includi 2ª pagina: servizi extra")} <span className="font-normal text-faint">({structExtras.length})</span>
               </label>
             )}
-            <div className="sm:col-span-2">
+            <div className="col-span-2">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-dim">{t("Acconto per confermare")}</span>
                 <span className="text-[11px] text-faint">{acconto > 0 && acconto < 100 ? `${eur(deposit)} ${t("ora")} · ${eur(balance)} ${t("al check-in")}` : ""}</span>
@@ -894,7 +894,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 ))}
               </div>
             </div>
-            <div className="sm:col-span-2 rounded-lg border border-line bg-paper p-3">
+            <div className="col-span-2 rounded-lg border border-line bg-paper p-3">
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Dati di pagamento")}</div>
               {(structure?.iban || structure?.ibanHolder) ? (
                 <div className="rounded-lg border border-line bg-wash p-2.5 text-xs text-dim">
@@ -914,7 +914,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               )}
               <div className="mt-2"><Field label={t("Altri metodi (facoltativo)")}><input value={payExtra} onChange={(e) => updPay({ extra: e.target.value })} className={inp} /></Field></div>
             </div>
-            <div className="sm:col-span-2"><Field label={t("Note (opzionale)")}><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inp} resize-none`} placeholder={t("Es. offerta valida 3 giorni, richieste particolari…")} /></Field></div>
+            <div className="col-span-2"><Field label={t("Note (opzionale)")}><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inp} resize-none`} placeholder={t("Es. offerta valida 3 giorni, richieste particolari…")} /></Field></div>
           </div>
         </Card>
 

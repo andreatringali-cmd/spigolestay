@@ -369,7 +369,7 @@ export default function StrutturaSchedaPage() {
         title={isNew ? t("Nuova struttura") : t("Scheda struttura")}
         subtitle={isNew ? t("Crea una nuova struttura") : `${f.name} · ${f.city ?? ""}${nCamere ? ` · ${nCamere} ${t("camere")}` : ""}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!isNew && <Link href="/camere" className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Camere")} ({nCamere})</Link>}
             {!isNew && autoSavedAt && <span className="flex items-center gap-1 text-xs font-medium text-[color:var(--ok)]" title={t("Le modifiche vengono salvate da sole")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>{t("Salvato in automatico")}</span>}
             <button onClick={() => router.push("/strutture")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>

@@ -12,6 +12,7 @@ import { apiPost } from "@/lib/invoicing/client";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import FilterSheet from "@/components/FilterSheet";
 import { forecastConsumption, estimateStock, stockState, reorderQty, type StockState } from "@/lib/forniture/forecast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { productImage } from "@/lib/forniture/image";
@@ -321,6 +322,19 @@ export default function ForniturePage() {
   };
 
   const reorderable = activeProds.filter((p) => p.consumption_per_arrival > 0 || p.consumption_per_guest_night > 0);
+  const catChips = (<>
+    <button onClick={() => setCatFilter("")} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${!catFilter ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>Tutte</button>
+    {cats.filter((cat) => activeProds.some((p) => p.category_id === cat.id)).map((cat) => (
+      <button key={cat.id} onClick={() => setCatFilter(cat.id)} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${catFilter === cat.id ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{cat.name}</button>
+    ))}
+  </>);
+  const stockFilters = (<>
+    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-dim"><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> Solo sotto soglia</label>
+    <label className="text-sm text-dim">Copertura su</label>
+    <select value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))} className="rounded-lg border border-line bg-surface px-3 py-2 max-sm:h-9 max-sm:py-0 text-sm text-txt">
+      <option value={30}>30 giorni</option><option value={60}>60 giorni</option><option value={90}>90 giorni</option>
+    </select>
+  </>);
   const shownCats = cats.filter((cat) => activeProds.some((p) => p.category_id === cat.id) && (!catFilter || cat.id === catFilter));
 
   return (
@@ -337,14 +351,14 @@ export default function ForniturePage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 max-sm:mb-3 max-sm:gap-2">
+        <div className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:flex max-sm:w-full">
           {(["catalogo", "scorte", "riordino", "ordini"] as const).map((tk) => (
-            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--warn)", color: "#fff" }}>{lowRows.length}</span>}</button>
+            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:py-2.5 max-sm:text-[13px] text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--warn)", color: "#fff" }}>{lowRows.length}</span>}</button>
           ))}
         </div>
         {activeStructureId === "all" && (
-          <select value={localStruct} onChange={(e) => setLocalStruct(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt">
+          <select value={localStruct} onChange={(e) => setLocalStruct(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt max-sm:h-10 max-sm:w-full max-sm:py-0 max-sm:text-[13px]">
             <option value="">Scegli la struttura…</option>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -355,12 +369,8 @@ export default function ForniturePage() {
         <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
           <div className="min-w-0">
             {/* filtro categorie */}
-            <div className="mb-4 flex flex-wrap gap-2">
-              <button onClick={() => setCatFilter("")} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${!catFilter ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>Tutte</button>
-              {cats.filter((cat) => activeProds.some((p) => p.category_id === cat.id)).map((cat) => (
-                <button key={cat.id} onClick={() => setCatFilter(cat.id)} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${catFilter === cat.id ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{cat.name}</button>
-              ))}
-            </div>
+            <div className="mb-4 flex flex-wrap gap-2 max-sm:hidden">{catChips}</div>
+            {cats.some((cat) => activeProds.some((p) => p.category_id === cat.id)) && <div className="mb-3 flex items-center sm:hidden"><FilterSheet label="Categoria" count={catFilter ? 1 : 0} onReset={() => setCatFilter("")}><div className="flex flex-col items-stretch gap-1.5 [&>button]:text-left">{catChips}</div></FilterSheet></div>}
 
             {catLoaded && shownCats.length === 0 && <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-dim">Nessun prodotto disponibile a catalogo.</div>}
             {shownCats.map((cat) => (
@@ -434,13 +444,10 @@ export default function ForniturePage() {
                   </div>
                 ))}
               </div>
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-dim"><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> Solo sotto soglia</label>
-                <label className="text-sm text-dim">Copertura su</label>
-                <select value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))} className="rounded-lg border border-line bg-surface px-3 py-2 max-sm:py-2.5 text-sm text-txt">
-                  <option value={30}>30 giorni</option><option value={60}>60 giorni</option><option value={90}>90 giorni</option>
-                </select>
-                <button onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Aggiungi i sotto soglia al carrello ({lowRows.length})</button>
+              <div className="mb-3 flex flex-wrap items-center gap-3 max-sm:flex-nowrap max-sm:gap-2">
+                <div className="contents max-sm:hidden">{stockFilters}</div>
+                <FilterSheet count={(onlyLow ? 1 : 0) + (horizon !== 30 ? 1 : 0)} onReset={() => { setOnlyLow(false); setHorizon(30); }}>{stockFilters}</FilterSheet>
+                <button onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:ml-0 max-sm:min-h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-1.5 max-sm:text-xs max-sm:leading-tight">Aggiungi i sotto soglia al carrello ({lowRows.length})</button>
               </div>
               <Card className="mb-3 !p-0 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">

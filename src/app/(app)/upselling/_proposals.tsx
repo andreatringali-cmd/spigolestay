@@ -18,6 +18,7 @@ import {
 } from "@/lib/upselling";
 import Icon from "@/components/Icon";
 import EmptyState from "@/components/EmptyState";
+import FilterSheet from "@/components/FilterSheet";
 import { useToast } from "@/components/ToastProvider";
 
 const fmt = (iso: string) => fmtDM(iso);
@@ -233,13 +234,30 @@ export default function ProposalsTab({ candidates, today, windowDays, setWindowD
   const hiddenCount = candidates.length - visible.length;
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <span className="text-xs text-dim">Arrivi nei prossimi</span>
-        {[7, 14, 30].map((d) => (
-          <button key={d} onClick={() => setWindowDays(d)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${windowDays === d ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{d} giorni</button>
-        ))}
-        <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} /> mostra anche senza proposte</label>
-      </div>
+      {(() => {
+        const windowChips = [7, 14, 30].map((d) => (
+          <button key={d} onClick={() => setWindowDays(d)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-9 ${windowDays === d ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{d} giorni</button>
+        ));
+        const emptyToggle = <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-dim max-sm:ml-0 max-sm:min-h-9"><input type="checkbox" className="max-sm:!w-4" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} /> mostra anche senza proposte</label>;
+        return (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm max-sm:hidden">
+              <span className="text-xs text-dim">Arrivi nei prossimi</span>
+              {windowChips}
+              {emptyToggle}
+            </div>
+            {/* Telefono: un solo pulsante «Filtri» (finestra dei giorni + «mostra anche senza proposte») */}
+            <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
+              <span className="text-xs text-dim">Arrivi nei prossimi {windowDays} giorni</span>
+              <FilterSheet count={(windowDays !== 14 ? 1 : 0) + (showEmpty ? 1 : 0)} onReset={() => { setWindowDays(14); setShowEmpty(false); }}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Arrivi nei prossimi</div>
+                <div className="flex flex-wrap gap-2">{windowChips}</div>
+                {emptyToggle}
+              </FilterSheet>
+            </div>
+          </>
+        );
+      })()}
       {estimate && (
         <div className="mb-3 rounded-lg bg-wash px-3 py-2 text-xs text-dim">Stima al tuo tasso di conversione storico ({Math.round(estimate.rate * 100)}%): circa <b className="font-mono text-txt">{eur(estimate.value)}</b> sul potenziale massimo qui sotto.</div>
       )}

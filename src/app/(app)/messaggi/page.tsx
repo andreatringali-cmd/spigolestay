@@ -30,7 +30,7 @@ function MessaggiInner() {
     <div>
       <PageHeader title={t("Messaggi")} subtitle={active.hint} />
 
-      <div className="mb-4 flex w-full gap-3">
+      <div className="mb-4 flex w-full gap-3 max-sm:mb-3 max-sm:gap-2">
         {TABS.map((x) => (
           <button
             key={x.id}

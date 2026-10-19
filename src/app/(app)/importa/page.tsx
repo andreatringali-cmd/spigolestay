@@ -566,12 +566,12 @@ export default function ImportaPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("1. Struttura e file")}{activeStructureId !== "all" ? ` · ${structures.find((s) => s.id === structureId)?.name ?? ""}` : ""}</SectionTitle>
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line bg-wash/50 p-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line bg-wash/50 p-3 max-sm:flex-col max-sm:items-stretch max-sm:p-2.5">
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-txt">{t("Non sai da dove partire?")}</div>
                 <div className="text-xs text-dim">{t("Scarica il modello CSV con le colonne giuste, compilalo con il tuo storico e ricaricalo qui.")}</div>
               </div>
-              <button type="button" onClick={downloadTemplate} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Scarica il modello CSV")}</button>
+              <button type="button" onClick={downloadTemplate} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">{t("Scarica il modello CSV")}</button>
             </div>
             {structures.length === 0 ? (
               <p className="text-sm text-dim">{t("Prima crea una struttura e le camere, poi torna qui a importare.")}</p>

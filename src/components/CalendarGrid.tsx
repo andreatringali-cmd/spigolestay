@@ -39,6 +39,8 @@ import { ArrowScroller } from "@/components/ScrollStrip";
 import DateField from "@/components/DateField";
 import Popover from "@/components/Popover";
 import SearchInput from "@/components/SearchInput";
+import FilterSheet from "@/components/FilterSheet";
+import { usePhone } from "@/lib/usePhone";
 import { normName } from "@/lib/guest-key";
 import { bookingCode } from "@/lib/bookingCode";
 import { useToast } from "@/components/ToastProvider";
@@ -1098,30 +1100,11 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     );
   };
 
-  return (
-    <div ref={wrapRef} className="flex flex-col gap-3 select-none">
-      {/* Riga filtri — data (jump), navigazione, menu Visualizza */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm sm:gap-3">
-        <div className="flex w-full items-center gap-2 sm:contents">
-          {/* Cerca ospite o codice: prima del mese */}
-          <div ref={searchRef} onFocusCapture={() => setHitsClosedFor(null)} className="relative min-w-0 flex-1 sm:order-first sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:flex-none sm:shrink-0">
-            <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
-            <Popover open={!!calQuery.trim() && hitsClosedFor !== calQuery} anchorRef={searchRef} onClose={() => setHitsClosedFor(calQuery)} align="start" width={320} label="Risultati ricerca">
-                {calHits.length === 0
-                  ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
-                  : calHits.map((b) => (
-                    <button key={b.id} onClick={() => goToHit(b)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-wash">
-                      <span className="min-w-0 flex-1 truncate font-semibold text-txt">{guestName(b.guestId)}</span>
-                      <span className="shrink-0 font-mono text-[11px] text-faint">{fmtDM(parseISO(b.checkIn))} → {fmtDM(parseISO(b.checkOut))}</span>
-                    </button>
-                  ))}
-            </Popover>
-          </div>
-          <Link href="/prenotazioni/nuova" className="sm:order-[41] sm:ml-auto inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
-        </div>
-        <div className="flex w-full items-center gap-2 sm:contents">
+  // Controlli di data/vista: su telefono stanno dentro la tendina «Filtri» (montati UNA sola volta, per via di ref e Popover); da sm in su restano inline come prima.
+  const phone = usePhone();
+  const filterControls = (<>
           <div className="relative shrink-0 sm:order-[10]">
-            <button ref={monthRef} onClick={() => setMonthOpen((o) => !o)} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition sm:h-auto sm:py-1.5 ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+            <button ref={monthRef} onClick={() => setMonthOpen((o) => !o)} className={`flex h-9 items-center gap-1.5 rounded-lg border px-2 text-sm font-medium transition sm:h-auto sm:px-3 sm:py-1.5 ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
               <span className="hidden sm:inline-flex"><Icon name="calendar" size={15} /></span> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
             </button>
             <Popover open={monthOpen} anchorRef={monthRef} onClose={() => setMonthOpen(false)} align="start" width={208} maxHeight={288} label="Mese">
@@ -1134,14 +1117,11 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             </Popover>
           </div>
           {/* Salta a una data + frecce ±1 giorno (come nella dashboard) */}
-          <div className="flex min-w-0 flex-1 items-center gap-1 sm:order-[20] sm:flex-none">
-            <button onClick={() => setStart((d) => addDays(d, -1))} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-9 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt sm:h-8">‹</button>
-            <div className="min-w-0 flex-1 sm:flex-none"><DateField value={toISO(start)} onChange={(v) => { if (v) setStart(parseISO(v)); }} title="Salta a una data" className="h-9 w-full justify-between rounded-lg border border-line bg-surface px-2 text-sm transition hover:border-focus sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5" /></div>
-            <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-9 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt sm:h-8">›</button>
+          <div className="flex min-w-0 items-center gap-1 max-sm:flex-none sm:order-[20]">
+            <button onClick={() => setStart((d) => addDays(d, -1))} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-9 w-7 shrink-0 sm:w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt sm:h-8">‹</button>
+            <div className="min-w-0 sm:flex-none"><DateField value={toISO(start)} onChange={(v) => { if (v) setStart(parseISO(v)); }} title="Salta a una data" className="h-9 w-auto justify-between rounded-lg border border-line bg-surface px-2 text-sm transition hover:border-focus sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5" /></div>
+            <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-9 w-7 shrink-0 sm:w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt sm:h-8">›</button>
           </div>
-        </div>
-        <div className="flex w-full items-center gap-2 sm:contents">
-          <div className="min-w-0 flex-1 sm:order-[31] sm:flex-none [&>div]:w-full sm:[&>div]:w-auto [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap [&>div]:h-9 sm:[&>div]:h-auto [&>div>button]:px-2 sm:[&>div>button]:px-2.5">{viewSwitch}</div>
           {/* Menu Visualizza — spostato dopo i mesi (order) */}
           <div className="relative shrink-0 sm:order-[30]">
             <button ref={vizRef} onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
@@ -1174,6 +1154,36 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim sm:order-[42] transition hover:bg-wash hover:text-txt">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
           </Link>
+  </>);
+
+  return (
+    <div ref={wrapRef} className="flex flex-col gap-3 select-none">
+      {/* Riga filtri — data (jump), navigazione, menu Visualizza */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:p-2 sm:gap-3">
+        <div className="flex w-full items-center gap-2 sm:contents">
+          {/* Cerca ospite o codice: prima del mese */}
+          <div ref={searchRef} onFocusCapture={() => setHitsClosedFor(null)} className="relative min-w-0 flex-1 sm:order-first sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:flex-none sm:shrink-0">
+            <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
+            <Popover open={!!calQuery.trim() && hitsClosedFor !== calQuery} anchorRef={searchRef} onClose={() => setHitsClosedFor(calQuery)} align="start" width={320} label="Risultati ricerca">
+                {calHits.length === 0
+                  ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
+                  : calHits.map((b) => (
+                    <button key={b.id} onClick={() => goToHit(b)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-wash">
+                      <span className="min-w-0 flex-1 truncate font-semibold text-txt">{guestName(b.guestId)}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-faint">{fmtDM(parseISO(b.checkIn))} → {fmtDM(parseISO(b.checkOut))}</span>
+                    </button>
+                  ))}
+            </Popover>
+          </div>
+          {phone && <FilterSheet count={0}><div className="flex flex-wrap items-center gap-2">{filterControls}</div></FilterSheet>}
+          <Link href="/prenotazioni/nuova" className="max-sm:w-[5.5rem] max-sm:justify-center sm:order-[41] sm:ml-auto inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+        </div>
+        {phone && <div className="w-full [&>div]:h-9 [&>div]:w-full [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap">{viewSwitch}</div>}
+        <div className="contents max-sm:hidden">
+          {!phone && <>
+            {filterControls}
+          <div className="min-w-0 sm:order-[31] sm:flex-none [&>div]:w-auto sm:[&>div]:w-auto [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap [&>div]:h-9 sm:[&>div]:h-auto [&>div>button]:px-2 sm:[&>div>button]:px-2.5">{viewSwitch}</div>
+          </>}
         </div>
       </div>
 

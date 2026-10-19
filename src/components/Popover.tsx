@@ -68,6 +68,8 @@ export default function Popover({ open, onClose, anchorRef, children, align = "s
     const down = (e: Event) => {
       const t = e.target as Node;
       if (popRef.current?.contains(t)) return;
+      // Tendine annidate (es. il calendario di un campo data dentro la tendina «Filtri»): un tocco dentro un'altra tendina non chiude questa
+      if ((t as Element).closest?.("[data-xn-popover]")) return;
       if (ignoreAnchorClicks && anchorRef.current?.contains(t)) return;
       onClose();
     };
@@ -79,7 +81,7 @@ export default function Popover({ open, onClose, anchorRef, children, align = "s
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div
-      ref={popRef} role="dialog" aria-label={label}
+      ref={popRef} role="dialog" aria-label={label} data-xn-popover=""
       className={`fixed z-[1000] overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-1 text-txt shadow-xl ${dark ? "dark" : ""} ${className}`}
       style={{ left: pos?.left ?? -9999, top: pos?.top, bottom: pos?.bottom, width: pos?.width, maxHeight: pos?.maxHeight, visibility: pos ? "visible" : "hidden" }}
     >

@@ -30,6 +30,7 @@ import LineChart from "@/components/LineChart";
 import DateField from "@/components/DateField";
 import { flagColor, flagGradient } from "@/lib/flags";
 import Icon from "@/components/Icon";
+import FilterSheet from "@/components/FilterSheet";
 import ExportMenu, { type ExportField } from "@/components/ExportMenu";
 import BookingChannelLogo, { BookingChannelWordmark } from "@/components/BookingChannelLogo";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -99,8 +100,8 @@ export default function PrenotazioniPage() {
   // Si salva l'elenco dei grafici VISIBILI (non quello dei nascosti): così un grafico che in quel momento non esiste (es. "per struttura"
   // con una sola struttura selezionata) o aggiunto in seguito non compare da solo, e "nascondi tutti" resta valido in ogni vista.
   const ALL_CHART_KEYS = ["ch-mix", "str-mix", "stay", "month", "rev-month", "rt-mix", "country"];
-  // I grafici sono SEMPRE aperti quando si apre la pagina: nasconderli vale solo finché la pagina resta aperta (non si ricorda).
-  const [visiblePren, setVisiblePren] = useState<Set<string>>(() => new Set(ALL_CHART_KEYS));
+  // I grafici sono SEMPRE nascosti quando si apre la pagina: mostrarli vale solo finché la pagina resta aperta (non si ricorda).
+  const [visiblePren, setVisiblePren] = useState<Set<string>>(() => new Set());
   const persistPren = (hiddenNow: Set<string>) => {
     const vis = new Set<string>();
     ALL_CHART_KEYS.forEach((k) => {
@@ -418,16 +419,41 @@ export default function PrenotazioniPage() {
     exportExcel("prenotazioni", fields.map((f) => t(f.label)), sorted.filter(isCounted).map((b) => fields.map((f) => f.get(b)))); // stesso ordine della tabella, senza annullate/no-show
   };
 
+  // Filtri scritti UNA volta: inline da tablet in su, dentro la tendina del pulsante «Filtri» su telefono.
+  const activeFilterCount = (dateField !== "attive" ? 1 : 0) + (dateField === "attive" && from !== toISO(new Date()) ? 1 : 0) + (to ? 1 : 0) + (channel !== "all" ? 1 : 0);
+  const filterControls = (
+    <>
+          <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1 max-sm:shrink-0 max-sm:flex-nowrap">
+            <Select className="max-sm:shrink-0 max-sm:px-1.5 max-sm:text-[13px]" value={dateField} onChange={(v) => { const f = v as "attive" | "arrivo" | "prenotazione" | "incasa" | "tutte"; setDateField(f); if (f === "tutte") { setFrom(""); setTo(""); } else if (!from) setFrom(toISO(new Date())); }} label={t("Tipo data")}>
+              <option value="attive">{t("In corso e future")}</option>
+              <option value="tutte">{t("Tutte (da sempre)")}</option>
+              <option value="arrivo">{t("Arrivo / check-in")}</option>
+              <option value="prenotazione">{t("Data prenotazione")}</option>
+              <option value="incasa">{t("In casa (occupazione)")}</option>
+            </Select>
+            <div className="max-sm:shrink-0"><DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:min-h-10 max-sm:w-full max-sm:justify-between" /></div>
+            <span className="text-xs text-faint">→</span>
+            <div className="max-sm:shrink-0"><DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:min-h-10 max-sm:w-full max-sm:justify-between" /></div>
+          </div>
+            <Select className="max-sm:shrink-0 max-sm:px-1.5 max-sm:text-[13px]" value={channel} onChange={setChannel} label={t("Canale")}>
+            <option value="all">{t("Tutti i canali")}</option>
+            {channelOptions.map((o) => (<option key={o.key} value={o.key}>{o.label} ({o.count})</option>))}
+          </Select>
+          {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
+          <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+      </>
+  );
+
   return (
     <div>
       <PageHeader title={t("Prenotazioni")} subtitle={t("In anteprima le prenotazioni in corso e future · seleziona un intervallo di date per vedere lo storico")} actions={<WeatherWidget compact />} />
 
       {/* Card riepilogo */}
-      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:[&>*:nth-child(n+3)]:col-span-2 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 lg:grid-cols-4">
         <StatCard label={t("Prenotazioni")} value={String(counted.length)} />
         <StatCard label={t("Notti totali")} value={String(nightsTot)} />
-        <StatCard label={t("ADR (prezzo medio/notte)")} value={<>{eur(avgPrice)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoPerNight)})</span></>} />
-        <StatCard label={t("Ricavi")} value={<>{eur(revenue)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoTot)})</span></>} />
+        <StatCard label={t("ADR (prezzo medio/notte)")} value={<>{eur(avgPrice)} <span className="text-sm font-normal text-faint max-sm:block max-sm:text-[11px]">({t("netto")} {eur(nettoPerNight)})</span></>} />
+        <StatCard label={t("Ricavi")} value={<>{eur(revenue)} <span className="text-sm font-normal text-faint max-sm:block max-sm:text-[11px]">({t("netto")} {eur(nettoTot)})</span></>} />
       </div>
 
       {/* Grafici: una riga scorrevole con frecce ‹ › · torte larghe 2 card, barre 1 card */}
@@ -453,35 +479,21 @@ export default function PrenotazioniPage() {
       {/* Filtri */}
       {/* Stessa griglia dei KPI sopra: la ricerca è la 1ª cella (= larga quanto una card e allineata),
           gli altri filtri occupano le colonne restanti. */}
-      <div className="no-print mb-4 grid grid-cols-[minmax(0,1fr)] items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
-        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1 max-sm:w-full">
-          <Select className="max-sm:w-full" value={dateField} onChange={(v) => { const f = v as "attive" | "arrivo" | "prenotazione" | "incasa" | "tutte"; setDateField(f); if (f === "tutte") { setFrom(""); setTo(""); } else if (!from) setFrom(toISO(new Date())); }} label={t("Tipo data")}>
-            <option value="attive">{t("In corso e future")}</option>
-            <option value="tutte">{t("Tutte (da sempre)")}</option>
-            <option value="arrivo">{t("Arrivo / check-in")}</option>
-            <option value="prenotazione">{t("Data prenotazione")}</option>
-            <option value="incasa">{t("In casa (occupazione)")}</option>
-          </Select>
-          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:min-h-10 max-sm:w-full max-sm:justify-between" /></div>
-          <span className="text-xs text-faint">→</span>
-          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:min-h-10 max-sm:w-full max-sm:justify-between" /></div>
+      <div className="no-print mb-4 grid grid-cols-[minmax(0,1fr)] items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:flex max-sm:flex-wrap max-sm:gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full max-sm:order-1 max-sm:min-w-0 max-sm:flex-1" />
+        <Link href="/prenotazioni/nuova" className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:order-3 sm:hidden" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:hidden sm:col-span-2 lg:col-span-3">
+          {filterControls}
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:flex-wrap">
+          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:hidden" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
+            <ExportMenu onExcel={doExcel} excelFields={excelFields} />
+          </div>
         </div>
-        <div className="flex items-center gap-2 max-sm:w-full sm:contents">
-        <Select className="max-sm:min-w-0 max-sm:flex-1" value={channel} onChange={setChannel} label={t("Canale")}>
-          <option value="all">{t("Tutti i canali")}</option>
-          {channelOptions.map((o) => (<option key={o.key} value={o.key}>{o.label} ({o.count})</option>))}
-        </Select>
-        {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
-        <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-        </div>
-        <div className="flex items-center gap-2 max-sm:w-full sm:contents">
-        <div className="ml-auto flex shrink-0 items-center gap-2 sm:flex-wrap">
-          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
-          <ExportMenu onExcel={doExcel} excelFields={excelFields} />
-        </div>
-        </div>
+        {/* Telefono: UN solo pulsante «Filtri» (con il numero dei filtri attivi) al posto della barra dei filtri */}
+        <div className="max-sm:order-2 sm:hidden">
+          <FilterSheet count={activeFilterCount} onReset={clearFilters}>
+            {(close) => (<>{filterControls}<button type="button" onClick={() => { close(); doExcel(); }} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-dim">{t("Esporta Excel")}</button></>)}
+          </FilterSheet>
         </div>
       </div>
 

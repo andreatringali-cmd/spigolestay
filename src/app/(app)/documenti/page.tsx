@@ -9,6 +9,7 @@ import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
+import FilterSheet from "@/components/FilterSheet";
 import { eur } from "@/lib/format";
 import { centsEur, DOC_KIND_LABEL, STATO, apiPost } from "@/lib/invoicing/client";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
@@ -134,7 +135,30 @@ export default function DocumentiPage() {
     downloadCsv(`documenti-${year}${month !== "all" ? `-${String(month).padStart(2, "0")}` : ""}`, buildCsv(head, lines));
   };
 
-  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
+  // Filtri veri: scritti una volta, mostrati inline (tablet/desktop) e nella tendina «Filtri» (telefono)
+  const filterControls = (<>
+    <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}>
+      <option value="all">Tutti gli anni</option>
+      {years.map((y) => <option key={y} value={y}>{y}</option>)}
+    </select>
+    <select value={String(month)} onChange={(e) => setMonth(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}>
+      <option value="all">Tutti i mesi</option>
+      {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+    </select>
+    <select value={kind} onChange={(e) => setKind(e.target.value)} className={selCls}>
+      <option value="all">Tutti i tipi</option>
+      <option value="fattura">Fatture</option>
+      <option value="nota_di_credito">Note di credito</option>
+      <option value="ricevuta_non_fiscale">Ricevute</option>
+    </select>
+    <select value={stato} onChange={(e) => setStato(e.target.value)} className={selCls}>
+      <option value="all">Tutti gli stati</option>
+      {Object.entries(STATO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+    </select>
+  </>);
+  const filtersActive = (year !== new Date().getFullYear() ? 1 : 0) + (month !== "all" ? 1 : 0) + (kind !== "all" ? 1 : 0) + (stato !== "all" ? 1 : 0);
+  const resetFilters = () => { setYear(new Date().getFullYear()); setMonth("all"); setKind("all"); setStato("all"); };
   const today = todayLocalISO();
 
   // Nuovo documento VUOTO: la prenotazione si collega dopo dalla scheda.
@@ -154,8 +178,8 @@ export default function DocumentiPage() {
       <PageHeader title="Documenti fiscali" subtitle="Fatture, note di credito e ricevute — con stato SDI" />
 
       {!loading && (
-        <div className="mb-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mb-4 max-sm:mb-3">
+          <div className="grid grid-cols-2 gap-3 max-sm:gap-2 sm:grid-cols-5">
             <StatCard label="Imponibile (netto NC)" value={eur(centsEur(summary.taxable))} hint={`${summary.nFatt} fatture · ${summary.nNc} NC`} />
             <StatCard label="IVA (netto NC)" value={eur(centsEur(summary.vat))} />
             <StatCard label="Tassa sogg. (fuori campo)" value={eur(centsEur(summary.out))} />
@@ -170,31 +194,23 @@ export default function DocumentiPage() {
         </div>
       )}
 
-      <Card className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, P.IVA, CF, prenotazione…" />
-          <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}>
-            <option value="all">Tutti gli anni</option>
-            {years.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select value={String(month)} onChange={(e) => setMonth(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}>
-            <option value="all">Tutti i mesi</option>
-            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className={selCls}>
-            <option value="all">Tutti i tipi</option>
-            <option value="fattura">Fatture</option>
-            <option value="nota_di_credito">Note di credito</option>
-            <option value="ricevuta_non_fiscale">Ricevute</option>
-          </select>
-          <select value={stato} onChange={(e) => setStato(e.target.value)} className={selCls}>
-            <option value="all">Tutti gli stati</option>
-            {Object.entries(STATO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-          <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:w-full">
-            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
-            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
+      <Card className="mb-4 max-sm:mb-3 max-sm:!p-3">
+        <div className="flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, P.IVA, CF, prenotazione…" className="w-full min-w-0 sm:w-72 max-sm:flex-1" />
+          {/* Telefono: ricerca + pulsante «Filtri» + «+ Nuovo» in una riga; dal tablet in su i filtri restano inline come prima */}
+          <FilterSheet count={filtersActive} onReset={resetFilters}>
+            {filterControls}
+            <div className="flex gap-2 border-t border-line pt-2">
+              <button onClick={exportCsv} className="h-9 flex-1 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+              <button onClick={() => router.push("/impostazioni-fattura")} className="h-9 flex-1 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash">Impostazioni</button>
+            </div>
+          </FilterSheet>
+          <button onClick={createNew} disabled={creating} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 sm:hidden">{creating ? "Creo…" : "+ Nuovo"}</button>
+          <div className="contents max-sm:hidden">{filterControls}</div>
+          <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
+            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
+            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
           </div>
         </div>
       </Card>

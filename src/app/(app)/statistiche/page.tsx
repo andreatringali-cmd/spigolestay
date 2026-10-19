@@ -16,6 +16,7 @@ import Gauge from "@/components/Gauge";
 import { flagColor, flagGradient } from "@/lib/flags";
 import ScrollStrip from "@/components/ScrollStrip";
 import Icon from "@/components/Icon";
+import FilterSheet from "@/components/FilterSheet";
 import EmptyState from "@/components/EmptyState";
 import { useLang } from "@/lib/i18n";
 
@@ -34,9 +35,9 @@ export default function StatistichePage() {
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts"); if (r) setChartOrder(JSON.parse(r)); } catch {} }, []);
   const persistChartOrder = (keys: string[]) => { setChartOrder(keys); try { localStorage.setItem("spigolestay:statscharts", JSON.stringify(keys)); } catch {} };
   // Mostra/nascondi grafici (un click, tutti o nessuno) — indipendente per Mensile e Annuale.
-  const [chartsOn, setChartsOn] = useState(true);
-  const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
-  const [chartsOnY, setChartsOnY] = useState(true);
+  const [chartsOn, setChartsOn] = useState(false);
+  const toggleCharts = () => setChartsOn((v) => !v); // NASCOSTI a ogni apertura della pagina; mostrarli vale solo per questa visita
+  const [chartsOnY, setChartsOnY] = useState(false);
   const toggleChartsY = () => setChartsOnY((v) => !v);
   // Report attivo: i tanti report di Octorate condensati in 2 (Mensile, Annuale). Mensile e
   // Previsionale erano diventati sostanzialmente uguali (stessa tabella giorno per giorno, stesse
@@ -341,20 +342,23 @@ export default function StatistichePage() {
   // Riga filtro: mese (assente su Annuale, che ragiona per anno) + toggle grafici a sinistra,
   // badge "Ricavi calcolati" (influenza le KPI card, non la tabella giorno/mese che usa una
   // regola fissa — vedi nota sotto la tabella), selettore report Mensile/Annuale a destra.
-  const FilterRow = ({ showMonth }: { showMonth: boolean }) => (
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+  // Chiamata come funzione (non come <FilterRow/>) così il pulsante «Filtri» non si rimonta a ogni cambio di stato e la tendina resta aperta.
+  const FilterRow = ({ showMonth }: { showMonth: boolean }) => {
+    const filtersActive = (showMonth ? (repMonth !== curMonthKey ? 1 : 0) : (annualYear !== y ? 1 : 0)) + (basis !== "notte" ? 1 : 0) + (showMonth && cmpMode !== "prev" ? 1 : 0);
+    const resetFilters = () => { if (showMonth) setRepMonth(curMonthKey); else setAnnualYear(y); setBasis("notte"); setCmpMode("prev"); };
+    const controls = (<>
       {showMonth ? (<>
-        <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
-        <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
+        <span className="text-sm font-semibold text-txt max-sm:text-xs max-sm:text-faint">{t("Mese")}</span>
+        <select aria-label={t("Mese")} value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus max-sm:h-9 max-sm:py-0">
           {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
         </select>
       </>) : (<>
-        <span className="text-sm font-semibold text-txt">{t("Anno")}</span>
-        <select value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+        <span className="text-sm font-semibold text-txt max-sm:text-xs max-sm:text-faint">{t("Anno")}</span>
+        <select aria-label={t("Anno")} value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:py-0">
           {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
         </select>
       </>)}
-      <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto (solo le KPI card, non la tabella)")}>
+      <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim max-sm:h-9 max-sm:py-0" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto (solo le KPI card, non la tabella)")}>
         {t("Ricavi")}:
         <select value={basis} onChange={(e) => setBasis(e.target.value as "notte" | "arrivo" | "incasso")} className="min-w-0 rounded-full border-none bg-transparent py-0.5 max-sm:py-2 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
           <option value="notte">{t("Per notte (competenza)")}</option>
@@ -363,7 +367,7 @@ export default function StatistichePage() {
         </select>
       </span>
       {showMonth && (
-        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Con cosa confrontare le KPI del mese")}>
+        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim max-sm:h-9 max-sm:py-0" title={t("Con cosa confrontare le KPI del mese")}>
           {t("Confronta con")}:
           <select value={cmpMode} onChange={(e) => setCmpMode(e.target.value as "prev" | "yoy")} className="min-w-0 rounded-full border-none bg-transparent py-0.5 max-sm:py-2 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
             <option value="prev">{t("mese precedente")}</option>
@@ -371,18 +375,25 @@ export default function StatistichePage() {
           </select>
         </span>
       )}
-      <div className="ml-auto flex items-center gap-2">
+    </>);
+    return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:gap-2 max-sm:p-2">
+      {/* Desktop/tablet: mese/anno, Ricavi, Confronta con inline come prima; telefono: stanno dietro il pulsante «Filtri» */}
+      <div className="contents max-sm:hidden">{controls}</div>
+      <div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
         {(() => { const on = showMonth ? chartsOn : chartsOnY; const tog = showMonth ? toggleCharts : toggleChartsY; return (
-          <button onClick={tog} title={on ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+          <button onClick={tog} title={on ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 max-sm:order-3 max-sm:ml-auto max-sm:shrink-0 place-items-center rounded-lg border transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
         ); })()}
-        <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm">
+        <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm max-sm:order-1 max-sm:shrink-0">
           {([["produzione", t("Mensile")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
-            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 max-sm:h-8 max-sm:py-0 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
           ))}
         </div>
+        <FilterSheet count={filtersActive} onReset={resetFilters} className="max-sm:order-2">{controls}</FilterSheet>
       </div>
     </div>
-  );
+    );
+  };
 
   // Vista tabella condivisa da Mensile (giorni del mese) e Annuale (mesi dell'anno): stesse
   // colonne, stesso ordine, "madre" = quella che prima era il Previsionale.
@@ -462,7 +473,7 @@ export default function StatistichePage() {
       )}
       {report === "produzione" && (<>
       {/* KPI del mese selezionato con confronto sul mese precedente */}
-      <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mt-1 grid grid-cols-2 gap-3 max-sm:gap-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-3 lg:grid-cols-5">
         <KpiD label={t("Notti vendute")} value={String(cur.roomNights)} d={prev ? delta(cur.roomNights, prev.roomNights) : null} cmp={cmpLabel} />
         <KpiD label={t("Occupazione")} value={`${Math.round(cur.occ * 100)}%`} d={prev ? delta(cur.occ, prev.occ) : null} cmp={cmpLabel} />
         <KpiD label="ADR" value={eur(cur.adr)} d={prev ? delta(cur.adr, prev.adr) : null} cmp={cmpLabel} />
@@ -491,7 +502,7 @@ export default function StatistichePage() {
         )}
       </div>
 
-      <FilterRow showMonth />
+      {FilterRow({ showMonth: true })}
 
       {/* Registro giorno per giorno del mese — stesse colonne/ordine della tabella Annuale
           ("madre" ex-Previsionale, ora unita qui): storico + previsione, non un elenco prenotazioni. */}
@@ -520,7 +531,7 @@ export default function StatistichePage() {
         </div>
 
         {/* KPI anno con confronto sull'anno precedente */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 max-sm:gap-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-3 lg:grid-cols-5">
           <KpiD label={t("Notti vendute")} value={String(annCur.roomNights)} d={delta(annCur.roomNights, annPrev.roomNights)} cmp={String(annualYear - 1)} />
           <KpiD label={t("Occupazione")} value={`${Math.round(annCur.occ * 100)}%`} d={delta(annCur.occ, annPrev.occ)} cmp={String(annualYear - 1)} />
           <KpiD label="ADR" value={eur(annCur.adr)} d={delta(annCur.adr, annPrev.adr)} cmp={String(annualYear - 1)} />
@@ -549,7 +560,7 @@ export default function StatistichePage() {
         </div>
 
         <div className="mt-6">
-          <FilterRow showMonth={false} />
+          {FilterRow({ showMonth: false })}
           <RepTableView
             periodLabel={t("Mese")}
             rows={yearRep}

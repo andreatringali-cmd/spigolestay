@@ -16,6 +16,7 @@ import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, cashOrgOf, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, groupOpeningRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveWithin, contiOfStructure, contiKeysInScope, contoUnassigned, contoDisplayLabel, contoVisible, isContoAssigned, routeFor, principalOf, moveContoOfStructure, openingsReplacedBy, countOnConto, updateContoOfMovements, updateContoOfRules, type ContiPrefs, type ContiRouter, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides, monthlyCommissionInfo, REST_IN_PREFIX, type CashScope, cashScopeOf, scopeIds, movSid, balanceParts, balanceTotalsBySid, openingOf, signedAmount, normSid, nextRecurrenceStart } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
+import FilterSheet from "@/components/FilterSheet";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
 import { fmtDMY, fmtDate, fmtDM } from "@/lib/dates";
@@ -235,8 +236,8 @@ export default function CassaPage() {
   // Previsione a 6 mesi: dal mese in corso fino a fine del sesto mese (es. oggi 14.10 → 31.03).
   const fcEnd = useMemo(() => { const [y, m] = today.split("-").map(Number); const d = new Date(y, m - 1 + 6, 0); return fmt(d.getFullYear(), d.getMonth(), d.getDate()); }, [today]);
   const listHorizon = to || fcEnd;                   // senza "Al" la lista prevede i prossimi 6 mesi
-  const [chartsOn, setChartsOn] = useState(true);
-  const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
+  const [chartsOn, setChartsOn] = useState(false);
+  const toggleCharts = () => setChartsOn((v) => !v); // NASCOSTI a ogni apertura della pagina; mostrarli vale solo per questa visita
 
   const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(raw.bookings, guests, getStructure, rules, scope, today, fcEnd, router, payouts), overrides), [raw.bookings, guests, getStructure, rules, scopeKey, today, fcEnd, router, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
@@ -628,6 +629,46 @@ export default function CassaPage() {
     </span>
   );
 
+  // Filtri veri: scritti una volta, mostrati inline (tablet/desktop) e nella tendina «Filtri» (telefono)
+  const filterControls = (<>
+        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1 max-sm:w-full max-sm:flex-col max-sm:items-stretch max-sm:gap-2 max-sm:border-0 max-sm:p-0">
+          <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px]">
+          <option value="future">{t("Oggi e future")}</option>
+          <option value="all">{t("Tutto lo storico")}</option>
+          <option value="month">{t("Questo mese")}</option>
+          <option value="prevMonth">{t("Mese scorso")}</option>
+          <option value="year">{t("Quest'anno")}</option>
+          <option value="prevYear">{t("Anno scorso")}</option>
+          <option value="custom">{t("Personalizzato")}</option>
+          </select>
+          <div className="contents max-sm:flex max-sm:items-center max-sm:gap-2">
+            <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={from} onChange={(v) => { setFrom(v); if (v && to && v > to) setTo(""); setPreset("custom"); }} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:h-9 max-sm:w-full max-sm:whitespace-nowrap max-sm:py-0 max-sm:text-[13px]" /></div>
+            <span className="text-xs text-faint max-sm:shrink-0">→</span>
+            <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={to} onChange={(v) => { setTo(v); if (v && from && v < from) setFrom(""); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:h-9 max-sm:w-full max-sm:whitespace-nowrap max-sm:py-0 max-sm:text-[13px]" /></div>
+          </div>
+        </div>
+        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px] ${tipo === "all" ? "border-line" : "border-focus"}`}>
+        <option value="all">{t("Tutti i movimenti")}</option>
+        <option value="in">{t("Solo entrate")}</option>
+        <option value="out">{t("Solo uscite")}</option>
+        <option value="booking">{t("Prenotazioni")}</option>
+        <option value="sched">{t("Pagamenti programmati")}</option>
+        <option value="manual">{t("Inseriti a mano")}</option>
+        </select>
+        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px] ${catF ? "border-focus" : "border-line"}`}>
+        <option value="">{t("Tutte le categorie")}</option>
+        {cats.filter((c) => c.key !== OPENING_CAT && (c.key === catF || catsInRegister.has(c.key))).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
+        </select>
+  </>);
+  const filtersCount = (preset !== "future" ? 1 : 0) + (tipo !== "all" ? 1 : 0) + (catF ? 1 : 0);
+  const resetFilters = () => { applyPreset("future"); setTipo("all"); setCatF(""); };
+  const chartsBtn = (
+    <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 max-sm:h-9 max-sm:w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+  );
+  const payBtn = (
+    <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 max-sm:h-9 max-sm:w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
+  );
+
   return (
     <div>
       <PageHeader title={t("Cassa · Prima Nota")} subtitle={t("Entrate e uscite, saldo e analisi della cassa")} />
@@ -639,7 +680,7 @@ export default function CassaPage() {
       )}
 
       {/* Riepilogo */}
-      <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-2 max-sm:mb-3 sm:gap-3 lg:grid-cols-4">
         <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}{saldoPerStruttura.length > 1 && <span className="mt-0.5 block space-y-px text-[10px] leading-tight">{saldoPerStruttura.map((x) => <span key={x.sid || "comuni"} className="flex items-baseline justify-between gap-2"><span className="truncate">{x.name}</span><span className="shrink-0 font-mono">{eur(x.saldo)}</span></span>)}</span>}</> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrateCard)} color="var(--ok)" hint={`${cardRows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(usciteCard)} color="var(--err)" hint={`${cardRows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
@@ -705,39 +746,23 @@ export default function CassaPage() {
       </div>
       )}
 
-      {/* Riga filtri + toggle grafici + Esporta */}
-      <div id="cassa-filtri" className="mb-4 flex scroll-mt-16 flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="min-w-[220px] max-w-md flex-1" />
-        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
-          <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus">
-            <option value="future">{t("Oggi e future")}</option>
-            <option value="all">{t("Tutto lo storico")}</option>
-            <option value="month">{t("Questo mese")}</option>
-            <option value="prevMonth">{t("Mese scorso")}</option>
-            <option value="year">{t("Quest'anno")}</option>
-            <option value="prevYear">{t("Anno scorso")}</option>
-            <option value="custom">{t("Personalizzato")}</option>
-          </select>
-          <DateField value={from} onChange={(v) => { setFrom(v); if (v && to && v > to) setTo(""); setPreset("custom"); }} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
-          <span className="text-xs text-faint">→</span>
-          <DateField value={to} onChange={(v) => { setTo(v); if (v && from && v < from) setFrom(""); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
-        </div>
-        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
-          <option value="all">{t("Tutti i movimenti")}</option>
-          <option value="in">{t("Solo entrate")}</option>
-          <option value="out">{t("Solo uscite")}</option>
-          <option value="booking">{t("Prenotazioni")}</option>
-          <option value="sched">{t("Pagamenti programmati")}</option>
-          <option value="manual">{t("Inseriti a mano")}</option>
-        </select>
-        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
-          <option value="">{t("Tutte le categorie")}</option>
-          {cats.filter((c) => c.key !== OPENING_CAT && (c.key === catF || catsInRegister.has(c.key))).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
-        </select>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
-          <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
-          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
+      {/* Riga filtri + toggle grafici + Esporta. Telefono: ricerca + «Filtri» + «Nuovo» in UNA riga; filtri e azioni dentro la tendina «Filtri». */}
+      <div id="cassa-filtri" className="mb-4 flex scroll-mt-16 flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm max-sm:mb-3 max-sm:flex-nowrap">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="min-w-[220px] max-w-md flex-1 max-sm:min-w-0 max-sm:max-w-none" />
+        <FilterSheet count={filtersCount} onReset={resetFilters}>
+          {filterControls}
+          <div className="flex items-center gap-2 border-t border-line pt-2">
+            {chartsBtn}
+            {payBtn}
+            <div className="ml-auto"><ExportMenu onExcel={doExcel} onPdf={exportPdf} /></div>
+          </div>
+        </FilterSheet>
+        <button onClick={openNewMov} className="inline-flex h-9 w-[4.75rem] shrink-0 items-center justify-center rounded-lg bg-focus text-sm font-semibold text-white hover:opacity-90 sm:hidden">＋ {t("Nuovo")}</button>
+        <div className="contents max-sm:hidden">{filterControls}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
+          {chartsBtn}
+          {payBtn}
+          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>

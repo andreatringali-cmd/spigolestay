@@ -3,6 +3,7 @@
 import { fmtDate } from "@/lib/dates";
 import { ymdRome } from "@/lib/dates-rome";
 import DateField from "@/components/DateField";
+import FilterSheet from "@/components/FilterSheet";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -110,7 +111,7 @@ export default function AlloggiatiWebPage() {
     .filter((b) => b.structureId === sid && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn <= todayLocal && todayLocal < b.checkOut)
     .reduce((a, b) => a + (b.adults ?? 1) + (b.children ?? 0), 0);
   const totSched = readyCount + toValidate + sentCount;
-  const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+  const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 max-sm:h-9 max-sm:py-0 max-sm:inline-flex max-sm:items-center text-sm text-txt outline-none focus:border-focus";
 
   // Pill di stato (connessione portale + invio automatico 23:00) da mostrare in linea col titolo Schedine.
   const statusPills = (
@@ -152,7 +153,7 @@ export default function AlloggiatiWebPage() {
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
 
       {/* Card riepilogo in alto */}
-      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 max-sm:gap-2 lg:grid-cols-4">
         {[
           ["Ospiti in struttura", String(inHouse), "var(--ok)"],
           ["Schedine pronte", `${readyCount}/${totSched}`, "var(--ok)"],
@@ -164,18 +165,23 @@ export default function AlloggiatiWebPage() {
       </div>
 
       {/* Riga filtri (sotto le card): filtro arrivo, ricevuta, invio e ingranaggio → Impostazioni */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      {(() => { const fc = (<>
         <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
         <DateField value={filterDate} onChange={(v) => setFilterDate(v)} className={fieldCls} />
         {filterDate && <button onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Link href="/alloggiati-web/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: riscarica o stampa le ricevute quando vuoi">📁 Archivio ricevute</Link>
-        <button onClick={generaTracciato} disabled={!!busy || readyCount === 0} className={`${fieldCls} ml-auto font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il tracciato .txt da caricare a mano sul portale (se il web service non è attivo)">{busy === "tracciato" ? "Genero…" : "⬇ Genera tracciato .txt"}</button>
-        <button onClick={() => setConfirmSend(true)} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
-        <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni account" aria-label="Impostazioni account" className="grid h-9 w-9 max-sm:h-11 max-sm:w-11 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
+        <button onClick={generaTracciato} disabled={!!busy || readyCount === 0} className={`${fieldCls} ml-auto max-sm:ml-0 font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il tracciato .txt da caricare a mano sul portale (se il web service non è attivo)">{busy === "tracciato" ? "Genero…" : "⬇ Genera tracciato .txt"}</button>
+      </>); return (
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:p-2">
+        <div className="contents max-sm:hidden">{fc}</div>
+        <div className="sm:hidden"><FilterSheet count={filterDate !== ymdRome(new Date()) ? 1 : 0} onReset={() => setFilterDate(ymdRome(new Date()))}><div className="flex flex-col gap-2 [&>*]:shrink-0">{fc}</div></FilterSheet></div>
+        <button onClick={() => setConfirmSend(true)} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:ml-0 max-sm:h-9 max-sm:py-0 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
+        <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni account" aria-label="Impostazioni account" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
         </button>
       </div>
+      ); })()}
 
       {/* Schedine a tutta larghezza */}
       <Card>

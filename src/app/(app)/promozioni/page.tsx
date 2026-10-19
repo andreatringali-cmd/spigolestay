@@ -197,9 +197,9 @@ export default function PromozioniPage() {
     <div>
       <PageHeader title="Promozioni" subtitle="Crea le tue promo, salvale e inviale quando vuoi · max 4 invii l'anno" />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 max-sm:mb-3 max-sm:gap-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
         {([["Commissioni OTA (storico)", eur(otaCommission)], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!promoRecipientEmail(g)) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
-          <StatCard key={lab} label={lab} value={val} />
+          <div key={lab} className="flex [&>*]:min-w-0 [&>*]:flex-1"><StatCard label={lab} value={val} /></div>
         ))}
       </div>
 

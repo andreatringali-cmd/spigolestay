@@ -105,14 +105,14 @@ export default function TariffeDerivatePage() {
       />
 
       {/* Barra: struttura + vista Tabella / Mappa + legenda */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3 max-sm:gap-x-2.5 max-sm:gap-y-1.5 max-sm:px-2.5">
         {activeStructureId === "all" && (
-          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:py-1 max-sm:text-[13px]">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
-        <div className="inline-flex overflow-hidden rounded-lg border border-line">
+        <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line">
           <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}
           </button>
@@ -120,15 +120,18 @@ export default function TariffeDerivatePage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
           </button>
         </div>
-        <span className="h-4 w-px bg-line" />
-        <span className="font-semibold uppercase tracking-wide text-faint">{t("Legenda")}</span>
-        <span className="flex items-center gap-1.5"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
-        <span className="flex items-center gap-1.5"><span className="text-focus"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
-        <span className="flex items-center gap-1.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
+        <span className="h-4 w-px bg-line max-sm:hidden" />
+        <span className="font-semibold uppercase tracking-wide text-faint max-sm:hidden">{t("Legenda")}</span>
+        {/* Legenda: da sm in su tre elementi flex come prima (contents); su telefono un unico testo che scorre su 2 righe */}
+        <div className="contents max-sm:order-5 max-sm:block max-sm:w-full max-sm:text-[10.5px] max-sm:leading-5">
+          <span className="flex items-center gap-1.5 max-sm:mr-2 max-sm:inline"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
+          <span className="flex items-center gap-1.5 max-sm:mr-2 max-sm:inline"><span className="text-focus max-sm:inline-block max-sm:align-middle"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
+          <span className="flex items-center gap-1.5 max-sm:inline"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
+        </div>
         <button
           onClick={() => setDerivModal({ structureIds: scoped.map((s) => s.id) })}
           disabled={!scoped.some((s) => roomTypes.some((rt) => rt.structureId === s.id && !rt.deriveFrom))}
-          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10 disabled:opacity-40"
+          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:w-full max-sm:py-0 max-sm:text-[13px]"
         >＋ {t("Crea tariffa derivata")}</button>
       </div>
 

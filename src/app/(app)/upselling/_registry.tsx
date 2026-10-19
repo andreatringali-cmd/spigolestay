@@ -3,7 +3,7 @@
 // Tab "Registro": storico delle offerte (in attesa / accettata / rifiutata / scaduta), tasso di
 // conversione, ricavo e rendimento per singolo extra. Tutto calcolato dai dati reali delle prenotazioni.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { fmtDM, fmtDate } from "@/lib/dates";
@@ -12,6 +12,7 @@ import {
   offerAcceptedViaLink, offerOutcome, offerRevenue, patchAccept, patchDeleteOffer, patchSetStatus, type OfferOutcome, type UpsellStats,
 } from "@/lib/upselling";
 import EmptyState from "@/components/EmptyState";
+import FilterSheet from "@/components/FilterSheet";
 import { useToast } from "@/components/ToastProvider";
 import { useConfirm } from "@/components/ConfirmProvider";
 
@@ -28,7 +29,11 @@ const fdt = (ms: number) => fmtDate(ms);
 
 interface Row { offer: UpsellOffer; booking: Booking; outcome: OfferOutcome; structure?: Structure }
 
-export default function RegistryTab({ bookings, stats, today, structures, multiStructure }: { bookings: Booking[]; stats: UpsellStats; today: string; structures: Structure[]; multiStructure: boolean }) {
+export default function RegistryTab({ bookings, stats, today, structures, multiStructure, periodControl, periodActive, onResetPeriod }: {
+  bookings: Booking[]; stats: UpsellStats; today: string; structures: Structure[]; multiStructure: boolean;
+  /** Select del periodo (vive nella pagina): su telefono compare nel pulsante «Filtri» insieme allo stato. */
+  periodControl?: ReactNode; periodActive?: boolean; onResetPeriod?: () => void;
+}) {
   const { guests, updateBooking, openBooking, addActivity } = useData();
   const toast = useToast();
   const confirm = useConfirm();
@@ -60,16 +65,16 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 max-sm:gap-2">
         {([
           ["Offerte inviate", String(stats.offers), `${stats.pending} in attesa · ${stats.direct} vendite dirette`],
           ["Accettate / rifiutate", `${stats.accepted} / ${stats.declined + stats.expired}`, stats.expired ? `di cui ${stats.expired} scadute senza risposta` : "scadute incluse tra le rifiutate"],
           ["Tasso di conversione", stats.conversion === null ? "—" : `${Math.round(stats.conversion * 100)}%`, stats.conversion === null ? "serve almeno un'offerta decisa" : `su ${stats.accepted + stats.declined + stats.expired} decise`],
           ["Ricavo da offerte", eur(stats.acceptedRevenue), stats.pendingValue ? `+${eur(stats.pendingValue)} ancora in attesa` : "extra accettati ancora in prenotazione"],
         ] as [string, string, string][]).map(([l, v, h]) => (
-          <div key={l} className="flex min-h-[92px] flex-col justify-center rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <div key={l} className="flex min-h-[92px] flex-col justify-center rounded-xl border border-line bg-surface p-4 shadow-sm max-sm:min-h-[72px] max-sm:min-w-0 max-sm:p-3">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{l}</div>
-            <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-txt">{v}</div>
+            <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-txt max-sm:text-[clamp(0.95rem,4.6vw,1.25rem)]">{v}</div>
             <div className="mt-0.5 text-[11px] text-faint">{h}</div>
           </div>
         ))}
@@ -85,9 +90,21 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
       <div className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="mr-auto text-xs font-semibold uppercase tracking-wide text-faint">Registro offerte ({rows.length})</div>
-          {([["all", "Tutte"], ["pending", "In attesa"], ["accepted", "Accettate"], ["declined", "Rifiutate"], ["expired", "Scadute"]] as [Filter, string][]).map(([k, l]) => (
-            <button key={k} onClick={() => setFilter(k)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${filter === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{l}{counts[k] ? ` (${counts[k]})` : ""}</button>
-          ))}
+          {(() => {
+            const statusChips = ([["all", "Tutte"], ["pending", "In attesa"], ["accepted", "Accettate"], ["declined", "Rifiutate"], ["expired", "Scadute"]] as [Filter, string][]).map(([k, l]) => (
+              <button key={k} onClick={() => setFilter(k)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-9 ${filter === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{l}{counts[k] ? ` (${counts[k]})` : ""}</button>
+            ));
+            return (
+              <>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:hidden">{statusChips}</div>
+                <FilterSheet count={(filter !== "all" ? 1 : 0) + (periodActive ? 1 : 0)} onReset={() => { setFilter("all"); onResetPeriod?.(); }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Stato</div>
+                  <div className="flex flex-wrap gap-2">{statusChips}</div>
+                  {periodControl && <><div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Periodo</div>{periodControl}</>}
+                </FilterSheet>
+              </>
+            );
+          })()}
         </div>
         {rows.length === 0 ? (
           <EmptyState title="Nessuna offerta ancora inviata" sub="Quando proponi degli extra a un ospite (WhatsApp, email o testo copiato) l'offerta compare qui e potrai segnarla come accettata o rifiutata: il tasso di conversione si calcola da solo." />

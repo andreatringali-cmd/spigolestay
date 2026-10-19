@@ -134,14 +134,14 @@ export default function PianiTariffariPage() {
       />
 
       {/* Barra: struttura + vista + legenda + aggiungi */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3 max-sm:gap-x-2.5 max-sm:gap-y-1.5 max-sm:px-2.5">
         {activeStructureId === "all" && (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:py-1 max-sm:text-[13px]">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
           </select>
         )}
-        <div className="inline-flex overflow-hidden rounded-lg border border-line">
+        <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line">
           <button onClick={() => setView2("list")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "list" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
           </button>
@@ -149,11 +149,11 @@ export default function PianiTariffariPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>{t("Schede")}
           </button>
         </div>
-        <span className="h-4 w-px bg-line" />
-        <span className="flex items-center gap-1.5"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>+%</span> {t("aumento")}</span>
-        <span className="flex items-center gap-1.5"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>−%</span> {t("sconto")}</span>
+        <span className="h-4 w-px bg-line max-sm:hidden" />
+        <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>+%</span> {t("aumento")}</span>
+        <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>−%</span> {t("sconto")}</span>
         <span className="hidden sm:inline">🛏️ {t("trattamento")} · 📅 {t("intervallo")} · 💳 {t("incasso")}</span>
-        <button onClick={addPlan} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">＋ {t("Nuovo piano")}</button>
+        <button onClick={addPlan} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px]">＋ {t("Nuovo piano")}</button>
       </div>
 
       {view === "list" ? (

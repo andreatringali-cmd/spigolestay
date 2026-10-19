@@ -144,10 +144,10 @@ export default function RateCheckerPage() {
       <PageHeader title="Rate checker" subtitle={t("Confronta le tue tariffe con i competitor della zona")} />
 
       {/* Stato connettore rate shopping */}
-      <Card className="mb-5">
-        <div className="flex flex-wrap items-center gap-3">
+      <Card className="mb-5 max-sm:mb-3">
+        <div className="flex flex-wrap items-center gap-3 max-sm:gap-2">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: isConfigured ? "var(--ok)" : "var(--warn)" }}>{isConfigured ? "✓" : "!"}</span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 max-sm:basis-0">
             <div className="text-sm font-semibold text-txt">{t("Confronto competitor")}</div>
             <div className="text-xs text-dim">
               {configured === null && loading ? t("Verifica del servizio in corso…")
@@ -155,7 +155,7 @@ export default function RateCheckerPage() {
                 : t("Nessun provider collegato. Imposta le variabili d'ambiente per attivare il confronto con dati reali.")}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:[&>button]:flex-1">
             <button onClick={() => setShowConfig((v) => !v)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash max-sm:min-h-10">{t("Competitor")}{competitors.length ? ` · ${competitors.length}` : ""}</button>
             <button onClick={() => void refresh()} disabled={loading} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60 max-sm:min-h-10">{loading ? t("Aggiorno…") : t("Aggiorna")}</button>
           </div>
@@ -212,7 +212,7 @@ export default function RateCheckerPage() {
 
       {/* Pannello: provider non collegato */}
       {configured === false && (
-        <Card className="mb-5">
+        <Card className="mb-5 max-sm:mb-3">
           <SectionTitle>{t("Collega un provider di rate shopping")}</SectionTitle>
           <p className="text-sm text-dim">{t("Il confronto con i competitor diventa reale appena colleghi un provider di rate shopping (es. servizi che leggono le tariffe di Booking/Google Hotels). Imposta queste variabili d'ambiente sul server (Vercel) e riavvia:")}</p>
           <div className="mt-3 space-y-2">
@@ -237,7 +237,7 @@ export default function RateCheckerPage() {
           )}
         </div>
         {isConfigured && summary.n > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] max-sm:gap-1.5">
             <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--ok)", background: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{summary.sotto} {t("giorni sotto mercato")}</span>
             <span className="rounded-full bg-wash px-2.5 py-1 font-semibold text-dim">{summary.linea} {t("in linea")}</span>
             <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--err)", background: "color-mix(in srgb, var(--err) 14%, transparent)" }}>{summary.sopra} {t("giorni sopra mercato")}</span>

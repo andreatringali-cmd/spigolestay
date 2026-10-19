@@ -97,41 +97,53 @@ export default function UpsellingPage() {
 
   const TABS: [Tab, string][] = [["proposte", `Proposte${withProposals.length ? ` (${withProposals.length})` : ""}`], ["registro", `Registro offerte${stats.offers ? ` (${stats.offers})` : ""}`], ["catalogo", `Catalogo${catExtras.length ? ` (${catExtras.length})` : ""}`]];
   const attach = stats.bookings ? Math.round((stats.withExtra / stats.bookings) * 100) : 0;
+  // Periodo del Registro: a destra delle schede da sm in su, dentro il pulsante «Filtri» del Registro su telefono.
+  const periodSelect = (
+    <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Periodo" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus max-sm:h-9 max-sm:py-1 max-sm:text-[13px]">
+      {PERIODS.map((p) => <option key={p.k} value={p.k}>{p.label}</option>)}
+    </select>
+  );
 
   return (
     <div>
       <PageHeader title="Upselling & extra" subtitle="Proponi servizi ed esperienze agli ospiti, registra le risposte e misura quanto ricavo aggiungono" />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 max-sm:mb-3 max-sm:gap-2">
         <StatCard label="Da proporre" value={String(withProposals.length)} hint={withProposals.length ? `potenziale max +${eur(potential)} (prossimi ${windowDays} gg)` : `prenotazioni con proposte (prossimi ${windowDays} gg)`} />
         <StatCard label="Offerte inviate" value={String(stats.offers)} hint={`${stats.pending} in attesa di risposta`} />
         <StatCard label="Conversione" value={stats.conversion === null ? "—" : `${Math.round(stats.conversion * 100)}%`} hint={stats.conversion === null ? "nessuna offerta ancora decisa" : `${stats.accepted} accettate su ${stats.accepted + stats.declined + stats.expired} decise`} />
         <StatCard label="Extra venduti" value={eur(stats.soldRevenue)} hint={stats.bookings ? `${attach}% delle prenotazioni ha un extra` : "nessuna prenotazione nel periodo"} />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-line">
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${tab === k ? "border-focus font-semibold text-focus" : "border-transparent text-dim hover:text-txt"}`}>{l}</button>
-        ))}
-        <div className="ml-auto flex flex-wrap items-center gap-2 pb-1">
-          {tab === "catalogo" && activeStructureId === "all" && structures.length > 0 && (
-            <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus">
-              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          )}
-          {tab === "registro" && (
-            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus">
-              {PERIODS.map((p) => <option key={p.k} value={p.k}>{p.label}</option>)}
-            </select>
-          )}
-        </div>
-      </div>
+      {/* Selettori: da sm in su stanno a destra delle schede; su telefono il periodo del Registro sta nel pulsante «Filtri» del Registro
+          e la struttura del Catalogo (un solo filtro) sta in una riga a tutta larghezza sotto le schede. */}
+      {(() => {
+        const catSelect = tab === "catalogo" && activeStructureId === "all" && structures.length > 0 ? (
+          <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus max-sm:h-9 max-sm:w-full max-sm:py-1 max-sm:text-[13px]">
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        ) : null;
+        return (
+          <>
+            <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-line max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-0">
+              {TABS.map(([k, l]) => (
+                <button key={k} onClick={() => setTab(k)} className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-center max-sm:text-[13px] ${tab === k ? "border-focus font-semibold text-focus" : "border-transparent text-dim hover:text-txt"}`}>{l}</button>
+              ))}
+              <div className="ml-auto flex flex-wrap items-center gap-2 pb-1 max-sm:hidden">
+                {catSelect}
+                {tab === "registro" && periodSelect}
+              </div>
+            </div>
+            {catSelect && <div className="mb-3 sm:hidden">{catSelect}</div>}
+          </>
+        );
+      })()}
 
       {tab === "proposte" && (
         <ProposalsTab key={activeStructureId} candidates={candidates} today={today} windowDays={windowDays} setWindowDays={setWindowDays} showEmpty={showEmpty} setShowEmpty={setShowEmpty} catalogEmpty={catalogEmpty} goCatalog={() => setTab("catalogo")} estimate={estimate} />
       )}
       {tab === "registro" && (
-        <RegistryTab key={activeStructureId} bookings={periodBookings} stats={stats} today={today} structures={structures} multiStructure={activeStructureId === "all" && structures.length > 1} />
+        <RegistryTab key={activeStructureId} bookings={periodBookings} stats={stats} today={today} structures={structures} multiStructure={activeStructureId === "all" && structures.length > 1} periodControl={periodSelect} periodActive={period !== "365"} onResetPeriod={() => setPeriod("365")} />
       )}
       {tab === "catalogo" && (
         structures.length === 0

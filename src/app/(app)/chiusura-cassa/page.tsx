@@ -153,21 +153,21 @@ export default function ChiusuraCassaPage() {
     <div>
       <PageHeader title="Chiusura cassa" subtitle="Quadratura del contante di giornata"
         actions={<div className="flex flex-wrap items-center gap-2">
-          <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Esporta</button>
-          <button onClick={printClose} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Stampa</button>
+          <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">Esporta</button>
+          <button onClick={printClose} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">Stampa</button>
         </div>} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+      <div className="grid gap-4 max-sm:gap-3 lg:grid-cols-2">
+        <Card className="max-sm:!p-3">
           <SectionTitle>Quadratura</SectionTitle>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <label className={lbl}>Giorno<DateField value={day} onChange={(v) => setDay(v)} className={inp} /></label>
             <label className={lbl}>Conto<select value={conto} onChange={(e) => setConto(e.target.value)} className={inp}>{conti.map((c) => <option key={c} value={c}>{contoLabel(c)}</option>)}</select></label>
             {/* Filtro struttura solo se in alto a destra è selezionato "Tutte" */}
             {!singleBase ? (
-              <label className={`${lbl} sm:col-span-2`}>Struttura<select value={struct} onChange={(e) => setStruct(e.target.value)} className={inp}><option value="all">{typeof baseScope === "string" ? "Tutte le strutture" : "Tutte le selezionate"}</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+              <label className={`${lbl} col-span-2`}>Struttura<select value={struct} onChange={(e) => setStruct(e.target.value)} className={inp}><option value="all">{typeof baseScope === "string" ? "Tutte le strutture" : "Tutte le selezionate"}</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             ) : (
-              <div className="sm:col-span-2 text-xs text-dim">Struttura: <b className="text-txt">{scopeName}</b></div>
+              <div className="col-span-2 text-xs text-dim">Struttura: <b className="text-txt">{scopeName}</b></div>
             )}
           </div>
           <div className="mt-3 flex flex-col gap-1 rounded-lg bg-wash p-3 text-sm">
@@ -184,7 +184,7 @@ export default function ChiusuraCassaPage() {
           {msg && <p className="mt-2 text-[12px] font-medium text-dim">{msg}</p>}
         </Card>
 
-        <Card>
+        <Card className="max-sm:!p-3">
           <SectionTitle>Dettaglio movimenti del giorno</SectionTitle>
           <div className="mt-2 max-h-[42dvh] overflow-y-auto">
             {dayMovs.map((m) => (
@@ -198,7 +198,7 @@ export default function ChiusuraCassaPage() {
         </Card>
       </div>
 
-      <Card className="mt-4">
+      <Card className="mt-4 max-sm:mt-3 max-sm:!p-3">
         <SectionTitle>Chiusure recenti</SectionTitle>
         <div className="mt-2">
           {closures.map((c) => (

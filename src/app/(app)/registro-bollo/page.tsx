@@ -9,6 +9,7 @@ import { useData } from "@/lib/store";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { PageHeader, StatCard, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
+import FilterSheet from "@/components/FilterSheet";
 import { eur } from "@/lib/format";
 import { fmtDate } from "@/lib/dates";
 import { STATO, DOC_KIND_LABEL } from "@/lib/invoicing/client";
@@ -45,7 +46,7 @@ export default function RegistroBolloPage() {
   const rejected = ofYear.filter((r) => r.stato === "scartata");
   const cents = (c: number) => c / 100;
   const today = todayLocalISO();
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:shrink-0 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
   const structName = (id: string | null) => allStructures.find((s) => s.id === id)?.name ?? "—";
   const cpName = (r: Row) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
 
@@ -55,18 +56,26 @@ export default function RegistroBolloPage() {
     downloadCsv(`registro-bollo-${year}${quarter !== "all" ? `-T${quarter}` : ""}`, buildCsv(head, lines));
   };
 
+  const filterControls = (<>
+    <select value={String(quarter)} onChange={(e) => setQuarter(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutto l&apos;anno</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>{q}º trimestre</option>)}</select>
+    <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{[...new Set([String(year), ...years])].map((y) => <option key={y} value={y}>{y}</option>)}</select>
+  </>);
+  const filtersActive = (quarter !== "all" ? 1 : 0) + (year !== new Date().getFullYear() ? 1 : 0);
+  const resetFilters = () => { setQuarter("all"); setYear(new Date().getFullYear()); };
+
   return (
     <div>
       <PageHeader title="Registro bollo virtuale" subtitle="Imposta di bollo (2€) sui documenti emessi — da versare all'Agenzia delle Entrate"
         actions={<div className="flex flex-wrap items-center gap-2">
-          <select value={String(quarter)} onChange={(e) => setQuarter(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutto l&apos;anno</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>{q}º trimestre</option>)}</select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{[...new Set([String(year), ...years])].map((y) => <option key={y} value={y}>{y}</option>)}</select>
-          <button onClick={exportCsv} disabled={shown.length === 0} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Esporta CSV</button>
+          {/* Telefono: i due filtri stanno dietro il pulsante «Filtri»; dal tablet in su restano inline come prima */}
+          <div className="contents max-sm:hidden">{filterControls}</div>
+          <FilterSheet count={filtersActive} onReset={resetFilters}>{filterControls}</FilterSheet>
+          <button onClick={exportCsv} disabled={shown.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50 max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]">Esporta CSV</button>
         </div>} />
 
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 sm:grid-cols-5">
         {quarters.map((q) => <StatCard key={q.q} label={`${q.q}º trimestre`} value={eur(cents(q.cents))} hint={`${q.count} doc.`} onClick={() => setQuarter(quarter === q.q ? "all" : q.q)} active={quarter === q.q} />)}
         <StatCard label={`Totale ${year}`} value={eur(cents(totalYear))} color="var(--focus)" hint={`${ofYear.length} doc.`} />
       </div>

@@ -90,12 +90,15 @@ export default function AnagraficaClientiPage() {
   return (
     <div>
       <PageHeader title="Anagrafica clienti / agenzie" subtitle="Intestatari riutilizzabili per fatture e documenti" />
-      <Card className="mb-4">
+      <Card className="mb-4 max-sm:mb-3 max-sm:p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" className="w-full sm:w-72" />
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className={sel}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-          <button onClick={() => { setErr(""); setEdit(emptyForm()); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">+ Nuovo</button>
-          {ficOn && <button onClick={openSync} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Sincronizza con Fatture in Cloud</button>}
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" className="w-full sm:w-72 max-sm:order-1 max-sm:w-[calc(100%-6rem)]" />
+          {/* Telefono: un solo filtro (il tipo) → resta in riga, a tutta larghezza, senza pulsante «Filtri»; con Fatture in Cloud collegato «Sincronizza» gli sta accanto */}
+          <div className="flex items-center gap-2 max-sm:order-3 max-sm:w-full sm:contents">
+            <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${sel} max-sm:h-9 max-sm:min-h-0 max-sm:min-w-0 max-sm:flex-1 max-sm:py-0 max-sm:text-[13px]`}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            {ficOn && <button onClick={openSync} className="ml-auto whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:ml-0 max-sm:h-9 max-sm:min-h-0 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px] sm:order-1">Sincronizza<span className="max-sm:hidden"> con Fatture in Cloud</span></button>}
+          </div>
+          <button onClick={() => { setErr(""); setEdit(emptyForm()); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:order-2 max-sm:h-9 max-sm:min-h-0 max-sm:w-[5.5rem] max-sm:py-0">+ Nuovo</button>
         </div>
       </Card>
 
@@ -112,9 +115,9 @@ export default function AnagraficaClientiPage() {
                 <td className="px-3 py-2.5 text-xs text-dim">{c.sdi_code || c.pec || "—"}</td>
               </tr>
             ))}
-            {!loading && filtered.length === 0 && <tr><td colSpan={5}><EmptyState title="Nessun intestatario" sub="Aggiungi clienti e agenzie ricorrenti con “+ Nuovo”." /></td></tr>}
           </tbody>
         </table>
+        {!loading && filtered.length === 0 && <EmptyState title="Nessun intestatario" sub="Aggiungi clienti e agenzie ricorrenti con “+ Nuovo”." />}
       </div>
 
       {sync.open && (

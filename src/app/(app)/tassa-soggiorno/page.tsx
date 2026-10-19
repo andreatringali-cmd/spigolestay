@@ -8,6 +8,7 @@ import { plural } from "@/lib/plural";
 import { csvSafe } from "@/lib/invoicing/csv";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import FilterSheet from "@/components/FilterSheet";
 import { cityTaxForBooking, cityTaxRulesOf, DEFAULT_CITY_TAX_RULES } from "@/lib/citytax";
 
 const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
@@ -161,30 +162,42 @@ export default function TassaSoggiornoPage() {
     [...istat.map((r) => [r.paese, r.arrivi, r.presenze]), ["TOTALE", totArrivi, totPresenze]],
   );
 
+  const periodControls = (<>
+    {mode === "mese" ? (
+      <label className="text-xs text-dim max-sm:flex max-sm:items-center max-sm:gap-2">{t("Mese")}<select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={sel}>{MONTHS.map((m, i) => (<option key={m} value={i}>{t(m)}</option>))}</select></label>
+    ) : (
+      <label className="text-xs text-dim max-sm:flex max-sm:items-center max-sm:gap-2">{t("Trimestre")}<select value={quarter} onChange={(e) => setQuarter(Number(e.target.value))} className={sel}>{[1, 2, 3, 4].map((q) => (<option key={q} value={q}>{q}º {t("trimestre")}</option>))}</select></label>
+    )}
+    <label className="text-xs text-dim max-sm:flex max-sm:items-center max-sm:gap-2">{t("Anno")}<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{years.map((y) => (<option key={y} value={y}>{y}</option>))}</select></label>
+  </>);
+  const nowD = new Date();
+  const filtersActive = (year !== nowD.getFullYear() ? 1 : 0) + (mode === "mese" ? (month !== nowD.getMonth() ? 1 : 0) : (quarter !== Math.floor(nowD.getMonth() / 3) + 1 ? 1 : 0));
+  const resetFilters = () => { setYear(nowD.getFullYear()); setMonth(nowD.getMonth()); setQuarter(Math.floor(nowD.getMonth() / 3) + 1); };
+
   return (
     <div>
       <PageHeader
         title={t("Tassa di soggiorno")}
         subtitle={t("Partita di giro · esclusa da ricavi e statistiche")}
-        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white">{t("Stampa dichiarazione")}</button>}
+        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white max-sm:hidden">{t("Stampa dichiarazione")}</button>}
       />
 
       {/* Periodo */}
-      <Card className="mb-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex items-center rounded-lg border border-line p-0.5">
+      <Card className="mb-4 max-sm:mb-3 max-sm:!p-3">
+        <div className="flex flex-wrap items-end gap-4 max-sm:gap-2">
+          {/* Telefono: il segmento Mese|Trimestre resta in riga, il periodo e l'anno stanno dietro il pulsante «Filtri»; sotto, il totale con «Stampa» */}
+          <div className="flex shrink-0 items-center rounded-lg border border-line p-0.5 max-sm:flex-1">
             <Toggle active={mode === "mese"} onClick={() => setMode("mese")}>{t("Mese")}</Toggle>
             <Toggle active={mode === "trimestre"} onClick={() => setMode("trimestre")}>{t("Trimestre")}</Toggle>
           </div>
-          {mode === "mese" ? (
-            <label className="text-xs text-dim">{t("Mese")}<select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={sel}>{MONTHS.map((m, i) => (<option key={m} value={i}>{t(m)}</option>))}</select></label>
-          ) : (
-            <label className="text-xs text-dim">{t("Trimestre")}<select value={quarter} onChange={(e) => setQuarter(Number(e.target.value))} className={sel}>{[1, 2, 3, 4].map((q) => (<option key={q} value={q}>{q}º {t("trimestre")}</option>))}</select></label>
-          )}
-          <label className="text-xs text-dim">{t("Anno")}<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{years.map((y) => (<option key={y} value={y}>{y}</option>))}</select></label>
-          <div className="ml-auto text-right">
-            <div className="text-xs text-dim">{t("Imposta da versare")} · {label}</div>
-            <div className="font-mono text-2xl font-bold text-txt">{eur(total)}</div>
+          <FilterSheet count={filtersActive} onReset={resetFilters}>{periodControls}</FilterSheet>
+          <div className="contents max-sm:hidden">{periodControls}</div>
+          <div className="ml-auto text-right max-sm:flex max-sm:w-full max-sm:items-center max-sm:justify-between max-sm:gap-3">
+            <button onClick={stampaDichiarazione} className="h-9 shrink-0 rounded-lg bg-focus px-3 text-[13px] font-semibold text-white sm:hidden">{t("Stampa dichiarazione")}</button>
+            <div>
+              <div className="text-xs text-dim">{t("Imposta da versare")} · {label}</div>
+              <div className="font-mono text-2xl font-bold text-txt max-sm:text-xl">{eur(total)}</div>
+            </div>
           </div>
         </div>
       </Card>
@@ -295,7 +308,7 @@ export default function TassaSoggiornoPage() {
 }
 
 const inp = "w-28 rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
-const sel = "mt-1 block rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+const sel = "mt-1 block rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:mt-0 max-sm:h-9 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="text-xs text-dim">{label}<div className="mt-1">{children}</div></label>;

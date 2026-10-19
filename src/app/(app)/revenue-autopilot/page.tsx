@@ -23,6 +23,7 @@ import { buildChanges, recordBatches, type RevenueSource } from "@/lib/revenue-h
 import { scanGaps } from "@/lib/revenue-gaps";
 import { plural } from "@/lib/plural";
 import ImpactPreview from "@/components/ImpactPreview";
+import FilterSheet from "@/components/FilterSheet";
 import PriceHistoryCard from "@/components/PriceHistoryCard";
 
 const fmtDay = (iso: string) => `${new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} ${fmtDM(iso)}`;
@@ -175,24 +176,27 @@ export default function RevenueAutopilotPage() {
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
 
+  // Fonti dati: onesto su cosa è reale ora e cosa arriva (inline da sm in su; su telefono dietro il pulsante «Fonti dati»)
+  const sourceChips = (<>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--ok)" }} />Dati tuoi · occupazione reale dalle prenotazioni</span>
+    {signal.hasZoneData
+      ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--focus)" }} />Media di zona attiva{city ? ` · ${city}` : ""}</span>
+      : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">Media di zona (Rete città): in arrivo</span>}
+    {signal.hasZoneData && pulseHasDemo(pulse) && (
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title="La media di zona include strutture demo dimostrative, non solo concorrenti reali.">Include dati dimostrativi</span>
+    )}
+  </>);
+
   return (
     <div>
       <PageHeader title="Revenue Autopilot" subtitle="Il pilota prezzi: suggerisce e applica tariffe ottimali giorno per giorno" />
 
-      {/* Fonti dati: onesto su cosa è reale ora e cosa arriva */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px]">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ok)" }} />Dati tuoi · occupazione reale dalle prenotazioni</span>
-        {signal.hasZoneData
-          ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />Media di zona attiva{city ? ` · ${city}` : ""}</span>
-          : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">Media di zona (Rete città): in arrivo</span>}
-        {signal.hasZoneData && pulseHasDemo(pulse) && (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title="La media di zona include strutture demo dimostrative, non solo concorrenti reali.">Include dati dimostrativi</span>
-        )}
-      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] max-sm:hidden">{sourceChips}</div>
+      <div className="mb-3 flex items-center text-[11px] sm:hidden"><FilterSheet label="Fonti dati"><div className="flex flex-col items-start gap-2 text-[11px]">{sourceChips}</div></FilterSheet></div>
 
       {/* Previsione storica per il prossimo weekend: solo se la confidenza è sufficiente (mai un numero inventato). */}
       {weekendForecast.length > 0 && (
-        <Card className="mb-4">
+        <Card className="mb-4 max-sm:mb-3">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Previsione basata sullo storico · non è intelligenza artificiale, è una media pesata dei tuoi dati reali</div>
           <ul className="space-y-1 text-sm text-txt">
             {weekendForecast.map((f) => (
@@ -206,14 +210,14 @@ export default function RevenueAutopilotPage() {
       )}
 
       {/* Riepilogo + interruttore autopilot */}
-      <div className="mb-4 grid gap-3 lg:grid-cols-4">
-        <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Suggerimenti</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{suggestions.length}</div></Card>
-        <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Rialzi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{up.length}</div></Card>
-        <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Ribassi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--warn)" }}>{down.length}</div></Card>
-        <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Effetto se si vendono le camere libere</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: impact.net >= 0 ? "var(--ok)" : "var(--warn)" }}>{impact.net >= 0 ? "+" : "−"}{eur(Math.abs(impact.net))}</div><div className="mt-0.5 text-[10px] text-faint">su {impact.freeNightRooms} notti-camera libere · {impact.soldNightRooms} già vendute restano al loro prezzo</div></Card>
+      <div className="mb-4 grid gap-3 max-sm:mb-3 max-sm:grid-cols-3 max-sm:gap-2 lg:grid-cols-4">
+        <Card className="max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Suggerimenti</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{suggestions.length}</div></Card>
+        <Card className="max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Rialzi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{up.length}</div></Card>
+        <Card className="max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Ribassi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--warn)" }}>{down.length}</div></Card>
+        <Card className="max-sm:col-span-3 max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Effetto se si vendono le camere libere</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: impact.net >= 0 ? "var(--ok)" : "var(--warn)" }}>{impact.net >= 0 ? "+" : "−"}{eur(Math.abs(impact.net))}</div><div className="mt-0.5 text-[10px] text-faint">su {impact.freeNightRooms} notti-camera libere · {impact.soldNightRooms} già vendute restano al loro prezzo</div></Card>
       </div>
 
-      <Card className="mb-4">
+      <Card className="mb-4 max-sm:mb-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button onClick={() => setCfgPersist({ on: !cfg.on })} className="relative h-7 w-12 rounded-full transition" style={{ backgroundColor: cfg.on ? "var(--ok)" : "var(--line)" }} title="Autopilot: applica i suggerimenti da solo">
@@ -253,7 +257,7 @@ export default function RevenueAutopilotPage() {
       )}
 
       {/* Notti orfane: buchi di 1-2 notti tra due prenotazioni della stessa camera */}
-      <Card className="mb-4">
+      <Card className="mb-4 max-sm:mb-3">
         <div className="mb-2 flex items-center justify-between">
           <SectionTitle>Notti orfane · prossimi 60 giorni</SectionTitle>
           <span className="text-[11px] text-faint">{gapScan.gaps.length ? `${gapScan.gaps.length} buchi` : "da prenotazioni reali"}</span>

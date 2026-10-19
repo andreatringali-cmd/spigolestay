@@ -59,11 +59,11 @@ export default function FatturePage() {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{planName}</div>{added.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{added.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}</Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(monthly)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((monthly / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((monthly - monthly / (1 + VAT)) * 100) / 100)}</div></Card>
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 max-sm:mb-3 max-sm:gap-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 max-sm:[&>*]:min-w-0">
+        <Card className="!p-4 max-sm:!p-3"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{planName}</div>{added.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{added.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}</Card>
+        <Card className="!p-4 max-sm:!p-3"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(monthly)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((monthly / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((monthly - monthly / (1 + VAT)) * 100) / 100)}</div></Card>
         {/* Durante la prova la data della prima fattura è quella di fine prova; dopo, il rinnovo lo conosce solo Stripe: non si inventa una data. */}
-        <Card className="!p-4"><div className="text-xs text-dim">{trial?.inTrial ? t("Prima fattura") : t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{trial?.inTrial ? fmtDay(trial.firstInvoice) : "—"}</div><div className="mt-0.5 text-[11px] text-faint">{trial?.inTrial ? t("Al termine della prova gratuita") : t("Vedi la data di rinnovo nel portale pagamenti")}</div></Card>
+        <Card className="!p-4 max-sm:!p-3"><div className="text-xs text-dim">{trial?.inTrial ? t("Prima fattura") : t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{trial?.inTrial ? fmtDay(trial.firstInvoice) : "—"}</div><div className="mt-0.5 text-[11px] text-faint">{trial?.inTrial ? t("Al termine della prova gratuita") : t("Vedi la data di rinnovo nel portale pagamenti")}</div></Card>
       </div>
 
       <Card>

@@ -412,7 +412,7 @@ export default function AdempimentiPage() {
       <PageHeader title="Adempimenti oggi" subtitle="Tutto ciò che va gestito o inviato, in ordine cronologico" actions={<><Link href="/adempimenti-2" className="rounded-lg px-2.5 py-2 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt">Prova Adempimenti 2</Link><WeatherWidget compact /></>} />
 
       {/* Riepilogo d'impatto: quante cose da gestire e con che priorità */}
-      <section className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5">
+      <section className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-line bg-surface p-4 shadow-sm max-sm:mb-3 max-sm:gap-x-3 max-sm:gap-y-2 max-sm:p-3 sm:p-5">
         <div className="flex items-center gap-3.5">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl font-bold" style={{ background: soft(headTone), color: headTone }}>{allClear ? "✓" : totalTasks}</div>
           <div>
@@ -423,14 +423,14 @@ export default function AdempimentiPage() {
         {!allClear && (
           <>
             <div className="hidden h-10 w-px bg-line sm:block" />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 max-sm:flex-1 max-sm:gap-1.5">
               {urgent > 0 && <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: soft("var(--err)"), color: "var(--err)" }}><b className="font-mono">{urgent}</b> urgenti</span>}
               {toDo > 0 && <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: soft("var(--focus)"), color: "var(--focus)" }}><b className="font-mono">{toDo}</b> da fare</span>}
             </div>
           </>
         )}
         {/* Azione "in un click": elabora TUTTI gli adempimenti PA dovuti (schedine, ISTAT, tassa) in sequenza. */}
-        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 max-sm:w-full max-sm:justify-center max-sm:py-3 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
+        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 max-sm:ml-auto max-sm:shrink-0 max-sm:justify-center max-sm:px-3 max-sm:py-2.5 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
           <span aria-hidden>⚡</span>{runBusy ? "Elaboro…" : "Elabora tutto"}
         </button>
       </section>

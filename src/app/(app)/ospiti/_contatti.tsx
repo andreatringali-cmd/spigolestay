@@ -49,7 +49,7 @@ export default function ContattiDaCorreggere() {
   const tidyAll = useMemo(() => guests.filter((g) => { if (!g.phone) return false; const p = contactReportCached({ phone: g.phone, country: g.country }).phone; return !!p.pretty && p.pretty !== g.phone; }), [guests]);
   const uniforma = () => updateGuests(tidyAll.map((g) => ({ id: g.id, patch: { phone: contactReportCached({ phone: g.phone, country: g.country }).phone.pretty! } })));
   const tidyBar = tidyAll.length > 0 && (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3">
       <span><b className="text-txt">{tidyAll.length}</b> numeri di telefono sono scritti in formati diversi (trattini, spazi, con o senza prefisso).</span>
       <button onClick={uniforma} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 max-sm:min-h-10">Uniforma i numeri</button>
     </div>

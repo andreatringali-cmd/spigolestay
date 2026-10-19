@@ -85,12 +85,12 @@ export default function ProductPage() {
     <>
       <button onClick={() => router.push("/forniture")} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-dim hover:text-txt"><Icon name="chevron" size={14} style={{ transform: "rotate(180deg)" }} /> Catalogo</button>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 max-sm:gap-4 lg:grid-cols-2">
         {/* immagine */}
         <div>
           <div className="overflow-hidden rounded-2xl border border-line bg-wash">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img} alt={p.name} className="aspect-[4/3] w-full object-cover" />
+            <img src={img} alt={p.name} className="aspect-[4/3] w-full object-cover max-sm:aspect-[16/10]" />
           </div>
           {p.customizable && logo && (
             <Card className="mt-3">

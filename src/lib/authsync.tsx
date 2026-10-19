@@ -27,9 +27,10 @@ import DeltaBar from "@/components/DeltaBar";
 import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig } from "./org-cassa-config";
 import { buildDelta, isEmptyDelta } from "./sync-delta";
+import { flatHash as flatHashOf } from "./sync-flat";
 import { deltaAllowedFor } from "./delta-allow";
 import { applyRaceChanges } from "./sync-merge";
-import { isSyncKey, LOCAL_OWNER_KEY, contentSig, settingsSig, mergeSnapshots } from "./sync-core";
+import { isSyncKey, LOCAL_OWNER_KEY, SYNCBASE_KEY, decideEntry, syncBaseText, readSyncBase, contentSig, settingsSig, mergeSnapshots } from "./sync-core";
 
 // Pulizia una tantum: la vecchia copia nel localStorage occupava ~400 KB di una quota di ~5 MB.
 if (typeof window !== "undefined") { try { localStorage.removeItem("spigolestay:channex-arisnapshot"); } catch { /* storage non disponibile */ } }
@@ -65,7 +66,31 @@ function wipeLocalAccount() {
   try {
     kvKeys().filter(isSyncKey).forEach((k) => kvRemove(k));
     sessionStorage.removeItem("spigolestay:loginlogged");
+    sessionStorage.removeItem("spigolestay:hydrated-for");
+    // Marcatore dei dati locali e base persistente non sono chiavi sincronizzate (SKIP_KEYS): restano dopo il wipe e vanno tolti a mano. A locale vuoto non c'è nulla da proteggere.
+    try { localStorage.removeItem(LOCAL_OWNER_KEY); localStorage.removeItem(SYNCBASE_KEY); } catch {}
+    // Marcatori "una volta per sessione" dell'account precedente (ultimo accesso già registrato): per il nuovo account vanno rifatti.
+    try { Object.keys(sessionStorage).filter((k) => k.startsWith("spigolestay:stamped:")).forEach((k) => sessionStorage.removeItem(k)); } catch {}
   } catch {}
+}
+
+// BASE PERSISTENTE della sincronizzazione (per dispositivo): impronte (non i contenuti) delle chiavi piatte all'ultima sync riuscita, legate all'uid.
+// Serve alla fusione a 3 vie delle chiavi piatte (sync-flat.ts) anche dopo un ricaricamento, quando la base in memoria è vuota. Se l'uid è diverso o manca si scarta.
+// Si scrive SOLO dopo che il server ha lo stato fuso e il locale è stato aggiornato (restore riuscito): mai una base che dica "sincronizzato" per ciò che non lo è.
+function loadSyncBase(uid: string): Record<string, string> | null {
+  try { return readSyncBase(localStorage.getItem(SYNCBASE_KEY), uid); } catch { return null; }
+}
+const hashMemo = new Map<string, { raw: string; h: string | undefined }>(); // evita di rifare l'impronta di valori grandi identici a ogni ciclo
+function commitSyncBase(uid: string, last: Record<string, string>) {
+  try {
+    if (!last || Object.keys(last).length === 0) return; // niente da ricordare: non si cancella la base buona con una vuota
+    const txt = syncBaseText(uid, last, (k, raw) => {
+      const m = hashMemo.get(k);
+      if (m && m.raw === raw) return m.h;
+      const h = flatHashOf(raw); hashMemo.set(k, { raw, h }); return h;
+    });
+    if (localStorage.getItem(SYNCBASE_KEY) !== txt) localStorage.setItem(SYNCBASE_KEY, txt);
+  } catch { /* storage pieno o non disponibile: la base resta quella di prima (più vecchia = più prudente) */ }
 }
 
 // A chi appartengono i dati ora salvati in locale (uid). Senza questo, un dispositivo/browser
@@ -265,9 +290,9 @@ async function writeRowWithLock(client: SbClient, table: string, idCol: string, 
 
 type SyncRef = { rev: number; last: Record<string, string> };
 // Salva un singolo store (personale o org) con fusione 3 vie + lucchetto. Aggiorna ref. Ritorna il merge.
-async function saveOne(client: SbClient, table: string, idCol: string, idVal: string, snap: Record<string, string>, ref: SyncRef): Promise<{ merged: Record<string, string>; wrote: boolean }> {
+async function saveOne(client: SbClient, table: string, idCol: string, idVal: string, snap: Record<string, string>, ref: SyncRef, baseHashes?: Record<string, string> | null): Promise<{ merged: Record<string, string>; wrote: boolean }> {
   const { data: serverData, rev: serverRev } = await readRow(client, table, idCol, idVal);
-  const merged = mergeSnapshots(snap, serverData, ref.last);
+  const merged = mergeSnapshots(snap, serverData, ref.last, baseHashes);
   if (DELTA_MODE) {
     // Modalità veloce: solo le modifiche, mai il blocco intero (una finestra riscritta come se fosse tutto cancellerebbe l'archivio).
     const delta = buildDelta(serverData, ref.last, merged);
@@ -304,7 +329,7 @@ async function syncOnce(
   revRef: { current: number },
   lastSynced: { current: Record<string, string> },
   orgRefs: { current: Record<string, SyncRef> },
-): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean }> {
+): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean; synced?: boolean }> {
   const versionAtStart = kvVersion(); // contatore delle scritture locali al momento della fotografia (per l'anti-race più sotto)
   const snap = snapshot();
   if (!("spigolestay:data:v1" in snap)) return { changedLocal: false, wrote: false };
@@ -319,9 +344,11 @@ async function syncOnce(
   // (righe diverse del database, nessuna dipendenza tra loro: prima erano una dopo l'altra e all'avvio sommavano i tempi di 3-4 trasferimenti da qualche MB).
   const personalSnap = { ...snap, "spigolestay:data:v1": JSON.stringify(personal) };
   const personalRef: SyncRef = { rev: revRef.current, last: lastSynced.current };
+  const lastBefore = lastSynced.current;
+  const baseHashes = loadSyncBase(uid) ?? {}; // base persistente (solo per lo stato personale): senza base valida vince il server sulle chiavi piatte
   for (const orgId of orgIds) if (!orgRefs.current[orgId]) orgRefs.current[orgId] = { rev: -1, last: {} };
   const [pRes, ...orgResults] = await Promise.all([
-    saveOne(client, "app_state", "user_id", uid, personalSnap, personalRef),
+    saveOne(client, "app_state", "user_id", uid, personalSnap, personalRef, baseHashes),
     ...orgIds.map((orgId) => {
       const localOrg = orgs.get(orgId) ?? EMPTY_ORG_DATA();
       const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg), ...extractOrgCassaConfig(snap, orgSids.get(orgId) ?? new Set<string>()), ...extractOrgPoolConfig(snap, orgSids.get(orgId) ?? new Set<string>(), orgRefs.current[orgId]?.last?.["spigolestay:inventorypool"]) };
@@ -362,7 +389,7 @@ async function syncOnce(
   // server non veniva mai adottato dal browser (restava "da fare" finché non ricaricavi).
   // Il reload della pagina resta gated su reloadSig (id-set) più avanti, così non introduce loop.
   const changedLocal = contentSig(newBlob) !== contentSig(snap);
-  return { changedLocal, newBlob, wrote: pRes.wrote };
+  return { changedLocal, newBlob, wrote: pRes.wrote, synced: personalRef.last !== lastBefore }; // synced: il ciclo dello stato personale è arrivato in fondo (non un conflitto da ritentare)
 }
 
 // Prepara (o disattiva) la modalità veloce per questo dispositivo. Ritorna true se DELTA_MODE è attivo dopo la chiamata.
@@ -387,6 +414,7 @@ orgRefs: { current: Record<string, SyncRef> },
     if (hasLocal) {
       const r = await syncOnce(supabase!, uid, revRef, lastSynced, orgRefs);
       if (r.changedLocal && r.newBlob && !restore(r.newBlob)) return false; // niente spazio: non si cambia nulla
+      if (r.synced) commitSyncBase(uid, lastSynced.current);
     }
     // 2) la copia locale dei dati grandi si scarta: si riparte dalla finestra
     kvRemove("spigolestay:data:v1");
@@ -502,6 +530,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastSigRef = useRef(""); // firma (server + locale) dell'ultima sincronizzazione riuscita: se non cambia, non si rifà nulla
   const lastFullRef = useRef(0);   // quando è stata fatta l'ultima sincronizzazione completa
   const syncingRef = useRef(false); // guardia anti-rientro: evita run concorrenti (intervallo + focus)
+  const hydratedUidRef = useRef<string>(""); // utente per cui questo AuthProvider ha avviato la sincronizzazione (se cambia sotto i piedi, es. login con un altro account in un'altra scheda, si riparte da zero)
 
   const stopPush = () => {
     if (pushTimer.current) { clearInterval(pushTimer.current); pushTimer.current = null; }
@@ -581,7 +610,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabaseEnabled || !supabase) return;
     if (!bigReady) return; // prima si carica l'archivio locale dei dati
     const uid = session?.user?.id;
+    // L'utente è cambiato mentre questo AuthProvider era già montato (login con un altro account in un'altra scheda dello stesso browser, o uscita da un'altra scheda):
+    // si fermano il push e i timer dell'utente precedente e si azzerano versione/base/organizzazioni. Con hydrated=false l'app (con lo stato in memoria del vecchio utente)
+    // viene smontata e non può riscrivere i suoi dati sotto il nuovo account; il percorso sotto verifica poi di chi sono i dati locali.
+    if (hydratedUidRef.current && hydratedUidRef.current !== (uid || "")) {
+      stopPush(); setHydrated(false);
+      revRef.current = -1; lastSynced.current = {}; orgRefs.current = {}; lastSigRef.current = ""; lastFullRef.current = 0;
+      try { sessionStorage.removeItem("spigolestay:hydrated-for"); } catch { /* niente */ }
+      hydratedUidRef.current = "";
+    }
     if (!uid) { setHydrated(false); return; }
+    hydratedUidRef.current = uid;
     if (!mfaChecked || mfaNeeded) return; // attendi la verifica 2FA prima di reidratare
     if (accessAllowed !== true) return; // attendi il via libera del cancello accesso (no workspace per non-abilitati)
     let cancelled = false;
@@ -646,12 +685,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (fullSig && fullSig === lastSigRef.current && Date.now() - lastFullRef.current < 45000) return;
           // Sincronizzazione completa: personale (app_state) + eventuali strutture condivise (org_state),
           // con fusione 3 vie + lucchetto. Se non sei in nessuna org, è identico a prima.
-          const { newBlob, changedLocal, wrote } = await syncOnce(supabase!, userId, revRef, lastSynced, orgRefs);
+          const { newBlob, changedLocal, wrote, synced } = await syncOnce(supabase!, userId, revRef, lastSynced, orgRefs);
+          if (hydratedUidRef.current !== userId) return; // l'utente è cambiato durante il ciclo: il risultato è di un altro account, non si applica
           syncOk = true;
           if (changedLocal && newBlob) {
             // Il server (o una struttura condivisa) aveva novità: aggiorno SEMPRE il browser…
             const settingsBefore = settingsSig(snapshot()); // com'erano utenti/piano/moduli PRIMA di applicare gli aggiornamenti
             if (!restore(newBlob)) return; // niente spazio: si avvisa l'utente (banner) e non si prosegue
+            if (synced) commitSyncBase(userId, lastSynced.current); // locale e server allineati: da qui in poi la base persistente dice "questo è lo stato sincronizzato"
             // …e avviso lo store di ri-leggere in-place (riflette anche i cambi di singolo campo,
             // es. check-in completato/pagamento, senza dover ricaricare la pagina).
             try { window.dispatchEvent(new Event("spigolestay:datasync")); } catch {}
@@ -676,6 +717,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             return;
           }
+          if (synced) commitSyncBase(userId, lastSynced.current);
           if (wrote) void syncProfile(userId);
         } catch {} finally {
           if (syncOk) {
@@ -708,13 +750,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let activeUid = ""; try { activeUid = localStorage.getItem(DELTA_ACTIVE_KEY) || ""; } catch { /* niente */ }
         const switching = wantDelta !== (activeUid === uid);
         if (!switching) DELTA_MODE = wantDelta;
-        if (!switching && sessionStorage.getItem(flagKey) === uid && localHasData) {
+        // La scorciatoia vale solo se i dati locali sono DAVVERO di questo utente: il flag è per scheda ma il localStorage è condiviso tra le schede, quindi un'altra scheda
+        // con un altro login può aver messo lì i dati di un altro account (decideEntry: proprietario diverso → niente scorciatoia, si svuota).
+        let localOwner: string | null = null; try { localOwner = localStorage.getItem(LOCAL_OWNER_KEY); } catch { /* storage non disponibile */ }
+        const entry = decideEntry({ localOwner, uid, sessionFlag: sessionStorage.getItem(flagKey), localHasData });
+        if (!switching && entry === "shortcut") {
           try {
             const res = await syncOnce(supabase!, uid, revRef, lastSynced, orgRefs);
-            if (res.changedLocal && res.newBlob) restore(res.newBlob); // l'app non è ancora montata: parte già con i dati aggiornati
+            if (res.changedLocal && res.newBlob) { if (restore(res.newBlob) && res.synced) commitSyncBase(uid, lastSynced.current); } // l'app non è ancora montata: parte già con i dati aggiornati
+            else if (res.synced) commitSyncBase(uid, lastSynced.current);
           } catch { /* rete assente: riproverà il push periodico */ }
           void syncProfile(uid);
-          markLocalOwner(uid);
+          if (localOwner === null) markLocalOwner(uid); // marcatore mancante ma scheda già reidratata per questo utente: si ripristina (mai su dati di un altro proprietario)
           setHydrated(true);
           startPush(uid);
           return;
@@ -737,7 +784,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // offline su questo dispositivo) e reidrato dal risultato.
           const snap = snapshot();
           const merged = ("spigolestay:data:v1" in snap)
-            ? mergeSnapshots(snap, serverData, {}) // prima idratazione: base vuota => unione
+            ? mergeSnapshots(snap, serverData, {}, loadSyncBase(uid) ?? {}) // prima idratazione: base in memoria vuota => unione; per le chiavi piatte conta la base persistente (senza: vince il server)
             : serverData!;
           const okR = restore(merged);
           lastSynced.current = merged;
@@ -745,11 +792,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Se la fusione ha aggiunto qualcosa al server, riallineo il server.
           // In modalità veloce NON si riscrive qui il «fuso» intero: contiene anche le strutture condivise (che vanno nell'organizzazione, non nella riga personale).
           // Ci pensa subito la prima sincronizzazione (syncOnce), che divide per organizzazione e invia solo le modifiche vere.
+          let pushedOk = true; // la base persistente si aggiorna solo se il server ha davvero lo stato fuso
           if (DELTA_MODE) { /* niente scrittura all'avvio */ }
           else if (contentSig(merged) !== contentSig(serverData ?? {})) {
             const nr = await writeWithLock(supabase!, uid, merged, serverRev);
-            if (nr !== null) revRef.current = nr;
+            if (nr !== null) revRef.current = nr; else pushedOk = false;
           }
+          if (okR && pushedOk && !DELTA_MODE) commitSyncBase(uid, merged);
           sessionStorage.setItem(flagKey, uid); markLocalOwner(uid);
           void syncProfile(uid);
           setHydrated(true);
@@ -764,6 +813,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const nr = await writeWithLock(supabase!, uid, merged, serverRev);
           revRef.current = nr ?? (serverRev ?? 0);
           lastSynced.current = merged;
+          if (nr !== null && !DELTA_MODE) commitSyncBase(uid, merged);
           void syncProfile(uid);
           sessionStorage.setItem(flagKey, uid); markLocalOwner(uid);
           setHydrated(true);
@@ -776,6 +826,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const okS = restore(serverData);
           lastSynced.current = serverData;
           revRef.current = serverRev ?? 0;
+          if (okS && !DELTA_MODE) commitSyncBase(uid, serverData);
           sessionStorage.setItem(flagKey, uid); markLocalOwner(uid);
           setHydrated(true);
           if (okS) startPush(uid);
@@ -809,6 +860,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const nr = await writeWithLock(supabase!, uid, snap, serverRev);
         revRef.current = nr ?? (serverRev ?? 0);
         lastSynced.current = snap;
+        if (nr !== null) commitSyncBase(uid, snap);
         await syncProfile(uid);
         sessionStorage.setItem(flagKey, uid); markLocalOwner(uid);
         setHydrated(true);

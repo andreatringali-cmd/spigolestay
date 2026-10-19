@@ -228,7 +228,7 @@ export default function UserSchedaPage() {
         title={isNew ? t("Nuovo utente") : t("Scheda utente")}
         subtitle={isNew ? t("Crea un nuovo accesso al gestionale") : `${fullName} · ${u.email}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canDelete && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={() => router.push("/utenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!valid} title={valid ? "" : `${t("Mancano:")} ${errs.join(", ")}`} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea utente") : t("Salva")}</button>

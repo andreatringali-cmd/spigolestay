@@ -110,7 +110,7 @@ export default function StrutturePage() {
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[820px] table-fixed text-sm max-sm:min-w-0">
           <colgroup>
-            <col className="w-[19%] max-sm:w-[54%]" />{/* Struttura */}
+            <col className="w-[19%] max-sm:w-[60%]" />{/* Struttura */}
             <col className="w-[8%] max-sm:hidden" />{/* Città */}
             <col className="w-[11%] max-sm:hidden" />{/* Indirizzo */}
             <col className="w-[9%] max-sm:hidden" />{/* Tipo */}
@@ -118,7 +118,7 @@ export default function StrutturePage() {
             <col className="w-[9%] max-sm:hidden" />{/* Camere */}
             <col className="w-[8%] max-sm:hidden" />{/* Posti letto */}
             <col className="w-[9%] max-sm:hidden" />{/* CIN */}
-            <col className="w-[7%] max-sm:w-[34%]" />{/* Stato */}
+            <col className="w-[7%] max-sm:w-[28%]" />{/* Stato */}
             <col className="w-[7%] max-sm:hidden" />{/* Ordina */}
             <col className="w-[3%] max-sm:w-[12%]" />{/* apri (›) */}
           </colgroup>

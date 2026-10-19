@@ -134,7 +134,7 @@ export default function MetaSearchPage() {
         title="Meta Search (beta)"
         subtitle={t("Porta le tue tariffe dirette sui comparatori: l'ospite prenota da te, senza commissione OTA")}
         actions={activeStructureId === "all" ? (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:py-1 max-sm:text-[13px]">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -142,26 +142,26 @@ export default function MetaSearchPage() {
       />
 
       {/* Differenza dai Canali, in una riga */}
-      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
-        <span>🆚</span>
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3 max-sm:flex-col max-sm:items-start max-sm:gap-1">
+        <span className="max-sm:hidden">🆚</span>
         <span><b className="text-txt">{t("Canali")}</b> = {t("l'ospite prenota sull'OTA (con commissione).")}</span>
-        <span className="text-faint">•</span>
+        <span className="text-faint max-sm:hidden">•</span>
         <span><b className="text-txt">Meta Search</b> = {t("l'ospite vede il tuo prezzo e prenota sul TUO sito (zero commissione OTA).")}</span>
       </div>
 
       {/* STEP 1 — dove atterra chi prenota diretto */}
       <SectionTitle>1. {t("Dove prenota chi arriva dai comparatori")}</SectionTitle>
-      <Card className="mb-5 mt-2">
+      <Card className="mb-5 mt-2 max-sm:mb-4">
         <div className="flex flex-wrap items-start gap-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: bookingReady ? "var(--ok)" : "var(--warn)" }}>{bookingReady ? "✓" : "!"}</span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-2.5rem)]">
             <div className="text-sm font-semibold text-txt">{t("Due modi, scegli quello che preferisci")}</div>
             <p className="mt-1 text-xs text-dim">
               <b className="text-txt">{t("Mini-sito Xenora")}</b> — {t("pubblicalo una volta in \"Xenosite\", è sempre pronto, nessuna configurazione extra.")}<br />
               <b className="text-txt">{t("Il tuo sito ufficiale")}</b> — {t("se ne hai uno, incorpora il widget di prenotazione (pagina \"Widget\") e l'ospite resta sul tuo dominio.")}
             </p>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 gap-2 max-sm:w-full">
             <Link href="/sito" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Xenosite")}</Link>
             <Link href="/widget" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Widget")}</Link>
           </div>
@@ -171,7 +171,7 @@ export default function MetaSearchPage() {
       {/* STEP 2 — quali comparatori usare */}
       <SectionTitle>2. {t("Scegli i comparatori")}</SectionTitle>
       <p className="mb-2 mt-1 text-xs text-dim">{t("Attiva quelli che vuoi usare e imposta il modello di costo — è la tua configurazione, salvata qui. Il collegamento vero avviene al passo 3, dandogli il feed.")}</p>
-      <Card className="mb-5 mt-2">
+      <Card className="mb-5 mt-2 max-sm:mb-4">
         <div className="flex flex-col divide-y divide-[color:var(--line)]">
           {META.map((m) => {
             const c = getCfg(m.key);
@@ -203,7 +203,7 @@ export default function MetaSearchPage() {
 
       {/* STEP 3 — collegare il feed reale */}
       <SectionTitle>3. {t("Collega il feed")}</SectionTitle>
-      <Card className="mb-5 mt-2 !p-0 overflow-hidden">
+      <Card className="mb-5 mt-2 !p-0 overflow-hidden max-sm:mb-4">
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-wash px-4 py-3">
           <span className="grid h-8 w-8 place-items-center rounded-lg text-white" style={{ backgroundColor: "var(--ok)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>

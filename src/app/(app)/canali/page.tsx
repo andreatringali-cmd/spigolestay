@@ -147,7 +147,7 @@ export default function CanaliPage() {
   // correzione prezzo) si apre al click, invece di stare tutto incollato nella card.
   const [, setColorTick] = useState(0); // il colore sta nel browser: dopo ogni scelta si ridisegna la pagina (evidenziazione e pallino in tabella)
   const [channelDetail, setChannelDetail] = useState<{ sid: string; c: { id: string; channel: string; title: string; active: boolean } } | null>(null);
-  const [chartsOn, setChartsOn] = useState(true); // grafici dell'andamento: si possono nascondere (vale per questa visita)
+  const [chartsOn, setChartsOn] = useState(false); // grafici dell'andamento: NASCOSTI all'apertura, si mostrano con l'icona (vale per questa visita)
   // Esc chiude la finestra aperta (pannello collegamento canali o impostazioni del canale).
   useEffect(() => {
     if (!channelDetail && !channelPanel.open) return;
@@ -270,7 +270,7 @@ export default function CanaliPage() {
       />
 
       {/* Andamento per canale: numeri reali dalle prenotazioni (arrivi nel periodo scelto), stesse formule dell'elenco Prenotazioni. */}
-      <section className="mb-5">
+      <section className="mb-5 max-sm:mb-3">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
         </div>
@@ -284,9 +284,9 @@ export default function CanaliPage() {
           <Card className="flex h-full flex-col">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Prenotazioni e ricavi per canale")}</div>
-              <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-[11px] font-semibold">
+              <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-[11px] font-semibold max-sm:flex max-sm:w-full">
                 {(Object.keys(PERIOD_LABEL) as StatsPeriod[]).map((p) => (
-                  <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-2.5 py-1 transition ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
+                  <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-2.5 py-1 transition max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-nowrap max-sm:px-1 max-sm:py-2 ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
                 ))}
               </div>
             </div>
@@ -307,7 +307,7 @@ export default function CanaliPage() {
 
       {/* Stato distribuzione canali. Channex è il motore dietro le quinte e resta INVISIBILE
          all'utente: niente nome fornitore, "staging" o ID tecnici — solo lo stato. */}
-      <Card className="mb-5">
+      <Card className="mb-5 max-sm:mb-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
@@ -336,8 +336,8 @@ export default function CanaliPage() {
               <button onClick={() => { importOta(); doFullSync(); void loadOtaStatus(); }} disabled={impSync.running || fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto" title={t("Controlla le nuove prenotazioni dalle OTA e rimanda a Channex l'intera finestra di disponibilità/prezzi, in un colpo solo. Normalmente entrambe avvengono già da sole.")}>{impSync.running || fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Sincronizza ora")}</button>
             ) : (
               <>
-                <button onClick={() => doRelink(true)} disabled={relink.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
-                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
+                <button onClick={() => doRelink(true)} disabled={relink.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 max-sm:w-auto lg:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
+                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:w-auto max-sm:flex-1 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
               </>
             )}
           </div>
@@ -350,7 +350,7 @@ export default function CanaliPage() {
       {!otaOff && (
         <>
           <div className="mb-3 mt-1"><SectionTitle>{t("Canali OTA collegati")}</SectionTitle></div>
-          <Card className="mb-5">
+          <Card className="mb-5 max-sm:mb-3">
           {otaErr ? (
             <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr} <button onClick={loadOtaStatus} disabled={otaLoading} className="ml-1 font-semibold underline disabled:opacity-40">{t("Riprova")}</button></p>
           ) : otaLoading && !otaByStructure ? (
@@ -463,7 +463,7 @@ export default function CanaliPage() {
 
       {/* Altri canali da valutare: quelli non ancora collegati nel perimetro in vista. Il collegamento si fa da "Gestisci canali". */}
       {!otaOff && suggestions.length > 0 && (
-        <section className="mb-5">
+        <section className="mb-5 max-sm:mb-3">
           <SectionTitle>{t("Altri canali da valutare")}</SectionTitle>
           <div className="grid gap-3 sm:grid-cols-3">
             {suggestions.map((s) => (
@@ -489,7 +489,7 @@ export default function CanaliPage() {
 
       {/* Collegamento al Channel Manager non attivo su questo ambiente */}
       {otaOff && (
-        <Card className="mb-5">
+        <Card className="mb-5 max-sm:mb-3">
           <p className="text-sm text-dim">{t("Il collegamento al Channel Manager non è attivo su questo ambiente: non posso leggere i canali collegati.")}</p>
         </Card>
       )}
