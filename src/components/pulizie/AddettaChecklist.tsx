@@ -5,10 +5,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Structure, Unit } from "@/lib/types";
 import {
-  EXAMPLE_TASK_PREFIX, KEY_CHECKS, KEY_TASKS, exampleTasksFor, WEEKDAY_SHORT, WEEKDAY_LONG, freqLabel, liveTasks, normalizeFreq, removeEntity, targetsFor, taskState, toggleCheck, weekDates, weekSummary,
+  EXAMPLE_TASK_PREFIX, KEY_CHECKS, KEY_TASKS, exampleTasksFor, WEEKDAY_SHORT, WEEKDAY_LONG, freqLabel, liveTasks, normalizeFreq, removeEntity, targetsFor, taskState, toggleCheck, weekDates, weekStart, weekSummary,
   type CleanCheck, type CleanTask, type Freq, type TaskScope, type TaskState,
 } from "@/lib/pulizie-addetta";
-import { fmtDMY } from "@/lib/dates";
+import { addDays, fmtDMY, parseISO, toISO } from "@/lib/dates";
+import DateField from "@/components/DateField";
 import { useConfirm } from "@/components/ConfirmProvider";
 import Icon from "@/components/Icon";
 import { readList, useSyncedList } from "./useSyncedList";
@@ -29,6 +30,14 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   const [onlyTodo, setOnlyTodo] = useState(false);
   const now = stamp();
   const today = now.today;
+  // Settimana scelta (qualunque data al suo interno). Quella corrente si spunta; le altre si consultano soltanto.
+  const [pick, setPick] = useState("");
+  const viewDay = pick || today;
+  const isCurrent = weekStart(viewDay) === weekStart(today);
+  const isPast = weekStart(viewDay) < weekStart(today);
+  // Giorno di riferimento per i calcoli: oggi nella settimana corrente; a fine settimana per una passata (conta quanto è stato fatto); a inizio per una futura.
+  const ref = isCurrent ? today : isPast ? weekDates(viewDay)[6] : weekStart(viewDay);
+  const shiftWeek = (n: number) => setPick(toISO(addDays(parseISO(weekStart(viewDay)), 7 * n)));
   const live = useMemo(() => liveTasks(tasks), [tasks]);
   // Esempi scritti nel codice: una struttura senza voci parte con le tre voci d'esempio (una sola volta: gli id sono fissi, se le elimini non tornano).
   // Si attende qualche secondo: la sincronizzazione può portare le voci vere da un altro dispositivo.
@@ -43,8 +52,8 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
     }, 2500);
     return () => clearTimeout(t);
   }, [canEdit, structures, units, setTasks]);
-  const week = useMemo(() => weekSummary(live, structures, units, checks, today), [live, structures, units, checks, today]);
-  const wd = weekDates(today);
+  const week = useMemo(() => weekSummary(live, structures, units, checks, ref), [live, structures, units, checks, ref]);
+  const wd = weekDates(viewDay);
   const pct = week.required ? Math.round((week.done / week.required) * 100) : 0;
 
   const tick = (task: CleanTask, targetId: string, structureId: string) => {
@@ -54,6 +63,7 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   };
 
   const sub = (s: TaskState): string => {
+    if (!isCurrent) return s.last ? `${s.done}/${s.required} · ultima ${fmtDMY(s.last.date).slice(0, 5)} ${hhmm(s.last.at)}` : `${s.done}/${s.required}`;
     if (s.state === "later" && s.nextDay) return `${s.done}/${s.required} · prossima ${WEEKDAY_LONG[s.nextDay - 1].toLowerCase()}`;
     if (s.today) return `${s.done}/${s.required} questa settimana · fatta oggi alle ${hhmm(s.today.at)}`;
     if (s.last) return `${s.done}/${s.required} questa settimana · ultima ${fmtDMY(s.last.date).slice(0, 5)} ${hhmm(s.last.at)}`;
@@ -61,15 +71,15 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
   };
 
   const row = (task: CleanTask, target: { id: string; label: string; structureId: string }) => {
-    const s = taskState(task, target.id, checks, today);
-    if (onlyTodo && (s.state === "done" || s.state === "later")) return null;
-    const ticked = !!s.today;
-    const chip = STATE_CHIP[s.state];
+    const s = taskState(task, target.id, checks, ref);
+    if (onlyTodo && (s.state === "done" || (isCurrent && s.state === "later"))) return null;
+    const ticked = isCurrent && !!s.today;
+    const chip = isCurrent ? STATE_CHIP[s.state] : s.state === "done" ? STATE_CHIP.done : isPast ? { label: "Non fatta", color: "var(--err)" } : { label: "", color: "var(--faint)" };
     return (
       <div key={`${task.id}:${target.id}`} className="flex items-stretch">
       <button
         onClick={() => tick(task, target.id, target.structureId)}
-        disabled={!canEdit}
+        disabled={!canEdit || !isCurrent}
         className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left transition active:bg-wash ${s.state === "done" && !ticked ? "opacity-70" : ""}`}
         aria-pressed={ticked}
       >
@@ -78,7 +88,7 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
           <span className={`block truncate text-sm font-semibold ${s.state === "done" ? "text-dim" : "text-txt"}`}>{task.scope === "room" ? target.label : task.name}</span>
           <span className="block truncate text-[11px] text-dim">{sub(s)}</span>
         </span>
-        {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{s.overdue ? "In ritardo" : chip.label}</span>}
+        {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{isCurrent && s.overdue ? "In ritardo" : chip.label}</span>}
       </button>
       {isManager && <button onClick={() => setEditing(task)} aria-label={`Modifica la voce «${task.name}»`} title="Modifica la voce" className="grid w-11 shrink-0 place-items-center text-dim hover:bg-wash hover:text-txt"><Icon name="settings" size={15} /></button>}
       </div>
@@ -110,7 +120,13 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
       <Card className="p-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="min-w-0">
-            <div className="text-sm font-bold text-txt">Questa settimana <span className="font-normal text-dim">{fmtDMY(wd[0]).slice(0, 5)} – {fmtDMY(wd[6]).slice(0, 5)}</span></div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button onClick={() => shiftWeek(-1)} aria-label="Settimana precedente" title="Settimana precedente" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash">‹</button>
+              <div className="text-sm font-bold text-txt">{isCurrent ? "Questa settimana" : isPast ? "Settimana passata" : "Settimana futura"} <span className="font-normal text-dim">{fmtDMY(wd[0]).slice(0, 5)} – {fmtDMY(wd[6]).slice(0, 5)}</span></div>
+              <button onClick={() => shiftWeek(1)} aria-label="Settimana successiva" title="Settimana successiva" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash">›</button>
+              <DateField value={viewDay} onChange={(v) => setPick(v)} title="Scegli una data: si apre la sua settimana" className="w-36 rounded-lg border border-line bg-paper px-2 py-2 text-sm" />
+              {!isCurrent && <button onClick={() => setPick("")} className="min-h-[36px] rounded-lg border border-line px-2.5 text-xs font-semibold text-focus hover:bg-wash">Questa settimana</button>}
+            </div>
             <div className="mt-1.5 flex items-center gap-2 text-[11px] text-dim">
               <span className="h-1.5 w-24 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--ok)" }} /></span>
               <span>{week.done}/{week.required} spunte · {week.completed}/{week.targets} voci complete</span>
@@ -122,6 +138,7 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
       </Card>
 
       {!canEdit && <p className="rounded-lg bg-wash px-3 py-2 text-xs text-dim">Hai solo il permesso di lettura: non puoi spuntare le voci.</p>}
+      {canEdit && !isCurrent && <p className="rounded-lg bg-wash px-3 py-2 text-xs text-dim">Stai guardando {isPast ? "una settimana passata" : "una settimana futura"}: le voci si possono spuntare solo nella settimana corrente.</p>}
 
       {groups.map(({ s, common, rooms }) => (
         <div key={s.id} className="flex flex-col gap-3">
