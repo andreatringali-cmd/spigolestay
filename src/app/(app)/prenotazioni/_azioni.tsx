@@ -13,7 +13,7 @@ import { chatPayGuestMessage, parseEurInput } from "@/lib/chat-pay-core";
 import { bookingGrandTotal } from "@/lib/booking";
 import { stayDue } from "@/lib/incassi";
 import { reviewLinksBlockFromStorage, reviewRequestMessage, reviewRequestSubject } from "@/lib/reviews";
-import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
+import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, reminderIntro, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
@@ -84,7 +84,7 @@ export default function StepActions(p: StepActionsProps) {
   };
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const fullCheckin = `${origin}/checkin?b=${encodeURIComponent(b.id)}`;
-  const intro = (kind: string) => (hist[kind]?.length ? REMINDER_INTRO[lang] : "");
+  const intro = (kind: string) => (hist[kind]?.length ? reminderIntro(lang) : "");
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); return { ok: true, message: "Copiato negli appunti ✓" }; } catch { return { ok: false, message: "Copia non riuscita." }; } };
 
   // Cronologia di ciò che è già stato inviato per questo passaggio (evita di scrivere due volte all'ospite).
@@ -171,7 +171,7 @@ export default function StepActions(p: StepActionsProps) {
       const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind, ...(asked !== undefined ? { amount: asked } : {}) });
       const hi = greeting(lang, guest).trim(); // saluto su una riga a sé
       const link = await shortenLink(r.url); // link corto /g/<codice>
-      return { text: `${hi ? `${hi}\n` : ""}${intro(remKind) || (sent ? REMINDER_INTRO[lang] : "")}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), link)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
+      return { text: `${hi ? `${hi}\n` : ""}${intro(remKind) || (sent ? reminderIntro(lang) : "")}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), link)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
     };
     const manual = async () => {
       if (kind === "saldo") {

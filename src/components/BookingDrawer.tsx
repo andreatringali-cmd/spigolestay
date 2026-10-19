@@ -46,6 +46,7 @@ import BookingInfoTab from "@/components/booking-panel/BookingInfoTab";
 import BookingTimelineTab from "@/components/booking-panel/BookingTimelineTab";
 import BookingMessagesTab from "@/components/booking-panel/BookingMessagesTab";
 import { recordOutgoing, markReminder } from "@/lib/guest-messages";
+import { renderSystemMessage } from "@/lib/msg-overrides";
 import { channexCodeOf, countryName, fmtDateWd, groupRooms, guestNames, languageName, nightRows, notesBlocks, safeMailtoHref, safeTelHref } from "@/lib/booking-info";
 import { bookingSheetHtml, type SheetInput } from "@/lib/booking-sheet";
 
@@ -205,7 +206,7 @@ export default function BookingDrawer() {
 
   // ── Contatti (dai dati salvati) ──
   const phoneDigits = (guest?.phone ?? "").replace(/[^\d]/g, "");
-  const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(booking.checkIn)}.`);
+  const waText = encodeURIComponent(renderSystemMessage("contact", guestLangOf(guest), { nome: guest?.fullName ?? "", struttura: structure?.name ?? "Xenora", checkin: fmtDate(booking.checkIn) })); // testo modificabile (Messaggi → Modelli)
 
   // ── Conto in sola lettura (dai dati salvati) ──
   const nView = nights(booking.checkIn, booking.checkOut);
@@ -531,7 +532,7 @@ export default function BookingDrawer() {
       </div>
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
-        const rmsg = `Grazie ${first} per aver soggiornato da ${structure?.name ?? "noi"}! Se ti sei trovato bene, ci lasceresti una recensione su Google? Ci aiuta tantissimo. ${reviewUrl}`.trim();
+        const rmsg = renderSystemMessage("reviewQuick", guestLangOf(guest), { nome: first, struttura: structure?.name ?? "noi", link: reviewUrl ?? "" }).trim();
         const rwa = phoneDigits ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(rmsg)}` : "";
         return (
           <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--ok) 32%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 6%, transparent)" }}>
@@ -745,7 +746,7 @@ export default function BookingDrawer() {
         {!booking.webCheckin && (() => {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
-          const ciMsg = (u: string) => `Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${u}`;
+          const ciMsg = (u: string) => renderSystemMessage("checkinShort", guestLangOf(guest), { nome: guest?.fullName ? guest.fullName.split(" ")[0] : "", struttura: structure?.name ?? "Xenora", link: u });
           const sendCiWa = async () => { if (!sendOnce(`ci:${booking.id}`)) return; const s = await shortenLink(link); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciMsg(s))}`, "_blank", "noopener,noreferrer"); if (guest) { recordOutgoing(guest.id, ciMsg(s), "WhatsApp (link)", undefined, { bid: booking.id, rem: "checkin" }); markReminder(booking.id, "checkin"); } };
           const copyCi = async () => { const s = await shortenLink(link); try { await navigator.clipboard.writeText(s); } catch {} };
           if (!moduleOn("checkin")) return (

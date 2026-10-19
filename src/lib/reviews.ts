@@ -5,6 +5,7 @@
 // Nessuna dipendenza da React: funzioni pure, riusabili lato client.
 
 import type { Booking, Guest } from "./types";
+import { renderSystemMessage } from "./msg-overrides";
 import { parseISO, toISO, nights } from "./dates";
 import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewLinksBlock } from "./auto-review";
 
@@ -70,13 +71,7 @@ export function recentCheckouts(
 /** Lingue dei messaggi agli ospiti. */
 export type ReviewLang = "it" | "en" | "fr" | "de" | "es";
 
-const REVIEW_T: Record<ReviewLang, { hi: (n: string) => string; thanks: (s: string) => string; ask: string; asHere: string; end: string; stFallback: string }> = {
-  it: { hi: (n) => (n ? `Ciao ${n},` : "Ciao,"), thanks: (s) => `grazie di aver scelto ${s}! Speriamo che il tuo soggiorno sia stato speciale.`, ask: "Se ti va, ci aiuteresti tantissimo lasciando una breve recensione sincera.", asHere: "Bastano 30 secondi da qui:", end: "Grazie di cuore e a presto! 🌊", stFallback: "la struttura" },
-  en: { hi: (n) => (n ? `Hi ${n},` : "Hi,"), thanks: (s) => `thank you for choosing ${s}! We hope your stay was special.`, ask: "If you like, a short, honest review would help us a lot.", asHere: "It only takes 30 seconds:", end: "Thank you so much, and see you soon! 🌊", stFallback: "us" },
-  fr: { hi: (n) => (n ? `Bonjour ${n},` : "Bonjour,"), thanks: (s) => `merci d'avoir choisi ${s} ! Nous espérons que votre séjour a été exceptionnel.`, ask: "Si vous le souhaitez, un court avis sincère nous aiderait énormément.", asHere: "Cela ne prend que 30 secondes :", end: "Merci de tout cœur et à bientôt ! 🌊", stFallback: "notre établissement" },
-  de: { hi: (n) => (n ? `Hallo ${n},` : "Hallo,"), thanks: (s) => `vielen Dank, dass Sie sich für ${s} entschieden haben! Wir hoffen, Ihr Aufenthalt war etwas Besonderes.`, ask: "Wenn Sie möchten, würde uns eine kurze, ehrliche Bewertung sehr helfen.", asHere: "Es dauert nur 30 Sekunden:", end: "Herzlichen Dank und bis bald! 🌊", stFallback: "uns" },
-  es: { hi: (n) => (n ? `Hola ${n},` : "Hola,"), thanks: (s) => `¡gracias por elegir ${s}! Esperamos que tu estancia haya sido especial.`, ask: "Si te apetece, una breve reseña sincera nos ayudaría muchísimo.", asHere: "Solo tardas 30 segundos:", end: "¡Muchas gracias y hasta pronto! 🌊", stFallback: "nuestro alojamiento" },
-};
+const REVIEW_ST_FALLBACK: Record<ReviewLang, string> = { it: "la struttura", en: "us", fr: "notre établissement", de: "uns", es: "nuestro alojamiento" };
 const SUBJECT_T: Record<ReviewLang, (s: string) => string> = {
   it: (s) => `Com'è andato il soggiorno${s ? ` da ${s}` : ""}?`,
   en: (s) => `How was your stay${s ? ` at ${s}` : ""}?`,
@@ -97,16 +92,12 @@ export function reviewRequestMessage(opts: {
   lang?: ReviewLang;
   linksBlock?: string;
 }): string {
-  const T = REVIEW_T[opts.lang ?? "it"];
+  const lang = opts.lang ?? "it";
   const first = (opts.guestName || "").split(" ")[0] || "";
-  const st = (opts.structureName || "").trim() || T.stFallback;
+  const st = (opts.structureName || "").trim() || REVIEW_ST_FALLBACK[lang];
   const links = (opts.linksBlock || "").trim() || (opts.reviewUrl ? opts.reviewUrl : "");
-  const link = links ? `\n\n${T.asHere}\n${links}` : "";
-  return `${T.hi(first)}
-${T.thanks(st)}
-${T.ask}${link}
-
-${T.end}`;
+  // Testo modificabile (Messaggi → Modelli): senza link la riga che li introduce sparisce insieme al segnaposto.
+  return renderSystemMessage("review", lang, { nome: first, struttura: st, link_recensioni: links });
 }
 
 /**

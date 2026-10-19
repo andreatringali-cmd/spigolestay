@@ -7,64 +7,37 @@ import type { Guest } from "./types";
 import { apiPost } from "./invoicing/client";
 import { waDigits } from "./contacts-check";
 import { guestLangOf } from "./guest-lang";
+import { renderSystemMessage } from "./msg-overrides";
 
 export type Lang = "it" | "en" | "fr" | "de" | "es";
 
-export const GUIDE_MSG: Record<Lang, (u: string) => string> = {
-  it: (u) => `Qui trovi la guida con tutte le info utili (check-in, wi-fi, dintorni): ${u}`,
-  en: (u) => `Here is our guest guide with all the useful info: ${u}`,
-  fr: (u) => `Voici le guide avec toutes les infos utiles : ${u}`,
-  de: (u) => `Hier ist der Gäste-Guide mit allen Infos: ${u}`,
-  es: (u) => `Aquí tienes la guía con toda la información útil: ${u}`,
-};
-export const CHECKIN_MSG: Record<Lang, (u: string) => string> = {
-  it: (u) => `Per velocizzare il suo arrivo la invitiamo a completare il check-in online (dati e documento, bastano due minuti): ${u}`,
-  en: (u) => `To speed up your arrival, please complete the online check-in (details and ID) here: ${u}`,
-  fr: (u) => `Pour accélérer votre arrivée, remplissez le check-in en ligne (données et pièce d'identité) ici : ${u}`,
-  de: (u) => `Um Ihre Ankunft zu beschleunigen, füllen Sie bitte den Online-Check-in (Daten und Ausweis) hier aus: ${u}`,
-  es: (u) => `Para agilizar tu llegada, completa el check-in online (datos y documento) aquí: ${u}`,
-};
+// I testi di questi messaggi sono MODIFICABILI (Messaggi → Modelli): quelli predefiniti e i segnaposto stanno in msg-overrides.ts.
+const L = ["it", "en", "fr", "de", "es"] as const;
+const perLang = <A extends unknown[]>(make: (lang: Lang, ...a: A) => string): Record<Lang, (...a: A) => string> => Object.fromEntries(L.map((l) => [l, (...a: A) => make(l, ...a)])) as Record<Lang, (...a: A) => string>;
+
+export const GUIDE_MSG: Record<Lang, (u: string) => string> = perLang((lang, u: string) => renderSystemMessage("guide", lang, { link: u }));
+export const CHECKIN_MSG: Record<Lang, (u: string) => string> = perLang((lang, u: string) => renderSystemMessage("checkin", lang, { link: u }));
+
+const GUEST_FALLBACK: Record<Lang, string> = { it: "ospite", en: "guest", fr: "cher client", de: "lieber Gast", es: "huésped" };
+const HOST_FALLBACK: Record<Lang, string> = { it: "la struttura", en: "your host", fr: "votre hôte", de: "Ihre Unterkunft", es: "el alojamiento" };
 // Richiesta di check-in dalla riga "arrivi senza check-in" (Adempimenti): firmata dalla struttura, con il link già accorciato.
 export function checkinRequestMsg(lang: Lang, o: { name?: string; structure?: string; link: string }): string {
   const n = (o.name ?? "").trim(), s = (o.structure ?? "").trim();
-  const T: Record<Lang, string> = {
-    it: `Gentile ${n || "ospite"}, le scriviamo da ${s || "la struttura"}. Per velocizzare il suo arrivo la invitiamo a completare il check-in online (dati e documento, bastano 2 minuti): ${o.link} . Grazie e a presto!`,
-    en: `Dear ${n || "guest"}, this is ${s || "your host"}. To speed up your arrival, please complete the online check-in (details and ID, it only takes 2 minutes): ${o.link} . Thank you and see you soon!`,
-    fr: `Bonjour ${n || "cher client"}, ici ${s || "votre hôte"}. Pour accélérer votre arrivée, merci de remplir le check-in en ligne (données et pièce d'identité, 2 minutes suffisent) : ${o.link} . Merci et à bientôt !`,
-    de: `Guten Tag ${n || "lieber Gast"}, hier ist ${s || "Ihre Unterkunft"}. Um Ihre Ankunft zu beschleunigen, füllen Sie bitte den Online-Check-in aus (Daten und Ausweis, es dauert nur 2 Minuten): ${o.link} . Vielen Dank und bis bald!`,
-    es: `Estimado/a ${n || "huésped"}, le escribimos desde ${s || "el alojamiento"}. Para agilizar su llegada, le invitamos a completar el check-in online (datos y documento, bastan 2 minutos): ${o.link} . ¡Gracias y hasta pronto!`,
-  };
-  return T[lang] + (s ? "\n— " + s : "");
+  return renderSystemMessage("checkinRequest", lang, { nome: n || GUEST_FALLBACK[lang], struttura: s || HOST_FALLBACK[lang], firma: s, link: o.link });
 }
 
 // Check-in incompleto: manca qualche ospite (n = quanti).
-export const CHECKIN_MORE_MSG: Record<Lang, (n: number, u: string) => string> = {
-  it: (n, u) => `Il check-in è quasi completo: ci mancano i dati di ${n} ${n === 1 ? "altro ospite" : "altri ospiti"}. Apri il link e compila di nuovo il modulo con i dati di tutti gli ospiti: ${u}`,
-  en: (n, u) => `Your check-in is almost done: we still need the details of ${n} more ${n === 1 ? "guest" : "guests"}. Open the link and fill in the form again with the details of all guests: ${u}`,
-  fr: (n, u) => `Votre check-in est presque terminé : il nous manque les données de ${n} ${n === 1 ? "autre personne" : "autres personnes"}. Ouvrez le lien et remplissez de nouveau le formulaire avec les données de tous les voyageurs : ${u}`,
-  de: (n, u) => `Ihr Check-in ist fast fertig: Es fehlen noch die Daten von ${n} weiteren ${n === 1 ? "Person" : "Personen"}. Öffnen Sie den Link und füllen Sie das Formular erneut mit den Daten aller Gäste aus: ${u}`,
-  es: (n, u) => `Su check-in está casi completo: faltan los datos de ${n} ${n === 1 ? "huésped más" : "huéspedes más"}. Abra el enlace y rellene de nuevo el formulario con los datos de todos los huéspedes: ${u}`,
-};
+const OTHERS: Record<Lang, [string, string]> = { it: ["altro ospite", "altri ospiti"], en: ["guest", "guests"], fr: ["autre personne", "autres personnes"], de: ["Person", "Personen"], es: ["huésped más", "huéspedes más"] };
+export const CHECKIN_MORE_MSG: Record<Lang, (n: number, u: string) => string> = perLang((lang, n: number, u: string) => renderSystemMessage("checkinMore", lang, { n, altri: OTHERS[lang][n === 1 ? 0 : 1], link: u }));
 // Apertura dei solleciti: si antepone al messaggio normale.
-export const REMINDER_INTRO: Record<Lang, string> = {
-  it: "Un promemoria dalla struttura. ",
-  en: "A quick reminder from us. ",
-  fr: "Un petit rappel de notre part. ",
-  de: "Eine kurze Erinnerung von uns. ",
-  es: "Un breve recordatorio de nuestra parte. ",
-};
+export const reminderIntro = (lang: Lang): string => renderSystemMessage("reminderIntro", lang, {});
 
 // Promemoria di partenza: data e orario del check-out, come contattare la struttura, ringraziamento.
+const AT_TIME: Record<Lang, (t: string) => string> = { it: (t) => ` entro le ${t}`, en: (t) => ` by ${t}`, fr: (t) => ` avant ${t}`, de: (t) => ` bis ${t} Uhr`, es: (t) => ` antes de las ${t}` };
+const US_FALLBACK: Record<Lang, string> = { it: "la nostra struttura", en: "us", fr: "notre établissement", de: "uns", es: "nuestro alojamiento" };
 export function checkoutMessage(lang: Lang, o: { date: string; time?: string; structure?: string }): string {
-  const d = o.date, t = (o.time ?? "").trim(), s = (o.structure ?? "").trim();
-  const T: Record<Lang, string> = {
-    it: `Il check-out è previsto il ${d}${t ? ` entro le ${t}` : ""}. Per qualsiasi esigenza (ad esempio il deposito bagagli) ci scriva pure qui. Grazie per aver scelto ${s || "la nostra struttura"}: è stato un piacere ospitarla!`,
-    en: `Check-out is on ${d}${t ? ` by ${t}` : ""}. If you need anything (for example luggage storage), just reply here. Thank you for choosing ${s || "us"}, it was a pleasure to host you!`,
-    fr: `Le check-out est prévu le ${d}${t ? ` avant ${t}` : ""}. Pour toute demande (par exemple la consigne à bagages), répondez simplement ici. Merci d'avoir choisi ${s || "notre établissement"}, ce fut un plaisir de vous accueillir !`,
-    de: `Der Check-out ist am ${d}${t ? ` bis ${t} Uhr` : ""}. Bei Fragen (zum Beispiel zur Gepäckaufbewahrung) schreiben Sie uns einfach hier. Vielen Dank, dass Sie sich für ${s || "uns"} entschieden haben, es war uns eine Freude!`,
-    es: `El check-out es el ${d}${t ? ` antes de las ${t}` : ""}. Para cualquier necesidad (por ejemplo, consigna de equipaje), escríbanos aquí. Gracias por elegir ${s || "nuestro alojamiento"}, ¡ha sido un placer recibirle!`,
-  };
-  return T[lang];
+  const t = (o.time ?? "").trim(), s = (o.structure ?? "").trim();
+  return renderSystemMessage("checkout", lang, { data: o.date, orario: t ? AT_TIME[lang](t) : "", struttura: s || US_FALLBACK[lang] });
 }
 
 export const langOf = (g?: Guest): Lang => guestLangOf(g); // lingua della scheda, altrimenti dal Paese o dal prefisso del telefono (gli ospiti OTA non hanno la lingua)

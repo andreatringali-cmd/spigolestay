@@ -20,10 +20,12 @@ test("conto OTA che incassa: il soggiorno è già pagato al portale, restano gli
   assert.equal(bill.paidAtPortal, 200);
   assert.equal(bill.due, 20);
 });
-test("messaggio del conto: righe, già pagato, da pagare, link", () => {
+test("messaggio del conto: righe, già pagato, da pagare (testo modificabile)", () => {
   const bill = billOf(b({ extras: [{ name: "Late checkout", price: 20 }] }), undefined);
-  const m = billMessage(bill, { lang: "it", name: "Mario", property: "Casa", link: "https://x.it/g/abc" });
-  assert.ok(m.includes("Buongiorno Mario,") && m.includes("• Soggiorno: € 200,00") && m.includes("• Late checkout: € 20,00") && m.includes("Da pagare: € 220,00") && m.includes("https://x.it/g/abc"));
-  assert.ok(!billMessage(bill, { lang: "it" }).includes("http"));
-  assert.ok(billMessage(bill, { lang: "fr" }).includes("Amount due"));
+  const m = billMessage(bill, { lang: "it", name: "Mario", property: "Casa" });
+  assert.ok(m.startsWith("Buongiorno Mario,\necco il conto del suo soggiorno presso Casa:"));
+  assert.ok(m.includes("• Soggiorno: € 200,00") && m.includes("• Late checkout: € 20,00") && m.includes("Da pagare: € 220,00") && m.endsWith("Grazie!"));
+  assert.ok(billMessage(bill, { lang: "fr" }).includes("Reste à payer"));
+  assert.ok(billMessage(bill, { lang: "xx" }).includes("Amount due")); // lingua sconosciuta → inglese (le altre ricevono l'inglese)
+  assert.ok(!billMessage(bill, { lang: "it" }).includes("Buongiorno ,")); // senza nome: «Buongiorno,»
 });

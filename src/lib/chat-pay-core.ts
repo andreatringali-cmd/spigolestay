@@ -13,6 +13,7 @@
 // ============================================================
 
 import { eur } from "./format";
+import { renderSystemMessage } from "./msg-overrides";
 
 export type ChatPayKind = "saldo" | "tassa";
 
@@ -220,13 +221,6 @@ export function appendPaymentNotice(threads: Record<string, ThreadMsg[]>, thread
 export type GuestLang = "it" | "en" | "fr" | "de" | "es";
 
 export function chatPayGuestMessage(lang: GuestLang, kind: ChatPayKind, cents: number, url: string): string {
-  const a = fmtEur(cents);
-  const T: Record<GuestLang, { saldo: string; tassa: string }> = {
-    it: { saldo: `Può pagare il saldo del soggiorno (${a}) online con carta, in modo sicuro: ${url}`, tassa: `Può pagare la tassa di soggiorno (${a}) online con carta, in modo sicuro: ${url}` },
-    en: { saldo: `You can pay the balance of your stay (${a}) online by card, securely, here: ${url}`, tassa: `You can pay the city tax (${a}) online by card, securely, here: ${url}` },
-    fr: { saldo: `Vous pouvez régler le solde de votre séjour (${a}) en ligne par carte, en toute sécurité, ici : ${url}`, tassa: `Vous pouvez régler la taxe de séjour (${a}) en ligne par carte, en toute sécurité, ici : ${url}` },
-    de: { saldo: `Den Restbetrag Ihres Aufenthalts (${a}) können Sie hier sicher online per Karte bezahlen: ${url}`, tassa: `Die Kurtaxe (${a}) können Sie hier sicher online per Karte bezahlen: ${url}` },
-    es: { saldo: `Puedes pagar el saldo de tu estancia (${a}) online con tarjeta, de forma segura, aquí: ${url}`, tassa: `Puedes pagar la tasa turística (${a}) online con tarjeta, de forma segura, aquí: ${url}` },
-  };
-  return (T[lang] ?? T.it)[kind];
+  // Testo modificabile (Messaggi → Modelli): predefiniti e segnaposto in msg-overrides.ts.
+  return renderSystemMessage(kind === "tassa" ? "payTassa" : "paySaldo", (["it", "en", "fr", "de", "es"] as const).includes(lang as never) ? lang : "it", { importo: fmtEur(cents), link: url });
 }

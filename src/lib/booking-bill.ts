@@ -31,18 +31,24 @@ export function billOf(b: Booking, structure: Structure | undefined): Bill {
   return { lines, total, paidAtPortal, paid, due: Math.max(0, roundCents(total - paidAtPortal - paid)) };
 }
 
-const T: Record<string, { hello: (n: string) => string; intro: (p: string) => string; paidPortal: string; paid: string; due: string; link: (url: string) => string; thanks: string }> = {
-  it: { hello: (n) => (n ? `Buongiorno ${n},` : "Buongiorno,"), intro: (p) => `ecco il conto del suo soggiorno${p ? ` presso ${p}` : ""}:`, paidPortal: "Già pagato al portale", paid: "Già versato", due: "Da pagare", link: (u) => `Può pagare online con carta, in modo sicuro: ${u}`, thanks: "Grazie!" },
-  en: { hello: (n) => (n ? `Hello ${n},` : "Hello,"), intro: (p) => `here is the bill for your stay${p ? ` at ${p}` : ""}:`, paidPortal: "Already paid to the booking site", paid: "Already paid", due: "Amount due", link: (u) => `You can pay online by card, securely, here: ${u}`, thanks: "Thank you!" },
+import { renderSystemMessage, type MsgLang } from "./msg-overrides";
+
+const LABELS: Record<MsgLang, { paidPortal: string; paid: string; due: string; fallback: string }> = {
+  it: { paidPortal: "Già pagato al portale", paid: "Già versato", due: "Da pagare", fallback: "la nostra struttura" },
+  en: { paidPortal: "Already paid to the booking site", paid: "Already paid", due: "Amount due", fallback: "our property" },
+  fr: { paidPortal: "Déjà payé au portail", paid: "Déjà versé", due: "Reste à payer", fallback: "notre établissement" },
+  de: { paidPortal: "Bereits beim Portal bezahlt", paid: "Bereits bezahlt", due: "Zu zahlen", fallback: "unserer Unterkunft" },
+  es: { paidPortal: "Ya pagado al portal", paid: "Ya abonado", due: "A pagar", fallback: "nuestro alojamiento" },
 };
 const fmt = (n: number): string => `€ ${n.toFixed(2).replace(".", ",")}`;
 
-/** Testo del conto (WhatsApp/email). Solo italiano e inglese; le altre lingue ricevono l'inglese. */
-export function billMessage(bill: Bill, o: { lang: string; name?: string; property?: string; link?: string }): string {
-  const t = T[o.lang] ?? T.en;
+/** Testo del conto (WhatsApp/email). Il testo è MODIFICABILE (Messaggi → Modelli): qui si compone solo il riepilogo delle voci. */
+export function billMessage(bill: Bill, o: { lang: string; name?: string; property?: string }): string {
+  const lang = (["it", "en", "fr", "de", "es"] as const).find((l) => l === o.lang) ?? "en";
+  const t = LABELS[lang];
   const rows = bill.lines.map((l) => `• ${l.label}: ${fmt(l.amount)}`);
   if (bill.paidAtPortal > 0) rows.push(`${t.paidPortal}: −${fmt(bill.paidAtPortal)}`);
   if (bill.paid > 0) rows.push(`${t.paid}: −${fmt(bill.paid)}`);
   rows.push(`${t.due}: ${fmt(bill.due)}`);
-  return [t.hello(o.name ?? ""), t.intro(o.property ?? ""), "", ...rows, ...(o.link ? ["", t.link(o.link)] : []), "", t.thanks].join("\n");
+  return renderSystemMessage("bill", lang, { nome: o.name ?? "", struttura: o.property || t.fallback, riepilogo: rows.join("\n") });
 }
