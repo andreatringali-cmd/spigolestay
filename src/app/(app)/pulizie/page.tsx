@@ -26,6 +26,7 @@ import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 import { downscaleImage } from "@/lib/images";
+import { realGuestRequests } from "@/lib/guest-requests";
 
 const fmt = (iso: string) => fmtDM(iso);
 const fmtShort = (iso: string) => fmtDM(iso);
@@ -393,7 +394,7 @@ export default function PuliziePage() {
           : <span className="text-faint">{t("nessuna partenza")}</span>}
       </div>
       {!r.arr && !r.dep && r.stay && <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span className="font-semibold text-dim">{t("In soggiorno:")}</span><span className="font-medium text-txt">{guestName(r.stay.guestId)}</span>{pax(r.stay, "both")}</div>}
-      {(r.arr ?? r.stay)?.guestRequests && <div className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Richiesta ospite:")}</b> {(r.arr ?? r.stay)!.guestRequests}</span></div>}
+      {realGuestRequests((r.arr ?? r.stay)?.guestRequests) && <div className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Richiesta ospite:")}</b> {realGuestRequests((r.arr ?? r.stay)?.guestRequests)}</span></div>}
       {r.oosFrom && <div className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px]" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 16%, transparent)", color: "var(--dim)" }}><span>🔧</span><span><b className="text-dim">{t("Poi fuori servizio")}{r.oosNote ? `: ${r.oosNote}` : ""}</b></span></div>}
     </div>
   );
@@ -882,7 +883,7 @@ function RowGuest({ label, color, b, name, dog, empty }: { label: string; color:
         <span className="text-faint">· {CHANNELS[b.channel]?.label ?? b.channel}</span>
         {dog && <span title={t("Ospite con animale")} className="inline-flex items-center gap-0.5 font-semibold" style={{ color: "var(--warn)" }}><Icon name="paw" size={12} /> {t("Animale")}</span>}
       </div>
-      {b.guestRequests && <div className="mt-1 truncate rounded-md px-1.5 py-0.5 text-[11px] text-txt" title={b.guestRequests} style={{ background: "color-mix(in srgb, var(--focus) 10%, transparent)" }}><b className="text-focus">{t("Richiesta")}:</b> {b.guestRequests}</div>}
+      {realGuestRequests(b.guestRequests) && <div className="mt-1 truncate rounded-md px-1.5 py-0.5 text-[11px] text-txt" title={realGuestRequests(b.guestRequests)} style={{ background: "color-mix(in srgb, var(--focus) 10%, transparent)" }}><b className="text-focus">{t("Richiesta")}:</b> {realGuestRequests(b.guestRequests)}</div>}
     </div>
   );
 }
@@ -948,7 +949,7 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
         {r.dep && <GuestLine dir="out" label={t("Parte")} name={guestName(r.dep.guestId)} b={r.dep} dog={hasDog(r.dep.guestId)} />}
         {r.arr && <GuestLine dir="in" label={t("Arriva")} name={guestName(r.arr.guestId)} b={r.arr} dog={hasDog(r.arr.guestId)} />}
         {!r.dep && !r.arr && r.stay && <GuestLine dir="stay" label={t("In casa")} name={guestName(r.stay.guestId)} b={r.stay} dog={hasDog(r.stay.guestId)} />}
-        {(r.arr ?? r.stay)?.guestRequests && <div className="flex items-start gap-1 rounded-lg px-1.5 py-1 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Richiesta ospite:")}</b> {(r.arr ?? r.stay)!.guestRequests}</span></div>}
+        {realGuestRequests((r.arr ?? r.stay)?.guestRequests) && <div className="flex items-start gap-1 rounded-lg px-1.5 py-1 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Richiesta ospite:")}</b> {realGuestRequests((r.arr ?? r.stay)?.guestRequests)}</span></div>}
         {r.oosFrom && (
           <div className="flex items-start gap-1 rounded-lg px-1.5 py-1 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 16%, transparent)", color: "var(--dim)" }}>
             <span>🔧</span><span><b className="text-dim">{t("Poi fuori servizio")}{r.oosNote ? `: ${r.oosNote}` : ""}</b></span>
