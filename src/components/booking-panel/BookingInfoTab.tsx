@@ -16,7 +16,7 @@ import { isRelayEmail } from "@/lib/contacts-check";
 import { eur } from "@/lib/format";
 import type { RevisionCustomer, RevisionView } from "@/lib/booking-revisions";
 import { fmtDate, nights } from "@/lib/dates";
-import { lordoOf, nightlyRevenue } from "@/lib/booking";
+import { nightlyRevenue } from "@/lib/booking";
 import {
   cancelPenaltyLines, channelDisplay, channexCodeOf, channexIdOf, countryName, detectGenius, directCancelText, fmtDateWd, groupRooms,
   guestNames, languageName, notesBlocks, nightRows, occupancyLabel, safeMailtoHref, safeTelHref,
@@ -161,7 +161,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
   const noteLabel = { ota: "", note: t("Note interne"), guest: t("Richieste dell'ospite") };
 
   // ── Spese di prenotazione (stesse funzioni del resto dell'app) ──
-  const lordo = lordoOf(booking);
+  const lordo = booking.total ?? 0; // come l'OTA: il solo soggiorno (gli extra aggiunti dalla struttura sono in Gestione)
   const noPrice = !booking.total;
   const payRule = collectRuleOf(structure, booking.channel);
   const pm = effectivePayMethod(booking, payRule);

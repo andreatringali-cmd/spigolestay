@@ -220,6 +220,10 @@ export default function BookingDrawer() {
   const totalV = accV + cleanV + extrasV;
   const commPctV = commissionShareOf(booking); // % REALE di questa prenotazione: (lordo − netto) ÷ lordo, cioè commissione + costo incasso ÷ lordo (cambia con promo e livello Genius)
   const commTotV = commissionOf(booking);
+  // Soggiorno e extra restano separati: commissione e netto dell'OTA riguardano SOLO il soggiorno; gli extra li vende la struttura (nessuna commissione).
+  const stayV = accV + cleanV;
+  const nettoStayV = stayV > 0 ? Math.max(0, roundCents(stayV - commTotV)) : 0;
+  const commPctStayV = stayV > 0 ? Math.round((commTotV / stayV) * 1000) / 10 : 0;
   const commV = commissionBaseOf(booking);
   const payFeeV = paymentFeeOf(booking);
   const adjV = otaAdjustmentOf(booking); // sconti applicati dall'OTA (differenza con la carta virtuale)
@@ -390,7 +394,7 @@ export default function BookingDrawer() {
   const pmDetail = pmView.method === "ota" ? otaPayDetail(booking, payRule) : undefined;
   // «Da incassare» per la struttura: sulle OTA è il NETTO (quello che ti arriva), non il totale che paga l'ospite. Fa eccezione l'OTA che dichiara/imposta «incassa la struttura»: lì l'ospite ti consegna il totale.
   const ownCollectV = booking.otaInfo?.paymentCollect === "property" || payRule?.collect === "property";
-  const dueV = (booking.channel !== "direct" && booking.channel !== "blocked") && !ownCollectV && !noPrice ? Math.max(0, roundCents(nettoV - paidV - otaPaidV)) : balanceV;
+  const dueV = (booking.channel !== "direct" && booking.channel !== "blocked") && !ownCollectV && !noPrice ? Math.max(0, roundCents(nettoStayV + extrasV - paidV - otaPaidV)) : balanceV;
   const isOtaChannelV = booking.channel !== "direct" && booking.channel !== "blocked";
   const payMethodRow = (
     <div className="flex items-center justify-between gap-3">
@@ -446,23 +450,32 @@ export default function BookingDrawer() {
           <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
           <span className="inline-flex items-center gap-1.5">
             {underprice?.flagged && <span title={underpriceReason(booking, underprice)} className="font-sans text-base font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
-            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(totalV)}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{noPrice ? t("Prezzo mancante") : eur(stayV)}</span>
           </span>
         </div>
         {!noPrice && (commV > 0 || payFeeV > 0 || adjV > 0 || (booking.otaDeductions ?? 0) > 0) && (
           <div className="mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5 text-sm text-dim">
-            {commV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Commissione OTA")}{commissionIsEstimate(booking) ? ` (${t("stima")})` : ""}{payFeeV <= 0 && adjV <= 0 ? ` · ${String(commPctV).replace(".", ",")}%` : ""}</span><span className="font-mono tabular-nums">−{eur(commV)}</span></div>}
+            {commV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Commissione OTA")}{commissionIsEstimate(booking) ? ` (${t("stima")})` : ""}{payFeeV <= 0 && adjV <= 0 ? ` · ${String(commPctStayV).replace(".", ",")}%` : ""}</span><span className="font-mono tabular-nums">−{eur(commV)}</span></div>}
             {payFeeV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Costo d'incasso")}</span><span className="font-mono tabular-nums">−{eur(payFeeV)}</span></div>}
             {adjV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Sconti OTA (carta virtuale)")}</span><span className="font-mono tabular-nums">−{eur(adjV)}</span></div>}
             {(booking.otaDeductions ?? 0) > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Trattenute dichiarate dall'OTA")}</span><span className="font-mono tabular-nums">−{eur(booking.otaDeductions)}</span></div>}
-            {commTotV > 0 && (payFeeV > 0 || adjV > 0) && <div className="flex items-baseline justify-between gap-4 text-[11px]"><span>{t("Totale costi")} ({String(commPctV).replace(".", ",")}%)</span><span className="font-mono tabular-nums">−{eur(commTotV)}</span></div>}
+            {commTotV > 0 && (payFeeV > 0 || adjV > 0) && <div className="flex items-baseline justify-between gap-4 text-[11px]"><span>{t("Totale costi")} ({String(commPctStayV).replace(".", ",")}%)</span><span className="font-mono tabular-nums">−{eur(commTotV)}</span></div>}
           </div>
         )}
         {!noPrice && (
           <div className="mt-1.5 flex items-baseline justify-between gap-4 border-t border-line pt-1.5">
-            <span className="text-sm font-semibold text-txt">{t("Incasso netto per te")}</span>
-            <span className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(nettoV)}</span>
+            <span className="text-sm font-semibold text-txt">{extrasV > 0 ? t("Netto del soggiorno") : t("Incasso netto per te")}</span>
+            <span className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(nettoStayV)}</span>
           </div>
+        )}
+        {!noPrice && extrasV > 0 && (
+          <>
+            <div className="mt-1 flex items-baseline justify-between gap-4 text-sm text-dim"><span>{t("Extra e altre voci")}</span><span className="font-mono tabular-nums">+{eur(extrasV)}</span></div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-4 border-t border-line pt-1.5">
+              <span className="text-sm font-semibold text-txt">{t("Incasso netto per te")}</span>
+              <span className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(roundCents(nettoStayV + extrasV))}</span>
+            </div>
+          </>
         )}
         <div className="mt-2 border-t border-line pt-1.5" />
         {otaPaidV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Pagato al portale")}</span><span className="font-mono text-sm font-semibold tabular-nums text-dim">{eur(otaPaidV)}</span></div>}
