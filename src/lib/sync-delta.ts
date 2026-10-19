@@ -28,10 +28,12 @@ export interface Delta {
   flat: Record<string, string>;             // altre chiavi della riga (impostazioni, conversazioni…): valore intero
   confirm?: boolean;                        // consenso esplicito a cancellazioni oltre soglia
   v?: number;                               // versione del formato (informativa)
+  diag?: Record<string, number>;            // diagnostica: perché le entità sono state inviate (solo conteggi)
 }
 /** Riassunto leggibile di un delta (per i log: quante voci per tipo, SENZA dati personali). */
 export function describeDelta(d: Delta): string {
   const parts: string[] = [];
+  if (d.diag) parts.push("perché:" + Object.entries(d.diag).map(([k, n]) => k + "=" + n).join(","));
   for (const [c, v] of Object.entries(d.colls)) if (v.upsert.length || v.del.length) parts.push(`${c}:+${v.upsert.length}/-${v.del.length}`);
   for (const [c, v] of Object.entries(d.tombs)) if (v.length) parts.push(`lapidi.${c}:${v.length}`);
   if (Object.keys(d.fields).length) parts.push("campi:" + Object.keys(d.fields).join(","));
@@ -109,7 +111,12 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
       for (const it of mList) {
         const id = idOf(it); if (!id) continue;
         const s = sMap.get(id), b = bMap.get(id);
-        if ((s === undefined || !same(s, it)) && (b === undefined || !same(b, it))) upsert.push(it as Json);
+        if ((s === undefined || !same(s, it)) && (b === undefined || !same(b, it))) {
+          upsert.push(it as Json);
+          const dg = (delta.diag ??= {});
+          const k = `${coll}:${s === undefined ? "fuoriFinestra" : "diversoDalServer"}/${b === undefined ? "nonInBase" : "diversoDallaBase"}`;
+          dg[k] = (dg[k] ?? 0) + 1;
+        }
       }
       for (const id of sMap.keys()) if (!mMap.has(id)) del.push(id);
       if (upsert.length || del.length) delta.colls[coll] = { upsert, del };
