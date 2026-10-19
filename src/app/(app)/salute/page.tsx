@@ -52,7 +52,7 @@ export default function SalutePage() {
       <PageHeader
         title="Salute del sistema"
         subtitle="Se tutto funziona, qui è tutto verde. Altrimenti ti diciamo cosa guardare."
-        actions={<button onClick={ricontrolla} disabled={loading} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash disabled:opacity-60">{loading ? "Controllo…" : "Ricontrolla"}</button>}
+        actions={<button onClick={ricontrolla} disabled={loading} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:min-h-10 disabled:opacity-60">{loading ? "Controllo…" : "Ricontrolla"}</button>}
       />
 
       {err && <Card className="mb-4"><p className="text-sm" style={{ color: "var(--err)" }}>{err}</p></Card>}

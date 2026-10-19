@@ -33,7 +33,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
       <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div className="relative w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
         {children}
       </div>
     </div>
@@ -214,10 +214,10 @@ export default function CamerePage() {
           // Filtri camere: ricerca + azioni, sempre sotto le card Tipologie.
           const filtriRow = () => (
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-              <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full flex-1 sm:w-auto" />
+              <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-auto sm:flex-1" />
               <div className="ml-auto flex items-center gap-2">
-                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
-                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:min-h-10">{t("+ Tipologia")}</button>
+                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">{t("+ Camera")}</button>
               </div>
             </div>
           );
@@ -242,7 +242,7 @@ export default function CamerePage() {
               {(<>
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
-              <div className="mb-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mb-4 grid grid-cols-1 gap-2 sm:auto-rows-fr sm:grid-cols-2 lg:grid-cols-4">
                 {types.map((rt, i) => {
                   if (rt.deriveFrom) return null; // le derivate stanno nella tabella "Tariffe derivate"
                   const color = typeColor(rt, colorIdx(rt));
@@ -253,7 +253,7 @@ export default function CamerePage() {
                       <div className="flex flex-1 flex-col p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="font-semibold text-txt">{rt.name}</div>
-                          <div className="font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
+                          <div className="shrink-0 whitespace-nowrap font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
                         </div>
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.beds} {t("letti")}</span>
@@ -263,7 +263,7 @@ export default function CamerePage() {
                         </div>
                         {rt.bedConfig && <div className="mt-1.5 text-[11px] text-faint">{rt.bedConfig}</div>}
                         {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5 text-dim">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} title={t(a)} aria-label={t(a)} className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>)}{(rt.amenities ?? []).length > 6 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 6}</span>}</div>}
-                        <div className="mt-auto pt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100">{t("Apri scheda")} →</div>
+                        <div className="mt-auto pt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100 max-sm:hidden">{t("Apri scheda")} →</div>
                       </div>
                     </button>
                   );
@@ -284,15 +284,15 @@ export default function CamerePage() {
                     const open = !!search.trim() || opened.has(rt.id); // cercando, apriamo i gruppi che corrispondono
                     return (
                       <div key={rt.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-                        <div draggable onDragStart={(e) => { setDragTypeId(rt.id); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => { if (dragTypeId && dragTypeId !== rt.id) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); reorderType(types, rt.id); }} onDragEnd={() => setDragTypeId(null)} title={t("Trascina per cambiare l'ordine delle tipologie")} className={`flex cursor-grab items-center justify-between gap-2 px-3 py-2.5 ${dragTypeId === rt.id ? "opacity-40" : ""} ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
-                          <button onClick={() => toggleOpen(rt.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={open ? t("Comprimi") : t("Espandi")}>
+                        <div draggable onDragStart={(e) => { setDragTypeId(rt.id); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => { if (dragTypeId && dragTypeId !== rt.id) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); reorderType(types, rt.id); }} onDragEnd={() => setDragTypeId(null)} title={t("Trascina per cambiare l'ordine delle tipologie")} className={`flex cursor-grab items-center justify-between gap-2 px-3 py-2.5 max-sm:flex-wrap ${dragTypeId === rt.id ? "opacity-40" : ""} ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
+                          <button onClick={() => toggleOpen(rt.id)} className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left max-sm:basis-full max-sm:py-2.5" title={open ? t("Comprimi") : t("Espandi")}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-faint transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                             <span className="truncate font-display text-base font-bold text-txt">{rt.name}</span>
                             <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{g.length} {g.length === 1 ? t("camera") : t("camere")}</span>
                             <span className="hidden shrink-0 text-[11px] text-faint sm:inline">{rt.beds} {t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
                           </button>
-                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="shrink-0 whitespace-nowrap text-[11px] font-medium text-focus hover:underline">{t("Apri tipologia")} →</button>
+                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="shrink-0 whitespace-nowrap text-[11px] font-medium text-focus hover:underline max-sm:-my-2 max-sm:ml-auto max-sm:py-2.5 max-sm:pl-2">{t("Apri tipologia")} →</button>
                         </div>
                         {open && (
                           <div className="overflow-x-auto">

@@ -37,6 +37,7 @@ import { shortChannelTitle } from "@/lib/channel-name";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import { ArrowScroller } from "@/components/ScrollStrip";
 import DateField from "@/components/DateField";
+import Popover from "@/components/Popover";
 import SearchInput from "@/components/SearchInput";
 import { normName } from "@/lib/guest-key";
 import { bookingCode } from "@/lib/bookingCode";
@@ -144,12 +145,10 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   }, []);
   const patchView = (p: Partial<ViewCfg>) => setVw((v) => { const n = { ...v, ...p }; try { localStorage.setItem("spigolestay:calview:v2", JSON.stringify(n)); } catch {} return n; });
   const [vizOpen, setVizOpen] = useState(false);
-  const vizRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (vizRef.current && !vizRef.current.contains(e.target as Node)) setVizOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
+  const vizRef = useRef<HTMLButtonElement>(null);
   // Selettore mese (tendina)
   const [monthOpen, setMonthOpen] = useState(false);
-  const monthRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
+  const monthRef = useRef<HTMLButtonElement>(null);
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const rowH = vw.dense ? 31 : 42;
   // Stato pulizie di oggi (dalla pagina Pulizie): chiave = `unitId:YYYY-MM-DD`.
@@ -517,6 +516,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       .sort((a, b) => near(a) - near(b)).slice(0, 8);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calQuery, bookings, guests, activeStructureId]);
+  // Tendina dei risultati: si chiude con un tocco fuori / Esc, e si riapre scrivendo o toccando di nuovo il campo.
+  const [hitsClosedFor, setHitsClosedFor] = useState<string | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
   const goToHit = (b: { id: string; checkIn: string }) => { setStart(addDays(parseISO(b.checkIn), -2)); setCalQuery(""); openBooking(b.id); };
 
   // ─── Refs per i listener di drag (leggono sempre i dati aggiornati) ───
@@ -1092,10 +1094,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm sm:gap-3">
         <div className="flex w-full items-center gap-2 sm:contents">
           {/* Cerca ospite o codice: prima del mese */}
-          <div className="relative min-w-0 flex-1 sm:order-first sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:flex-none sm:shrink-0">
+          <div ref={searchRef} onFocusCapture={() => setHitsClosedFor(null)} className="relative min-w-0 flex-1 sm:order-first sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:flex-none sm:shrink-0">
             <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
-            {calQuery.trim() && (
-              <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+            <Popover open={!!calQuery.trim() && hitsClosedFor !== calQuery} anchorRef={searchRef} onClose={() => setHitsClosedFor(calQuery)} align="start" width={320} label="Risultati ricerca">
                 {calHits.length === 0
                   ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
                   : calHits.map((b) => (
@@ -1104,26 +1105,23 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                       <span className="shrink-0 font-mono text-[11px] text-faint">{fmtDM(parseISO(b.checkIn))} → {fmtDM(parseISO(b.checkOut))}</span>
                     </button>
                   ))}
-              </div>
-            )}
+            </Popover>
           </div>
           <Link href="/prenotazioni/nuova" className="sm:order-[41] sm:ml-auto inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
         </div>
         <div className="flex w-full items-center gap-2 sm:contents">
-          <div ref={monthRef} className="relative shrink-0 sm:order-[10]">
-            <button onClick={() => setMonthOpen((o) => !o)} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition sm:h-auto sm:py-1.5 ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+          <div className="relative shrink-0 sm:order-[10]">
+            <button ref={monthRef} onClick={() => setMonthOpen((o) => !o)} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition sm:h-auto sm:py-1.5 ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
               <span className="hidden sm:inline-flex"><Icon name="calendar" size={15} /></span> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
             </button>
-            {monthOpen && (
-              <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+            <Popover open={monthOpen} anchorRef={monthRef} onClose={() => setMonthOpen(false)} align="start" width={208} maxHeight={288} label="Mese">
                 {monthList.map((mm) => {
                   const active = start.getFullYear() === mm.y && start.getMonth() === mm.m;
                   return (
                     <button key={`${mm.y}-${mm.m}`} onClick={() => { setStart(new Date(mm.y, mm.m, 1)); patchView({ span: "month" }); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>
                   );
                 })}
-              </div>
-            )}
+            </Popover>
           </div>
           {/* Salta a una data + frecce ±1 giorno (come nella dashboard) */}
           <div className="flex min-w-0 flex-1 items-center gap-1 sm:order-[20] sm:flex-none">
@@ -1135,12 +1133,11 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         <div className="flex w-full items-center gap-2 sm:contents">
           <div className="min-w-0 flex-1 sm:order-[31] sm:flex-none [&>div]:w-full sm:[&>div]:w-auto [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap [&>div]:h-9 sm:[&>div]:h-auto [&>div>button]:px-2 sm:[&>div>button]:px-2.5">{viewSwitch}</div>
           {/* Menu Visualizza — spostato dopo i mesi (order) */}
-          <div ref={vizRef} className="relative shrink-0 sm:order-[30]">
-            <button onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+          <div className="relative shrink-0 sm:order-[30]">
+            <button ref={vizRef} onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
             </button>
-            {vizOpen && (
-              <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+            <Popover open={vizOpen} anchorRef={vizRef} onClose={() => setVizOpen(false)} align="start" width={256} label="Visualizza">
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Finestra</div>
                 <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
                   {([[7, "7 giorni"], ["month", "Mensile"]] as [Span, string][]).map(([v, lab]) => (
@@ -1159,8 +1156,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                   <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
                   <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
                 </div>
-              </div>
-            )}
+            </Popover>
           </div>
           <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 shrink-0 place-items-center sm:order-[32] rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
             <Icon name="chart" size={16} />
@@ -1234,7 +1230,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <span className="min-w-0 flex-1 text-xs leading-snug text-txt">{s.text}</span>
                 {s.apply && s.cta && (tipDone.has(tipKey(s))
                   ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--ok)]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>Applicato</span>
-                  : <button onClick={() => { const k = tipKey(s); const doIt = () => { s.apply!(); markTip(k); }; if (s.from != null && s.to != null && s.subject) setPriceConfirm({ kind: "single", subject: s.subject, detail: s.detail, from: s.from, to: s.to, onOk: doIt }); else doIt(); }} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: s.dir === "up" ? "var(--ok)" : s.dir === "down" ? "var(--err)" : "var(--focus)" }}>{s.cta}</button>)}
+                  : <button onClick={() => { const k = tipKey(s); const doIt = () => { s.apply!(); markTip(k); }; if (s.from != null && s.to != null && s.subject) setPriceConfirm({ kind: "single", subject: s.subject, detail: s.detail, from: s.from, to: s.to, onOk: doIt }); else doIt(); }} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 max-sm:min-h-10 max-sm:px-3" style={{ backgroundColor: s.dir === "up" ? "var(--ok)" : s.dir === "down" ? "var(--err)" : "var(--focus)" }}>{s.cta}</button>)}
               </div>
             ))}
           </div>

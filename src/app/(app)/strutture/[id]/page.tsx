@@ -407,7 +407,7 @@ export default function StrutturaSchedaPage() {
                 <div className="text-[11px] text-faint">{t("Clicca il riquadro per caricarlo. Compare sui preventivi e sul PDF.")}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <span className="text-[11px] text-faint">{t("Colore identità:")}</span>
-                  <div className="flex gap-1.5">{AV_COLORS.map((c) => <button key={c} type="button" onClick={() => set("photoColor", c)} className={`h-4 w-4 rounded-full border-2 ${f.photoColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
+                  <div className="flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} type="button" onClick={() => set("photoColor", c)} className={`h-4 w-4 rounded-full border-2 max-sm:h-9 max-sm:w-9 ${f.photoColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
                   <label className="flex cursor-pointer items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[11px] text-dim hover:bg-wash" title={t("Scegli un colore personalizzato")}>
                     <span className="h-3.5 w-3.5 rounded-full border border-line" style={{ backgroundColor: f.photoColor ?? AV_COLORS[1] }} />
                     {t("Personalizzato")}
@@ -484,7 +484,7 @@ export default function StrutturaSchedaPage() {
             <SectionTitle>{t("Servizi & dotazioni")}</SectionTitle>
             <div className="flex flex-wrap gap-1.5">
               {Array.from(new Set([...AMENITIES, ...(f.services ?? [])])).map((a) => { const on = (f.services ?? []).includes(a); const custom = !AMENITIES.includes(a); return (
-                <button key={a} onClick={() => toggleArr("services", a)} title={custom ? t("Servizio personalizzato · clicca per rimuoverlo") : undefined} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}{custom && on ? " ✕" : ""}</button>
+                <button key={a} onClick={() => toggleArr("services", a)} title={custom ? t("Servizio personalizzato · clicca per rimuoverlo") : undefined} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}{custom && on ? " ✕" : ""}</button>
               ); })}
             </div>
             <div className="mt-3 flex gap-2">
@@ -656,7 +656,7 @@ export default function StrutturaSchedaPage() {
             <SectionTitle>{t("Pagamenti & incassi")}</SectionTitle>
             <div className="mb-1 text-xs text-dim">{t("Metodi accettati")}</div>
             <div className="mb-3 flex flex-wrap gap-1.5">
-              {PAY_METHODS.map((m) => <button key={m} onClick={() => toggleArr("payMethods", m)} className={`rounded-full border px-2.5 py-1 text-xs transition ${(f.payMethods ?? []).includes(m) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(m)}</button>)}
+              {PAY_METHODS.map((m) => <button key={m} onClick={() => toggleArr("payMethods", m)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${(f.payMethods ?? []).includes(m) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(m)}</button>)}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className={`${lbl} col-span-2`}>IBAN<input value={f.iban ?? ""} onChange={(e) => set("iban", e.target.value)} className={`${inp} mt-1 font-mono`} placeholder="IT00 X000 0000 0000 0000 0000 000" /></label>

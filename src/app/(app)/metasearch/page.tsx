@@ -162,8 +162,8 @@ export default function MetaSearchPage() {
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Link href="/sito" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Sito web")}</Link>
-            <Link href="/widget" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Widget")}</Link>
+            <Link href="/sito" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Sito web")}</Link>
+            <Link href="/widget" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Widget")}</Link>
           </div>
         </div>
       </Card>
@@ -194,7 +194,7 @@ export default function MetaSearchPage() {
                     </div>
                   </div>
                 )}
-                <button onClick={() => patch(m.key, { on: !c.on })} title={t("Solo la tua lista: la connessione vera si fa al passo 3, sulla piattaforma del comparatore")} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${c.on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Attivo") : t("Attiva")}</button>
+                <button onClick={() => patch(m.key, { on: !c.on })} title={t("Solo la tua lista: la connessione vera si fa al passo 3, sulla piattaforma del comparatore")} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition max-sm:min-h-10 ${c.on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Attivo") : t("Attiva")}</button>
               </div>
             );
           })}

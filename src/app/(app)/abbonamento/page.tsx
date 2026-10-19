@@ -251,8 +251,8 @@ export default function AbbonamentoPage() {
           <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span> · {t("Prova gratuita 5 giorni · nessun costo di attivazione · disdici quando vuoi")}
         </p>
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface p-0.5 text-sm">
-          <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
-          <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition ${annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[10px] font-bold text-[color:var(--ok)]">−20%</span></button>
+          <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition max-sm:min-h-10 ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
+          <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition max-sm:min-h-10 ${annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[10px] font-bold text-[color:var(--ok)]">−20%</span></button>
         </div>
       </div>
 
@@ -416,7 +416,7 @@ export default function AbbonamentoPage() {
                   <div className="shrink-0 text-right">
                     <div className="font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[m.key] || 0)}<span className="text-[10px] font-normal text-faint">{t("/mese")}</span></div>
                   </div>
-                  <button onClick={() => setPendingAddon(m.key)} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${on ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "border border-line text-txt hover:bg-wash"}`}>{on ? `${t("Attivo")} ✓` : t("Aggiungi")}</button>
+                  <button onClick={() => setPendingAddon(m.key)} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${on ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "border border-line text-txt hover:bg-wash"}`}>{on ? `${t("Attivo")} ✓` : t("Aggiungi")}</button>
                 </div>
               );
             })}
@@ -504,7 +504,7 @@ export default function AbbonamentoPage() {
         const up = TIERS.findIndex((x) => x.key === pendingTier) > TIERS.findIndex((x) => x.key === tier.key);
         return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingTier(null)}>
-            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="font-display text-lg font-bold text-txt">{up ? t("Passa al piano") : t("Cambia nel piano")} {pt.name}</div>
               <p className="mt-1 text-sm text-dim">{t("Vuoi confermare il cambio di piano?")}</p>
               <div className="mt-3 space-y-1 rounded-lg border border-line bg-wash p-3 text-sm">
@@ -532,7 +532,7 @@ export default function AbbonamentoPage() {
         const on = !!active[pendingAddon];
         return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingAddon(null)}>
-            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="font-display text-lg font-bold text-txt">{on ? t("Rimuovere il modulo?") : t("Attivare il modulo?")}</div>
               <div className="mt-3 rounded-lg border border-line bg-wash p-3">
                 <div className="text-sm font-semibold text-txt">{t(m.name)}</div>

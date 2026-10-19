@@ -144,7 +144,7 @@ export default function ModelliPanel() {
           <Card className="relative w-full max-w-xl">
             <div className="mb-3 flex items-center justify-between">
               <SectionTitle>{t("Modello messaggio")}</SectionTitle>
-              <button onClick={() => setEditing(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button onClick={() => setEditing(null)} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt max-sm:px-3 max-sm:py-2.5">✕</button>
             </div>
             <div className="flex items-end gap-2">
               <label className="block flex-1 text-xs font-medium text-dim">{t("Nome modello")} *<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" placeholder={t("Es. Benvenuto pre-arrivo")} /></label>
@@ -155,7 +155,7 @@ export default function ModelliPanel() {
 
             <div className="mt-4">
               <div className="mb-1.5 flex items-center gap-1">
-                {LANGS.map(([l, n]) => (<button key={l} onClick={() => setEditLang(l)} className={`rounded-md px-2 py-1 text-xs font-medium ${editLang === l ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n.slice(0, 3)}</button>))}
+                {LANGS.map(([l, n]) => (<button key={l} onClick={() => setEditLang(l)} className={`rounded-md px-2 py-1 text-xs font-medium max-sm:min-h-9 max-sm:px-3 ${editLang === l ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n.slice(0, 3)}</button>))}
               </div>
               <textarea value={editing.texts[editLang]} onChange={(e) => setEditing({ ...editing, texts: { ...editing.texts, [editLang]: e.target.value } })} rows={5} className="w-full resize-none rounded-lg border border-line bg-paper p-3 text-sm text-txt outline-none focus:border-focus" placeholder={`${t("Testo in")} ${LANGS.find(([l]) => l === editLang)?.[1]}…`} />
               <div className="mt-2"><VarLegend vars={MSG_VARS} onInsert={insertVar} /></div>
@@ -171,8 +171,8 @@ export default function ModelliPanel() {
             )}
 
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveTpl} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva modello")}</button>
+              <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
+              <button onClick={saveTpl} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-11">{t("Salva modello")}</button>
             </div>
           </Card>
         </div>

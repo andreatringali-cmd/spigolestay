@@ -743,7 +743,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
     setConfirming((c) => (c ? { ...c, q: { ...c.q, status: "confermato" } } : c));
   };
 
-  const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
 
   return (
     <div>
@@ -751,8 +751,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
       {/* Sezioni: Nuovo preventivo · Archivio */}
       <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5">
-        <button onClick={() => { if (editingId) { setEditingId(null); setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setNote(""); const t0 = toISO(new Date()); setCheckIn(t0); setCheckOut(shiftISO(t0, 1)); } setTab("nuovo"); }} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
-        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
+        <button onClick={() => { if (editingId) { setEditingId(null); setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setNote(""); const t0 = toISO(new Date()); setCheckIn(t0); setCheckOut(shiftISO(t0, 1)); } setTab("nuovo"); }} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
+        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
       </div>
 
       {tab === "nuovo" && (
@@ -809,7 +809,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                   {plans.filter((p) => planApplies(p, { checkIn, nights: n, structureId })).map((p) => {
                     const on = p.id === planId;
                     return (
-                      <button key={p.id} type="button" onClick={() => { setPlanId(p.id); setAcconto(planDepositPct(p)); }} className={`rounded-lg border px-3 py-1.5 text-sm transition ${on ? "font-semibold" : "text-dim hover:bg-wash"}`} style={on ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)", color: "var(--focus)" } : { borderColor: "var(--line)" }}>
+                      <button key={p.id} type="button" onClick={() => { setPlanId(p.id); setAcconto(planDepositPct(p)); }} className={`rounded-lg border px-3 py-1.5 max-sm:py-2.5 text-sm transition ${on ? "font-semibold" : "text-dim hover:bg-wash"}`} style={on ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)", color: "var(--focus)" } : { borderColor: "var(--line)" }}>
                         {p.name}{p.adjPct !== 0 && <span className="ml-1 text-[11px] font-bold">{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span>}
                       </button>
                     );
@@ -953,9 +953,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             document.body,
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> {t("Salva")}</button>
-            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
-            <button onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="fileText" size={16} /></button>
+            <button onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> {t("Salva")}</button>
+            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
+            <button onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="grid h-9 w-9 max-sm:h-11 max-sm:w-11 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="fileText" size={16} /></button>
             {saveNote && <span className={`text-xs ${saveNote.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{saveNote.ok ? "✓ " : "⚠ "}{t(saveNote.msg)}</span>}
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
@@ -970,7 +970,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
       {tab === "archivio" && scopedSaved.length > 0 && (
         <div>
           <SectionTitle>{t("Preventivi salvati")} ({scopedSaved.length})</SectionTitle>
-          <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
             <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
@@ -1017,6 +1017,34 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </tbody>
             </table>
           </div>
+          {/* Telefono: una scheda per preventivo (la tabella serve da tablet in su) */}
+          <div className="flex flex-col gap-2 md:hidden">
+            {scopedSaved.map((p) => (
+              <div key={p.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-txt">{p.name}</div>
+                    <div className="truncate text-xs text-dim"><span className="font-mono font-semibold text-txt">{p.number ? `${p.number}/${new Date(p.createdAt).getFullYear()}` : "—"}</span> · {p.structure}</div>
+                    <div className="text-xs text-dim"><span className="font-mono">{fmt(p.checkIn)} → {fmt(p.checkOut)}</span> · {nights(p.checkIn, p.checkOut)} {t("Notti")}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-mono text-sm font-semibold text-txt">{eur(p.total)}</div>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: p.status === "confermato" ? "var(--ok)" : p.status === "bozza" ? "var(--dim)" : "var(--warn)" }}>
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.status === "confermato" ? "var(--ok)" : p.status === "bozza" ? "var(--faint)" : "var(--warn)" }} />
+                      {p.status === "confermato" ? t("Confermato") : p.status === "bozza" ? t("Bozza") : t("Inviato")}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <button onClick={() => loadQuote(p)} className="flex-1 rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
+                  {p.status === "confermato"
+                    ? <span className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2.5 py-2.5 text-sm font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}>{t("Prenotazione creata")} ✓</span>
+                    : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="flex-1 rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
+                  <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-line text-sm font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1037,14 +1065,14 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-display text-lg font-bold text-txt">{t("Conferma prenotazione")}</span>
-                <button onClick={() => setConfirming(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+                <button onClick={() => setConfirming(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="mb-3 text-sm text-dim">{q.name} · {q.structure} · <span className="font-mono">{fmt(q.checkIn)} → {fmt(q.checkOut)}</span> · <b className="text-txt">{eur(q.total)}</b></div>
 
               <div className="text-xs font-medium text-dim">{t("Anticipo")}</div>
               <div className="mt-1 flex items-center rounded-lg border border-line p-0.5">
                 {[0, 50, 100].map((v) => (
-                  <button key={v} onClick={() => setConfirming({ q, pct: v })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${pct === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}%</button>
+                  <button key={v} onClick={() => setConfirming({ q, pct: v })} className={`flex-1 rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${pct === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}%</button>
                 ))}
               </div>
               <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-sm">
@@ -1059,8 +1087,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 <div className="mt-3 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{t("Prenotazione creata")} ✓ — {t("invia la conferma all'ospite:")}</div>
               )}
 
-              <div className="mt-3 flex flex-nowrap items-center gap-1.5">
-                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
+              <div className="mt-3 flex flex-nowrap items-center gap-1.5 max-sm:flex-wrap">
+                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
                 <button disabled={confMail.sending} onClick={async () => {
                   if (!q.email) { setConfMail({ ok: false, msg: t("Email destinatario mancante") }); return; }
                   setConfMail({ sending: true, msg: t("Invio…") });
@@ -1070,9 +1098,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                     if (r.ok && j?.ok) setConfMail({ ok: true, msg: t("Email inviata a") + " " + q.email });
                     else { setConfMail({ ok: false, msg: j?.error || t("Invio non riuscito") }); window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank"); }
                   } catch (e) { setConfMail({ ok: false, msg: e instanceof Error ? e.message : t("Rete non disponibile") }); }
-                }} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash disabled:opacity-50">{confMail.sending ? t("Invio…") : t("Email")}</button>
-                <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
-                <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
+                }} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 max-sm:py-2.5 text-xs font-medium text-txt hover:bg-wash disabled:opacity-50">{confMail.sending ? t("Invio…") : t("Email")}</button>
+                <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 max-sm:py-2.5 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>
               {confMail.msg && <div className={`mt-2 rounded-lg px-3 py-2 text-xs font-medium ${confMail.ok ? "text-[color:var(--ok)]" : confMail.sending ? "text-dim" : "text-[color:var(--err)]"}`} style={{ backgroundColor: confMail.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : confMail.sending ? "var(--wash)" : "color-mix(in srgb, var(--err) 10%, transparent)" }}>{confMail.ok ? "✓ " : ""}{confMail.msg}</div>}
             </div>

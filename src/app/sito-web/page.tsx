@@ -344,7 +344,7 @@ export function Site() {
           <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenosite</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
-            <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs" title="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
+            <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs max-sm:min-h-10" title="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
           </div>
         </div>
       </div>
@@ -368,7 +368,7 @@ export function Site() {
                 <div className="flex flex-wrap items-center gap-2">
                   {childAges.map((age, i) => (
                     <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">Bimbo {i + 1}
-                      <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+                      <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus max-sm:py-1.5" />
                     </label>
                   ))}
                   <label className="ml-1 flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Culla <span className="text-faint">(gratuita, su richiesta)</span></label>
@@ -706,7 +706,7 @@ export function Site() {
                     <span className="mb-1 block text-[11px] font-medium text-dim">{T("La tua valutazione")}</span>
                     <div className="flex items-center gap-1" onMouseLeave={() => setRevHover(0)}>
                       {[1, 2, 3, 4, 5].map((n) => (
-                        <button key={n} type="button" onClick={() => setRev((f) => ({ ...f, rating: n }))} onMouseEnter={() => setRevHover(n)} aria-label={`${n}/5`} className="text-2xl leading-none transition-transform hover:scale-110" style={{ color: n <= (revHover || rev.rating) ? "#E0A21C" : "var(--line)" }}>★</button>
+                        <button key={n} type="button" onClick={() => setRev((f) => ({ ...f, rating: n }))} onMouseEnter={() => setRevHover(n)} aria-label={`${n}/5`} className="px-1 text-2xl leading-none transition-transform hover:scale-110 max-sm:px-2 max-sm:py-2" style={{ color: n <= (revHover || rev.rating) ? "#E0A21C" : "var(--line)" }}>★</button>
                       ))}
                       <span className="ml-2 text-sm font-semibold text-dim">{rev.rating}/5</span>
                     </div>
@@ -726,7 +726,7 @@ export function Site() {
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
           <MediaImg src={lightbox} alt="" className="max-h-[90dvh] max-w-full rounded-lg object-contain" />
-          <button onClick={() => setLightbox(null)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white">✕</button>
+          <button onClick={() => setLightbox(null)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white max-sm:h-11 max-sm:w-11">✕</button>
         </div>
       )}
 
@@ -742,10 +742,10 @@ export function Site() {
               {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
               {structure?.cin && <span>CIN {structure.cin}</span>}
               <div className="flex items-center gap-2">
-                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
-                {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
-                {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
-                {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" title="Sito" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80" style={{ color: accent }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg></a>}
+                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
+                {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
+                {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
+                {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" title="Sito" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: accent }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg></a>}
               </div>
             </div>
           </div>
@@ -764,7 +764,7 @@ export function Site() {
       )}
 
       {/* Barra Prenota fissa (solo telefono) */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-2.5 backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accent }}>{T("Prenota")}</button>
       </div>
 
@@ -773,7 +773,7 @@ export function Site() {
         <div className="fixed inset-x-0 bottom-16 z-50 mx-auto max-w-3xl px-4 md:bottom-4">
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-xl">
             <span className="min-w-0 flex-1 text-xs text-dim">Usiamo solo cookie tecnici necessari al funzionamento del sito. <button onClick={() => setShowPrivacy(true)} className="font-semibold underline" style={{ color: accent }}>Informativa privacy</button>.</span>
-            <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ backgroundColor: accent }}>Accetta</button>
+            <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white max-sm:py-3" style={{ backgroundColor: accent }}>Accetta</button>
           </div>
         </div>
       )}
@@ -782,7 +782,7 @@ export function Site() {
       {showPrivacy && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPrivacy(false)}>
           <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between"><h3 className="font-display text-lg font-bold text-txt">Informativa sulla privacy</h3><button onClick={() => setShowPrivacy(false)} className="text-faint hover:text-txt">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h3 className="font-display text-lg font-bold text-txt">Informativa sulla privacy</h3><button onClick={() => setShowPrivacy(false)} aria-label="Chiudi" className="grid h-8 w-8 place-items-center text-faint hover:text-txt max-sm:h-10 max-sm:w-10">✕</button></div>
             <div className="space-y-2.5 text-xs leading-relaxed text-dim">
               <p><b className="text-txt">Titolare del trattamento.</b> {name}{structure?.email ? ` · ${structure.email}` : ""}{structure?.phone ? ` · ${structure.phone}` : ""}.</p>
               <p><b className="text-txt">Dati raccolti.</b> Quando prenoti o ti iscrivi alla newsletter raccogliamo i dati che ci fornisci: nome, cognome, email, telefono ed eventuali richieste. Non raccogliamo dati di pagamento su questo sito.</p>

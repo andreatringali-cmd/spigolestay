@@ -71,7 +71,7 @@ export default function Hero(p: HeroProps) {
         <img src="/xenora-mark.png" alt="" className="absolute -right-10 -top-10 h-56 w-56 select-none object-contain sm:-right-4 sm:-top-16 sm:h-80 sm:w-80" style={{ filter: "brightness(0) invert(1)", opacity: 0.07 }} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-8">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5">
             <p className="text-[11px] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: HERO.inkDim }}>{p.dateLabel}{p.scopeLabel && <span style={{ color: "rgba(235,241,255,.62)" }}> · {p.scopeLabel}</span>}</p>
@@ -81,7 +81,7 @@ export default function Hero(p: HeroProps) {
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <a
               href="#adempimenti"
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-xs max-sm:min-h-10 font-semibold transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
               style={glass({ color: HERO.ink })}
             >
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: sc, boxShadow: `0 0 0 3px ${sc}33, 0 0 8px ${sc}` }} />
@@ -92,20 +92,20 @@ export default function Hero(p: HeroProps) {
         </div>
 
         {/* Tre numeri con sparkline (ultimi 14 giorni) e anello, su una sola riga */}
-        <div className="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-center gap-2 md:gap-3">
+        <div className="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-center gap-2 max-[359px]:grid-cols-3 md:gap-3">
           {figures.map((f, i) => (
-            <div key={f.label} className="d2-fade min-w-0 rounded-2xl px-2 pb-1.5 pt-2 sm:px-3 md:w-[108px]" style={glass({ animationDelay: `${160 + i * 70}ms` })}>
-              <div className="flex items-center gap-1 truncate text-[10px] font-semibold uppercase leading-none tracking-wide sm:text-[11px]" style={{ color: f.color }}>
+            <div key={f.label} className="d2-fade min-w-0 rounded-2xl px-1.5 pb-1.5 pt-2 sm:px-2.5 lg:w-[108px] lg:px-3" style={glass({ animationDelay: `${160 + i * 70}ms` })}>
+              <div className="flex items-center gap-1 truncate text-[10px] font-semibold uppercase leading-none tracking-wide max-sm:text-[9px] max-lg:tracking-normal sm:text-[11px]" style={{ color: f.color }}>
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: f.color, boxShadow: `0 0 8px ${f.color}` }} /><span className="truncate">{f.label}</span>
               </div>
               <div className="mt-1.5 font-display text-[1.9rem] font-bold leading-none tabular-nums sm:text-4xl" style={{ color: "#fff" }}><CountUp value={f.value} delay={200 + i * 80} /></div>
               <div className="mt-1"><Sparkline values={f.spark} color={f.color} h={18} strokeWidth={1.5} label={`${f.label}: ultimi 14 giorni`} /></div>
             </div>
           ))}
-          <div className="d2-fade ml-1 md:ml-2" style={{ animationDelay: "120ms" }} title={`${p.occupied} ${plural(p.occupied, "camera occupata", "camere occupate")}${p.totalRooms ? ` · ${free} ${plural(free, "libera", "libere")} su ${p.totalRooms}` : ""}`}>
+          <div className="d2-fade ml-1 max-[359px]:col-span-3 max-[359px]:ml-0 max-[359px]:justify-self-center md:ml-2" style={{ animationDelay: "120ms" }} title={`${p.occupied} ${plural(p.occupied, "camera occupata", "camere occupate")}${p.totalRooms ? ` · ${free} ${plural(free, "libera", "libere")} su ${p.totalRooms}` : ""}`}>
             <Ring
               pct={p.pct} color={HERO.cyan} colorTo={HERO.lilac} track="rgba(255,255,255,.14)" glow="rgba(95,216,255,.55)"
-              size="clamp(76px, 22vw, 124px)" stroke={8} label={`Occupazione di stanotte: ${p.pct}% (${p.occupied} camere su ${p.totalRooms})`}
+              size="clamp(68px, 20vw, 124px)" stroke={8} label={`Occupazione di stanotte: ${p.pct}% (${p.occupied} camere su ${p.totalRooms})`}
             >
               <div className="text-center">
                 <div className="font-display text-[1.35rem] font-bold leading-none tabular-nums sm:text-[2rem]" style={{ color: "#fff" }}><CountUp value={p.pct} delay={250} duration={1100} />

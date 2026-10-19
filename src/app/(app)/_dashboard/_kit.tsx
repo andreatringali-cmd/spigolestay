@@ -228,7 +228,7 @@ export function TileHead({ title, sub, right, count }: { title: ReactNode; sub?:
 
 /** Link discreto "Apri →" per le intestazioni. */
 export function MoreLink({ children, onClick, href }: { children: ReactNode; onClick?: () => void; href?: string }) {
-  const cls = "inline-flex items-center gap-0.5 rounded-lg px-1.5 py-1 text-xs font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]";
+  const cls = "inline-flex items-center gap-0.5 rounded-lg px-1.5 py-1 text-xs max-sm:min-h-10 max-sm:px-2.5 font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]";
   if (href) return <Link href={href} className={cls}>{children}<Icon name="chevron" size={12} /></Link>;
   return <button type="button" onClick={onClick} className={cls}>{children}<Icon name="chevron" size={12} /></button>;
 }

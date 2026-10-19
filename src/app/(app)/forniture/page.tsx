@@ -331,14 +331,14 @@ export default function ForniturePage() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--warn)", backgroundColor: "color-mix(in srgb, var(--warn) 10%, transparent)" }}>
           <span className="font-semibold text-txt">{lowRows.length} {lowRows.length === 1 ? "prodotto sotto" : "prodotti sotto"} la soglia minima</span>
           <span className="min-w-0 flex-1 truncate text-dim">{lowRows.slice(0, 4).map((r) => r.p.name).join(", ")}{lowRows.length > 4 ? "…" : ""}</span>
-          <button onClick={() => { setOnlyLow(true); setTab("scorte"); }} className="rounded-lg border border-line bg-surface px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">Vedi scorte</button>
+          <button onClick={() => { setOnlyLow(true); setTab("scorte"); }} className="rounded-lg border border-line bg-surface px-3 py-1 max-sm:py-2 text-xs font-semibold text-txt hover:bg-wash">Vedi scorte</button>
         </div>
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
           {(["catalogo", "scorte", "riordino", "ordini"] as const).map((tk) => (
-            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--warn)", color: "#fff" }}>{lowRows.length}</span>}</button>
+            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--warn)", color: "#fff" }}>{lowRows.length}</span>}</button>
           ))}
         </div>
         {activeStructureId === "all" && (
@@ -354,9 +354,9 @@ export default function ForniturePage() {
           <div className="min-w-0">
             {/* filtro categorie */}
             <div className="mb-4 flex flex-wrap gap-2">
-              <button onClick={() => setCatFilter("")} className={`rounded-full px-3 py-1 text-xs font-semibold ${!catFilter ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>Tutte</button>
+              <button onClick={() => setCatFilter("")} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${!catFilter ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>Tutte</button>
               {cats.filter((cat) => activeProds.some((p) => p.category_id === cat.id)).map((cat) => (
-                <button key={cat.id} onClick={() => setCatFilter(cat.id)} className={`rounded-full px-3 py-1 text-xs font-semibold ${catFilter === cat.id ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{cat.name}</button>
+                <button key={cat.id} onClick={() => setCatFilter(cat.id)} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${catFilter === cat.id ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{cat.name}</button>
               ))}
             </div>
 
@@ -399,7 +399,7 @@ export default function ForniturePage() {
                     return (
                       <div key={`${l.productId}::${l.variantId ?? ""}`} className="flex items-center gap-2 text-xs">
                         <div className="min-w-0 flex-1"><div className="truncate font-semibold text-txt">{p.name}</div>{l.customization?.text ? <div className="truncate text-faint">✎ {String(l.customization.text)}</div> : null}</div>
-                        <input type="number" min={0} step={p.min_order_qty} value={l.qty} onChange={(e) => cartSetQty(l.productId, parseInt(e.target.value) || 0, l.variantId)} className="w-16 rounded border border-line bg-surface px-1.5 py-1 text-right" />
+                        <input type="number" min={0} step={p.min_order_qty} value={l.qty} onChange={(e) => cartSetQty(l.productId, parseInt(e.target.value) || 0, l.variantId)} className="w-16 max-sm:w-20 rounded border border-line bg-surface px-1.5 py-1 max-sm:py-2 text-right" />
                         <span className="w-16 text-right font-mono">{c(p.sale_price_cents * l.qty)}</span>
                       </div>
                     );
@@ -409,8 +409,8 @@ export default function ForniturePage() {
                     <div className="flex justify-between text-dim"><span>IVA 22%</span><span className="font-mono">{c(cartTotals.vat)}</span></div>
                     <div className="mt-1 flex justify-between text-sm font-bold text-txt"><span>Totale</span><span className="font-mono">{c(cartTotals.tot)}</span></div>
                   </div>
-                  <button onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Paga con Stripe</button>
-                  <button onClick={() => checkout(false)} disabled={busy} className="w-full rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Salva come bozza</button>
+                  <button onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 max-sm:py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Paga con Stripe</button>
+                  <button onClick={() => checkout(false)} disabled={busy} className="w-full rounded-lg border border-line px-3 py-2 max-sm:py-3 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Salva come bozza</button>
                 </div>
               )}
             </Card>
@@ -434,7 +434,7 @@ export default function ForniturePage() {
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-dim"><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> Solo sotto soglia</label>
                 <label className="text-sm text-dim">Copertura su</label>
-                <select value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt">
+                <select value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))} className="rounded-lg border border-line bg-surface px-3 py-2 max-sm:py-2.5 text-sm text-txt">
                   <option value={30}>30 giorni</option><option value={60}>60 giorni</option><option value={90}>90 giorni</option>
                 </select>
                 <button onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Aggiungi i sotto soglia al carrello ({lowRows.length})</button>
@@ -571,12 +571,12 @@ export default function ForniturePage() {
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-2">
-                            <button onClick={() => orderToCart(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Riordina (riporta nel carrello)</button>
-                            {ORDER_OPEN.includes(o.status) && <button onClick={() => receiveOrder(o)} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Segna consegnato e carica a magazzino</button>}
+                            <button onClick={() => orderToCart(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Riordina (riporta nel carrello)</button>
+                            {ORDER_OPEN.includes(o.status) && <button onClick={() => receiveOrder(o)} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Segna consegnato e carica a magazzino</button>}
                             {["paid", "processing", "shipped", "delivered"].includes(o.status) && (invoiced[docNumberOf(o)]
                               ? <span className="text-xs text-faint">Registrato in Fatture passive ({docNumberOf(o)})</span>
-                              : <button onClick={() => orderToInvoice(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Registra in Fatture passive</button>)}
-                            {o.status === "draft" && <button onClick={() => deleteDraft(o)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-faint hover:text-[color:var(--err)]">Elimina bozza</button>}
+                              : <button onClick={() => orderToInvoice(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Registra in Fatture passive</button>)}
+                            {o.status === "draft" && <button onClick={() => deleteDraft(o)} className="rounded-lg px-3 py-1.5 max-sm:py-2.5 text-xs font-medium text-faint hover:text-[color:var(--err)]">Elimina bozza</button>}
                           </div>
                         </td>
                       </tr>

@@ -462,7 +462,7 @@ export default function WidgetPage() {
             {/* Istruzioni per piattaforma */}
             <div className="mt-4 text-xs font-medium text-dim">Come incollarlo</div>
             <div className="mt-1 flex flex-wrap gap-1">
-              {PLATFORMS.map((p) => (<button key={p.key} onClick={() => setPlatform(p.key)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${platform === p.key ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{p.label}</button>))}
+              {PLATFORMS.map((p) => (<button key={p.key} onClick={() => setPlatform(p.key)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${platform === p.key ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{p.label}</button>))}
             </div>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-dim">
               {platformSteps.steps.map((st, i) => <li key={i}>{st}</li>)}
@@ -490,8 +490,8 @@ export default function WidgetPage() {
                   <div className="min-w-0 flex-1">
                     <div className="break-all font-mono text-[11px] text-txt">{directUrl}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <button onClick={() => copy("direct", directUrl)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{copied === "direct" ? "Copiato ✓" : "Copia link"}</button>
-                      {qr && <button onClick={downloadQr} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Scarica QR</button>}
+                      <button onClick={() => copy("direct", directUrl)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{copied === "direct" ? "Copiato ✓" : "Copia link"}</button>
+                      {qr && <button onClick={downloadQr} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">Scarica QR</button>}
                     </div>
                   </div>
                   {qr && /* eslint-disable-next-line @next/next/no-img-element */ <img src={qr} alt="QR del link di prenotazione" className="h-20 w-20 shrink-0 rounded bg-white p-1" />}
@@ -570,7 +570,7 @@ export default function WidgetPage() {
             {previewTab === "real" && (
               <div className="flex items-center gap-1">
                 {([["mobile", "Telefono"], ["tablet", "Tablet"], ["desktop", "Desktop"]] as const).map(([k, lab]) => (
-                  <button key={k} onClick={() => setViewport(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${viewport === k ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{lab}</button>
+                  <button key={k} onClick={() => setViewport(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${viewport === k ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{lab}</button>
                 ))}
                 <button onClick={() => setReloadTick((x) => x + 1)} title="Ricarica l'anteprima" className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-dim hover:bg-wash">↻</button>
               </div>

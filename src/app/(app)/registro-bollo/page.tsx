@@ -45,7 +45,7 @@ export default function RegistroBolloPage() {
   const rejected = ofYear.filter((r) => r.stato === "scartata");
   const cents = (c: number) => c / 100;
   const today = todayLocalISO();
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const sel = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
   const structName = (id: string | null) => allStructures.find((s) => s.id === id)?.name ?? "—";
   const cpName = (r: Row) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
 
@@ -58,10 +58,10 @@ export default function RegistroBolloPage() {
   return (
     <div>
       <PageHeader title="Registro bollo virtuale" subtitle="Imposta di bollo (2€) sui documenti emessi — da versare all'Agenzia delle Entrate"
-        actions={<div className="flex items-center gap-2">
+        actions={<div className="flex flex-wrap items-center gap-2">
           <select value={String(quarter)} onChange={(e) => setQuarter(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutto l&apos;anno</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>{q}º trimestre</option>)}</select>
           <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{[...new Set([String(year), ...years])].map((y) => <option key={y} value={y}>{y}</option>)}</select>
-          <button onClick={exportCsv} disabled={shown.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Esporta CSV</button>
+          <button onClick={exportCsv} disabled={shown.length === 0} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Esporta CSV</button>
         </div>} />
 
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
@@ -96,7 +96,7 @@ export default function RegistroBolloPage() {
         <p className="mt-2 text-[11px] text-faint">Date, codici tributo e soglia dei 250 € sono un promemoria: confermali sempre con il commercialista. Xenora non registra se il versamento è stato effettuato.</p>
       </Card>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[720px] text-sm">
           <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2 font-semibold">Trim.</th><th className="px-3 py-2 font-semibold">Struttura</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Bollo</th></tr></thead>
           <tbody>
@@ -118,6 +118,27 @@ export default function RegistroBolloPage() {
           </tbody>
           {shown.length > 0 && <tfoot><tr><td colSpan={6} className="px-3 py-2 text-right text-xs font-semibold text-dim">Totale periodo</td><td className="px-3 py-2 text-right font-mono font-bold text-txt">{eur(cents(shown.reduce((a, r) => a + r.bollo_cents, 0)))}</td></tr></tfoot>}
         </table>
+      </div>
+
+      {/* Telefono: una scheda per documento (la tabella serve da tablet in su) */}
+      <div className="flex flex-col gap-2 md:hidden">
+        {shown.map((r) => {
+          const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" };
+          return (
+            <div key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-txt">{cpName(r) || "—"}</div>
+                  <div className="truncate text-xs text-dim"><span className="font-mono">{r.number_label}</span> · {r.issue_date ? fmtDate(r.issue_date) : "—"} · {quarterOf(r.issue_date)}º trim.</div>
+                  <div className="truncate text-[11px] text-faint">{structName(r.structure_id)}</div>
+                </div>
+                <div className="shrink-0 text-right"><div className="font-mono text-sm font-semibold text-txt">{eur(cents(r.bollo_cents))}</div><span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></div>
+              </div>
+            </div>
+          );
+        })}
+        {!loading && shown.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title="Nessun bollo nel periodo" sub="Il bollo compare sui documenti emessi in regime forfettario oltre 77,47 €." /></div>}
+        {shown.length > 0 && <div className="flex items-center justify-between rounded-xl border border-line bg-wash px-3 py-2 text-sm font-semibold"><span className="text-dim">Totale periodo</span><span className="font-mono text-txt">{eur(cents(shown.reduce((a, r) => a + r.bollo_cents, 0)))}</span></div>}
       </div>
     </div>
   );

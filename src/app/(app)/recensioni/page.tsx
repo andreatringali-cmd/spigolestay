@@ -701,7 +701,7 @@ export default function RecensioniPage() {
           <SectionTitle>Andamento della media</SectionTitle>
           <div className="mb-3 flex items-center gap-1">
             {([[30, "30 giorni"], [90, "90 giorni"], [365, "12 mesi"]] as const).map(([d, lab]) => (
-              <button key={d} onClick={() => setTrendDays(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${trendDays === d ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{lab}</button>
+              <button key={d} onClick={() => setTrendDays(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition max-sm:min-h-10 ${trendDays === d ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{lab}</button>
             ))}
           </div>
         </div>
@@ -872,7 +872,7 @@ export default function RecensioniPage() {
                 <div className="truncate text-[11px] text-faint">{noteFor(s)}</div>
               </div>
               {showConnectedBadge ? (
-                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition group-hover:opacity-0" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
+                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition max-sm:min-h-10 group-hover:opacity-0" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
               ) : (
                 <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint transition group-hover:opacity-0">Impostazioni</span>
               )}
@@ -885,7 +885,7 @@ export default function RecensioniPage() {
       {/* Impostazioni di una fonte OTA (Booking/Airbnb/…): come Google, ma via connettore partner o inserimento manuale */}
       {srcCfg && srcCfg !== "google" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSrcCfg(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: SRC[srcCfg].color }}>{SRC[srcCfg].label[0]}</span>
@@ -922,21 +922,21 @@ export default function RecensioniPage() {
       {/* Filtro per fonte + aggiunta manuale */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <span className="mr-1 text-xs font-semibold text-faint">Fonte:</span>
-        <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
+        <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
         {connectedSources.map((c) => (
-          <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
+          <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
         ))}
         <span className="mx-1 h-4 w-px bg-line" />
         <span className="mr-1 text-xs font-semibold text-faint">Voto:</span>
         {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
-          <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
+          <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
         ))}
         <span className="mx-1 h-4 w-px bg-line" />
         <span className="mr-1 text-xs font-semibold text-faint">Risposta:</span>
         {([["all", "Tutte"], ["todo", `Da rispondere (${unanswered})`], ["done", "Risposte"]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${replyFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
+          <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${replyFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
         ))}
-        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
+        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus max-sm:min-h-10 hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <SearchInput value={search} onChange={setSearch} placeholder="Cerca ospite o testo…" />
@@ -947,7 +947,7 @@ export default function RecensioniPage() {
         </label>
         <span className="text-[11px] text-faint">{shown.length} di {reviews.length}</span>
         {filtersActive && <button onClick={resetFilters} className="text-[11px] font-semibold text-focus hover:underline">Azzera filtri</button>}
-        <button onClick={exportCsv} disabled={!shown.length} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
+        <button onClick={exportCsv} disabled={!shown.length} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10 disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
       </div>
 
       {/* Form inserimento manuale */}
@@ -1030,7 +1030,7 @@ export default function RecensioniPage() {
               <div className="mt-2">
                 <textarea value={draft[r.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))} rows={2} placeholder="Scrivi una risposta…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
+                  <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash max-sm:min-h-10 disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
                   {isChx(r) ? (
                     <button onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</button>
                   ) : isGbp(r) ? (

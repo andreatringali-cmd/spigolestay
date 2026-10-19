@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import Popover from "@/components/Popover";
 import { copyGuideContent, guideHasText } from "@/lib/guide-copy";
 import { exampleContentFrom, loadExampleIt } from "@/lib/guide-example";
 
@@ -34,7 +35,7 @@ interface GAction { label: string; href: string; type?: string; icon?: string }
 interface GListRow { n: string; sub: string; tel?: string }
 interface GItem { h: string; p: string; actions?: GAction[]; list?: GListRow[] }
 // Passaggio numerato (check-in, colazione). `code` = quale codice del link ospite mostrare sotto.
-interface GStep { h: string; p: string; code?: "" | "gate" | "door" | "door2"; codeNote?: string; actions?: GAction[] }
+interface GStep { h: string; p: string; code?: "" | "gate" | "door" | "door2"; codeNote?: string; actions?: GAction[]; parkOnly?: boolean; noParkOnly?: boolean } // parkOnly / noParkOnly: il passaggio si vede solo a chi HA / NON HA prenotato il parcheggio
 interface GAmenity { icon: string; label: string }
 interface GSection {
   id: string; icon: string; title: string; sub: string; intro: string; photos: string[]; items: GItem[];
@@ -434,6 +435,7 @@ export default function GuidaOspitiPage() {
   const [storageFull, setStorageFull] = useState(false);
   // "Copia da un'altra struttura": pannello, struttura sorgente e opzioni
   const [copyOpen, setCopyOpen] = useState(false);
+  const copyBtnRef = useRef<HTMLButtonElement>(null); // ancora della tendina «Copia da un'altra struttura» (Popover)
   const [copySrc, setCopySrc] = useState("");
   const [copyTv, setCopyTv] = useState(false);
   const [copyMsg, setCopyMsg] = useState(false);
@@ -970,9 +972,9 @@ export default function GuidaOspitiPage() {
           <div className="flex flex-wrap items-center gap-2">
           {otherStructs.length > 0 && (
             <div className="relative">
-              <button onClick={() => { setCopyOpen((o) => !o); if (!copySrc || !otherStructs.some((x) => x.id === copySrc)) setCopySrc(otherStructs.find((x) => guideHasText(all[x.id]?.content))?.id ?? otherStructs[0].id); }} title="Copia testi e traduzioni dalla guida di un'altra tua struttura: i dati di questa struttura non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">⧉ Copia da un&apos;altra struttura</button>
-              {copyOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-64 space-y-2 rounded-lg border border-line bg-paper p-2.5 text-xs shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+              <button ref={copyBtnRef} onClick={() => { setCopyOpen((o) => !o); if (!copySrc || !otherStructs.some((x) => x.id === copySrc)) setCopySrc(otherStructs.find((x) => guideHasText(all[x.id]?.content))?.id ?? otherStructs[0].id); }} title="Copia testi e traduzioni dalla guida di un'altra tua struttura: i dati di questa struttura non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">⧉ Copia da un&apos;altra struttura</button>
+              <Popover open={copyOpen} anchorRef={copyBtnRef} onClose={() => setCopyOpen(false)} align="end" width={256} label="Copia da un'altra struttura">
+                <div className="space-y-2 p-1.5 text-xs">
                   <select value={copySrc} onChange={(e) => setCopySrc(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-2 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
                     {otherStructs.map((x) => <option key={x.id} value={x.id} disabled={!guideHasText(all[x.id]?.content)}>{x.name}{guideHasText(all[x.id]?.content) ? "" : " (guida vuota)"}</option>)}
                   </select>
@@ -984,7 +986,7 @@ export default function GuidaOspitiPage() {
                     <button onClick={copyFromOther} disabled={!copySrc || !guideHasText(all[copySrc]?.content)} className="rounded-lg bg-[color:var(--focus)] px-2.5 py-1 font-bold text-white hover:opacity-90 disabled:opacity-40">Copia</button>
                   </div>
                 </div>
-              )}
+              </Popover>
             </div>
           )}
           <button onClick={loadDemo} title="Copia i testi della guida di esempio (Siracusa) in questa guida: i tuoi dati non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">✨ Parti dall&apos;esempio</button>
@@ -1189,6 +1191,18 @@ export default function GuidaOspitiPage() {
                               <button onClick={() => removeStep(si, ki)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                             </div>
                             <textarea value={st.p} maxLength={LIM.p} onChange={(e) => updStep(si, ki, { p: e.target.value })} rows={5} placeholder="Descrizione…  ([[evidenziato]] · [i]corsivo[/i])" className="mt-1 min-h-[9rem] w-full resize-y rounded border border-line bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-txt outline-none focus:border-focus" />
+                                                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] text-faint">Mostra il passaggio:</span>
+                                <select
+                                  value={st.parkOnly ? "park" : st.noParkOnly ? "nopark" : ""}
+                                  onChange={(e) => updStep(si, ki, { parkOnly: e.target.value === "park" || undefined, noParkOnly: e.target.value === "nopark" || undefined })}
+                                  className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus"
+                                >
+                                  <option value="">A tutti gli ospiti</option>
+                                  <option value="park">Solo a chi ha prenotato il parcheggio</option>
+                                  <option value="nopark">Solo a chi NON ha prenotato il parcheggio</option>
+                                </select>
+                              </div>
                             <div className="mt-1.5 flex flex-wrap items-center gap-2">
                               <span className="text-[11px] text-faint">Codice sotto il passaggio:</span>
                               <select value={st.code || ""} onChange={(e) => updStep(si, ki, { code: e.target.value as GStep["code"] })} className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus">{CODE_OPTS.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}</select>

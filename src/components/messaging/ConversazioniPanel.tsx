@@ -12,6 +12,7 @@ import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import { bookingExtrasTotal } from "@/lib/booking";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
+import Popover from "@/components/Popover";
 import VoiceNote from "@/components/messaging/VoiceNote";
 import { GUIDE_MSG, CHECKIN_MSG, emailBrandPayload, type Lang } from "@/lib/guest-messages";
 import { asLang, autoSubject, decideSend, dedupeGroups, fillTokens, guestFallback, sentKeysFor, stayTimeText, structureFallback } from "@/lib/auto-messages-core";
@@ -188,16 +189,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [touchKb, setTouchKb] = useState(false);
   useEffect(() => { try { setTouchKb(!!window.matchMedia?.("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)); } catch { /* resta tastiera fisica */ } }, []);
   const [queueOpen, setQueueOpen] = useState(false); // elenco degli invii automatici in arrivo per l'ospite aperto (menu nell'intestazione)
-  const queueRef = useRef<HTMLDivElement>(null);
+  const queueBtnRef = useRef<HTMLButtonElement>(null); // ancora della tendina (Popover): chiusura fuori/Esc la gestisce lei
   const fitList = useFitViewport();
   const fitChat = useFitViewport();
-  useEffect(() => {
-    if (!queueOpen) return;
-    const h = (e: MouseEvent) => { if (queueRef.current && !queueRef.current.contains(e.target as Node)) setQueueOpen(false); };
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setQueueOpen(false); };
-    document.addEventListener("pointerdown", h); document.addEventListener("keydown", k);
-    return () => { document.removeEventListener("pointerdown", h); document.removeEventListener("keydown", k); };
-  }, [queueOpen]);
   const [showInvii, setShowInvii] = useState(false); // gli invii programmati si aprono su richiesta, non di default
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -949,10 +943,10 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   )}
                 </div>
                 {guestQueue.length > 0 && (
-                  <div ref={queueRef} className="relative shrink-0">
-                    <button onClick={() => setQueueOpen((o) => !o)} aria-expanded={queueOpen} title={t("Invii automatici in arrivo")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${queueOpen ? "border-focus text-focus" : "border-line text-dim"}`}>⏱ {guestQueue.length} {t("in arrivo")}</button>
-                    {queueOpen && (
-                      <div className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[85vw] rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+                  <div className="relative shrink-0">
+                    <button ref={queueBtnRef} onClick={() => setQueueOpen((o) => !o)} aria-expanded={queueOpen} title={t("Invii automatici in arrivo")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${queueOpen ? "border-focus text-focus" : "border-line text-dim"}`}>⏱ {guestQueue.length} {t("in arrivo")}</button>
+                    <Popover open={queueOpen} anchorRef={queueBtnRef} onClose={() => setQueueOpen(false)} align="end" width={288} label={t("Invii automatici in arrivo")}>
+                      <div className="p-1">
                         <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Invii automatici in arrivo")}</div>
                         <div className="flex flex-col gap-1.5">
                           {guestQueue.slice(0, 5).map((x) => (
@@ -964,7 +958,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           ))}
                         </div>
                       </div>
-                    )}
+                    </Popover>
                   </div>
                 )}
                 <button onClick={() => togglePin(current.id)} title={isPinned(current.id) ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={isPinned(current.id)} className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${isPinned(current.id) ? "border-focus text-focus" : "border-line text-dim"}`}>📌 {isPinned(current.id) ? t("Fissata") : t("Fissa")}</button>

@@ -50,7 +50,7 @@ export default function BookingEngineHub() {
         </div>
       </div>
       <div className="mt-3 flex-1 rounded-lg bg-wash px-3 py-2 text-sm text-txt">{value}</div>
-      <button onClick={onClick} className="mt-3 inline-flex items-center gap-1 self-start text-xs font-semibold transition group-hover:gap-1.5" style={{ color: tint }}>
+      <button onClick={onClick} className="mt-3 inline-flex items-center gap-1 self-start text-xs font-semibold transition group-hover:gap-1.5 max-sm:py-3" style={{ color: tint }}>
         {action} <span aria-hidden>→</span>
       </button>
     </Card>

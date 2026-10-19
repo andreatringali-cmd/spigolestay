@@ -215,10 +215,10 @@ export default function PromozioniPage() {
                 {p.description && <p className="mt-1 text-xs text-dim">{p.description}</p>}
                 <p className="mt-1.5 line-clamp-2 flex-1 text-xs text-dim">{p.body}</p>
                 <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
-                  <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="mail" size={13} /> Invia</button>
-                  <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">Modifica</button>
-                  <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash"><Icon name="copy" size={13} /></button>
-                  <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
+                  <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 max-sm:min-h-10"><Icon name="mail" size={13} /> Invia</button>
+                  <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Modifica</button>
+                  <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash max-sm:min-h-10"><Icon name="copy" size={13} /></button>
+                  <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)] max-sm:min-h-10">✕</button>
                 </div>
               </div>
             ),
@@ -288,7 +288,7 @@ export default function PromozioniPage() {
       {sending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setSending(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">Invia «{sending.name}»</span><button onClick={() => setSending(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             {limitReached && <div className="mb-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)", color: "var(--warn)" }}>Hai già inviato 4 promo quest'anno. Meglio non sovraccaricare gli ospiti.</div>}
             <label className="block text-xs font-medium text-dim">Destinatari<select value={segment} onChange={(e) => setSegment(e.target.value as Segment)} className={`${inp} mt-1`}>

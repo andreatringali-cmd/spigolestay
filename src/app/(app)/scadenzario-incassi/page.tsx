@@ -93,7 +93,7 @@ export default function ScadenzarioIncassiPage() {
   const overdueTot = all.filter((r) => r.days > 0).reduce((a, r) => a + r.residuo, 0);
   const byBucket = (k: AgingKey) => all.filter((r) => r.bucket === k).reduce((a, r) => a + r.residuo, 0);
   const shownTot = rows.reduce((a, r) => a + r.residuo, 0);
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const sel = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
 
   const nameOf = (r: Doc) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
   // Contatti: dall'ospite della prenotazione collegata (telefono) o dall'intestatario (email salvata nel documento).
@@ -150,10 +150,30 @@ export default function ScadenzarioIncassiPage() {
     downloadCsv(`scadenzario-incassi-${t}`, buildCsv(head, lines));
   };
 
+  // Pannello «sollecito»: usato sotto la riga della tabella (tablet/desktop) e sotto la scheda (telefono)
+  const remindPanel = (r: (typeof rows)[number], c: NonNullable<ReturnType<typeof contactOf>>) => (
+    <>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Testo del sollecito (modificabile)</div>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {waDigits(c.phone)
+          ? <a href={waReminderLink(c.phone, text)} target="_blank" rel="noreferrer" onClick={() => logReminder(r.id, "WhatsApp")} className="rounded-lg px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Apri WhatsApp</a>
+          : <span className="text-[11px] text-faint">Nessun telefono: collega la prenotazione all&apos;ospite per usare WhatsApp.</span>}
+        {c.email
+          ? <a href={mailReminderLink(c.email, reminderSubject({ customerName: nameOf(r), docLabel: `${(DOC_KIND_LABEL[r.doc_kind] ?? "documento").toLowerCase()} ${r.number_label ?? ""}`.trim(), issueDate: r.issue_date, dueDate: r.due_date, residuoCents: r.residuo, daysLate: r.days, senderName: "" }), text)} onClick={() => logReminder(r.id, "email")} className="rounded-lg border border-line px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">✉ Apri email</a>
+          : <span className="text-[11px] text-faint">Nessuna email disponibile.</span>}
+        <button onClick={() => copy(r.id)} className="rounded-lg border border-line px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Copia testo</button>
+        <button onClick={() => setText(draftText(r))} className="text-xs font-medium text-dim hover:underline">Ripristina testo</button>
+        {note && <span className="text-[11px] font-medium text-dim">{note}</span>}
+      </div>
+      <p className="mt-1 text-[11px] text-faint">Il messaggio non parte da solo: si apre in WhatsApp/email già compilato e lo invii tu. L&apos;invio viene annotato nello storico del documento.</p>
+    </>
+  );
+
   return (
     <div>
       <PageHeader title="Scadenzario incassi" subtitle="Documenti emessi ancora da incassare, per scadenza"
-        actions={<button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Esporta CSV</button>} />
+        actions={<button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Esporta CSV</button>} />
 
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Totale da incassare" value={eur(cents(totalOpen))} hint={`${all.length} documenti`} onClick={() => setBucket("all")} active={bucket === "all"} />
@@ -176,7 +196,7 @@ export default function ScadenzarioIncassiPage() {
         {ficNote && <p className="mt-2 text-[11px] font-medium" style={{ color: ficNote.ok ? "var(--ok)" : "var(--dim)" }}>{ficNote.text}</p>}
       </Card>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[860px] text-sm">
           <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 text-right font-semibold">Residuo</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Azioni</th></tr></thead>
           <tbody>
@@ -201,20 +221,7 @@ export default function ScadenzarioIncassiPage() {
                   {remind === r.id && c && (
                     <tr className="border-b border-line bg-wash/40">
                       <td colSpan={7} className="px-3 py-3">
-                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Testo del sollecito (modificabile)</div>
-                        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {waDigits(c.phone)
-                            ? <a href={waReminderLink(c.phone, text)} target="_blank" rel="noreferrer" onClick={() => logReminder(r.id, "WhatsApp")} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Apri WhatsApp</a>
-                            : <span className="text-[11px] text-faint">Nessun telefono: collega la prenotazione all&apos;ospite per usare WhatsApp.</span>}
-                          {c.email
-                            ? <a href={mailReminderLink(c.email, reminderSubject({ customerName: nameOf(r), docLabel: `${(DOC_KIND_LABEL[r.doc_kind] ?? "documento").toLowerCase()} ${r.number_label ?? ""}`.trim(), issueDate: r.issue_date, dueDate: r.due_date, residuoCents: r.residuo, daysLate: r.days, senderName: "" }), text)} onClick={() => logReminder(r.id, "email")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">✉ Apri email</a>
-                            : <span className="text-[11px] text-faint">Nessuna email disponibile.</span>}
-                          <button onClick={() => copy(r.id)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Copia testo</button>
-                          <button onClick={() => setText(draftText(r))} className="text-xs font-medium text-dim hover:underline">Ripristina testo</button>
-                          {note && <span className="text-[11px] font-medium text-dim">{note}</span>}
-                        </div>
-                        <p className="mt-1 text-[11px] text-faint">Il messaggio non parte da solo: si apre in WhatsApp/email già compilato e lo invii tu. L&apos;invio viene annotato nello storico del documento.</p>
+                        {remindPanel(r, c)}
                       </td>
                     </tr>
                   )}
@@ -224,6 +231,43 @@ export default function ScadenzarioIncassiPage() {
             {!loading && rows.length === 0 && <tr><td colSpan={7}><EmptyState title="Nessun incasso in sospeso" sub={bucket === "all" && !q ? "Tutti i documenti emessi risultano saldati." : "Nessun documento con questi filtri."} /></td></tr>}
           </tbody>
         </table>
+      </div>
+
+      {/* Telefono: una scheda per documento (la tabella serve da tablet in su) */}
+      <div className="flex flex-col gap-2 md:hidden">
+        {rows.map((r) => {
+          const overdue = r.days > 0;
+          const rem = reminders[r.id];
+          const c = remind === r.id ? contactOf(r) : null;
+          const col = overdue ? "var(--err)" : "var(--warn)";
+          return (
+            <div key={r.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+              <div onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-txt">{nameOf(r) || "—"}</div>
+                    <div className="truncate text-xs text-dim"><span className="font-mono">{r.number_label}</span>{r.booking_code ? <> · {r.booking_code}</> : null}</div>
+                    {rem && <div className="text-[10px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-mono text-sm font-semibold text-txt">{eur(cents(r.residuo))}</div>
+                    <div className="text-[10px] text-faint">{r.credited > 0 ? `dopo NC −${eur(cents(r.credited))}` : `su ${eur(cents(r.total_cents))}`}</div>
+                  </div>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${col} 16%, transparent)`, color: col }}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</span>
+                  <span style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? dmy(r.due_date) : "senza scadenza"}{overdue ? ` · ${r.days} gg di ritardo` : ""}</span>
+                </div>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button onClick={() => openRemind(r)} className="rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-txt hover:bg-wash">Sollecita</button>
+                <button onClick={() => markPaid(r)} disabled={busy === r.id} className="rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-50">{busy === r.id ? "…" : "Incassato"}</button>
+              </div>
+              {remind === r.id && c && <div className="mt-3 border-t border-line pt-3">{remindPanel(r, c)}</div>}
+            </div>
+          );
+        })}
+        {!loading && rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title="Nessun incasso in sospeso" sub={bucket === "all" && !q ? "Tutti i documenti emessi risultano saldati." : "Nessun documento con questi filtri."} /></div>}
       </div>
     </div>
   );

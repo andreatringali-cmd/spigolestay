@@ -62,7 +62,7 @@ export default function AssistantBar() {
       {/* Trigger nel header (campo tipo ricerca) */}
       <button
         onClick={() => setOpen(true)}
-        className="group flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-paper px-3 py-1.5 text-left text-sm text-faint transition hover:border-focus hover:bg-surface sm:max-w-sm"
+        className="group flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-paper px-3 py-1.5 text-left text-sm text-faint transition hover:border-focus hover:bg-surface max-sm:min-h-10 sm:max-w-sm"
         title="Assistente · premi /"
       >
         <span className="text-focus"><Icon name="chat" size={16} /></span>

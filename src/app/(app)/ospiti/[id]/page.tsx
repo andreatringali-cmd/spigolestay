@@ -148,11 +148,11 @@ export default function OspiteSchedaPage() {
         title={isNew ? t("Nuovo ospite") : t("Scheda ospite")}
         subtitle={isNew ? t("Aggiungi un'anagrafica ospite") : `${fullName}${g.country ? ` · ${g.country}` : ""}`}
         actions={
-          <div className="flex items-center gap-2">
-            {!isNew && g.email && <button onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash disabled:opacity-40">✉ {t("Invia promo")}</button>}
-            {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
-            <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea ospite") : t("Salva")}</button>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isNew && g.email && <button onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash disabled:opacity-40 max-sm:min-h-10">✉ {t("Invia promo")}</button>}
+            {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash max-sm:min-h-10">{t("Elimina")}</button>}
+            <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash max-sm:min-h-10">{t("Annulla")}</button>
+            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{isNew ? t("Crea ospite") : t("Salva")}</button>
           </div>
         }
       />
@@ -163,9 +163,9 @@ export default function OspiteSchedaPage() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white" style={{ backgroundColor: color }}>{initials(g.firstName, g.lastName) || "?"}</div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
-            <div className="text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
+            <div className="break-words text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
           </div>
           {!isNew && (
             <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
@@ -259,7 +259,7 @@ export default function OspiteSchedaPage() {
               <div className="flex items-center justify-between py-1.5"><span className="text-sm text-txt">{t("Consenso marketing")} <span className="text-[11px] text-faint">{t("(newsletter/offerte)")}</span></span><Toggle on={!!g.marketingConsent} onClick={() => set("marketingConsent", !g.marketingConsent)} color="var(--ok)" /></div>
             </div>
             <div className="mb-1 mt-2 text-xs font-medium text-dim">{t("Etichette")}</div>
-            <div className="flex flex-wrap gap-1.5">{GUEST_TAGS.map((tag) => <button key={tag} onClick={() => toggleTag(tag)} className={`rounded-full border px-2.5 py-1 text-xs transition ${(g.tags ?? []).includes(tag) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(tag)}</button>)}</div>
+            <div className="flex flex-wrap gap-1.5">{GUEST_TAGS.map((tag) => <button key={tag} onClick={() => toggleTag(tag)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:py-2 ${(g.tags ?? []).includes(tag) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(tag)}</button>)}</div>
             <label className={`${lbl} mt-3`}>{t("Preferenze / richieste ricorrenti")}<textarea value={g.preferences ?? ""} onChange={(e) => set("preferences", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Es. camera silenziosa, allergie, check-in tardivo…")} /></label>
             <label className={`${lbl} mt-3`}>{t("Note interne")}<textarea value={g.notes ?? ""} onChange={(e) => set("notes", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Visibili solo allo staff")} /></label>
           </Card>
@@ -290,10 +290,10 @@ export default function OspiteSchedaPage() {
       </div>
 
       {pickPromo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label={t("Chiudi")} onClick={() => setPickPromo(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Invia promo a")} {fullName}</span><button onClick={() => setPickPromo(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
+          <button aria-label={t("Chiudi")} onClick={() => setPickPromo(false)} className="fixed inset-0 bg-black/40" />
+          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Invia promo a")} {fullName}</span><button onClick={() => setPickPromo(false)} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
             <div className="mb-3 text-xs text-dim">{g.email}</div>
             {promos.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>

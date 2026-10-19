@@ -40,8 +40,8 @@ export default function AccettaInvito() {
 
   const card = "w-full max-w-md rounded-2xl border p-6 shadow-sm";
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f5f7", padding: 16 }}>
-      <div className={card} style={{ background: "#fff", borderColor: "#e6e8ec" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f5f7", padding: 16 }}>
+      <div className={card} style={{ background: "#fff", borderColor: "#e6e8ec", overflowWrap: "anywhere" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/xenora-mark.png" alt="" width={26} height={26} style={{ objectFit: "contain" }} />

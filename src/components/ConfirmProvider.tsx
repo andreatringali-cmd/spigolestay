@@ -29,7 +29,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {state && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <button aria-label="Annulla" onClick={() => close(false)} className="absolute inset-0 bg-black/45" />
-          <div className="anim-in relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="anim-in relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ backgroundColor: `color-mix(in srgb, ${state.danger ? "var(--err)" : "var(--focus)"} 15%, transparent)`, color: state.danger ? "var(--err)" : "var(--focus)" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>

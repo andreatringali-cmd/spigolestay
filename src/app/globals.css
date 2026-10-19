@@ -158,7 +158,8 @@ body {
    Con minmax(0, 1fr) la colonna resta larga quanto lo schermo e il testo va a capo. Non tocca le griglie con colonne esplicite (grid-cols-*) né quelle a scorrimento (grid-flow-*). */
 @media (max-width: 639px) {
   /* le classi con prefisso (sm:grid-cols-2) contengono ":" e non contano: valgono solo le colonne esplicite di base */
-  .grid:not([class^="grid-cols-"]):not([class*=" grid-cols-"]):not([class^="grid-flow-"]):not([class*=" grid-flow-"]):not([class^="grid-rows-"]):not([class*=" grid-rows-"]) { grid-template-columns: minmax(0, 1fr); }
+  .grid:not([class^="grid-cols-"]):not([class*=" grid-cols-"]):not([class^="grid-flow-"]):not([class*=" grid-flow-"]):not([class^="grid-rows-"]):not([class*=" grid-rows-"]):not([class*="max-sm:grid-cols-"]):not([class*="max-md:grid-cols-"]):not([class*="max-lg:grid-cols-"]) { grid-template-columns: minmax(0, 1fr); }
+  /* le colonne scelte apposta per il telefono (max-sm:grid-cols-*, max-md:grid-cols-*) non vanno annullate da questa regola */
 }
 
 /* Telefono/tablet (puntatore "coarse"): i campi sotto i 16px fanno zoomare Safari al tocco; target e scroll più sicuri. */

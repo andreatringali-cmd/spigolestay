@@ -349,7 +349,7 @@ export default function FatturePassivePage() {
     catch (e) { setFic((p) => p && { ...p, msg: friendlyError(e) }); }
   };
 
-  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
   const totEur = (parseEur(edit?.taxableEur ?? "") ?? 0) + (parseEur(edit?.vatEur ?? "") ?? 0);
@@ -396,15 +396,15 @@ export default function FatturePassivePage() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
             {(["elenco", "riepiloghi"] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}</button>
+              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold capitalize transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}</button>
             ))}
           </div>
           <span className="text-xs text-faint">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
-            <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
-            <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
-            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
+            <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
+            <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
+            <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
+            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
           </div>
         </div>
       </Card>
@@ -417,7 +417,7 @@ export default function FatturePassivePage() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
               {([["supplier", "Per fornitore"], ["category", "Per categoria"], ["month", "Per mese"]] as const).map(([k, l]) => (
-                <button key={k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
+                <button key={k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
               ))}
             </div>
             <span className="text-xs text-faint">Sui documenti che corrispondono ai filtri qui sopra; le note di credito sono sottratte.</span>
@@ -455,14 +455,45 @@ export default function FatturePassivePage() {
       {view === "elenco" && sel.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-sm">
           <span className="font-semibold text-txt">{sel.size} selezionat{sel.size === 1 ? "o" : "i"}</span>
-          <button onClick={bulkPaid} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Segna come pagate</button>
-          <button onClick={() => registerCash(filtered.filter((r) => sel.has(r.id) && r.paid))} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash" title="Crea in Cassa il movimento di uscita dei documenti pagati selezionati">Registra in Cassa</button>
+          <button onClick={bulkPaid} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Segna come pagate</button>
+          <button onClick={() => registerCash(filtered.filter((r) => sel.has(r.id) && r.paid))} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash" title="Crea in Cassa il movimento di uscita dei documenti pagati selezionati">Registra in Cassa</button>
           <button onClick={() => setSel(new Set())} className="ml-auto text-xs font-semibold text-dim hover:text-txt">Annulla selezione</button>
         </div>
       )}
 
       {view === "elenco" && (
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div className="flex flex-col gap-2 md:hidden">
+        {filtered.map((r) => {
+          const overdue = r.due_date && r.due_date < t && !r.paid && r.doc_type !== "nota_credito";
+          const credit = r.doc_type === "nota_credito";
+          return (
+            <div key={r.id} onClick={() => openEdit(r)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
+              <div className="flex items-start gap-3">
+                <label className="-m-2 grid shrink-0 place-items-center p-2" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="h-5 w-5" aria-label="Seleziona" checked={sel.has(r.id)} onChange={(e) => setSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} /></label>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-txt">{r.supplier_name || "—"}</div>
+                  <div className="truncate text-xs text-dim">{r.doc_date ? fmtDate(r.doc_date) : "—"} · {TIPI[r.doc_type]}{r.doc_number ? <> · <span className="font-mono">{r.doc_number}</span></> : null}</div>
+                  {(r.category || !single) && <div className="truncate text-[11px] text-faint">{[r.category, !single ? structName(r.structure_id) : ""].filter(Boolean).join(" · ")}</div>}
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="font-mono text-sm font-semibold text-txt">{eur(cents(signedCents(r, r.total_cents)))}</div>
+                  <div className="text-[11px]" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? "scad. " + fmtDate(r.due_date) : ""}</div>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-1.5" onClick={(e) => { e.stopPropagation(); if (!credit) togglePaid(r); }}>
+                <span className={`${credit ? "" : "cursor-pointer"} rounded-full px-2.5 py-1 text-xs font-semibold`} style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
+                {inCassa.has(r.id) && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
+              </div>
+            </div>
+          );
+        })}
+        {!loading && filtered.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={filtersActive ? "Nessuna fattura con questi filtri" : "Nessuna fattura passiva"} sub={filtersActive ? "Prova ad azzerare i filtri." : "Registra la prima con “+ Nuova fattura”."} /></div>}
+        {loading && <p className="px-3 py-10 text-center text-sm text-faint">Caricamento…</p>}
+      </div>
+      )}
+
+      {view === "elenco" && (
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
@@ -505,7 +536,7 @@ export default function FatturePassivePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setFic(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button onClick={() => setFic(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button onClick={() => setFic(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-3 text-[11px] text-faint">Legge le fatture e le spese dei fornitori che Fatture in Cloud ha ricevuto (anche dal cassetto fiscale). Sola lettura: su Fatture in Cloud non viene modificato nulla.</p>
             <div className="flex flex-wrap items-end gap-2">
               <label className={lbl}>Dal<DateField value={fic.from} max={fic.to} onChange={(v) => setFic({ ...fic, from: v, items: null })} className={inp} /></label>
@@ -552,7 +583,7 @@ export default function FatturePassivePage() {
                 <p className="mt-1 text-[11px] text-faint">Le «Forse già presente» hanno stesso fornitore, numero e anno di una fattura inserita a mano: non sono selezionate di default.</p>
                 <div className="mt-3 flex items-center gap-2">
                   <button onClick={ficImport} disabled={fic.busy !== "" || fic.pick.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{fic.busy === "import" ? "Importo…" : `Importa ${fic.pick.size} ${fic.pick.size === 1 ? "fattura" : "fatture"}`}</button>
-                  <button onClick={() => setFic(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
+                  <button onClick={() => setFic(null)} className="ml-auto rounded-lg border border-line px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
                 </div>
               </>
             )}
@@ -564,7 +595,7 @@ export default function FatturePassivePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setOta(false)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button onClick={() => setOta(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button onClick={() => setOta(false)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
               <label className={lbl}>Mese<input type="month" value={otaMonth} max={monthNow()} onChange={(e) => setOtaMonth(e.target.value)} className={inp} /></label>
@@ -586,7 +617,7 @@ export default function FatturePassivePage() {
               <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) onCsv(f); }} className="mt-2 block w-full text-xs text-dim file:mr-2 file:rounded-lg file:border file:border-line file:bg-paper file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-txt" />
               {csvInfo && <p className="mt-1 text-[11px] text-faint">{csvInfo}</p>}
               {csvTotal != null && <div className="mt-2 flex items-center justify-between"><span className="text-sm text-dim">Totale rilevato</span><span className="font-mono text-lg font-bold text-txt">{eur(csvTotal)}</span></div>}
-              <button onClick={precompileCsv} disabled={csvTotal == null || csvTotal <= 0} className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Precompila da CSV</button>
+              <button onClick={precompileCsv} disabled={csvTotal == null || csvTotal <= 0} className="mt-2 w-full rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Precompila da CSV</button>
             </div>
             <p className="mt-3 text-[11px] text-faint">Dopo la precompilazione controlla l&apos;imponibile con la fattura del portale, salva, poi premi &quot;Genera autofattura TD17&quot;.</p>
           </div>
@@ -597,7 +628,7 @@ export default function FatturePassivePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               {single ? (
                 <div className="sm:col-span-2"><span className={lbl}>Struttura</span><div className="mt-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{structName(activeStructureId)}</div></div>
@@ -636,7 +667,7 @@ export default function FatturePassivePage() {
                 <p className="mt-1 text-[11px] text-faint">Per commissioni/servizi da fornitori esteri (OTA) va emessa l&apos;autofattura in reverse charge. L&apos;imponibile è l&apos;importo indicato sopra; IVA 22%.</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button onClick={genAutofattura} disabled={!!afBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{afBusy === "gen" ? "Genero…" : af.status ? "Rigenera autofattura" : "Genera autofattura TD17"}</button>
-                  {af.status && <button onClick={dlAutofattura} disabled={!!afBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</button>}
+                  {af.status && <button onClick={dlAutofattura} disabled={!!afBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</button>}
                 </div>
                 {afMsg && <p className="mt-2 text-[12px] text-dim">{afMsg}</p>}
               </div>
@@ -652,9 +683,9 @@ export default function FatturePassivePage() {
               </div>
             )}
             <div className="mt-3 flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
-              {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}
-              <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
+              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
+              {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 max-sm:py-2.5 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}
+              <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
             </div>
           </div>
         </div>

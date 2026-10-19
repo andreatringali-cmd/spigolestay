@@ -273,18 +273,18 @@ export default function RevenueAutopilotPage() {
           <p className="py-8 text-center text-sm text-faint">{scopedTypes.length === 0 ? "Nessuna tipologia con camere attive: aggiungi camere e tipologie per ricevere suggerimenti." : zeroPriceTypes.length === scopedTypes.length ? "Nessuna tipologia ha una tariffa base: impostala in Tariffe per ricevere suggerimenti." : "Nessun aggiustamento consigliato: le tariffe sono già in linea con l'occupazione attuale."}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-2 py-2 font-semibold">Giorno</th><th className="px-2 py-2 font-semibold">Tipologia</th><th className="px-2 py-2 text-center font-semibold">Occ.</th><th className="px-2 py-2 text-right font-semibold">Attuale</th><th className="px-2 py-2 text-right font-semibold">Suggerito</th><th className="px-2 py-2 font-semibold">Perché</th><th className="px-2 py-2"></th></tr></thead>
-              <tbody>
+            <table className="w-full min-w-[640px] text-sm max-sm:block max-sm:min-w-0">
+              <thead className="max-sm:hidden"><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-2 py-2 font-semibold">Giorno</th><th className="px-2 py-2 font-semibold">Tipologia</th><th className="px-2 py-2 text-center font-semibold">Occ.</th><th className="px-2 py-2 text-right font-semibold">Attuale</th><th className="px-2 py-2 text-right font-semibold">Suggerito</th><th className="px-2 py-2 font-semibold">Perché</th><th className="px-2 py-2"></th></tr></thead>
+              <tbody className="max-sm:block">
                 {suggestions.slice(0, 200).map((s) => (
-                  <tr key={s.key} className="border-b border-line last:border-0 hover:bg-wash">
-                    <td className="whitespace-nowrap px-2 py-2 text-dim">{fmtDay(s.iso)}</td>
-                    <td className="px-2 py-2 font-medium text-txt">{s.typeName}</td>
-                    <td className="px-2 py-2 text-center font-mono text-dim">{s.occ}%</td>
-                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-dim">{eur(s.current)}</td>
-                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[10px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
-                    <td className="px-2 py-2 text-[11px] text-faint">{explainSuggestionCompact(s)}{s.limitedBy && <span className="ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={`Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}. Senza limiti: ${eur(s.rawSuggested)}`}>limitato</span>}</td>
-                    <td className="px-2 py-2 text-right"><button onClick={() => applyOne(s)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Applica</button></td>
+                  <tr key={s.key} className="border-b border-line last:border-0 hover:bg-wash max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-sm:py-3">
+                    <td className="whitespace-nowrap px-2 py-2 text-dim max-sm:order-1 max-sm:p-0 max-sm:font-semibold max-sm:text-txt">{fmtDay(s.iso)}</td>
+                    <td className="px-2 py-2 font-medium text-txt max-sm:order-2 max-sm:p-0">{s.typeName}</td>
+                    <td className="px-2 py-2 text-center font-mono text-dim max-sm:order-3 max-sm:p-0 max-sm:text-xs max-sm:before:content-['occ._']">{s.occ}%</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-dim max-sm:order-4 max-sm:basis-full max-sm:p-0 max-sm:text-left max-sm:before:content-['ora_'] max-sm:after:content-['_→']">{eur(s.current)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold max-sm:order-5 max-sm:p-0" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[10px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
+                    <td className="px-2 py-2 text-[11px] text-faint max-sm:order-7 max-sm:w-full max-sm:p-0">{explainSuggestionCompact(s)}{s.limitedBy && <span className="ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={`Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}. Senza limiti: ${eur(s.rawSuggested)}`}>limitato</span>}</td>
+                    <td className="px-2 py-2 text-right max-sm:order-6 max-sm:ml-auto max-sm:p-0"><button onClick={() => applyOne(s)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">Applica</button></td>
                   </tr>
                 ))}
               </tbody>

@@ -37,10 +37,10 @@ export default function ProvenienzaPage() {
   const Bars = ({ data, max }: { data: [string, { arrivi: number; presenze: number }][]; max: number }) => (
     <div className="flex flex-col gap-2">
       {data.map(([k, v]) => (
-        <div key={k} className="flex items-center gap-2 text-sm">
-          <span className="w-28 shrink-0 truncate text-dim">{k}</span>
-          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${max ? (v.presenze / max) * 100 : 0}%` }} /></div>
-          <span className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-dim">{v.arrivi} arr · {v.presenze} pres</span>
+        <div key={k} className="flex items-center gap-2 text-sm max-sm:flex-wrap max-sm:gap-y-1">
+          <span className="w-28 shrink-0 truncate text-dim max-sm:w-auto max-sm:min-w-0 max-sm:flex-1">{k}</span>
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-wash max-sm:order-last max-sm:basis-full"><div className="h-full rounded-full bg-focus" style={{ width: `${max ? (v.presenze / max) * 100 : 0}%` }} /></div>
+          <span className="w-24 shrink-0 whitespace-nowrap text-right max-sm:w-auto font-mono text-xs text-dim">{v.arrivi} arr · {v.presenze} pres</span>
         </div>
       ))}
     </div>

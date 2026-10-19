@@ -97,7 +97,7 @@ export default function GruppoPage() {
             const on = cfg.structureIds.includes(st.id);
             return (
               <button key={st.id} type="button" aria-pressed={on} onClick={() => save({ structureIds: on ? cfg.structureIds.filter((x) => x !== st.id) : [...cfg.structureIds, st.id] })}
-                className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold transition ${on ? "border-focus text-txt" : "border-line text-dim hover:bg-wash"}`}
+                className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold transition max-sm:min-h-10 ${on ? "border-focus text-txt" : "border-line text-dim hover:bg-wash"}`}
                 style={on ? { backgroundColor: tint("var(--focus)", 9) } : undefined}>
                 <Dot name={st.name} color={st.photoColor} logo={st.logo} size={24} />
                 {st.name}

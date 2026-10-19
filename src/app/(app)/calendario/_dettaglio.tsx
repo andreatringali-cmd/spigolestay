@@ -17,6 +17,7 @@ import { journeyOf, isLiveBooking, stepOpensModal, type JourneyStep } from "@/li
 import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
+import Popover from "@/components/Popover";
 import { bookingCode } from "@/lib/bookingCode";
 import { normName } from "@/lib/guest-key";
 import EmptyState from "@/components/EmptyState";
@@ -193,8 +194,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const pick = (iso: string) => { setSel(iso); setWinStart(iso); setMode("day"); };
   // Selettore mese e frecce ±1 giorno: stessi controlli della riga filtri del calendario a griglia
   const [monthOpen, setMonthOpen] = useState(false);
-  const monthRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
+  const monthRef = useRef<HTMLButtonElement>(null);
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), iso: toISO(d), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const selDate = parseISO(sel);
   const stepDay = (n: number) => { const next = shiftISO(sel, n); setSel(next); if (!winDays.includes(next)) setWinStart(next); };
@@ -231,18 +231,16 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
         <div className="relative w-full sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:shrink-0">
           <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full" />
         </div>
-        <div ref={monthRef} className="relative">
-          <button onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+        <div className="relative">
+          <button ref={monthRef} onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
             <Icon name="calendar" size={15} /> <span className="capitalize">{selDate.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</span> <span className="text-xs">▾</span>
           </button>
-          {monthOpen && (
-            <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+          <Popover open={monthOpen} anchorRef={monthRef} onClose={() => setMonthOpen(false)} align="start" width={208} maxHeight={288} label="Mese">
               {monthList.map((mm) => {
                 const active = selDate.getFullYear() === mm.y && selDate.getMonth() === mm.m;
                 return <button key={mm.iso} onClick={() => { pick(mm.iso); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>;
               })}
-            </div>
-          )}
+          </Popover>
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => stepDay(-1)} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>

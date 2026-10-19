@@ -112,7 +112,7 @@ export default function OtaMessagesPanel() {
             {loaded && listErr && (
               <div className="m-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>
                 {missingApp ? "L'app «Messages» non è installata su Channex per questa struttura: attivala dalla dashboard di Channex (Applications) e riprova." : listErr}
-                <button type="button" onClick={() => void loadList()} className="ml-2 font-semibold underline">Riprova</button>
+                <button type="button" onClick={() => void loadList()} className="ml-2 py-2 font-semibold underline">Riprova</button>
               </div>
             )}
             {loaded && !listErr && partial && <p className="m-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>Alcune strutture non rispondono (app «Messages» non attiva su Channex o errore temporaneo): le loro conversazioni non compaiono.</p>}
@@ -149,7 +149,7 @@ export default function OtaMessagesPanel() {
               subtitle={stayInfo}
               guestName={guestNameOf(sel)}
               onBack={() => setSelId(null)}
-              actions={<button type="button" disabled={!selBooking} onClick={() => selBooking && openBooking(selBooking.id)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Apri prenotazione</button>}
+              actions={<button type="button" disabled={!selBooking} onClick={() => selBooking && openBooking(selBooking.id)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40 max-sm:min-h-10">Apri prenotazione</button>}
               onChanged={() => void loadList()}
               onClosed={() => { void loadList().then(() => setSelId(null)); }}
             />

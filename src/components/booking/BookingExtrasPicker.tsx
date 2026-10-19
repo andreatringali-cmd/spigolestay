@@ -13,7 +13,7 @@ import { PER_LABEL } from "@/lib/upselling";
 import { entriesTotal, entryFor, entryQty, extraUnitAmount, freeEntries, maxQtyOf, pricingLabel, selectableExtras, setExtraQty, type BookingExtraEntry, type StayLike } from "@/lib/booking-extras";
 
 const inp = "rounded-md border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus";
-const stepBtn = "flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none disabled:opacity-30";
+const stepBtn = "flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none disabled:opacity-30 max-sm:h-10 max-sm:w-10";
 
 export default function BookingExtrasPicker({ entries, onChange, catalog, stay, onConfigure }: {
   entries: BookingExtraEntry[];

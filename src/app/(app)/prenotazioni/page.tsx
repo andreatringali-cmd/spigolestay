@@ -423,7 +423,7 @@ export default function PrenotazioniPage() {
       <PageHeader title={t("Prenotazioni")} subtitle={t("In anteprima le prenotazioni in corso e future · seleziona un intervallo di date per vedere lo storico")} actions={<WeatherWidget compact />} />
 
       {/* Card riepilogo */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 max-sm:[&>*:nth-child(n+3)]:col-span-2 lg:grid-cols-4">
         <StatCard label={t("Prenotazioni")} value={String(counted.length)} />
         <StatCard label={t("Notti totali")} value={String(nightsTot)} />
         <StatCard label={t("ADR (prezzo medio/notte)")} value={<>{eur(avgPrice)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoPerNight)})</span></>} />
@@ -464,9 +464,9 @@ export default function PrenotazioniPage() {
             <option value="prenotazione">{t("Data prenotazione")}</option>
             <option value="incasa">{t("In casa (occupazione)")}</option>
           </Select>
-          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:w-full max-sm:justify-between" /></div>
+          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:min-h-10 max-sm:w-full max-sm:justify-between" /></div>
           <span className="text-xs text-faint">→</span>
-          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:w-full max-sm:justify-between" /></div>
+          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:min-h-10 max-sm:w-full max-sm:justify-between" /></div>
         </div>
         <div className="flex items-center gap-2 max-sm:w-full sm:contents">
         <Select className="max-sm:min-w-0 max-sm:flex-1" value={channel} onChange={setChannel} label={t("Canale")}>
@@ -635,8 +635,8 @@ export default function PrenotazioniPage() {
       {displayList.length > limit && (
         <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">
           <span>{t("Mostrate")} {limit} {t("di")} {displayList.length}</span>
-          <button onClick={() => setLimit((l) => l + PAGE)} className="rounded-lg border border-line px-3 py-1.5 font-semibold text-txt hover:bg-wash">{t("Mostra altre")} {Math.min(PAGE, displayList.length - limit)}</button>
-          <button onClick={() => setLimit(displayList.length)} className="rounded-lg px-2 py-1.5 font-semibold text-focus hover:underline">{t("Mostra tutte")}</button>
+          <button onClick={() => setLimit((l) => l + PAGE)} className="rounded-lg border border-line px-3 py-1.5 font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Mostra altre")} {Math.min(PAGE, displayList.length - limit)}</button>
+          <button onClick={() => setLimit(displayList.length)} className="rounded-lg px-2 py-1.5 font-semibold text-focus hover:underline max-sm:min-h-10">{t("Mostra tutte")}</button>
         </div>
       )}
     </div>

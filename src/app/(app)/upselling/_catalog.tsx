@@ -44,7 +44,7 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder="Cerca extra…" className="w-full sm:w-64" />
-        <button onClick={add} disabled={addDisabled} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
+        <button onClick={add} disabled={addDisabled} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white max-sm:min-h-10 shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
       </div>
 
       {unverified > 0 && (

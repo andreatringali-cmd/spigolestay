@@ -352,7 +352,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
           return (
             <div key={ph} className="flex items-center gap-2">
               {i > 0 && <span className="h-px w-5" style={{ backgroundColor: order[phase] >= i ? "var(--ok)" : "var(--line)" }} />}
-              <button type="button" disabled={order[phase] < i} onClick={() => setPhase(ph)} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 transition hover:bg-wash" style={state === "current" ? { backgroundColor: "var(--ok)", color: "#fff" } : state === "done" ? { color: "var(--ok)" } : { color: "var(--faint)" }}>
+              <button type="button" disabled={order[phase] < i} onClick={() => setPhase(ph)} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 transition hover:bg-wash max-sm:min-h-10 max-sm:px-3" style={state === "current" ? { backgroundColor: "var(--ok)", color: "#fff" } : state === "done" ? { color: "var(--ok)" } : { color: "var(--faint)" }}>
                 <span className="grid h-5 w-5 place-items-center rounded-full text-[10px]" style={state === "current" ? { backgroundColor: "rgba(255,255,255,.25)" } : state === "done" ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)" } : { backgroundColor: "var(--wash)" }}>{state === "done" ? "✓" : n}</span>
                 <span className="hidden sm:inline">{lab}</span>
               </button>
@@ -403,9 +403,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                   </div>
                 ))}
                 <span className="ml-2 flex items-center gap-2 text-sm text-dim">Culle
-                  <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                  <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-9 max-sm:w-9">−</button>
                   <span className="w-4 text-center text-sm font-semibold tabular-nums text-txt">{cribs}</span>
-                  <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
+                  <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30 max-sm:h-9 max-sm:w-9">+</button>
                 </span>
               </div>
             </div>
@@ -447,8 +447,8 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                   </div>
                   {/* tabella camere */}
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[720px] text-sm">
-                      <thead>
+                    <table className="w-full text-sm md:min-w-[720px] max-md:block">
+                      <thead className="max-md:hidden">
                         <tr className="bg-wash text-left text-[11px] font-semibold uppercase tracking-wide text-dim">
                           <th className="px-4 py-2.5">Camera</th>
                           <th className="px-3 py-2.5 text-center">Ospiti</th>
@@ -458,7 +458,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                           <th className="px-4 py-2.5 text-right">Quantità</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[color:var(--line)]">
+                      <tbody className="divide-y divide-[color:var(--line)] max-md:block">
                         {visibleRows.map((rt) => {
                           const av = availUnits(rt).length;
                           const q = qty[rt.id] ?? 0;
@@ -468,20 +468,20 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                           const poolSel = selected.filter((x) => poolRootId(x) === rootId).reduce((a, x) => a + (qty[x.id] ?? 0), 0);
                           const canAdd = poolSel < av;
                           return (
-                            <tr key={rt.id} className={q > 0 ? "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" : ""}>
-                              <td className="px-4 py-3">
+                            <tr key={rt.id} className={`max-md:grid max-md:grid-cols-2 max-md:items-center max-md:gap-x-3 max-md:gap-y-2 max-md:px-4 max-md:py-3 ${q > 0 ? "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" : ""}`}>
+                              <td className="px-4 py-3 max-md:col-span-2 max-md:p-0">
                                 <div className="flex items-center gap-1.5 font-semibold text-txt">{rt.name}{isDerived && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ derivata</span>}</div>
                                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-dim"><Icon name="cup" size={12} /> BB · Flessibile 7 gg{isDerived && <span className="text-faint">· stesse camere della madre</span>}{!fits && <span className="text-[color:var(--warn)]">· capienza {cap(rt)} &lt; {party} ospiti</span>}</div>
                               </td>
-                              <td className="px-3 py-3 text-center"><span className="inline-flex items-center gap-[1px] text-dim">{Array.from({ length: Math.min(cap(rt), 5) }).map((_, i) => <Person key={i} />)}</span></td>
-                              <td className="px-3 py-3 text-center"><span className="inline-grid h-6 w-6 place-items-center rounded-full text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}><Icon name="check" size={13} /></span></td>
-                              <td className="px-3 py-3 text-center">{(() => { const tot = unitsOfType(rt); const occ = tot - av; return (<><span className={`font-semibold ${av > 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{av}</span><span className="text-faint"> / {tot}</span>{occ > 0 && <div className="text-[10px] text-faint">{occ} {occ === 1 ? "occupata" : "occupate"}</div>}</>); })()}</td>
-                              <td className="px-3 py-3 text-right"><span className="text-base font-extrabold text-txt">{eur(stayPrice(rt))}</span><div className="text-[10px] text-faint">{nightsN} {nightsN === 1 ? "notte" : "notti"}</div></td>
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3 text-center max-md:p-0 max-md:text-left"><span className="inline-flex items-center gap-[1px] text-dim">{Array.from({ length: Math.min(cap(rt), 5) }).map((_, i) => <Person key={i} />)}</span></td>
+                              <td className="px-3 py-3 text-center max-md:hidden"><span className="inline-grid h-6 w-6 place-items-center rounded-full text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}><Icon name="check" size={13} /></span></td>
+                              <td className="px-3 py-3 text-center max-md:p-0 max-md:text-right">{(() => { const tot = unitsOfType(rt); const occ = tot - av; return (<><span className="text-[11px] text-faint md:hidden">Disponibili </span><span className={`font-semibold ${av > 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{av}</span><span className="text-faint"> / {tot}</span>{occ > 0 && <div className="text-[10px] text-faint">{occ} {occ === 1 ? "occupata" : "occupate"}</div>}</>); })()}</td>
+                              <td className="px-3 py-3 text-right max-md:p-0 max-md:text-left"><span className="text-base font-extrabold text-txt">{eur(stayPrice(rt))}</span><div className="text-[10px] text-faint">{nightsN} {nightsN === 1 ? "notte" : "notti"}</div></td>
+                              <td className="px-4 py-3 max-md:p-0">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                                  <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-md:h-10 max-md:w-10">−</button>
                                   <span className={`w-6 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                                  <button disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                                  <button disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 max-md:h-10 max-md:w-10 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                                 </div>
                               </td>
                             </tr>
@@ -506,7 +506,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         )}
         <div className="sticky bottom-3 z-10 mt-2 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg">
           <div className="text-sm text-dim">{totalRooms > 0 ? (<>{totalRooms} {totalRooms === 1 ? "camera" : "camere"} · <b className="text-txt">{eur(grandTotal)}</b></>) : "Seleziona almeno una camera"}</div>
-          <button onClick={() => setPhase("details")} disabled={totalRooms < 1} className="flex items-center gap-2 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">Continua →</button>
+          <button onClick={() => setPhase("details")} disabled={totalRooms < 1} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">Continua →</button>
         </div>
         </>
       )}
@@ -517,7 +517,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         const saldo = Math.max(0, grandFinal - depositN);
         return (
         <div className="mb-10">
-          <button onClick={() => setPhase("rooms")} className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-focus hover:underline">← Torna alle camere</button>
+          <button onClick={() => setPhase("rooms")} className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-focus hover:underline max-sm:min-h-10">← Torna alle camere</button>
           <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]">
             {/* Colonna sinistra · inserimento dati */}
             <div className="space-y-4">
@@ -555,7 +555,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                             <td className="px-3 py-2.5 text-center font-bold text-txt">{qty[rt.id]}</td>
                             <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <NumInput value={linePrice(rt)} onChange={(v) => setPriceOv((o) => ({ ...o, [rt.id]: v ?? 0 }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
                             <td className="px-4 py-2.5 text-right font-bold text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td>
-                            <td className="px-3 py-2.5 text-right"><button onClick={() => setQ(rt.id, 0)} title="Rimuovi" className="text-faint hover:text-[color:var(--err)]">✕</button></td>
+                            <td className="px-3 py-2.5 text-right"><button onClick={() => setQ(rt.id, 0)} title="Rimuovi" className="px-2 py-1 text-faint hover:text-[color:var(--err)] max-sm:px-3 max-sm:py-2.5">✕</button></td>
                           </tr>
                         );
                       })}
@@ -574,9 +574,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                       <div key={e.id} className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${q > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]" : "border-line"}`}>
                         <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}<div className="text-[11px] text-faint">{e.free ? "gratis" : eur(e.price)}</div></div>
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                          <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
                           <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                          <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                          <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                         </div>
                       </div>
                     ); })}

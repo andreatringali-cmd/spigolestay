@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import type { ActivityType } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
+import Popover from "./Popover";
 
 const TYPE_COLOR: Record<ActivityType, string> = {
   booking: "var(--ok)", cancel: "var(--err)", block: "var(--faint)", move: "var(--focus)",
@@ -32,7 +33,7 @@ export default function ActivityLog() {
   const activities = activeStructureId === "all" ? allActivities : allActivities.filter((a) => !a.structureId || a.structureId === activeStructureId);
   const { t } = useLang();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null); // ancora della tendina (Popover): chiusura fuori/Esc la gestisce lei
   // "Non letti" = attività più recenti dell'ultima apertura del pannello (persistito nel browser).
   const [seenTs, setSeenTs] = useState<number>(0);
   useEffect(() => { try { setSeenTs(Number(localStorage.getItem(SEEN_KEY)) || 0); } catch {} }, []);
@@ -43,15 +44,10 @@ export default function ActivityLog() {
     try { localStorage.setItem(SEEN_KEY, String(now)); } catch {}
   };
   const toggle = () => setOpen((o) => { if (!o) markSeen(); return !o; });
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("pointerdown", h);
-    return () => document.removeEventListener("pointerdown", h);
-  }, []);
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={toggle} title={t("Registro attività")} aria-label={t("Registro attività")} className="relative grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
+    <div className="relative">
+      <button ref={btnRef} onClick={toggle} title={t("Registro attività")} aria-label={t("Registro attività")} className="relative grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" />
         </svg>
@@ -59,8 +55,8 @@ export default function ActivityLog() {
           <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-focus px-1 text-[9px] font-bold text-white">{unread > 99 ? "99+" : unread}</span>
         )}
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 max-h-[70dvh] w-80 overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={320} maxHeight={560} label={t("Registro attività")}>
+        <div className="p-1">
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Registro attività")}</div>
           {activities.length === 0 ? (
             <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>
@@ -76,7 +72,7 @@ export default function ActivityLog() {
             ))
           )}
         </div>
-      )}
+      </Popover>
     </div>
   );
 }

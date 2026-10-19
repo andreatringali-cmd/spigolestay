@@ -86,7 +86,7 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="mr-auto text-xs font-semibold uppercase tracking-wide text-faint">Registro offerte ({rows.length})</div>
           {([["all", "Tutte"], ["pending", "In attesa"], ["accepted", "Accettate"], ["declined", "Rifiutate"], ["expired", "Scadute"]] as [Filter, string][]).map(([k, l]) => (
-            <button key={k} onClick={() => setFilter(k)} className={`rounded-full border px-2.5 py-1 text-xs transition ${filter === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{l}{counts[k] ? ` (${counts[k]})` : ""}</button>
+            <button key={k} onClick={() => setFilter(k)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${filter === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{l}{counts[k] ? ` (${counts[k]})` : ""}</button>
           ))}
         </div>
         {rows.length === 0 ? (

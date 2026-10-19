@@ -23,7 +23,7 @@ export default function PublicSitePage() {
 
   if (state === "loading") {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/xenora-mark.png" alt="Xenora" width={64} height={64} style={{ width: 64, height: 64, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
         <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
@@ -33,7 +33,7 @@ export default function PublicSitePage() {
 
   if (state === "notfound") {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#fff", color: "#1c1917", padding: 24, textAlign: "center", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#fff", color: "#1c1917", padding: 24, textAlign: "center", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/xenora-mark.png" alt="Xenora" width={56} height={56} style={{ width: 56, height: 56, objectFit: "contain" }} />
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Sito non trovato</h1>

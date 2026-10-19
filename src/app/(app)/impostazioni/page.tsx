@@ -384,7 +384,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 function ThemeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
   return (
-    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${active ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
+    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition max-sm:min-h-10 ${active ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
       <Icon name={icon} size={14} /> {label}
     </button>
   );

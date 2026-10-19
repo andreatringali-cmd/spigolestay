@@ -78,7 +78,7 @@ export default function AnagraficaClientiPage() {
   };
   const del = async () => { if (!supabase || !edit?.id) return; if (!(await ask({ message: "Eliminare questo intestatario?", danger: true, confirmLabel: "Elimina" }))) return; await supabase.from("counterparts").delete().eq("id", edit.id); setEdit(null); load(); };
 
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:min-h-10";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
 
@@ -87,10 +87,10 @@ export default function AnagraficaClientiPage() {
       <PageHeader title="Anagrafica clienti / agenzie" subtitle="Intestatari riutilizzabili per fatture e documenti" />
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" />
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" className="w-full sm:w-72" />
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={sel}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-          <button onClick={() => setEdit(emptyForm())} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuovo</button>
-          {ficOn && <button onClick={openSync} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">Sincronizza con Fatture in Cloud</button>}
+          <button onClick={() => setEdit(emptyForm())} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10">+ Nuovo</button>
+          {ficOn && <button onClick={openSync} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Sincronizza con Fatture in Cloud</button>}
         </div>
       </Card>
 
@@ -116,7 +116,7 @@ export default function AnagraficaClientiPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setSync((p) => ({ ...p, open: false }))} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-base font-bold text-txt">Sincronizza con Fatture in Cloud</span><button onClick={() => setSync((p) => ({ ...p, open: false }))} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-base font-bold text-txt">Sincronizza con Fatture in Cloud</span><button onClick={() => setSync((p) => ({ ...p, open: false }))} aria-label="Chiudi" className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
             {sync.busy && <p className="text-xs text-dim">Un attimo…</p>}
             {sync.msg && <p className="mb-2 rounded-lg bg-paper px-3 py-2 text-xs text-txt">{sync.msg}</p>}
             {sync.prev && (
@@ -154,7 +154,7 @@ export default function AnagraficaClientiPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica intestatario" : "Nuovo intestatario"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica intestatario" : "Nuovo intestatario"}</span><button onClick={() => setEdit(null)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className={`${lbl} sm:col-span-2`}>Tipo<select value={edit.kind} onChange={(e) => setEdit({ ...edit, kind: e.target.value })} className={inp}>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
               <label className={`${lbl} sm:col-span-2`}>{edit.kind === "privato" ? "Nome e cognome" : "Ragione sociale"}<input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} className={inp} /></label>
@@ -168,9 +168,9 @@ export default function AnagraficaClientiPage() {
               <label className={`${lbl} sm:col-span-2`}>Email<input value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} className={inp} /></label>
             </div>
             <div className="mt-3 flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
-              {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}
-              <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
+              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{saving ? "Salvo…" : "Salva"}</button>
+              {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)] max-sm:min-h-11">Elimina</button>}
+              <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:min-h-11">Annulla</button>
             </div>
           </div>
         </div>

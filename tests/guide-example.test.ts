@@ -28,9 +28,12 @@ test("«Parti dall'esempio»: stesso ordine di sezioni, stessi titoli, sottotito
     if (!["wifi", "contacts", "review"].includes(s.id)) assert.equal(m.intro, s.intro ?? "");
   }
 });
-test("«Parti dall'esempio»: passaggi e blocchi con gli stessi testi (senza parcheggio riservato)", () => {
+test("«Parti dall'esempio»: passaggi e blocchi con gli stessi testi; il parcheggio ha le due versioni (prenotato / non prenotato)", () => {
+  const park = sec("checkin").steps.filter((st: any) => st.h === "Parcheggio");
+  assert.equal(park.length, 2);
+  assert.ok(park.some((st: any) => st.parkOnly) && park.some((st: any) => st.noParkOnly));
   const checkin = it.sections.find((s: any) => s.id === "checkin");
-  const expected = checkin.steps.filter((st: any) => !st.parkOnly).map((st: any) => [st.h, st.p]);
+  const expected = checkin.steps.map((st: any) => [st.h, st.p]);
   assert.deepEqual(sec("checkin").steps.map((st: any) => [st.h, st.p]), expected);
   assert.deepEqual(sec("checkin").items.map((i: any) => [i.h, i.p]), checkin.items.map((i: any) => [i.h, i.p]));
   assert.deepEqual(sec("checkin").amenities.map((a: any) => a.label), checkin.amenities.map((a: any) => a.label));
@@ -50,6 +53,6 @@ test("«Parti dall'esempio» attraversa il motore e coincide con l'esempio (benv
   const res = w.I18N.it;
   assert.deepEqual(clone(res.home), { welcomeTitle: it.home.welcomeTitle, welcomeSub: "", welcome: it.home.welcome });
   assert.deepEqual(clone(res.groups), clone(it.groups));
-  const view = (s: any) => ({ title: s.title, sub: s.sub, intro: s.intro || "", steps: (s.steps || []).filter((x: any) => !x.parkOnly).map((x: any) => [x.h, x.p]), items: (s.items || []).map((x: any) => [x.h, x.p || ""]), am: (s.amenities || []).map((a: any) => a.label) });
+  const view = (s: any) => ({ title: s.title, sub: s.sub, intro: s.intro || "", steps: (s.steps || []).map((x: any) => [x.h, x.p, !!x.parkOnly, !!x.noParkOnly]), items: (s.items || []).map((x: any) => [x.h, x.p || ""]), am: (s.amenities || []).map((a: any) => a.label) });
   for (const s of it.sections) assert.deepEqual(clone(view(res.sections.find((x: any) => x.id === s.id))), clone(view(s)), `sezione ${s.id}`);
 });

@@ -28,7 +28,7 @@ export default function SupportWidget() {
         <div className="fixed bottom-24 right-6 z-50 flex h-[min(420px,calc(100dvh-7rem))] w-[340px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
           <div className="flex items-center justify-between bg-focus px-4 py-3 text-white">
             <span className="font-semibold">{t("Assistenza")}</span>
-            <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white">✕</button>
+            <button onClick={() => setOpen(false)} aria-label="Chiudi" className="-m-2 p-2 text-white/80 hover:text-white">✕</button>
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-3">
             {msgs.map((m, i) => (
@@ -54,9 +54,9 @@ export default function SupportWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t("Assistenza")}
         title={t("Assistenza")}
-        className="no-print fixed bottom-24 max-sm:bottom-20 right-0 z-50 flex h-14 w-9 items-center justify-center rounded-l-xl bg-focus text-white shadow-lg transition hover:w-11"
+        className="no-print fixed bottom-24 max-sm:bottom-20 right-0 z-50 flex h-14 w-9 items-center justify-center overflow-hidden rounded-l-xl bg-focus text-white shadow-lg transition hover:w-11 max-sm:h-16 max-sm:w-5 max-sm:hover:w-5"
       >
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="shrink-0 max-sm:h-[14px] max-sm:w-[14px]" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
       </button>

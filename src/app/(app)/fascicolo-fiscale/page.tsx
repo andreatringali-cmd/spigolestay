@@ -216,7 +216,7 @@ export default function FascicoloFiscalePage() {
     } finally { setGenerating(false); }
   };
 
-  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
 
   return (
     <div>
@@ -224,11 +224,11 @@ export default function FascicoloFiscalePage() {
         title={t("Fascicolo fiscale")}
         subtitle={t("Un unico PDF con incassi per canale, tassa di soggiorno e fatture emesse — pronto per il commercialista")}
         actions={
-          <div className="flex items-center gap-2">
-            <button onClick={exportDocsCsv} disabled={loadingDocs || invoiceCount + creditNoteCount === 0} title="Elenco dei documenti emessi dell'anno (CSV per Excel; note di credito in negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">
+          <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
+            <button onClick={exportDocsCsv} disabled={loadingDocs || invoiceCount + creditNoteCount === 0} title="Elenco dei documenti emessi dell'anno (CSV per Excel; note di credito in negativo)" className="rounded-lg border border-line px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">
               {t("Esporta documenti (CSV)")}
             </button>
-            <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+            <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
               {generating ? t("Genero…") : t("Genera fascicolo fiscale (PDF)")}
             </button>
           </div>
@@ -297,10 +297,10 @@ export default function FascicoloFiscalePage() {
             <SectionTitle>{t("Tassa di soggiorno")}</SectionTitle>
             <Card>
               {cityTaxEnabled ? (
-                <div className="grid grid-cols-3 gap-3">
-                  <div><div className="text-xs text-dim">{t("Dovuta")}</div><div className="font-mono text-lg font-bold text-txt">{eur(cityTaxDovuta)}</div></div>
-                  <div><div className="text-xs text-dim">{t("Incassata")}</div><div className="font-mono text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(cityTaxIncassata)}</div></div>
-                  <div><div className="text-xs text-dim">{t("Da incassare")}</div><div className="font-mono text-lg font-bold" style={{ color: "var(--warn)" }}>{eur(cityTaxDaIncassare)}</div></div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div><div className="text-xs text-dim">{t("Dovuta")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{eur(cityTaxDovuta)}</div></div>
+                  <div><div className="text-xs text-dim">{t("Incassata")}</div><div className="font-mono text-base sm:text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(cityTaxIncassata)}</div></div>
+                  <div><div className="text-xs text-dim">{t("Da incassare")}</div><div className="font-mono text-base sm:text-lg font-bold" style={{ color: "var(--warn)" }}>{eur(cityTaxDaIncassare)}</div></div>
                 </div>
               ) : (
                 <p className="text-sm text-faint">{t("Tassa di soggiorno non configurata per questa struttura.")}</p>
@@ -315,16 +315,16 @@ export default function FascicoloFiscalePage() {
                 <p className="text-sm text-faint">{t("Caricamento…")}</p>
               ) : invoiceModuleReady ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div><div className="text-xs text-dim">{t("N. fatture")}</div><div className="font-mono text-lg font-bold text-txt">{invoiceCount}</div></div>
-                  <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-lg font-bold text-txt">{eur(invoiceTaxable)}</div></div>
-                  <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-lg font-bold text-txt">{eur(invoiceVat)}</div></div>
-                  <div><div className="text-xs text-dim">{t("Totale")}</div><div className="font-mono text-lg font-bold text-txt">{eur(invoiceTotal)}</div></div>
+                  <div><div className="text-xs text-dim">{t("N. fatture")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{invoiceCount}</div></div>
+                  <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{eur(invoiceTaxable)}</div></div>
+                  <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{eur(invoiceVat)}</div></div>
+                  <div><div className="text-xs text-dim">{t("Totale")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{eur(invoiceTotal)}</div></div>
                   {creditNoteCount > 0 && (<>
                     <div className="col-span-2 mt-1 border-t border-line pt-2 text-xs font-semibold uppercase tracking-wide text-faint sm:col-span-4">{t("Note di credito emesse")}</div>
-                    <div><div className="text-xs text-dim">{t("N. NC")}</div><div className="font-mono text-lg font-bold text-txt">{creditNoteCount}</div></div>
-                    <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-lg font-bold text-txt">−{eur(creditNoteTaxable)}</div></div>
-                    <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-lg font-bold text-txt">−{eur(creditNoteVat)}</div></div>
-                    <div><div className="text-xs text-dim">{t("Totale al netto NC")}</div><div className="font-mono text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(netTotal)}</div><div className="text-[10px] text-faint">imp. {eur(netTaxable)} · IVA {eur(netVat)}</div></div>
+                    <div><div className="text-xs text-dim">{t("N. NC")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{creditNoteCount}</div></div>
+                    <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">−{eur(creditNoteTaxable)}</div></div>
+                    <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-base sm:text-lg font-bold text-txt">−{eur(creditNoteVat)}</div></div>
+                    <div><div className="text-xs text-dim">{t("Totale al netto NC")}</div><div className="font-mono text-base sm:text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(netTotal)}</div><div className="text-[10px] text-faint">imp. {eur(netTaxable)} · IVA {eur(netVat)}</div></div>
                   </>)}
                   {bolloTotal > 0 && <div className="col-span-2 text-[11px] text-dim sm:col-span-4">{t("Di cui bollo virtuale")}: <b className="font-mono text-txt">{eur(bolloTotal)}</b></div>}
                   {rejectedCount > 0 && <div className="col-span-2 text-[11px] font-medium text-[color:var(--warn)] sm:col-span-4">{rejectedCount} {t("documenti scartati dallo SdI esclusi dai totali: correggili e reinviali.")}</div>}

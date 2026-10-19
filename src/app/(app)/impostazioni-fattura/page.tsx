@@ -137,7 +137,7 @@ export default function ImpostazioniFatturaPage() {
     setMsg(error ? "Errore: " + friendlyError(error) : "Impostazioni salvate ✓");
   };
 
-  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
   const fieldCls = (error?: string) => `${inp}${error ? " !border-[color:var(--err)]" : ""}`;
   const fieldMsg = (m?: string, soft?: boolean) => (m ? <span className="mt-0.5 block text-[11px] font-medium" style={{ color: soft ? "var(--warn)" : "var(--err)" }}>{m}</span> : null);
@@ -148,7 +148,7 @@ export default function ImpostazioniFatturaPage() {
   return (
     <div>
       <PageHeader title="Impostazioni fattura" subtitle="Regime, dati dell'emittente e servizio di invio"
-        actions={<div className="flex items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<button onClick={save} disabled={saving || !tenantId || !!loadErr} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button></div>} />
+        actions={<div className="flex flex-wrap items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<button onClick={save} disabled={saving || !tenantId || !!loadErr} className="rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -201,8 +201,8 @@ export default function ImpostazioniFatturaPage() {
               <label className="flex items-center justify-between"><span className="text-sm text-txt">Conservazione a norma</span>
                 <input type="checkbox" checked={cred.legalStorage} onChange={(e) => setCred((c) => ({ ...c, legalStorage: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button onClick={saveCred} disabled={!!credBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{credBusy === "save" ? "Salvo…" : "Salva credenziali"}</button>
-                <button onClick={testCred} disabled={!!credBusy || !cred.hasToken} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{credBusy === "test" ? "Test…" : "Test connessione"}</button>
+                <button onClick={saveCred} disabled={!!credBusy} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{credBusy === "save" ? "Salvo…" : "Salva credenziali"}</button>
+                <button onClick={testCred} disabled={!!credBusy || !cred.hasToken} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{credBusy === "test" ? "Test…" : "Test connessione"}</button>
                 <span className="text-[11px] font-medium" style={{ color: cred.hasToken ? "var(--ok)" : "var(--faint)" }}>{cred.hasToken ? "● token configurato" : "○ token mancante"}</span>
               </div>
               {credMsg && <p className="text-[12px] text-dim">{credMsg}</p>}
@@ -217,7 +217,7 @@ export default function ImpostazioniFatturaPage() {
                 <span className="text-[11px] font-medium" style={{ color: fic.connected ? "var(--ok)" : "var(--faint)" }}>{fic.connected ? `● collegato${fic.companyName ? ` — ${fic.companyName}` : ""}` : "○ non collegato"}</span>
               </div>
               {!fic.connected ? (
-                <button onClick={connectFic} disabled={!!ficBusy || !fic.configured} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{ficBusy === "connect" ? "Reindirizzo…" : "Collega Fatture in Cloud"}</button>
+                <button onClick={connectFic} disabled={!!ficBusy || !fic.configured} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{ficBusy === "connect" ? "Reindirizzo…" : "Collega Fatture in Cloud"}</button>
               ) : (
                 <>
                   <label className="flex items-center justify-between rounded-lg border border-line bg-paper px-3 py-2">
@@ -226,8 +226,8 @@ export default function ImpostazioniFatturaPage() {
                   </label>
                   {!fic.dryRun && <p className="text-[12px] font-medium text-[color:var(--warn)]">⚠ Invio reale attivo: le fatture emesse saranno trasmesse allo SdI.</p>}
                   <div className="flex flex-wrap items-center gap-2">
-                    <button onClick={() => ficAction("test")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{ficBusy === "test" ? "Verifico…" : "Verifica collegamento"}</button>
-                    <button onClick={() => ficAction("disconnect")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{ficBusy === "disconnect" ? "…" : "Scollega"}</button>
+                    <button onClick={() => ficAction("test")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{ficBusy === "test" ? "Verifico…" : "Verifica collegamento"}</button>
+                    <button onClick={() => ficAction("disconnect")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{ficBusy === "disconnect" ? "…" : "Scollega"}</button>
                   </div>
                 </>
               )}

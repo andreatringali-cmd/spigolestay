@@ -19,7 +19,7 @@ export default function StyleChooser() {
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Colori</div>
         <div className="grid gap-1.5 sm:grid-cols-2">
           {PALETTES.map((p, i) => (
-            <button key={p.name} onClick={() => pickPal(i)} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition ${pal === i ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] text-txt" : "border-line text-dim hover:bg-wash"}`}>
+            <button key={p.name} onClick={() => pickPal(i)} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition max-sm:min-h-11 ${pal === i ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] text-txt" : "border-line text-dim hover:bg-wash"}`}>
               <span className="flex shrink-0 gap-0.5">
                 {p.swatch.map((c, j) => <span key={j} className="h-4 w-4 rounded" style={{ background: c, border: "1px solid rgba(0,0,0,.08)" }} />)}
               </span>
@@ -34,7 +34,7 @@ export default function StyleChooser() {
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Struttura box</div>
         <div className="grid gap-1.5 sm:grid-cols-2">
           {STRUCTS.map((s, i) => (
-            <button key={s.name} onClick={() => pickStr(i)} className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition ${str === i ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] text-txt" : "border-line text-dim hover:bg-wash"}`}>
+            <button key={s.name} onClick={() => pickStr(i)} className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition max-sm:min-h-11 ${str === i ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] text-txt" : "border-line text-dim hover:bg-wash"}`}>
               <span className="truncate font-medium">{s.name}</span>
               {str === i && <span className="text-focus">✓</span>}
             </button>

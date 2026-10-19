@@ -30,13 +30,13 @@ export default function StructureSwitcher() {
       <button
         ref={btnRef}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-lg border border-line bg-paper py-1.5 pl-2.5 pr-2 text-sm transition hover:border-focus"
+        className="flex items-center gap-2 rounded-lg border border-line bg-paper py-1.5 pl-2.5 pr-2 text-sm transition hover:border-focus max-sm:min-h-10"
       >
         <span style={{ color: "var(--focus)" }}><Icon name="building" size={16} /></span>
         {current ? (
           <span className="flex items-baseline gap-1.5">
-            <span className="max-w-[110px] truncate font-medium text-txt sm:max-w-[180px]">{current.name}</span>
-            {current.city && <span className="hidden text-[11px] text-faint sm:inline">{current.city}</span>}
+            <span className="max-w-[110px] truncate font-medium text-txt sm:max-w-[180px] md:max-w-[110px] lg:max-w-[180px]">{current.name}</span>
+            {current.city && <span className="hidden text-[11px] text-faint sm:inline md:hidden xl:inline">{current.city}</span>}
           </span>
         ) : (
           <span className="font-medium text-txt">{label}</span>
@@ -59,12 +59,12 @@ export default function StructureSwitcher() {
 function Item({ checked, onClick, name, sub, onOnly, onlyLabel }: { checked: boolean; onClick: () => void; name: string; sub?: string; onOnly?: () => void; onlyLabel?: string }) {
   return (
     <div className="group flex items-center rounded-lg transition hover:bg-wash" style={checked ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : undefined}>
-      <button onClick={onClick} role="checkbox" aria-checked={checked} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-sm">
+      <button onClick={onClick} role="checkbox" aria-checked={checked} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-sm max-sm:min-h-11">
         <span className="grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] font-bold leading-none text-white" style={{ borderColor: checked ? "var(--focus)" : "var(--line)", background: checked ? "var(--focus)" : "transparent" }}>{checked ? "✓" : ""}</span>
         <span className="min-w-0 flex-1 truncate font-medium text-txt">{name}</span>
         {sub && <span className="text-[11px] text-faint">{sub}</span>}
       </button>
-      {onOnly && <button onClick={onOnly} title={onlyLabel} className="mr-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-focus opacity-0 transition hover:bg-surface group-hover:opacity-100 focus-visible:opacity-100">{onlyLabel}</button>}
+      {onOnly && <button onClick={onOnly} title={onlyLabel} className="mr-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-focus opacity-0 transition hover:bg-surface group-hover:opacity-100 focus-visible:opacity-100 max-sm:py-2.5 [@media(hover:none)]:opacity-100">{onlyLabel}</button>}
     </div>
   );
 }

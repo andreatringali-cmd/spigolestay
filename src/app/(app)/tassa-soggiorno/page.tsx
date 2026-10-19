@@ -166,7 +166,7 @@ export default function TassaSoggiornoPage() {
       <PageHeader
         title={t("Tassa di soggiorno")}
         subtitle={t("Partita di giro · esclusa da ricavi e statistiche")}
-        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white">{t("Stampa dichiarazione")}</button>}
+        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white">{t("Stampa dichiarazione")}</button>}
       />
 
       {/* Periodo */}
@@ -224,7 +224,7 @@ export default function TassaSoggiornoPage() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>{t("Dettaglio imposta")} ({rows.length})</SectionTitle>
-            <button onClick={exportImpostaCsv} disabled={!rows.length} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{t("Esporta CSV")}</button>
+            <button onClick={exportImpostaCsv} disabled={!rows.length} className="rounded-lg border border-line px-2.5 py-1 max-sm:py-2 text-xs font-medium text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{t("Esporta CSV")}</button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
@@ -255,7 +255,7 @@ export default function TassaSoggiornoPage() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>{t("Movimento turistico (ISTAT)")} — {label}</SectionTitle>
-            <button onClick={exportIstatCsv} disabled={!istat.length} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{t("Esporta ISTAT (CSV)")}</button>
+            <button onClick={exportIstatCsv} disabled={!istat.length} className="rounded-lg border border-line px-2.5 py-1 max-sm:py-2 text-xs font-medium text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{t("Esporta ISTAT (CSV)")}</button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
@@ -294,12 +294,12 @@ export default function TassaSoggiornoPage() {
   );
 }
 
-const inp = "w-28 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
-const sel = "mt-1 block rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+const inp = "w-28 rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
+const sel = "mt-1 block rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="text-xs text-dim">{label}<div className="mt-1">{children}</div></label>;
 }
 function Toggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${active ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{children}</button>;
+  return <button onClick={onClick} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${active ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{children}</button>;
 }

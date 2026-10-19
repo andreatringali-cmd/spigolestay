@@ -146,15 +146,15 @@ export default function ChiusuraCassaPage() {
     w.document.close();
   };
 
-  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
 
   return (
     <div>
       <PageHeader title="Chiusura cassa" subtitle="Quadratura del contante di giornata"
-        actions={<div className="flex items-center gap-2">
-          <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta</button>
-          <button onClick={printClose} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa</button>
+        actions={<div className="flex flex-wrap items-center gap-2">
+          <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Esporta</button>
+          <button onClick={printClose} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Stampa</button>
         </div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -173,14 +173,14 @@ export default function ChiusuraCassaPage() {
           <div className="mt-3 flex flex-col gap-1 rounded-lg bg-wash p-3 text-sm">
             <div className="flex justify-between"><span className="text-dim">Entrate del giorno</span><span className="font-mono text-[color:var(--ok)]">{eur(entrate)}</span></div>
             <div className="flex justify-between"><span className="text-dim">Uscite del giorno</span><span className="font-mono text-[color:var(--err)]">−{eur(uscite)}</span></div>
-            <div className="flex justify-between border-t border-line pt-1 font-semibold"><span>Saldo teorico {contoLabel(conto).toLowerCase()}</span><span className="font-mono">{eur(expected)}</span></div>
+            <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold"><span>Saldo teorico {contoLabel(conto).toLowerCase()}</span><span className="shrink-0 whitespace-nowrap font-mono">{eur(expected)}</span></div>
             {balance.since && <div className="text-[11px] text-faint">Calcolato dal saldo di partenza del {fmtDate(balance.since)}: contano solo i movimenti successivi.</div>}
           </div>
           <label className={`${lbl} mt-3 block`}>Contato in cassa €<input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" className={inp} placeholder="0,00" /></label>
           {countedBad && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">Importo non valido: scrivi un numero, per esempio 1234,56.</p>}
           {countedVal !== null && <div className="mt-2 flex justify-between rounded-lg px-3 py-2 text-sm font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${Math.abs(diff) < 0.005 ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: Math.abs(diff) < 0.005 ? "var(--ok)" : "var(--err)" }}><span>Differenza</span><span className="font-mono">{diff >= 0 ? "+" : ""}{eur(diff)}</span></div>}
           <label className={`${lbl} mt-2 block`}>Note<input value={note} onChange={(e) => setNote(e.target.value)} className={inp} /></label>
-          <button onClick={save} disabled={countedVal === null} className="mt-3 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Chiudi giornata</button>
+          <button onClick={save} disabled={countedVal === null} className="mt-3 rounded-lg bg-focus px-4 py-2 max-sm:w-full max-sm:py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Chiudi giornata</button>
           {msg && <p className="mt-2 text-[12px] font-medium text-dim">{msg}</p>}
         </Card>
 

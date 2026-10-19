@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Icon from "./Icon";
+import Popover from "./Popover";
 import { useLang } from "@/lib/i18n";
 
 // Icone file Excel/PDF: documento con angolo piegato, colore di brand, senza testo
@@ -36,12 +37,7 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [picker, setPicker] = useState<Set<string> | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("pointerdown", h);
-    return () => document.removeEventListener("pointerdown", h);
-  }, []);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const openExcel = () => {
     setOpen(false);
     if (!excelFields) { onExcel(); return; }
@@ -49,26 +45,24 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   };
   const toggleField = (key: string) => setPicker((p) => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       {!onPdf && (
         <button onClick={openExcel} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0" title="Excel" aria-label="Excel">
           <ExcelIcon /> <span className="max-sm:sr-only">Excel</span>
         </button>
       )}
       {onPdf && (<>
-      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0">
         <span className="max-sm:sr-only">{t("Esporta")}</span> <Icon name="chevron" size={14} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 w-40 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={160} label={t("Esporta")}>
           <button onClick={openExcel} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-txt hover:bg-wash">
             <ExcelIcon /> Excel
           </button>
           <button onClick={() => { onPdf?.(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-txt hover:bg-wash">
             <PdfIcon /> PDF
           </button>
-        </div>
-      )}
+      </Popover>
       </>)}
       {picker && excelFields && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">

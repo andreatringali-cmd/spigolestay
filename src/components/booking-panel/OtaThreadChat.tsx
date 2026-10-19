@@ -152,7 +152,7 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
     <div className={`flex min-w-0 flex-col ${compact ? "overflow-hidden rounded-xl border border-line bg-surface" : "min-h-0 flex-1"}`}>
       <div className={`flex flex-wrap items-start justify-between gap-2 border-b border-line ${pad} ${compact ? "py-2" : "py-3"}`}>
         <div className="flex min-w-0 items-start gap-2.5">
-          {onBack && <button type="button" onClick={onBack} className="mt-0.5 rounded-lg px-1.5 py-0.5 text-lg leading-none text-dim hover:bg-wash md:hidden" aria-label={t("Torna all'elenco")}>‹</button>}
+          {onBack && <button type="button" onClick={onBack} className="-ml-1 mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-lg text-2xl leading-none text-dim hover:bg-wash md:hidden" aria-label={t("Torna all'elenco")}>‹</button>}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               {title && <h2 className="truncate font-display text-base font-bold text-txt">{title}</h2>}
@@ -200,12 +200,12 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
           <div className="rounded-xl border border-line bg-paper p-2 focus-within:border-focus">
             <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void send(); } }} rows={2} placeholder={t("Inserisci il messaggio")} className="w-full resize-none bg-transparent px-1.5 py-1 text-base text-txt outline-none sm:text-sm" />
             <div className="flex items-center justify-between gap-2">
-              <label className={`inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-dim hover:bg-wash ${!thread.bookingId ? "pointer-events-none opacity-40" : ""}`}>
+              <label className={`inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10 ${!thread.bookingId ? "pointer-events-none opacity-40" : ""}`}>
                 📎 {t("Allega")}
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" disabled={sending || !thread.bookingId} onChange={(e) => { void attach(e.target.files?.[0]); e.target.value = ""; }} />
               </label>
               <span className="hidden text-[11px] text-faint sm:inline">{t("Premi Ctrl+Invio per inviare il messaggio")}</span>
-              <button type="button" onClick={() => void send()} disabled={sending || !draft.trim()} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{sending ? t("Invio…") : t("Invia")}</button>
+              <button type="button" onClick={() => void send()} disabled={sending || !draft.trim()} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10 max-sm:px-5">{sending ? t("Invio…") : t("Invia")}</button>
             </div>
           </div>
         )}

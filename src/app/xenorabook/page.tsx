@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import Popover from "@/components/Popover";
 import DateField from "@/components/DateField";
 import { type Listing, stars, ListingImage } from "@/lib/xenorabook/data";
 
@@ -53,12 +54,7 @@ export default function XenoraBookPublicPage() {
   const today = ymdRome(new Date());
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
-  const guestsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (guestsRef.current && !guestsRef.current.contains(e.target as Node)) setGuestsOpen(false); };
-    document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h);
-  }, []);
+  const guestsBtnRef = useRef<HTMLButtonElement>(null); // ancora della tendina ospiti (Popover): chiusura fuori/Esc la gestisce lei
 
   // Vocabolari dei filtri: calcolati dalle strutture REALI caricate, non da liste fisse
   // di esempio — così un filtro compare solo se esiste davvero almeno una struttura a cui si applica.
@@ -151,13 +147,13 @@ export default function XenoraBookPublicPage() {
                 <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-out</div>
                 <DateField value={to} min={from} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
               </div>
-              <div className="relative" ref={guestsRef}>
-                <button onClick={() => setGuestsOpen((o) => !o)} className="h-full w-full rounded-xl px-3 py-2 text-left hover:bg-wash">
+              <div className="relative">
+                <button ref={guestsBtnRef} onClick={() => setGuestsOpen((o) => !o)} className="h-full w-full rounded-xl px-3 py-2 text-left hover:bg-wash">
                   <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Ospiti</div>
                   <div className="text-sm font-semibold text-txt">{adults + children} ospiti · {rooms} {rooms > 1 ? "camere" : "camera"}</div>
                 </button>
-                {guestsOpen && (
-                  <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+                <Popover open={guestsOpen} anchorRef={guestsBtnRef} onClose={() => setGuestsOpen(false)} align="end" width={256} label="Ospiti">
+                  <div className="p-2">
                     {([["Adulti", adults, setAdults, 1], ["Bambini", children, setChildren, 0], ["Camere", rooms, setRooms, 1]] as const).map(([lbl, val, set, min]) => (
                       <div key={lbl} className="flex items-center justify-between py-1.5">
                         <span className="text-sm text-txt">{lbl}</span>
@@ -169,7 +165,7 @@ export default function XenoraBookPublicPage() {
                       </div>
                     ))}
                   </div>
-                )}
+                </Popover>
               </div>
               <button onClick={() => setGuestsOpen(false)} className="flex items-center justify-center gap-2 rounded-xl bg-focus px-5 py-2.5 text-sm font-bold text-white hover:opacity-90"><Icon name="search" size={16} /> Cerca</button>
             </div>

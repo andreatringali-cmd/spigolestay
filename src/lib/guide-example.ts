@@ -25,7 +25,7 @@ const actionsOf = (list: unknown): Action[] | undefined => {
 
 /**
  * `it` = window.I18N.it del pacchetto guida. `old` = contenuto già pronto (foto d'esempio per sezione, ripiego se qualcosa manca).
- * Dall'esempio si prende ciò che vede un ospite senza dati personali nel link: niente parcheggio riservato, nessun testo «personale».
+ * Dall'esempio si prende ciò che l'ospite vede nei casi principali: i passaggi legati al parcheggio restano entrambi (con/senza), nessun testo «personale».
  */
 export function exampleContentFrom(it: Json, old: ExampleContent): ExampleContent {
   const home = (it.home ?? {}) as Json;
@@ -37,8 +37,10 @@ export function exampleContentFrom(it: Json, old: ExampleContent): ExampleConten
     const o = old.sections.find((x) => x.id === id) as Json | undefined;
     const base: Json = { id, icon: str(s.icon), title: str(s.title), sub: str(s.sub), intro: str(s.intro), photos: arr<string>(o?.photos) };
     if (FUNC_IDS.has(id)) return { ...base, items: [] };
-    const steps = arr(s.steps).filter((st) => !st.parkOnly).map((st) => {
+    const steps = arr(s.steps).map((st) => {
       const o2: Json = { h: str(st.h), p: str(st.p), code: CODE_OF[str(st.codeKey)] ?? "" };
+      if (st.parkOnly) o2.parkOnly = true;          // «Parcheggio» per chi lo ha prenotato…
+      if (st.noParkOnly) o2.noParkOnly = true;      // …e per chi NON lo ha prenotato: due passaggi, ognuno col suo testo
       if (st.codeSuffix) o2.codeNote = str(st.codeSuffix);
       const a = actionsOf(st.actions); if (a) o2.actions = a;
       return o2;

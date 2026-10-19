@@ -134,7 +134,7 @@ export default function DocumentiPage() {
     downloadCsv(`documenti-${year}${month !== "all" ? `-${String(month).padStart(2, "0")}` : ""}`, buildCsv(head, lines));
   };
 
-  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
   const today = todayLocalISO();
 
   // Nuovo documento VUOTO: la prenotazione si collega dopo dalla scheda.
@@ -191,10 +191,10 @@ export default function DocumentiPage() {
             <option value="all">Tutti gli stati</option>
             {Object.entries(STATO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
-            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
+          <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:w-full">
+            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
+            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
           </div>
         </div>
       </Card>
@@ -202,7 +202,7 @@ export default function DocumentiPage() {
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
 
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[960px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
@@ -246,6 +246,35 @@ export default function DocumentiPage() {
             {loading && <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
           </tbody>
         </table>
+      </div>
+
+      {/* Telefono: una scheda per documento (la tabella serve da tablet in su) */}
+      <div className="flex flex-col gap-2 md:hidden">
+        {filtered.map((r) => {
+          const st = sdiBadge(r.stato, trialIds.has(r.id), STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" });
+          const notSent = r.stato === "emessa" && !r.send_sdi && r.doc_kind !== "ricevuta_non_fiscale";
+          const res = residuoOf(r);
+          const late = res !== null && res > 0 && !!r.due_date && r.due_date < today;
+          const isNc = r.doc_kind === "nota_di_credito";
+          return (
+            <div key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-txt">{cpName(r) || "—"}</div>
+                  <div className="truncate text-xs text-dim"><span className="font-mono">{r.number_label ?? "—"}</span> · {DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind} · {r.issue_date ? fmtDate(r.issue_date) : "bozza"}</div>
+                  {r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}
+                </div>
+                <div className="shrink-0 text-right"><span title={st.title} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>{notSent && <div className="mt-0.5 text-[10px] text-faint">non inviata allo SdI</div>}</div>
+              </div>
+              <div className="mt-2 flex items-end justify-between gap-2 font-mono text-sm">
+                <span className="font-semibold text-txt">{isNc ? "−" : ""}{eur(centsEur(r.total_cents))}</span>
+                <span className="text-xs" style={{ color: late ? "var(--err)" : "var(--dim)" }}>{res === null ? "" : res === 0 ? "saldato" : `da incassare ${eur(centsEur(res))}`}</span>
+              </div>
+            </div>
+          );
+        })}
+        {!loading && filtered.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title="Nessun documento" sub="Nessun risultato con questi filtri. Crea il primo con “+ Nuovo documento” o dalla scheda di una prenotazione." /></div>}
+        {loading && <p className="px-3 py-10 text-center text-sm text-faint">Caricamento…</p>}
       </div>
     </div>
   );

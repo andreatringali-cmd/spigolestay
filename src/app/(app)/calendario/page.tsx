@@ -23,7 +23,7 @@ export default function CalendarioPage() {
   const viewSwitch = (
     <div className="no-print flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
       {([["grid", t("Griglia")], ["detail", t("Dettagliata")]] as const).map(([k, l]) => (
-        <button key={k} onClick={() => choose(k)} aria-pressed={view === k} className={`rounded-md px-2.5 py-1.5 transition ${view === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
+        <button key={k} onClick={() => choose(k)} aria-pressed={view === k} className={`rounded-md px-2.5 py-1.5 transition max-sm:min-h-9 max-sm:px-3 ${view === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
       ))}
     </div>
   );

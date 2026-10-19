@@ -288,7 +288,7 @@ export default function CassaPage() {
   const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout));
   // cella "saldo conti" (riusata dalle voci bonifico)
   const balCell = (bal: number | null, inc: boolean) => (
-    <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
+    <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2 max-md:col-start-2 max-md:row-start-2 max-md:my-0 max-md:border-l-0 max-md:pl-0"><span className="mr-1 text-[10px] text-faint md:hidden">{t("saldo")}</span>
       {inc
         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
         : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined}>{bal === null ? "—" : eur(bal)}</span>}
@@ -694,7 +694,7 @@ export default function CassaPage() {
                         {tr.out > 0 && <span className="absolute bottom-full left-1/2 mb-0.5 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[8px] leading-none text-dim sm:block">{compactEuro(tr.out)}</span>}
                       </div>
                     </div>
-                    <button type="button" onClick={() => pickMonth(tr.ym, "all")} aria-label={`${t("Tutti i movimenti")} · ${monthLabel(tr.ym)}`} className="w-full rounded px-1 text-[10px] capitalize text-faint hover:text-txt">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</button>
+                    <button type="button" onClick={() => pickMonth(tr.ym, "all")} aria-label={`${t("Tutti i movimenti")} · ${monthLabel(tr.ym)}`} className="w-full rounded px-1 max-sm:py-2 text-[10px] capitalize text-faint hover:text-txt">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</button>
                   </div>
                 ))}
               </div>
@@ -708,7 +708,7 @@ export default function CassaPage() {
       <div id="cassa-filtri" className="mb-4 flex scroll-mt-16 flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="min-w-[220px] max-w-md flex-1" />
         <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
-          <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus">
             <option value="future">{t("Oggi e future")}</option>
             <option value="all">{t("Tutto lo storico")}</option>
             <option value="month">{t("Questo mese")}</option>
@@ -721,7 +721,7 @@ export default function CassaPage() {
           <span className="text-xs text-faint">→</span>
           <DateField value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
         </div>
-        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
+        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
           <option value="all">{t("Tutti i movimenti")}</option>
           <option value="in">{t("Solo entrate")}</option>
           <option value="out">{t("Solo uscite")}</option>
@@ -729,14 +729,14 @@ export default function CassaPage() {
           <option value="sched">{t("Pagamenti programmati")}</option>
           <option value="manual">{t("Inseriti a mano")}</option>
         </select>
-        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
+        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
           <option value="">{t("Tutte le categorie")}</option>
           {cats.filter((c) => c.key !== OPENING_CAT && (c.key === catF || catsInRegister.has(c.key))).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
         </select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
-          <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
-          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
+          <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+          <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
+          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>
@@ -747,7 +747,7 @@ export default function CassaPage() {
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
               <div className="-mx-1 max-h-[70dvh] overflow-auto px-1 md:max-h-[640px]">
               <div className="md:min-w-[920px]">
-              <div className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 max-md:hidden sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
                 <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right max-md:hidden">{t("Lordo")}</span><span className="text-right max-md:hidden">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
@@ -760,26 +760,26 @@ export default function CassaPage() {
                     const stName = r.structureId ? structNameOf(r.structureId) : "";
                     return (
                       <div key={r.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra i conti")} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap py-2.5 hover:bg-wash/60">
-                          <span className="font-mono text-xs text-dim">{fmtDMY(r.date)}</span>
-                          <div className="flex min-w-0 items-center gap-2">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra i conti")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap py-2.5 hover:bg-wash/60">
+                          <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(r.date)}</span>
+                          <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-wash text-dim"><Icon name="coins" size={13} /></span>
                             <span className="truncate text-sm font-medium text-txt">{t("Saldo di partenza")}{stName ? ` · ${stName}` : ""} · {r.items.length} {t("conti")}</span>
                             <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
                           </div>
                           <span className="max-md:hidden" />
                           <span className="max-md:hidden" />
-                          <span className="text-right font-mono text-sm font-bold" style={{ color: r.total >= 0 ? "var(--ok)" : "var(--err)" }}>{r.total >= 0 ? "+ " : "− "}{eur(Math.abs(r.total))}</span>
+                          <span className="text-right font-mono text-sm font-bold max-md:col-start-2 max-md:row-start-1" style={{ color: r.total >= 0 ? "var(--ok)" : "var(--err)" }}>{r.total >= 0 ? "+ " : "− "}{eur(Math.abs(r.total))}</span>
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
                         {open && r.items.map((m) => (
-                          <div key={"o-" + m.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
-                            <span />
-                            <span className="truncate pl-9">{(CONTI.find((c) => c.key === m.conto)?.label) ?? m.conto}</span>
+                          <div key={"o-" + m.id} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                            <span className="max-md:hidden" />
+                            <span className="truncate pl-9 max-md:pl-8">{(CONTI.find((c) => c.key === m.conto)?.label) ?? m.conto}</span>
                             <span className="max-md:hidden" />
                             <span className="max-md:hidden" />
                             <span className="text-right font-mono">{m.kind === "in" ? "+ " : "− "}{eur(m.amount)}</span>
-                            <div className="-my-1 self-stretch border-l border-line" />
+                            <div className="-my-1 self-stretch border-l border-line max-md:hidden" />
                           </div>
                         ))}
                       </div>
@@ -792,9 +792,9 @@ export default function CassaPage() {
                     const ch = r.channel as Channel;
                     return (
                       <div key={r.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
-                          <span className="font-mono text-xs text-dim">{fmtDMY(r.date)}</span>
-                          <div className="flex min-w-0 items-center gap-2">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                          <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(r.date)}</span>
+                          <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
                             <span className="truncate text-sm font-medium text-txt">{CHANNELS[ch]?.label} · {t("pagamento")} · {r.count} {r.count === 1 ? t("prenotazione") : t("prenotazioni")}</span>
                             {r.forecast && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span>}
@@ -802,7 +802,7 @@ export default function CassaPage() {
                           </div>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
                           {r.comm === 0 && infoSum > 0 ? <span className="text-right font-mono text-[11px] italic text-faint max-md:hidden" title={t("Commissioni trattenute dal portale tutte insieme, a parte: non cambiano il saldo.")}>(− {eur(infoSum)})</span> : <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>}
-                          <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
+                          <span className="text-right font-mono text-sm font-bold text-txt max-md:col-start-2 max-md:row-start-1">{eur(r.net)}</span>
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
                         {open && r.items.map((it) => {
@@ -814,13 +814,13 @@ export default function CassaPage() {
                           const c2 = it.type === "booking" ? it.comm : im.kind === "out" ? im.amount : 0;
                           const inf2 = !c2 ? infoOf(im) : undefined;
                           return (
-                            <div key={"i-" + im.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
-                              <span />
-                              <span className="truncate pl-9">{gn}{ib ? <span className="text-faint"> · {t("check-out")} {fmtDMY(ib.checkOut)}</span> : null}</span>
+                            <div key={"i-" + im.id} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                              <span className="max-md:hidden" />
+                              <span className="truncate pl-9 max-md:pl-8">{gn}{ib ? <span className="text-faint"> · {t("check-out")} {fmtDMY(ib.checkOut)}</span> : null}</span>
                               <span className="text-right font-mono max-md:hidden">{g2 ? `+ ${eur(g2)}` : ""}</span>
                               <span className={"text-right font-mono max-md:hidden" + (inf2 ? " text-[11px] italic text-faint" : "")} title={inf2 ? infoText(inf2) : undefined}>{c2 ? `− ${eur(c2)}` : inf2 ? `(− ${eur(inf2.amount)})` : ""}</span>
                               <span className="text-right font-mono">{eur(roundCents(g2 - c2))}</span>
-                              <div className="-my-1 self-stretch border-l border-line" />
+                              <div className="-my-1 self-stretch border-l border-line max-md:hidden" />
                             </div>
                           );
                         })}
@@ -838,9 +838,9 @@ export default function CassaPage() {
                     const pctOf = (c: number, l: number) => (l > 0 ? String(Math.round((c / l) * 1000) / 10).replace(".", ",") + "%" : "");
                     return (
                       <div key={m.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni incluse in queste commissioni")} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
-                          <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
-                          <div className="flex min-w-0 items-center gap-2">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni incluse in queste commissioni")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                          <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(m.date)}</span>
+                          <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
                             <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
                             <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>
@@ -848,28 +848,28 @@ export default function CassaPage() {
                           </div>
                           <span className="max-md:hidden" />
                           <span className="max-md:hidden" />
-                          <span className="text-right font-mono text-sm font-semibold" style={{ color: "var(--err)" }}>− {eur(m.amount)}</span>
+                          <span className="text-right font-mono text-sm font-semibold max-md:col-start-2 max-md:row-start-1" style={{ color: "var(--err)" }}>− {eur(m.amount)}</span>
                           {balCell(ledger.balanceAfter.get(m.id) ?? null, ledger.included.has(m.id))}
                         </div>
                         {open && (
                           <>
                             {det.map((b) => (
-                              <div key={"cm-" + b.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
-                                <span />
-                                <span className="truncate pl-9">{guests.find((g) => g.id === b.guestId)?.fullName || "Ospite"}<span className="text-faint"> · {t("check-out")} {fmtDMY(b.checkOut)}</span></span>
+                              <div key={"cm-" + b.id} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                                <span className="max-md:hidden" />
+                                <span className="truncate pl-9 max-md:pl-8">{guests.find((g) => g.id === b.guestId)?.fullName || "Ospite"}<span className="text-faint"> · {t("check-out")} {fmtDMY(b.checkOut)}</span></span>
                                 <span className="text-right font-mono max-md:hidden">{lordoOf(b) ? `+ ${eur(lordoOf(b))}` : ""}</span>
                                 <span className="text-right font-mono max-md:hidden" title={t("Commissioni ÷ lordo")}>{String(commissionShareOf(b)).replace(".", ",")}%</span>
                                 <span className="text-right font-mono">− {eur(roundCents(commissionOf(b)))}</span>
-                                <div className="-my-1 self-stretch border-l border-line" />
+                                <div className="-my-1 self-stretch border-l border-line max-md:hidden" />
                               </div>
                             ))}
-                            <div className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs font-semibold text-dim">
-                              <span />
-                              <span className="truncate pl-9">{t("Totale")} · {det.length} {det.length === 1 ? t("prenotazione") : t("prenotazioni")}</span>
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs font-semibold text-dim">
+                              <span className="max-md:hidden" />
+                              <span className="truncate pl-9 max-md:pl-8">{t("Totale")} · {det.length} {det.length === 1 ? t("prenotazione") : t("prenotazioni")}</span>
                               <span className="text-right font-mono max-md:hidden">{totLordo ? `+ ${eur(totLordo)}` : ""}</span>
                               <span className="text-right font-mono max-md:hidden" title={t("Commissioni ÷ lordo")}>{pctOf(totComm, totLordo)}</span>
                               <span className="text-right font-mono">− {eur(totComm)}</span>
-                              <div className="-my-1 self-stretch border-l border-line" />
+                              <div className="-my-1 self-stretch border-l border-line max-md:hidden" />
                             </div>
                           </>
                         )}
@@ -891,9 +891,9 @@ export default function CassaPage() {
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
                     <div key={isBooking ? "b-" + r.id : m.id}>
-                    <div onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
-                      <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
-                      <div className="flex min-w-0 items-center gap-2">
+                    <div onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                      <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(m.date)}</span>
+                      <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                         {bk ? <BookingChannelLogo booking={bk} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
                         <span className="truncate text-sm font-medium text-txt">{title}</span>
                         {!isBooking && receiptOf.get(m.id) && <button type="button" onClick={(e) => { e.stopPropagation(); void openRcpt(receiptOf.get(m.id)!.path); }} aria-label={t("Apri scontrino")} title={t("Apri scontrino")} className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt"><Icon name="receipt" size={13} /></button>}
@@ -901,29 +901,29 @@ export default function CassaPage() {
                         {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
                         {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
                         {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
-                        <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", contoLabel(m.conto, movSid(m) || undefined), multiScope && movSid(m) && !contoLabel(m.conto, movSid(m) || undefined).includes(" - ") ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
+                        <span className="min-w-0 truncate text-[11px] text-faint max-sm:hidden">{[c?.label ? t(c.label) : "", contoLabel(m.conto, movSid(m) || undefined), multiScope && movSid(m) && !contoLabel(m.conto, movSid(m) || undefined).includes(" - ") ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
                         {contoUnassigned(m, conti) && <span className="shrink-0 text-[10px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a questa struttura: correggi il conto dalla modifica del movimento, oppure sposta in blocco i movimenti da «Saldo di partenza» → «Sposta movimenti tra conti».")}>⚠ {t("conto non assegnato")}</span>}
                       </div>
                       {isBooking ? (
                         <>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>
-                          <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
+                          <span className="text-right font-mono text-sm font-bold text-txt max-md:col-start-2 max-md:row-start-1">{eur(r.net)}</span>
                         </>
                       ) : (
                         <>
                           <span className="max-md:hidden" />
                           <span className="max-md:hidden" />
-                          <span className="text-right font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.variable ? "~ " : ""}{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
+                          <span className="text-right font-mono text-sm font-semibold max-md:col-start-2 max-md:row-start-1" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.variable ? "~ " : ""}{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
                         </>
                       )}
-                      <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
+                      <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2 max-md:col-start-2 max-md:row-start-2 max-md:my-0 max-md:border-l-0 max-md:pl-0"><span className="mr-1 text-[10px] text-faint md:hidden">{t("saldo")}</span>
                       {included
                         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
                         : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
                       </div>
                     </div>
-                    {inf && <div className="-mt-0.5 pb-1 pl-[70px] text-[11px] italic leading-tight text-faint md:pl-[96px]" title={t("Il portale trattiene le commissioni tutte insieme: non è un movimento di questa riga e non cambia il saldo.")}>{infoText(inf)}</div>}
+                    {inf && <div className="-mt-0.5 pb-1 pl-8 text-[11px] italic leading-tight text-faint md:pl-[96px]" title={t("Il portale trattiene le commissioni tutte insieme: non è un movimento di questa riga e non cambia il saldo.")}>{infoText(inf)}</div>}
                     </div>
                   );
                 });
@@ -931,13 +931,13 @@ export default function CassaPage() {
                 const oggiOpen = openPayouts.has("oggi");
                 const oggiNode = (k: string) => (
                         <div key={k}>
-                          <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
+                          <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer flex-wrap items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
                             <span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">{t("Oggi")}</span><span>{fmtDMY(today)}</span><span className="text-faint">{oggiOpen ? "▾" : "▸"}</span>
                             {hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}
                           </div>
                           {oggiOpen && balParts.filter((b) => b.own || b.start !== undefined || Math.abs(b.saldo) > 0.004).map((b) => (
                             <div key={"og-" + b.sid + "|" + b.conto} className="flex items-center gap-2 bg-wash/40 px-3 py-1 text-xs text-dim">
-                              <span className="truncate pl-9">{contoLabel(b.conto, b.sid || undefined)}</span>
+                              <span className="truncate pl-9 max-md:pl-8">{contoLabel(b.conto, b.sid || undefined)}</span>
                               <span className="ml-auto font-mono" style={{ color: b.saldo < 0 ? "var(--err)" : undefined }}>{eur(b.saldo)}</span>
                             </div>
                           ))}
@@ -975,7 +975,7 @@ export default function CassaPage() {
                 {pending.map(({ rule, iso }) => {
                   const c = catOf(rule.cat);
                   return (
-                    <div key={`${rule.id}-${iso}`} className={"flex items-center gap-3 py-2.5" + (rule.variable ? " rounded px-2 bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "")}>
+                    <div key={`${rule.id}-${iso}`} className={"flex items-center gap-3 py-2.5 max-sm:flex-wrap" + (rule.variable ? " rounded px-2 bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "")}>
                       {iconCircle(c, 32)}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-txt">{rule.desc}</div>
@@ -987,12 +987,12 @@ export default function CassaPage() {
                       {rule.variable ? (
                         <>
                           <input inputMode="decimal" aria-label={t("Importo reale")} title={t("Importo reale (la stima è precompilata)")} value={pendAmt[`${rule.id}|${iso}`] ?? String(rule.amount).replace(".", ",")} onChange={(e) => setPendAmt((p) => ({ ...p, [`${rule.id}|${iso}`]: e.target.value }))} className="w-24 shrink-0 rounded-lg border border-line bg-paper px-2 py-1 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
-                          <button onClick={() => confirmVariable(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Registra")}</button>
+                          <button onClick={() => confirmVariable(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 max-sm:py-2 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Registra")}</button>
                         </>
                       ) : (
                         <>
                           <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: rule.kind === "in" ? "var(--ok)" : "var(--err)" }}>{rule.kind === "in" ? "+" : "−"} {eur(rule.amount)}</span>
-                          <button onClick={() => markPaid(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Segna pagata")}</button>
+                          <button onClick={() => markPaid(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 max-sm:py-2 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Segna pagata")}</button>
                         </>
                       )}
                     </div>

@@ -19,7 +19,7 @@ export default function ConfirmDialog({ title, message, warning, confirmLabel = 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => { if (!busy) onClose(); }}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative z-10 max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-base font-semibold text-txt">{title}</h2>
         {message && <div className="mt-2 text-sm text-dim">{message}</div>}
         {warning && (

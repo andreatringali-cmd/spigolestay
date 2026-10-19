@@ -45,6 +45,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 #app > main { flex: 1 0 auto; width: 100%; min-width: 0; }
@@ -1174,6 +1175,9 @@ main { max-width: 900px; margin: 0 auto; padding: 26px 18px 60px; }
   position: fixed;
   left: 50%;
   bottom: 28px;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  max-width: calc(100vw - 32px);
+  text-align: center;
   transform: translateX(-50%) translateY(20px);
   padding: 11px 22px;
   font-weight: 600;
@@ -1196,10 +1200,17 @@ main { max-width: 900px; margin: 0 auto; padding: 26px 18px 60px; }
   .brand-name { font-size: 1rem; }
   .quick-row { grid-template-columns: repeat(2, 1fr); }
   .cards { grid-template-columns: 1fr; }
-  .lang-pill { padding: 6px 7px; font-size: .72rem; }
+  .lang-pill { padding: 6px 7px; font-size: .72rem; min-width: 38px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; }
+  .lang-switch { gap: 2px; }
+  .topbar-back { min-height: 40px; }
+  .social-btn { width: 40px; height: 40px; }
+  .info-list .li-tel, .info-list .li-map { padding: 11px; margin: -11px -11px -11px -4px; }
+  .copy-btn { padding: 10px 16px; }
 }
 
 @media (max-width: 470px) {
   .topbar { padding: 10px 12px; }
   .brand-name { display: none; }
+  .wifi-card .wifi-value { white-space: normal; overflow-wrap: anywhere; }
+  .welcome { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 }

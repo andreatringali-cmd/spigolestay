@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fmtDMY } from "@/lib/dates";
+import Popover from "./Popover";
 
-// Campo data con calendario personalizzato che si apre SEMPRE verso il basso.
+// Campo data con calendario personalizzato (tendina ancorata al campo: sotto, o sopra se sotto non c'è spazio; mai fuori dallo schermo, anche a 320px).
 // Testi del calendario nelle lingue dell'ospite (it · en · fr · de · es); `lang` assente = italiano, come prima.
 const CAL: Record<string, { months: string[]; dow: string[]; today: string; clear: string; prev: string; next: string }> = {
   it: { months: ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"], dow: ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"], today: "Oggi", clear: "Cancella", prev: "Mese precedente", next: "Mese successivo" },
@@ -42,16 +43,9 @@ export default function DateField({
   const cal = CAL[(lang || "it").slice(0, 2).toLowerCase()] ?? CAL.it;
   const MONTHS = cal.months, DOW = cal.dow;
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const [view, setView] = useState(() => (value ? new Date(value + "T00:00") : new Date()));
 
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", h);
-    document.addEventListener("keydown", k);
-    return () => { document.removeEventListener("pointerdown", h); document.removeEventListener("keydown", k); };
-  }, []);
   // All'apertura: mese del valore selezionato, o il mese di OGGI se il campo è vuoto — senza
   // questo, un campo svuotato restava fermo sull'ultimo mese aperto (es. gennaio) invece che oggi.
   useEffect(() => { if (open) setView(value ? new Date(value + "T00:00") : new Date()); }, [open, value]);
@@ -69,13 +63,12 @@ export default function DateField({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <div ref={ref} className="relative">
-      <button type="button" id={id} aria-required={required || undefined} disabled={disabled} onClick={() => setOpen((o) => !o)} title={title} className={`flex items-center gap-1.5 ${className}`}>
+    <div className="relative">
+      <button ref={btnRef} type="button" id={id} aria-required={required || undefined} disabled={disabled} onClick={() => setOpen((o) => !o)} title={title} className={`flex items-center gap-1.5 ${className}`}>
         <span className={value ? "text-txt" : "text-faint"}>{display}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto shrink-0 text-dim"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="start" width={256} className="p-2" label={cal.months[m]}>
           <div className="mb-1 flex items-center justify-between px-1">
             <button type="button" onClick={() => setView(new Date(y, m - 1, 1))} aria-label={cal.prev} className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">‹</button>
             <span className="text-sm font-semibold capitalize text-txt">{MONTHS[m]} {y}</span>
@@ -91,8 +84,7 @@ export default function DateField({
             <button type="button" disabled={(!!min && todayIso < min) || (!!max && todayIso > max)} onClick={() => { onChange(todayIso); setOpen(false); }} className="flex-1 rounded-lg py-1 text-[11px] font-medium text-focus hover:bg-wash disabled:opacity-40">{cal.today}</button>
             {value && <button type="button" onClick={() => { onChange(""); setOpen(false); }} className="flex-1 rounded-lg py-1 text-[11px] text-dim hover:bg-wash">{cal.clear}</button>}
           </div>
-        </div>
-      )}
+      </Popover>
     </div>
   );
 }

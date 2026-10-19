@@ -221,7 +221,7 @@ export default function ChannexCertPage() {
           {allTaskIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="text-xs text-faint">{allTaskIds.length} task ID raccolti finora</span>
-              <button onClick={() => copy(allTaskIds.join(", "), "all")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">
+              <button onClick={() => copy(allTaskIds.join(", "), "all")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">
                 {copied === "all" ? "Copiati ✓" : "Copia tutti i task ID"}
               </button>
             </div>

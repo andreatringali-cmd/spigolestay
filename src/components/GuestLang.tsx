@@ -33,7 +33,7 @@ export function GuestLangPicker({ lang, setLang, label }: { lang: GuestLang; set
           const on = l.code === lang;
           return (
             <button key={l.code} type="button" onClick={() => setLang(l.code)} aria-pressed={on} title={l.label}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${on ? "border-transparent text-white" : "border-line bg-surface text-txt hover:border-focus"}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 max-sm:px-3 ${on ? "border-transparent text-white" : "border-line bg-surface text-txt hover:border-focus"}`}
               style={on ? { backgroundColor: "var(--focus)" } : undefined}>
               <span aria-hidden>{l.flag}</span>{l.short}
             </button>

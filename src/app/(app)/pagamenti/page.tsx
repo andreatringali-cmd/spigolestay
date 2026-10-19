@@ -66,14 +66,14 @@ export default function PagamentiPage() {
         <Kpi label={t("Totale atteso")} value={eur(sumDue)} color="var(--txt)" />
         <Card className="!p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-dim">{t("Incassato")}</div>
-          <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(sumPaid)}</div>
+          <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(sumPaid)}</div>
           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: "var(--ok)" }} /></div>
           <div className="mt-0.5 text-[11px] text-faint">{pct}% {t("del totale")}</div>
         </Card>
         <Kpi label={t("In sospeso")} value={eur(sumBalance)} color="var(--warn)" />
         <button onClick={() => setFilter("overdue")} className="anim-in rounded-xl border p-4 text-left shadow-sm transition hover:shadow-md" style={{ borderColor: sumOverdue > 0 ? "var(--err)" : "var(--line)" }}>
           <div className="text-xs font-medium uppercase tracking-wide text-dim">{t("Scaduti")}</div>
-          <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color: sumOverdue > 0 ? "var(--err)" : "var(--txt)" }}>{eur(sumOverdue)}</div>
+          <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color: sumOverdue > 0 ? "var(--err)" : "var(--txt)" }}>{eur(sumOverdue)}</div>
           <div className="mt-0.5 text-[11px] text-faint">{t("saldo non incassato, ospite già partito")}</div>
         </button>
       </div>
@@ -84,14 +84,14 @@ export default function PagamentiPage() {
         <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
           <div className="flex items-center rounded-lg border border-line p-0.5">
             {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
+              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
             ))}
           </div>
           <span className="ml-auto text-xs text-faint">{rows.length} {t("prenotazioni")}</span>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
@@ -132,6 +132,31 @@ export default function PagamentiPage() {
           </tbody>
         </table>
       </div>
+      {/* Telefono: una scheda per prenotazione (la tabella sopra serve da tablet in su) */}
+      <div className="flex flex-col gap-2 md:hidden">
+        {rows.map(({ b, due, paid, balance, overdue, status }) => (
+          <div key={b.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <button onClick={() => openBooking(b.id)} className="block max-w-full truncate py-1 text-left font-semibold text-txt hover:text-focus">{guestName(b.guestId)}</button>
+                <div className="truncate text-xs text-dim">{getStructure(b.structureId)?.name} · {getUnit(b.unitId)?.name ?? t("Da assegnare")} · <span className={"font-mono " + (b.checkIn < todayISO ? "text-faint" : "")}>{fmt(b.checkIn)}</span></div>
+              </div>
+              {overdue ? (
+                <span className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>{t("Scaduto")}</span>
+              ) : (
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium" style={{ color: STATUS[status].color }}><span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS[status].color }} />{t(STATUS[status].label)}</span>
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+              <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Totale")}</div><div className="font-mono text-dim">{eur(due)}</div></div>
+              <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Saldo")}</div><div className={`font-mono font-semibold ${balance > 0 ? "text-[color:var(--err)]" : "text-[color:var(--ok)]"}`}>{eur(balance)}</div></div>
+              <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Incassato")}</div><PaidCell key={`m-${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} className="mt-0.5 w-full" /></div>
+            </div>
+            {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="mt-2 w-full rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Salda")}</button>}
+          </div>
+        ))}
+        {rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessun pagamento con questi filtri.")} /></div>}
+      </div>
       <p className="mt-3 text-xs text-faint">{t("Modifica l'importo incassato direttamente in tabella o usa «Salda» per registrare il pagamento completo. Gli incassi si riflettono nella scheda prenotazione e nella Cassa.")}</p>
     </div>
   );
@@ -139,7 +164,7 @@ export default function PagamentiPage() {
 
 // Importo incassato: tiene il testo digitato (virgola, centesimi) e salva UNA volta sola, all'uscita dal campo o con Invio.
 // Salvare a ogni tasto scriveva valori parziali (4, 45, 450), rifaceva il sync e mandava email «Pagamento ricevuto» intermedie.
-function PaidCell({ paid, due, onCommit }: { paid: number; due: number; onCommit: (v: number) => void }) {
+function PaidCell({ paid, due, onCommit, className = "w-24" }: { paid: number; due: number; onCommit: (v: number) => void; className?: string }) {
   const [draft, setDraft] = useState(() => formatDecimalIT(paid, 2));
   const commit = () => {
     const n = parseDecimalIT(draft);
@@ -158,7 +183,7 @@ function PaidCell({ paid, due, onCommit }: { paid: number; due: number; onCommit
       onChange={(e) => { if (NUM_TYPING_RE.test(e.target.value)) setDraft(e.target.value); }}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-      className="w-24 rounded-md border border-line bg-paper px-2 py-1 text-right font-mono text-sm text-txt outline-none focus:border-focus"
+      className={className + " rounded-md border border-line bg-paper px-2 py-1 max-md:py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus"}
     />
   );
 }
@@ -167,7 +192,7 @@ function Kpi({ label, value, color }: { label: string; value: string; color: str
   return (
     <div className="anim-in rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="text-xs font-medium uppercase tracking-wide text-dim">{label}</div>
-      <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color }}>{value}</div>
+      <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color }}>{value}</div>
     </div>
   );
 }

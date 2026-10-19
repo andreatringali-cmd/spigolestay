@@ -46,7 +46,7 @@ export function CameraLibera({ f, roomType, structure, showStructure, guestName,
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {weekMode && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Libera {f.freeNights} {f.freeNights === 1 ? "notte" : "notti"} su {f.totalNights}</span>}
           {departing && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 14%, transparent)" }} title={guestName(departing)}>Partenza il giorno stesso: da pulire</span>}
-          <button onClick={onNew} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-focus transition hover:border-focus hover:bg-wash">
+          <button onClick={onNew} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-focus transition hover:border-focus hover:bg-wash max-sm:min-h-10">
             + Nuova prenotazione{weekMode ? ` · ${dayShort(f.firstFree)}` : ""}
           </button>
         </div>

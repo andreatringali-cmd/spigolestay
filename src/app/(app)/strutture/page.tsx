@@ -70,13 +70,13 @@ export default function StrutturePage() {
             <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div>{s.orgId && orgInfo[s.orgId] && orgInfo[s.orgId].role !== "owner" && orgInfo[s.orgId].ownerEmail && <div className="truncate text-[11px] text-faint">{t("Proprietario")}: {orgInfo[s.orgId].ownerEmail}</div>}</div>
           </div>
         </td>
-        <td className="truncate px-3 py-2.5 text-dim">{s.city || <span className="text-faint">—</span>}</td>
-        <td className="truncate px-3 py-2.5 text-xs text-dim">{[s.address, s.streetNumber].filter(Boolean).join(" ") || <span className="text-faint">—</span>}</td>
-        <td className="px-3 py-2.5"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{s.type ?? "—"}</span></td>
-        <td className="truncate px-3 py-2.5 text-dim">{s.groupName}</td>
-        <td className="px-3 py-2.5 text-dim"><span className="text-txt">{nCamere}</span> <span className="text-faint">· {nTipologie} {t("tipol.")}</span></td>
-        <td className="px-3 py-2.5 text-dim">{posti}</td>
-        <td className="px-3 py-2.5">
+        <td className="truncate px-3 py-2.5 text-dim max-sm:hidden">{s.city || <span className="text-faint">—</span>}</td>
+        <td className="truncate px-3 py-2.5 text-xs text-dim max-sm:hidden">{[s.address, s.streetNumber].filter(Boolean).join(" ") || <span className="text-faint">—</span>}</td>
+        <td className="px-3 py-2.5 max-sm:hidden"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{s.type ?? "—"}</span></td>
+        <td className="truncate px-3 py-2.5 text-dim max-sm:hidden">{s.groupName}</td>
+        <td className="px-3 py-2.5 text-dim max-sm:hidden"><span className="text-txt">{nCamere}</span> <span className="text-faint">· {nTipologie} {t("tipol.")}</span></td>
+        <td className="px-3 py-2.5 text-dim max-sm:hidden">{posti}</td>
+        <td className="px-3 py-2.5 max-sm:hidden">
           {s.cin ? <span className="font-mono text-xs text-dim">{s.cin}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("mancante")}</span>}
         </td>
         <td className="px-3 py-2.5">
@@ -84,10 +84,10 @@ export default function StrutturePage() {
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.active === false ? "var(--faint)" : "var(--ok)" }} />{s.active === false ? t("Disattiva") : t("Attiva")}
           </span>
         </td>
-        <td className="px-3 py-2.5 text-center">
+        <td className="px-3 py-2.5 text-center max-sm:hidden">
           <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button title={t("Sposta su")} aria-label={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↑</button>
-            <button title={t("Sposta giù")} aria-label={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↓</button>
+            <button title={t("Sposta su")} aria-label={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10">↑</button>
+            <button title={t("Sposta giù")} aria-label={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10">↓</button>
           </span>
         </td>
         <td className="px-3 py-2.5 text-right text-faint">›</td>
@@ -108,32 +108,32 @@ export default function StrutturePage() {
       {/* Unica tabella: i due registri (proprietà / condivise) sono separati da righe-intestazione,
           così TUTTE le colonne restano perfettamente allineate tra i due gruppi. */}
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-        <table className="w-full min-w-[820px] table-fixed text-sm">
+        <table className="w-full min-w-[820px] table-fixed text-sm max-sm:min-w-0">
           <colgroup>
-            <col style={{ width: "19%" }} />{/* Struttura */}
-            <col style={{ width: "8%" }} />{/* Città */}
-            <col style={{ width: "11%" }} />{/* Indirizzo */}
-            <col style={{ width: "9%" }} />{/* Tipo */}
-            <col style={{ width: "11%" }} />{/* Gruppo */}
-            <col style={{ width: "9%" }} />{/* Camere */}
-            <col style={{ width: "8%" }} />{/* Posti letto */}
-            <col style={{ width: "9%" }} />{/* CIN */}
-            <col style={{ width: "7%" }} />{/* Stato */}
-            <col style={{ width: "7%" }} />{/* Ordina */}
-            <col style={{ width: "3%" }} />{/* apri (›) */}
+            <col className="w-[19%] max-sm:w-[54%]" />{/* Struttura */}
+            <col className="w-[8%] max-sm:hidden" />{/* Città */}
+            <col className="w-[11%] max-sm:hidden" />{/* Indirizzo */}
+            <col className="w-[9%] max-sm:hidden" />{/* Tipo */}
+            <col className="w-[11%] max-sm:hidden" />{/* Gruppo */}
+            <col className="w-[9%] max-sm:hidden" />{/* Camere */}
+            <col className="w-[8%] max-sm:hidden" />{/* Posti letto */}
+            <col className="w-[9%] max-sm:hidden" />{/* CIN */}
+            <col className="w-[7%] max-sm:w-[34%]" />{/* Stato */}
+            <col className="w-[7%] max-sm:hidden" />{/* Ordina */}
+            <col className="w-[3%] max-sm:w-[12%]" />{/* apri (›) */}
           </colgroup>
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
               <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Città")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Indirizzo")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Tipo")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Gruppo")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Camere")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Posti letto")}</th>
-              <th className="px-3 py-2 font-semibold">CIN</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Città")}</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Indirizzo")}</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Tipo")}</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Gruppo")}</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Camere")}</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Posti letto")}</th>
+              <th className="px-3 py-2 font-semibold max-sm:hidden">CIN</th>
               <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
-              <th className="px-3 py-2 text-center font-semibold">{t("Ordina")}</th>
+              <th className="px-3 py-2 text-center font-semibold max-sm:hidden">{t("Ordina")}</th>
               <th className="px-3 py-2 font-semibold"></th>
             </tr>
           </thead>

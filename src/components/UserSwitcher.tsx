@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useAccess } from "@/lib/access";
 import { PERM_TEMPLATES, initials } from "@/lib/users";
 import { playSound } from "@/lib/sound";
 import { useAuth } from "@/lib/authsync";
+import Popover from "./Popover";
 
 const roleLabel = (k: string) => (k === "custom" ? "Personalizzato" : PERM_TEMPLATES.find((t) => t.key === k)?.label ?? "—");
 
@@ -13,18 +14,17 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
   const { user } = useAccess();
   const { enabled: authEnabled, signOut, user: authUser } = useAuth();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
+  const btnRef = useRef<HTMLButtonElement>(null);
   if (!user) return null;
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} className={`flex items-center gap-2 rounded-lg border border-line hover:bg-wash ${sidebar ? `w-full ${collapsed ? "justify-center px-1.5 py-1.5" : "px-2 py-1.5"}` : "px-2 py-1"}`} title="Utente collegato">
+    <div className="relative">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className={`flex items-center gap-2 rounded-lg border border-line hover:bg-wash ${sidebar ? `w-full ${collapsed ? "justify-center px-1.5 py-1.5" : "px-2 py-1.5"}` : "px-2 py-1"}`} title="Utente collegato">
         <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: user.avatarColor }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
         {!(sidebar && collapsed) && <span className={`text-left leading-tight ${sidebar ? "block min-w-0 flex-1" : "hidden sm:block"}`}><span className="block truncate text-xs font-semibold text-txt">{user.firstName} {user.lastName}</span><span className="block text-[10px] text-faint">{roleLabel(user.templateKey)}</span></span>}
       </button>
-      {open && (
-        <div className={`absolute z-40 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl ${sidebar ? "bottom-full left-0 mb-1 w-64 max-w-[calc(100vw-2rem)]" : "right-0 top-full mt-1 w-64"}`}>
+      {/* Nella barra laterale (in basso) la tendina si apre sopra il pulsante da sola, se sotto non c'è spazio. */}
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align={sidebar ? "start" : "end"} width={256} label="Utente collegato">
           <div className="flex items-center gap-2 px-2 py-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: user.avatarColor }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
             <span className="min-w-0 flex-1">
@@ -41,8 +41,7 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
               </button>
             </div>
           )}
-        </div>
-      )}
+      </Popover>
     </div>
   );
 }

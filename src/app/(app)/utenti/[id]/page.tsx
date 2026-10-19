@@ -252,7 +252,7 @@ export default function UserSchedaPage() {
                 {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
                 <div className="mt-0.5 text-[11px] text-faint">{t("Clicca il tondino per caricare la foto. In alternativa scegli un colore:")}</div>
-                <div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 max-sm:h-9 max-sm:w-9 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -417,10 +417,10 @@ export default function UserSchedaPage() {
                   </div>
                   {/* Frecce */}
                   <div className="flex flex-col items-center justify-center gap-1.5">
-                    <button onClick={moveRight} disabled={pickA.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30" title={t("Sposta selezionate")}>›</button>
-                    <button onClick={moveAllRight} disabled={available.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30" title={t("Sposta tutte")}>»</button>
-                    <button onClick={moveLeft} disabled={pickS.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30" title={t("Rimuovi selezionate")}>‹</button>
-                    <button onClick={moveAllLeft} disabled={selected.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30" title={t("Rimuovi tutte")}>«</button>
+                    <button onClick={moveRight} disabled={pickA.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta selezionate")}>›</button>
+                    <button onClick={moveAllRight} disabled={available.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta tutte")}>»</button>
+                    <button onClick={moveLeft} disabled={pickS.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi selezionate")}>‹</button>
+                    <button onClick={moveAllLeft} disabled={selected.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi tutte")}>«</button>
                   </div>
                   {/* Selezionate */}
                   <div className="rounded-lg border border-line">
@@ -465,7 +465,7 @@ export default function UserSchedaPage() {
             <div className="flex flex-col gap-4">
               {PERM_GROUPS.map((group) => (
                 <div key={group}>
-                  <div className="mb-1.5 flex items-center justify-between">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-y-1">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t(group)}</div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[9px] font-semibold uppercase tracking-wide text-faint">{t("tutta la categoria")}</span>
@@ -474,7 +474,7 @@ export default function UserSchedaPage() {
                           const m = LEVEL_META[lv];
                           return (
                             <button key={lv} onClick={() => setAllGroup(group, lv)} title={`${t("Imposta tutta la categoria")}: ${t(m.label)}`}
-                              className="grid h-7 w-8 place-items-center border-l border-dashed border-line first:border-l-0 transition hover:bg-wash"
+                              className="grid h-7 w-8 place-items-center border-l border-dashed border-line first:border-l-0 transition hover:bg-wash max-sm:h-10 max-sm:w-10"
                               style={{ color: m.color }}>
                               {m.icon}
                             </button>
@@ -497,7 +497,7 @@ export default function UserSchedaPage() {
                               const m = LEVEL_META[lv];
                               return (
                                 <button key={lv} disabled={!allowed} onClick={() => setPerm(perm.key, lv)} title={allowed ? t(m.label) : t("Non disponibile")}
-                                  className={`grid h-7 w-8 place-items-center border-l border-line first:border-l-0 transition ${!allowed ? "cursor-not-allowed opacity-25" : active ? "text-white" : "text-faint hover:bg-wash"}`}
+                                  className={`grid h-7 w-8 place-items-center border-l border-line first:border-l-0 transition max-sm:h-10 max-sm:w-10 ${!allowed ? "cursor-not-allowed opacity-25" : active ? "text-white" : "text-faint hover:bg-wash"}`}
                                   style={active && allowed ? { backgroundColor: m.color } : undefined}>
                                   {m.icon}
                                 </button>
@@ -536,7 +536,7 @@ export default function UserSchedaPage() {
                         return (
                           <td key={c.key} className="px-1 py-1.5 text-center">
                             <button onClick={() => set("notify", { ...(u.notify ?? defaultNotify()), [key]: !on })} title={on ? t("Attivo") : t("Disattivo")}
-                              className="mx-auto grid h-6 w-6 place-items-center rounded-full transition"
+                              className="mx-auto grid h-6 w-6 place-items-center rounded-full transition max-sm:h-9 max-sm:w-9"
                               style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { backgroundColor: "var(--wash)", color: "var(--faint)" }}>
                               {on ? "✓" : ""}
                             </button>

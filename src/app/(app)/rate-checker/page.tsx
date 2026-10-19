@@ -152,8 +152,8 @@ export default function RateCheckerPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button onClick={() => setShowConfig((v) => !v)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash">{t("Competitor")}{competitors.length ? ` · ${competitors.length}` : ""}</button>
-            <button onClick={() => void refresh()} disabled={loading} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60">{loading ? t("Aggiorno…") : t("Aggiorna")}</button>
+            <button onClick={() => setShowConfig((v) => !v)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash max-sm:min-h-10">{t("Competitor")}{competitors.length ? ` · ${competitors.length}` : ""}</button>
+            <button onClick={() => void refresh()} disabled={loading} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60 max-sm:min-h-10">{loading ? t("Aggiorno…") : t("Aggiorna")}</button>
           </div>
         </div>
 
@@ -218,7 +218,7 @@ export default function RateCheckerPage() {
             </div>
             <p className="text-xs text-faint">{t("Il server invia al provider intervallo date, coordinate della struttura e la lista competitor qui sopra; la risposta viene normalizzata in media/min/max di mercato. Senza queste variabili non mostriamo dati finti.")}</p>
           </div>
-          <button onClick={() => setShowConfig(true)} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash">{t("Configura i competitor")}</button>
+          <button onClick={() => setShowConfig(true)} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash max-sm:min-h-10">{t("Configura i competitor")}</button>
         </Card>
       )}
 

@@ -3,8 +3,9 @@
 // Colonna principale (versione COMPATTA): le cose da fare, per ENTE (default) o per URGENZA. Ogni voce sta su una riga sola:
 // nome e stato a sinistra, scadenza come pillola piccola a destra, azione principale come bottone piccolo e le altre azioni nel menu «⋯».
 // Si mostrano le prime 3 per gruppo ("Mostra tutte"); i gruppi in regola si raccolgono in una sola riga espandibile.
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
+import Popover from "@/components/Popover";
 import { eur } from "@/lib/format";
 import { ENTE_META, ENTI, URGENCY_LABEL, nWord, type Ente, type Summary, type Task, type TaskAction, type Urgency } from "@/lib/adempimenti2";
 import { EmptyLine, IconTile, Pill, tint } from "../_ui";
@@ -59,25 +60,18 @@ export function Toolbar({ view, onView, filter, onFilter, summary, totalSoon }: 
 // ───────────── Menu «⋯» di una voce ─────────────
 function RowMenu({ items, onPick }: { items: TaskAction[]; onPick: (a: TaskAction) => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", down); document.addEventListener("keydown", key);
-    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("keydown", key); };
-  }, [open]);
+  const btnRef = useRef<HTMLButtonElement>(null); // ancora della tendina (Popover): chiusura fuori/Esc la gestisce lei
   if (!items.length) return <span className="w-1 shrink-0" aria-hidden />;
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Altre azioni" onClick={() => setOpen((o) => !o)} className="grid h-8 w-8 place-items-center rounded-lg text-base font-bold leading-none text-faint transition hover:bg-line hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">⋯</button>
-      {open && (
-        <div role="menu" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+    <div className="relative shrink-0">
+      <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Altre azioni" onClick={() => setOpen((o) => !o)} className="grid h-8 w-8 place-items-center rounded-lg text-base font-bold leading-none text-faint transition hover:bg-line hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">⋯</button>
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={200} label="Altre azioni">
+        <div role="menu">
           {items.map((a, i) => (
             <button key={i} type="button" role="menuitem" onClick={() => { setOpen(false); onPick(a); }} className="block w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-xs font-semibold text-txt transition hover:bg-wash">{a.label}</button>
           ))}
         </div>
-      )}
+      </Popover>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
 import Icon from "@/components/Icon";
+import Popover from "@/components/Popover";
 import { WhatsAppIcon, MailIcon, PdfIcon } from "@/components/BrandIcons";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
@@ -247,8 +248,10 @@ export default function PuliziePage() {
   const copyShop = async () => { try { await navigator.clipboard.writeText(buildShopText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
   const emailShop = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Lista della spesa"))}&body=${encodeURIComponent(buildShopText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const [shareOpen, setShareOpen] = useState(false);
-  const shareRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
+  // Pulsanti che ancorano le tendine (Popover): chiusura fuori/Esc la gestisce il Popover stesso.
+  const shareBtnRef = useRef<HTMLButtonElement>(null);
+  const planShareBtnRef = useRef<HTMLButtonElement>(null);
+  const rowMenuBtnRef = useRef<HTMLButtonElement>(null); // vale per la riga prodotto con menu aperto
   const toggleDone = (k: string) => {
     const next = { ...done };
     const wasDone = !!next[k];
@@ -416,15 +419,12 @@ export default function PuliziePage() {
         ))}
       </div>
       <div className="relative shrink-0" data-prodmenu>
-        <button onClick={() => setRowMenu(rowMenu === p.id ? null : p.id)} title={t("Altre azioni")} className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-wash hover:text-txt">⋯</button>
-        {rowMenu === p.id && (<>
-          <button className="fixed inset-0 z-30 cursor-default" aria-label="Chiudi" onClick={() => setRowMenu(null)} />
-          <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
-            <button onClick={() => { setStatusQuick(p, "ok"); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-[color:var(--ok)]"><Icon name="plus" size={15} /></span> {t("Riassortisci")}</button>
-            <button onClick={() => { setProdDraft({ id: p.id, name: p.name, structureId: p.structureId, supplier: p.supplier ?? "", qty: p.qty, min: p.min }); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-dim"><Icon name="settings" size={15} /></span> {t("Modifica")}</button>
-            <button onClick={() => { setConfirmDelProd(p); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-[color:var(--err)] hover:bg-wash"><Icon name="trash" size={15} /> {t("Elimina")}</button>
-          </div>
-        </>)}
+        <button ref={rowMenu === p.id ? rowMenuBtnRef : undefined} onClick={() => setRowMenu(rowMenu === p.id ? null : p.id)} title={t("Altre azioni")} className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-wash hover:text-txt">⋯</button>
+        <Popover open={rowMenu === p.id} anchorRef={rowMenuBtnRef} onClose={() => setRowMenu(null)} align="end" width={176} label={t("Altre azioni")}>
+          <button onClick={() => { setStatusQuick(p, "ok"); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-[color:var(--ok)]"><Icon name="plus" size={15} /></span> {t("Riassortisci")}</button>
+          <button onClick={() => { setProdDraft({ id: p.id, name: p.name, structureId: p.structureId, supplier: p.supplier ?? "", qty: p.qty, min: p.min }); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-dim"><Icon name="settings" size={15} /></span> {t("Modifica")}</button>
+          <button onClick={() => { setConfirmDelProd(p); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-[color:var(--err)] hover:bg-wash"><Icon name="trash" size={15} /> {t("Elimina")}</button>
+        </Popover>
       </div>
     </div>
   ); };
@@ -465,15 +465,13 @@ export default function PuliziePage() {
             <div className="order-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-2">
               <div className="ml-auto flex items-center gap-2">
                 <button disabled={empty} onClick={() => persistStock((cur) => cur.map((p) => (!p._deleted && scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2, updatedAt: Date.now() } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
-                <div ref={shareRef} className="relative">
-                  <button disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
-                  {shareOpen && (
-                    <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
-                      <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
-                      <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
-                      <button onClick={() => { copyShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
-                    </div>
-                  )}
+                <div className="relative">
+                  <button ref={shareBtnRef} disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+                  <Popover open={shareOpen} anchorRef={shareBtnRef} onClose={() => setShareOpen(false)} align="end" width={176} label={t("Condividi")}>
+                    <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
+                    <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
+                    <button onClick={() => { copyShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+                  </Popover>
                 </div>
               </div>
             </div>
@@ -626,7 +624,7 @@ export default function PuliziePage() {
         </>)}
         <div className="relative ml-auto flex items-center gap-2">
           {copied && <span className="text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
-          <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+          <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
           <button
             onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
             disabled={!autoShareStructure}
@@ -634,13 +632,10 @@ export default function PuliziePage() {
             title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
             className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           ><Icon name="clock" size={16} /></button>
-          {planShare && (<>
-            <button aria-label={t("Chiudi")} onClick={() => setPlanShare(false)} className="fixed inset-0 z-20 cursor-default" />
-            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
-              <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
-              <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
-            </div>
-          </>)}
+          <Popover open={planShare} anchorRef={planShareBtnRef} onClose={() => setPlanShare(false)} align="end" width={176} label={t("Condividi")}>
+            <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
+            <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+          </Popover>
         </div>
         </div>
       </div>

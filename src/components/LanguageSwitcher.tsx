@@ -1,24 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useLang, LANGS } from "@/lib/i18n";
 import Flag from "./Flag";
+import Popover from "./Popover";
 
 // Selettore lingua dell'interfaccia. L'italiano è la lingua di default.
 export default function LanguageSwitcher() {
   const { lang, setLang } = useLang();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const cur = LANGS.find((l) => l.code === lang) ?? LANGS[0];
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} title={`Lingua · ${cur.label}`} className="flex items-center rounded-lg border border-line px-2.5 py-2 hover:bg-wash">
+    <div className="relative">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} title={`Lingua · ${cur.label}`} className="flex items-center rounded-lg border border-line px-2.5 py-2 hover:bg-wash">
         <Flag code={cur.code} className="h-4 w-6" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={176} label="Lingua">
           <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Lingua</div>
           {LANGS.map((l) => (
             <button key={l.code} onClick={() => { setLang(l.code); setOpen(false); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-wash ${l.code === lang ? "bg-wash" : ""}`}>
@@ -27,8 +26,7 @@ export default function LanguageSwitcher() {
               {l.code === lang && <span className="text-focus">✓</span>}
             </button>
           ))}
-        </div>
-      )}
+      </Popover>
     </div>
   );
 }

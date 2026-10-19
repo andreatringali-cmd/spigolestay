@@ -227,7 +227,7 @@ export default function LoginPage() {
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
                   <div className="relative">
                     <input type={show ? "text" : "password"} required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
-                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-3 py-2 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16] sm:right-2 sm:px-2 sm:py-1">{show ? "Nascondi" : "Mostra"}</button>
                   </div>
                   <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri.</span>
                 </label>
@@ -252,7 +252,7 @@ export default function LoginPage() {
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nuova password</span>
                   <div className="relative">
                     <input type={show ? "text" : "password"} required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} autoFocus />
-                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-3 py-2 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16] sm:right-2 sm:px-2 sm:py-1">{show ? "Nascondi" : "Mostra"}</button>
                   </div>
                   <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri, meglio con lettere e numeri.</span>
                 </label>
@@ -285,7 +285,7 @@ export default function LoginPage() {
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
                   <div className="relative">
                     <input type={show ? "text" : "password"} required minLength={mode === "signup" ? 8 : 6} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
-                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-3 py-2 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16] sm:right-2 sm:px-2 sm:py-1">{show ? "Nascondi" : "Mostra"}</button>
                   </div>
                   {mode === "signup" && <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri, meglio con lettere e numeri.</span>}
                 </label>
@@ -343,8 +343,13 @@ export default function LoginPage() {
       </main>
       <footer className="relative mt-3 border-t border-[#eceae4] px-2 pt-2 text-[11px] text-[#9a9186]">
         {/* Mobile: sito + social sulla stessa riga */}
+        <div className="mb-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 sm:hidden">
+          <a href="/termini" className="py-1.5 hover:text-[#4a453d] hover:underline">Termini</a>
+          <a href="/privacy" className="py-1.5 hover:text-[#4a453d] hover:underline">Privacy</a>
+          <a href="/cookie" className="py-1.5 hover:text-[#4a453d] hover:underline">Cookie</a>
+        </div>
         <div className="flex items-center justify-between gap-2 sm:hidden">
-          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="py-2 hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
           <SocialIcons />
         </div>
 
@@ -380,7 +385,7 @@ function SocialIcons() {
         { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
         { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
       ].map((s) => (
-        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-6 w-6 place-items-center rounded-md border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
+        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-6 w-6 place-items-center rounded-md border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90 max-sm:h-9 max-sm:w-9">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
         </a>
       ))}

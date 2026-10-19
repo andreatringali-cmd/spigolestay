@@ -474,7 +474,7 @@ export default function AssistentePage() {
       {/* Domande rapide */}
       <div className="mt-3 flex max-w-3xl flex-wrap gap-1.5">
         {CHIPS.map((c) => (
-          <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{c.label}</button>
+          <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-dim transition max-sm:min-h-10 hover:border-focus hover:text-focus">{c.label}</button>
         ))}
       </div>
 

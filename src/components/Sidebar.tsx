@@ -54,7 +54,7 @@ export default function Sidebar({
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onCloseMobile} />}
       <aside
-        className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 flex w-64" : "hidden"} flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-dvh ${collapsed ? "md:w-[70px]" : "md:w-64"}`}
+        className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(16rem,85vw)] max-w-full" : "hidden"} flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-dvh ${collapsed ? "md:w-[70px]" : "md:w-64"}`}
       >
         {/* Header */}
         <div className="flex h-14 items-center gap-2.5 border-b border-line px-3">
@@ -113,7 +113,7 @@ export default function Sidebar({
                       key={n.href}
                       href={n.href}
                       onClick={onCloseMobile}
-                      className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${active ? "" : "hover:bg-wash"}`}
+                      className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-11 ${active ? "" : "hover:bg-wash"}`}
                       style={active ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 } : { color: "var(--txt)" }}
                     >
                       <span style={{ color: active ? color : "var(--dim)" }}><Icon name={n.icon} size={18} /></span>
@@ -131,7 +131,7 @@ export default function Sidebar({
                 <div key={group}>
                   <button
                     onClick={() => toggleGroup(group)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash"
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash max-md:min-h-11"
                     style={{ color: isOpen ? "var(--focus)" : "var(--dim)", backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
                     <span className="flex-1 text-left">{t(group)}</span>
@@ -148,7 +148,7 @@ export default function Sidebar({
                             key={n.href}
                             href={n.href}
                             onClick={onCloseMobile}
-                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
+                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-11 ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={
                               active
                                 ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 }

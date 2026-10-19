@@ -236,7 +236,7 @@ export default function ProposalsTab({ candidates, today, windowDays, setWindowD
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <span className="text-xs text-dim">Arrivi nei prossimi</span>
         {[7, 14, 30].map((d) => (
-          <button key={d} onClick={() => setWindowDays(d)} className={`rounded-full border px-2.5 py-1 text-xs transition ${windowDays === d ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{d} giorni</button>
+          <button key={d} onClick={() => setWindowDays(d)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${windowDays === d ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{d} giorni</button>
         ))}
         <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} /> mostra anche senza proposte</label>
       </div>
@@ -246,7 +246,7 @@ export default function ProposalsTab({ candidates, today, windowDays, setWindowD
       {catalogEmpty ? (
         <div className="rounded-xl border border-dashed border-line bg-surface">
           <EmptyState title="Nessun extra pronto da proporre" sub="Aggiungi nel catalogo gli extra con i TUOI prezzi (e conferma quelli di esempio): le proposte compariranno qui in automatico." />
-          <div className="pb-5 text-center"><button onClick={goCatalog} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white" style={{ backgroundColor: "var(--focus)" }}>Vai al catalogo</button></div>
+          <div className="pb-5 text-center"><button onClick={goCatalog} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white max-sm:min-h-10" style={{ backgroundColor: "var(--focus)" }}>Vai al catalogo</button></div>
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-surface"><EmptyState title={candidates.length === 0 ? `Nessun arrivo o ospite in casa nei prossimi ${windowDays} giorni` : "Nessuna prenotazione con proposte"} sub={candidates.length === 0 ? "Quando ci saranno prenotazioni confermate in arrivo, le proposte appariranno qui." : `${hiddenCount} prenotazioni non hanno extra proponibili (già venduti, fuori stagione, camera non libera…). Attiva "mostra anche senza proposte" per vedere il perché.`} /></div>

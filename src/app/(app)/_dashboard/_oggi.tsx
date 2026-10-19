@@ -34,7 +34,7 @@ function Row({ r, onOpen }: { r: MoveRow; onOpen: (id: string) => void }) {
         type="button" onClick={() => onOpen(r.id)}
         className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]"
       >
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-sm font-bold" style={{ background: tileBg, color: r.turnover ? "var(--txt)" : color }} title={r.turnover ? "Turnover: partenza e arrivo nella stessa camera" : undefined}>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-sm font-bold max-sm:w-[3.75rem] max-sm:text-xs" style={{ background: tileBg, color: r.turnover ? "var(--txt)" : color }} title={r.turnover ? "Turnover: partenza e arrivo nella stessa camera" : undefined}>
           <span className="max-w-full truncate px-0.5">{r.room ?? "—"}</span>
         </span>
         <span className="min-w-0 flex-1">
@@ -72,7 +72,7 @@ function Colonna({ k, list, onOpen, delay }: { k: "arr" | "dep" | "stay"; list: 
         <>
           <ul>{shown.map((r) => <Row key={r.id} r={r} onOpen={onOpen} />)}</ul>
           {hidden && (
-            <button type="button" onClick={() => setAll(true)} className="ml-2 mt-1 rounded-lg px-2 py-1 text-xs font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">
+            <button type="button" onClick={() => setAll(true)} className="ml-2 mt-1 rounded-lg px-2 py-1 text-xs max-sm:min-h-10 max-sm:px-3 font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">
               Mostra tutti ({list.length})
             </button>
           )}

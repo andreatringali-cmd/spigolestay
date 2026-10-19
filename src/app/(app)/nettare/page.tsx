@@ -250,7 +250,7 @@ export default function NettarePage() {
           {market.hasZoneData && pulseHasDemo(pulse) && (
             <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
           )}
-          {city && <Link href="/mercato" className="font-medium" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
+          {city && <Link href="/mercato" className="inline-block font-medium max-sm:py-2.5" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
         </div>
       </div>
 
@@ -301,7 +301,7 @@ export default function NettarePage() {
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           <Chip on={scope === "general"} onClick={() => setScope("general")}>{t("Strategia generale")}</Chip>
           {strat.periods.map((p) => <Chip key={p.id} on={scope === p.id} onClick={() => setScope(p.id)}>{p.name}<span className="ml-1.5 font-normal opacity-70">{fmtShort(p.from)}–{fmtShort(p.to)}</span></Chip>)}
-          <button onClick={addPeriod} className="rounded-full border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-dim hover:text-txt">+ {t("Nuovo periodo")}</button>
+          <button onClick={addPeriod} className="rounded-full border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-dim hover:text-txt max-sm:min-h-10">+ {t("Nuovo periodo")}</button>
         </div>
 
         {period && (
@@ -384,9 +384,9 @@ export default function NettarePage() {
             <p className="mt-0.5 text-xs text-dim">{t("Passa sopra una cella per vedere il perché del prezzo, cliccala per modificarla.")}</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setStart((s) => (shiftISO(s, -GRID_DAYS) < today ? today : shiftISO(s, -GRID_DAYS)))} disabled={start <= today} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim disabled:opacity-40" style={{ background: "var(--surface)" }} aria-label={t("30 giorni prima")}>‹</button>
-            <button onClick={() => setStart(today)} className="h-8 rounded-lg border border-line px-3 text-xs font-semibold text-txt" style={{ background: "var(--surface)" }}>{t("Oggi")}</button>
-            <button onClick={() => setStart((s) => shiftISO(s, GRID_DAYS))} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim" style={{ background: "var(--surface)" }} aria-label={t("30 giorni dopo")}>›</button>
+            <button onClick={() => setStart((s) => (shiftISO(s, -GRID_DAYS) < today ? today : shiftISO(s, -GRID_DAYS)))} disabled={start <= today} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim max-sm:h-10 max-sm:w-10 disabled:opacity-40" style={{ background: "var(--surface)" }} aria-label={t("30 giorni prima")}>‹</button>
+            <button onClick={() => setStart(today)} className="h-8 rounded-lg border border-line px-3 text-xs font-semibold text-txt max-sm:h-10" style={{ background: "var(--surface)" }}>{t("Oggi")}</button>
+            <button onClick={() => setStart((s) => shiftISO(s, GRID_DAYS))} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim max-sm:h-10 max-sm:w-10" style={{ background: "var(--surface)" }} aria-label={t("30 giorni dopo")}>›</button>
             <DateField value={start} min={today} onChange={(v) => v && setStart(v < today ? today : v)} className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-txt" />
           </div>
         </div>
@@ -653,7 +653,7 @@ function Card({ title, desc, open, onToggle, children }: { title: string; desc: 
 }
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
-  return <button onClick={onClick} className="rounded-full border px-3 py-1.5 text-xs font-semibold transition" style={{ borderColor: on ? "var(--focus)" : "var(--line)", background: on ? "var(--focus)" : "var(--surface)", color: on ? "#fff" : "var(--txt)" }}>{children}</button>;
+  return <button onClick={onClick} className="rounded-full border px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10" style={{ borderColor: on ? "var(--focus)" : "var(--line)", background: on ? "var(--focus)" : "var(--surface)", color: on ? "#fff" : "var(--txt)" }}>{children}</button>;
 }
 
 function GoalBtn({ on, onClick, label, desc }: { on: boolean; onClick: () => void; label: string; desc: string }) {
@@ -665,7 +665,7 @@ function GoalBtn({ on, onClick, label, desc }: { on: boolean; onClick: () => voi
 }
 
 function Seg({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
-  return <button onClick={onClick} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition" style={{ background: on ? "var(--focus)" : "transparent", color: on ? "#fff" : "var(--dim)" }}>{children}</button>;
+  return <button onClick={onClick} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10" style={{ background: on ? "var(--focus)" : "transparent", color: on ? "#fff" : "var(--dim)" }}>{children}</button>;
 }
 
 function Tgl({ on, onClick, label, hint }: { on: boolean; onClick: () => void; label: string; hint: string }) {
@@ -725,7 +725,7 @@ function PriceChart({ dates, series, periods, t }: { dates: string[]; series: Se
     <div className="mt-3">
       <div className="mb-2 flex flex-wrap gap-2">
         {series.map((s) => (
-          <button key={s.key} onClick={() => setHidden((h) => ({ ...h, [s.key]: !h[s.key] }))} aria-pressed={!hidden[s.key]} className="flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-txt transition" style={{ opacity: hidden[s.key] ? 0.45 : 1, background: "var(--surface)" }}>
+          <button key={s.key} onClick={() => setHidden((h) => ({ ...h, [s.key]: !h[s.key] }))} aria-pressed={!hidden[s.key]} className="flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-txt transition max-sm:min-h-10" style={{ opacity: hidden[s.key] ? 0.45 : 1, background: "var(--surface)" }}>
             <svg width="18" height="6" aria-hidden><line x1="1" y1="3" x2="17" y2="3" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash} strokeLinecap="round" /></svg>{s.label}
           </button>
         ))}

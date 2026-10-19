@@ -438,9 +438,9 @@ export default function BookingDrawer() {
 
   const contactIcons = (
     <div className="flex shrink-0 gap-1.5">
-      <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
-      <a href={safeTelHref(guest?.phone)} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
-      <a href={safeMailtoHref(guest?.email) ?? "mailto:"} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
+      <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white max-sm:h-10 max-sm:w-10 ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
+      <a href={safeTelHref(guest?.phone)} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white max-sm:h-10 max-sm:w-10 ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
+      <a href={safeMailtoHref(guest?.email) ?? "mailto:"} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
     </div>
   );
 
@@ -482,12 +482,12 @@ export default function BookingDrawer() {
         </div>
         {!noPrice && (commV > 0 || payFeeV > 0 || adjV > 0 || dedV > 0 || accelV > 0) && (
           <div className="mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5 text-sm text-dim">
-            {commV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Commissione OTA")}{commissionIsEstimate(booking) ? ` (${t("stima")})` : ""}{payFeeV <= 0 && adjV <= 0 ? ` · ${String(commPctStayV).replace(".", ",")}%` : ""}</span><span className="font-mono tabular-nums">−{eur(commV)}</span></div>}
-            {payFeeV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Costo d'incasso")}</span><span className="font-mono tabular-nums">−{eur(payFeeV)}</span></div>}
-            {adjV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Sconti OTA (carta virtuale)")}</span><span className="font-mono tabular-nums">−{eur(adjV)}</span></div>}
-            {accelV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Acceleratore")}</span><span className="font-mono tabular-nums">−{eur(accelV)}</span></div>}
-            {dedV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{netPayV ? t("Commissione OTA") : t("Trattenute dichiarate dall'OTA")}</span><span className="font-mono tabular-nums">−{eur(dedV)}</span></div>}
-            {commTotV > 0 && (payFeeV > 0 || adjV > 0) && <div className="flex items-baseline justify-between gap-4 text-[11px]"><span>{t("Totale costi")} ({String(commPctStayV).replace(".", ",")}%)</span><span className="font-mono tabular-nums">−{eur(commTotV)}</span></div>}
+            {commV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Commissione OTA")}{commissionIsEstimate(booking) ? ` (${t("stima")})` : ""}{payFeeV <= 0 && adjV <= 0 ? ` · ${String(commPctStayV).replace(".", ",")}%` : ""}</span><span className="whitespace-nowrap font-mono tabular-nums">−{eur(commV)}</span></div>}
+            {payFeeV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Costo d'incasso")}</span><span className="whitespace-nowrap font-mono tabular-nums">−{eur(payFeeV)}</span></div>}
+            {adjV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Sconti OTA (carta virtuale)")}</span><span className="whitespace-nowrap font-mono tabular-nums">−{eur(adjV)}</span></div>}
+            {accelV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{t("Acceleratore")}</span><span className="whitespace-nowrap font-mono tabular-nums">−{eur(accelV)}</span></div>}
+            {dedV > 0 && <div className="flex items-baseline justify-between gap-4"><span>{netPayV ? t("Commissione OTA") : t("Trattenute dichiarate dall'OTA")}</span><span className="whitespace-nowrap font-mono tabular-nums">−{eur(dedV)}</span></div>}
+            {commTotV > 0 && (payFeeV > 0 || adjV > 0) && <div className="flex items-baseline justify-between gap-4 text-[11px]"><span>{t("Totale costi")} ({String(commPctStayV).replace(".", ",")}%)</span><span className="whitespace-nowrap font-mono tabular-nums">−{eur(commTotV)}</span></div>}
           </div>
         )}
         {!noPrice && (
@@ -498,7 +498,7 @@ export default function BookingDrawer() {
         )}
         {!noPrice && extrasV > 0 && (
           <>
-            <div className="mt-1 flex items-baseline justify-between gap-4 text-sm text-dim"><span>{t("Extra e altre voci")}</span><span className="font-mono tabular-nums">+{eur(extrasV)}</span></div>
+            <div className="mt-1 flex items-baseline justify-between gap-4 text-sm text-dim"><span>{t("Extra e altre voci")}</span><span className="whitespace-nowrap font-mono tabular-nums">+{eur(extrasV)}</span></div>
             <div className="mt-1.5 flex items-baseline justify-between gap-4 border-t border-line pt-1.5">
               <span className="text-sm font-semibold text-txt">{t("Incasso netto per te")}</span>
               <span className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(roundCents(nettoStayV + extrasV))}</span>
@@ -1103,9 +1103,9 @@ export default function BookingDrawer() {
         <div className="h-1 w-full shrink-0" style={{ background: `var(${ch.cssVar})` }} />
         {/* Titolo del pannello */}
         <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-          <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+          <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10">✕</button>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-txt">{t("Prenotazione")} {booking.code && booking.channel !== "direct" && booking.channel !== "blocked" ? channexCodeOf(booking.channel, bookingCode(booking)) : bookingCode(booking)}</h1>
-          <button onClick={printSheet} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("Stampa")}</button>
+          <button onClick={printSheet} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:min-h-10">{t("Stampa")}</button>
         </div>
         {/* Schede */}
         <div ref={tabsRef} role="tablist" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-3 [scrollbar-width:none]">
@@ -1178,16 +1178,16 @@ export default function BookingDrawer() {
 
         {/* Barra azioni (solo nella scheda Gestione) */}
         {tab === "manage" && (mode === "edit" ? (
-          <div className="flex items-center gap-3 border-t border-line bg-surface px-5 py-3">
-            <button onClick={() => { loadForm(); setMode("view"); }} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} className="ml-auto rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva modifiche")}</button>
+          <div className="flex items-center gap-3 border-t border-line bg-surface px-5 py-3 max-sm:px-3">
+            <button onClick={() => { loadForm(); setMode("view"); }} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
+            <button onClick={save} className="ml-auto rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-11">{t("Salva modifiche")}</button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 border-t border-line bg-surface px-5 py-3 text-xs text-dim">
+          <div className="flex items-center gap-2 border-t border-line bg-surface px-5 py-3 text-xs text-dim max-sm:px-3">
             {saved && <span className="font-medium text-[color:var(--ok)]">{t("Salvato ✓")}</span>}
-            <button onClick={() => setExpanded((v) => !v)} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-focus hover:bg-wash">{expanded ? `← ${t("Anteprima")}` : `${t("Dettagli")} →`}</button>
-            <button onClick={closeBooking} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash">{t("Chiudi")}</button>
-            <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Modifica")}</button>
+            <button onClick={() => setExpanded((v) => !v)} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-focus hover:bg-wash max-sm:min-h-11">{expanded ? `← ${t("Anteprima")}` : `${t("Dettagli")} →`}</button>
+            <button onClick={closeBooking} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Chiudi")}</button>
+            <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-11">{t("Modifica")}</button>
           </div>
         ))}
       </div>
@@ -1200,7 +1200,7 @@ function ContactBtn({ href, label, color, missingTitle }: { href?: string; label
     <span className="flex-1 cursor-not-allowed rounded-lg border border-line bg-paper py-2 text-center text-xs font-semibold text-faint" title={missingTitle}>{label}</span>
   );
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: color }}>{label}</a>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white transition hover:opacity-90 max-sm:py-3" style={{ backgroundColor: color }}>{label}</a>
   );
 }
 
@@ -1226,7 +1226,7 @@ function Row({ label, value, mono, strong, icon }: { label: string; value: strin
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="text-sm text-dim">{label}</span>
-      <span className={`${icon ? "flex items-center justify-end gap-1.5" : ""} text-right text-sm ${mono ? "font-mono tabular-nums" : ""} ${strong ? "font-bold text-txt" : "text-txt"}`}>{icon}{value}</span>
+      <span className={`${icon ? "flex items-center justify-end gap-1.5" : ""} text-right text-sm ${mono ? "whitespace-nowrap font-mono tabular-nums" : ""} ${strong ? "font-bold text-txt" : "text-txt"}`}>{icon}{value}</span>
     </div>
   );
 }

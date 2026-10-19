@@ -111,10 +111,10 @@ export default function TariffeDerivatePage() {
           </select>
         )}
         <div className="inline-flex overflow-hidden rounded-lg border border-line">
-          <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+          <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}
           </button>
-          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "table" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "table" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
           </button>
         </div>
@@ -126,7 +126,7 @@ export default function TariffeDerivatePage() {
         <button
           onClick={() => setDerivModal({ structureIds: scoped.map((s) => s.id) })}
           disabled={!scoped.some((s) => roomTypes.some((rt) => rt.structureId === s.id && !rt.deriveFrom))}
-          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-10 disabled:opacity-40"
         >＋ {t("Crea tariffa derivata")}</button>
       </div>
 
@@ -214,7 +214,7 @@ export default function TariffeDerivatePage() {
                                   : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center justify-end gap-1.5">
-                                    <button onClick={(e) => { e.stopPropagation(); setDerivModal({ structureIds: [s.id], parentId: rt.id }); }} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">＋ {t("Derivata")}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setDerivModal({ structureIds: [s.id], parentId: rt.id }); }} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash max-sm:py-2.5">＋ {t("Derivata")}</button>
                                   </div>
                                 </td>
                               </tr>
@@ -305,13 +305,13 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
               {!derived && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
             </div>
           </div>
-          <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs">
-            <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline">＋ {t("Derivata")}</button>
+          <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs max-sm:py-0">
+            <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline max-sm:py-3">＋ {t("Derivata")}</button>
             {derived && rt.personPlan && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={t("Inviata ai portali come prezzo per 1 ospite")}>✓ 👤1 {t("portali")}</span>}
             {derived ? (
-              <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
+              <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline max-sm:py-3">{t("Modifica")}</button>
             ) : (
-              <button onClick={() => onOpenType(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
+              <button onClick={() => onOpenType(rt.id)} className="font-medium text-dim hover:underline max-sm:py-3">{t("Modifica")}</button>
             )}
           </div>
         </div>
@@ -460,8 +460,8 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
           <div className="mt-3">
             <span className={lbl}>{t("Piano tariffario")}</span>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <button type="button" onClick={() => setRatePlan("")} className={`rounded-full border px-2.5 py-1 text-xs transition ${!ratePlan ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Nessuno")}</button>
-              {planNames.map((p) => { const on = ratePlan === p; return <button key={p} type="button" onClick={() => setRatePlan(p)} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(p)}</button>; })}
+              <button type="button" onClick={() => setRatePlan("")} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${!ratePlan ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Nessuno")}</button>
+              {planNames.map((p) => { const on = ratePlan === p; return <button key={p} type="button" onClick={() => setRatePlan(p)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(p)}</button>; })}
             </div>
             <p className="mt-1 text-[11px] text-faint">{t("Gestisci i piani dalla pagina Tariffe.")}</p>
           </div>

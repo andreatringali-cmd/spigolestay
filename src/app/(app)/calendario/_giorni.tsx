@@ -30,7 +30,7 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
   onToday: () => void;
 }) {
   const atToday = days[0]?.iso === today && (mode === "week" || sel === today);
-  const nav = "grid h-8 w-8 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
+  const nav = "grid h-8 w-8 max-sm:h-10 max-sm:w-10 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
   return (
     <div className="rounded-2xl border border-line p-3 shadow-sm sm:p-4" style={{ background: "color-mix(in srgb, var(--wash) 70%, var(--surface))" }}>
       <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
@@ -38,7 +38,7 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
           <button onClick={() => onShift(-1)} className={nav} aria-label="7 giorni indietro" title="7 giorni indietro">‹</button>
           <button onClick={() => onShift(1)} className={nav} aria-label="7 giorni avanti" title="7 giorni avanti">›</button>
         </div>
-        <button onClick={onToday} disabled={atToday} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:text-focus disabled:opacity-50">Oggi</button>
+        <button onClick={onToday} disabled={atToday} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:text-focus disabled:opacity-50 max-sm:min-h-10">Oggi</button>
         <div className="min-w-0 flex-1 truncate font-display text-base font-bold capitalize text-txt sm:text-lg">{rangeLabel}</div>
       </div>
 
@@ -78,18 +78,19 @@ function DayBody({ stats }: { stats: DayStats }) {
   const occ = total > 0 ? Math.round(((total - free) / total) * 100) : 0;
   const barCol = free === 0 ? "var(--ok)" : "var(--focus)";
   return (<>
-    <span className="mt-1 grid grid-cols-2 gap-1">
+    <span className="mt-1 grid grid-cols-2 gap-1 max-xl:grid-cols-1">
       {([["arr", stats.arrivals, "arrivi"], ["dep", stats.departures, "partenze"]] as const).map(([k, n, lab]) => (
-        <span key={k} className="rounded-lg py-1" style={{ background: tint(C[k]) }} title={`${n} ${lab}`}>
-          <span className="block font-mono text-lg font-bold leading-none tabular-nums" style={{ color: C[k] }}>{n}</span>
-          <span className="block text-[11px]" style={{ color: C[k] }}>{lab}</span>
+        <span key={k} className="rounded-lg py-1 max-xl:flex max-xl:items-center max-xl:justify-center max-xl:gap-0.5 max-xl:py-1.5" style={{ background: tint(C[k]) }} title={`${n} ${lab}`}>
+          <span className="hidden max-xl:inline-flex" style={{ color: C[k] }}><KindIcon k={k} /></span>
+          <span className="block font-mono text-lg font-bold leading-none tabular-nums max-xl:text-base" style={{ color: C[k] }}>{n}</span>
+          <span className="block text-[11px] max-xl:hidden" style={{ color: C[k] }}>{lab}</span>
         </span>))}
     </span>
-    <span className="mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[12px] font-semibold tabular-nums" style={{ color: C.stay, background: tint(C.stay) }}><KindIcon k="stay" />{stats.stay} in casa</span>
-    {stats.closed > 0 && <span className="mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[11px] font-semibold text-dim" style={{ background: tint("var(--faint)", 22) }} title={`${stats.closed} ${stats.closed === 1 ? "camera chiusa o fuori servizio" : "camere chiuse o fuori servizio"}`}>{stats.closed} {stats.closed === 1 ? "chiusa" : "chiuse"}</span>}
+    <span className="mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[12px] font-semibold tabular-nums" style={{ color: C.stay, background: tint(C.stay) }}><KindIcon k="stay" />{stats.stay}<span className="max-xl:hidden"> in casa</span></span>
+    {stats.closed > 0 && <span className="mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[11px] font-semibold text-dim" style={{ background: tint("var(--faint)", 22) }} title={`${stats.closed} ${stats.closed === 1 ? "camera chiusa o fuori servizio" : "camere chiuse o fuori servizio"}`}>{stats.closed}<span className="xl:hidden">ch.</span><span className="max-xl:hidden"> {stats.closed === 1 ? "chiusa" : "chiuse"}</span></span>}
     <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-wash" title={`Camere occupate nella notte: ${total - free} su ${total} (${occ}%)`}><span className="block h-full rounded-full" style={{ width: `${occ}%`, background: barCol }} /></span>
-    <span className="mt-1.5 flex items-center justify-between text-[11px] text-faint">
-      <span style={free === 0 ? { color: "var(--err)", fontWeight: 600 } : undefined}>{free === 0 ? "0 libere" : `${free} ${free === 1 ? "libera" : "libere"}`}</span>
+    <span className="mt-1.5 flex items-center justify-between text-[11px] text-faint max-xl:flex-col max-xl:gap-0.5 max-xl:text-[10px]">
+      <span className="whitespace-nowrap" style={free === 0 ? { color: "var(--err)", fontWeight: 600 } : undefined}>{free === 0 ? "0 libere" : `${free} ${free === 1 ? "libera" : "libere"}`}</span>
       <span className="inline-flex items-center gap-0.5" title={`Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}><KindIcon k="clean" /><b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b></span>
     </span>
   </>);

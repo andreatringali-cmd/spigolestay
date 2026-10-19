@@ -234,7 +234,7 @@ export default function OspitiPage() {
         {/* Telefono: schede */}
         <div className="md:hidden">
           <div className="mb-2 flex items-center px-1 text-sm font-bold uppercase tracking-wide text-txt">
-            <button onClick={onToggle} className="flex items-center gap-1.5 hover:text-focus">
+            <button onClick={onToggle} className="flex items-center gap-1.5 py-2.5 hover:text-focus">
               <span className="text-[10px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
             </button>
             {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
@@ -242,7 +242,7 @@ export default function OspitiPage() {
           {open && <div className="flex flex-col gap-2">
             {shown.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
               <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
-                <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
+                <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="h-5 w-5 shrink-0" />
                 <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
                   <div className="flex items-center justify-between gap-2">
                     {nameCell(guest)}
@@ -360,10 +360,10 @@ export default function OspitiPage() {
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-3">
           <div className="flex items-center gap-1.5 max-sm:-mx-1 max-sm:w-full max-sm:overflow-x-auto max-sm:px-1 max-sm:pb-1 sm:contents [&>button]:shrink-0 [&>button]:whitespace-nowrap">
           {SEGMENTS.map(([k, lab]) => (
-            <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
+            <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition max-sm:py-2 ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
           ))}
           {seg !== "all" && guestSorted.length > 0 && (
-            <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
+            <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:py-2">{t("Seleziona segmento")} ({guestSorted.length})</button>
           )}
           </div>
           <div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
@@ -390,9 +390,9 @@ export default function OspitiPage() {
 
       {mergeOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
-          <button aria-label="Chiudi" onClick={() => setMergeOpen(false)} className="absolute inset-0 bg-black/40" />
+          <button aria-label="Chiudi" onClick={() => setMergeOpen(false)} className="fixed inset-0 bg-black/40" />
           <div className="relative w-full max-w-2xl rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Unisci i doppioni")}</span><button onClick={() => setMergeOpen(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Unisci i doppioni")}</span><button onClick={() => setMergeOpen(false)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
             <div className="mb-3 text-xs text-dim">{t("Per ogni gruppo resta la scheda con più prenotazioni: le prenotazioni delle altre le passano e i campi mancanti vengono completati (tag in unione, VIP e consenso marketing se presenti in una delle schede, note accodate). L'unione non si può annullare: togli la spunta ai gruppi che non sono la stessa persona.")}</div>
             <div className="flex flex-col gap-3">
               {mergePlans.map((p) => {
@@ -429,10 +429,10 @@ export default function OspitiPage() {
       )}
 
       {exportPick && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setExportPick(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Esporta ospiti in Excel")}</span><button onClick={() => setExportPick(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
+          <button aria-label="Chiudi" onClick={() => setExportPick(false)} className="fixed inset-0 bg-black/40" />
+          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Esporta ospiti in Excel")}</span><button onClick={() => setExportPick(false)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
             <div className="mb-3 text-xs text-dim">{guestSorted.length} {t("ospiti nel segmento corrente")} · {t("scegli le colonne")}</div>
             <div className="mb-4 grid grid-cols-2 gap-2">
               {EXPORT_COLUMNS.map((c) => (
@@ -454,10 +454,10 @@ export default function OspitiPage() {
       )}
 
       {pickPromo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setPickPromo(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Scegli la promo da inviare")}</span><button onClick={() => setPickPromo(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
+          <button aria-label="Chiudi" onClick={() => setPickPromo(false)} className="fixed inset-0 bg-black/40" />
+          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Scegli la promo da inviare")}</span><button onClick={() => setPickPromo(false)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim max-sm:px-3 max-sm:py-2.5 hover:bg-wash">✕</button></div>
             <div className="mb-3 text-xs text-dim">{selEmails.length} {t("destinatari con email")}</div>
             {promos.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>

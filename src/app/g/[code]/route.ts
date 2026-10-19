@@ -41,7 +41,7 @@ function invalidLink(req: Request): Response {
   const m = INVALID[lang];
   const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>${esc(m.t)}</title></head>
-<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#f6f4ef;color:#2b2b2b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:center">
+<body style="margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#f6f4ef;color:#2b2b2b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:center">
 <div style="max-width:340px"><div style="font-size:42px;line-height:1;margin-bottom:14px" aria-hidden="true">&#128279;</div><h1 style="font-size:20px;margin:0 0 10px">${esc(m.t)}</h1><p style="font-size:15px;line-height:1.5;margin:0;color:#555">${esc(m.p)}</p></div></body></html>`;
   return new Response(html, { status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" } });
 }

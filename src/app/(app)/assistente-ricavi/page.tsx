@@ -125,7 +125,7 @@ export default function AssistenteRicaviPage() {
           <button
             onClick={addEvent}
             disabled={!newEvName.trim() || !newEvDate}
-            className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10"
           >
             Aggiungi
           </button>
@@ -149,7 +149,7 @@ export default function AssistenteRicaviPage() {
       <div className="mb-2 flex items-center justify-between">
         <SectionTitle>Prezzi consigliati</SectionTitle>
         <div className="flex items-center gap-1 rounded-lg border border-line p-0.5">
-          {[14, 30, 60].map((h) => (<button key={h} onClick={() => setHorizon(h)} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${horizon === h ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{h} gg</button>))}
+          {[14, 30, 60].map((h) => (<button key={h} onClick={() => setHorizon(h)} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${horizon === h ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{h} gg</button>))}
         </div>
       </div>
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
@@ -168,7 +168,7 @@ export default function AssistenteRicaviPage() {
                   <td className="px-3 py-2 text-right font-mono text-dim">{eur(d.current)}</td>
                   <td className="px-3 py-2 text-right font-mono font-bold" style={{ color: up ? "var(--ok)" : down ? "var(--err)" : "var(--txt)" }}>{eur(d.rate)} {d.delta !== 0 && <span className="text-[10px]">({up ? "+" : ""}{d.delta})</span>}</td>
                   <td className="border-l border-line px-3 py-2"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => { const col = REASON_COLOR[r.kind]; return <span key={i} className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${col} 16%, transparent)`, color: col }}>{r.text}</span>; })}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
-                  <td className="px-3 py-2 text-right">{d.delta !== 0 ? <button onClick={() => applyOne(d)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">Applica</button> : null}</td>
+                  <td className="px-3 py-2 text-right">{d.delta !== 0 ? <button onClick={() => applyOne(d)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash max-sm:min-h-10">Applica</button> : null}</td>
                 </tr>
               );
             })}

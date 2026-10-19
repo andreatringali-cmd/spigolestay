@@ -58,7 +58,7 @@ function StepCard({ n, tone, label, count, badge, action, onAction, children }: 
           </div>
         </div>
         {children ? <div className="mt-3 flex-1 space-y-1.5">{children}</div> : <div className="flex-1" />}
-        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
+        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 max-sm:py-3 max-sm:text-sm text-xs font-semibold text-white transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
       </div>
     </article>
   );
@@ -142,9 +142,9 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
         <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70" style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "#25D366" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
-        {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
-        <button onClick={compila} className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
+        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className="rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70" style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "#25D366" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
+        {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
+        <button onClick={compila} className="rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
       </div>
     </div>
   );
@@ -428,7 +428,7 @@ export default function AdempimentiPage() {
           </>
         )}
         {/* Azione "in un click": elabora TUTTI gli adempimenti PA dovuti (schedine, ISTAT, tassa) in sequenza. */}
-        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
+        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 max-sm:w-full max-sm:justify-center max-sm:py-3 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
           <span aria-hidden>⚡</span>{runBusy ? "Elaboro…" : "Elabora tutto"}
         </button>
       </section>

@@ -5,6 +5,7 @@ import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
+import Popover from "./Popover";
 
 // Utenti online REALI: presenza Supabase Realtime su un canale per ogni struttura condivisa (org)
 // di cui sei membro. Così vedi quando il tuo socio è collegato e ricevi un avviso quando entra.
@@ -20,16 +21,10 @@ export default function OnlineUsers() {
   const [open, setOpen] = useState(false);
   const [peers, setPeers] = useState<Peer[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const known = useRef<Set<string>>(new Set());
   const ready = useRef(false);
   const [netOnline, setNetOnline] = useState(true);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("pointerdown", h);
-    return () => document.removeEventListener("pointerdown", h);
-  }, []);
 
   // Stato di rete reale: il pallino è verde quando SEI online (connesso), non solo se c'è un socio.
   useEffect(() => {
@@ -93,8 +88,8 @@ export default function OnlineUsers() {
   ];
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} title={peers.length ? `${peers.map((p) => p.name).join(", ")} ${t("online")}` : t("Utenti online")} className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 transition hover:bg-wash">
+    <div className="relative">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} title={peers.length ? `${peers.map((p) => p.name).join(", ")} ${t("online")}` : t("Utenti online")} className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 transition hover:bg-wash">
         <div className="flex -space-x-2">
           {online.slice(0, 3).map((u, i) => (
             <span key={u.id} className="grid h-6 w-6 place-items-center overflow-hidden rounded-full border-2 border-surface text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.name)}</span>
@@ -105,8 +100,7 @@ export default function OnlineUsers() {
           {peers.length ? `${peers.length === 1 ? peers[0].name.split(" ")[0] : `${peers.length} ${t("soci")}`} ${t("online")}` : myName}
         </span>
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 w-64 rounded-xl border border-line bg-surface p-2 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={256} label={t("Utenti online")}>
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Online adesso")} · {online.length}</div>
           {online.map((u, i) => (
             <div key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
@@ -120,8 +114,7 @@ export default function OnlineUsers() {
               </div>
             </div>
           ))}
-        </div>
-      )}
+      </Popover>
       {toast && (
         <div role="status" className="fixed bottom-5 right-5 z-[70] flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm font-medium text-txt shadow-2xl">
           <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--ok)]" />{toast}

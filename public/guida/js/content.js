@@ -85,6 +85,9 @@
       // Salto i passaggi vuoti (le righe di esempio non compilate non devono comparire).
       var steps = (hs.steps || []).filter(function (st) { return nz(st.h) || nz(st.p); }).map(function (st) {
         var o = { h: st.h, p: st.p, actions: st.actions };
+        // Passaggi condizionati al parcheggio (il motore li filtra con i dati del link dell'ospite).
+        if (st.parkOnly) o.parkOnly = true;
+        if (st.noParkOnly) o.noParkOnly = true;
         if (st.code && CODEKEY[st.code]) {
           o.codeKey = CODEKEY[st.code];
           // Se l'host ha scritto una nota, compare dopo il codice (e sostituisce il "#" automatico).

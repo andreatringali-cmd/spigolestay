@@ -60,8 +60,8 @@ function DocFace({ label, photo, onPick, onRemove, onReread, extracting, aiOff, 
         <MediaImg src={photo} alt={label} className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
         <div className="flex flex-col items-start gap-1">
           <span className="text-[11px] font-medium text-dim">✓ {label}</span>
-          {onReread && !aiOff && <button type="button" onClick={onReread} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50">{extracting ? t("Leggo…") : t("✨ Rileggi dal documento")}</button>}
-          <button type="button" onClick={onRemove} className="text-[11px] text-dim hover:text-[color:var(--err)]">{t("Rimuovi")}</button>
+          {onReread && !aiOff && <button type="button" onClick={onReread} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50 max-sm:py-2">{extracting ? t("Leggo…") : t("✨ Rileggi dal documento")}</button>}
+          <button type="button" onClick={onRemove} className="text-[11px] text-dim hover:text-[color:var(--err)] max-sm:py-2">{t("Rimuovi")}</button>
         </div>
       </div>
     );
@@ -543,7 +543,7 @@ function Engine() {
           const content = (
             <>
               <span className="grid h-7 w-7 place-items-center rounded-full border border-line text-xs font-bold text-dim" style={circle}>{isDone && !isCur ? "✓" : warn ? "!" : s.n}</span>
-              <span className={`text-[10px] leading-tight ${isCur ? "font-bold text-txt" : "text-dim"}`}>{s.label}</span>
+              <span className={`text-[10px] leading-tight [overflow-wrap:anywhere] ${isCur ? "font-bold text-txt" : "text-dim"}`}>{s.label}</span>
             </>
           );
           return (
@@ -583,7 +583,7 @@ function Engine() {
           <h1 className="font-display text-2xl font-bold text-txt">{t("Check-in completato!")}</h1>
           <p className="mt-1 text-sm text-dim">{t("Grazie {name}. Abbiamo ricevuto i tuoi dati per il soggiorno a {structure}. A presto!", { name: doc?.firstName || info.guest.firstName, structure: st?.name ?? "" })}</p>
           {st?.checkInFrom && <p className="mt-3 text-sm text-txt">{t("Ti aspettiamo dal {date}, check-in dalle {time}.", { date: fmtD(info.booking.checkIn), time: st.checkInFrom })}</p>}
-          <button type="button" onClick={() => { setDone(false); setEditing(true); setStep(1); setShowErr(false); setAckMissing(false); topScroll(); }} className="mt-3 text-xs font-medium text-focus hover:underline">{t("Devi correggere qualcosa o aggiungere un ospite? Modifica i dati")}</button>
+          <button type="button" onClick={() => { setDone(false); setEditing(true); setStep(1); setShowErr(false); setAckMissing(false); topScroll(); }} className="mt-3 text-xs font-medium text-focus hover:underline max-sm:py-2">{t("Devi correggere qualcosa o aggiungere un ospite? Modifica i dati")}</button>
           <div className="mx-auto mt-4 max-w-sm">
             {walletState === "unavailable"
               ? <p className="mt-2 text-center text-xs text-faint">{t("Aggiungi a Google Wallet: disponibile a breve.")}</p>
@@ -702,7 +702,7 @@ function Engine() {
 
           {/* Co-ospiti (sezione sempre visibile: si può sempre aggiungere un ospite) */}
           <div className={`${box} mb-4 p-4`}>
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Altri ospiti")}</h2><button onClick={() => setExtras((p) => [...p, { ...emptyExtra(), room: isGroup ? (primaryRoom || groupRooms[0].b) : "" }])} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ {t("Aggiungi")}</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Altri ospiti")}</h2><button onClick={() => setExtras((p) => [...p, { ...emptyExtra(), room: isGroup ? (primaryRoom || groupRooms[0].b) : "" }])} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash max-sm:min-h-10 max-sm:px-3">＋ {t("Aggiungi")}</button></div>
             {extras.length === 0 ? (
               <p className="text-xs text-faint">{t("Se con te soggiornano altre persone, aggiungile con «＋ Aggiungi».")}</p>
             ) : (
@@ -711,7 +711,7 @@ function Engine() {
                   <div key={i} className="rounded-lg border border-line p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-xs font-semibold text-dim">{t("Ospite")} {i + 2}</span>
-                      <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="text-faint hover:text-[color:var(--err)]" aria-label={t("Rimuovi")}>✕</button>
+                      <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="grid h-8 w-8 place-items-center text-faint hover:text-[color:var(--err)] max-sm:h-10 max-sm:w-10" aria-label={t("Rimuovi")}>✕</button>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {isGroup && <select value={e.room} onChange={(ev) => setExtra(i, "room", ev.target.value)} className={`${field} sm:col-span-2`}>{groupRooms.map((r) => <option key={r.b} value={r.b}>{t("Camera")}: {roomLabel(r)}</option>)}</select>}
@@ -767,7 +767,7 @@ function Engine() {
             {extractMsg && (
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--focus)" }}>
                 <span>✨ {t(extractMsg)}</span>
-                <button type="button" onClick={() => goStep(1)} className="rounded-md border border-line bg-surface px-2 py-1 font-semibold text-txt hover:bg-wash">{t("Controlla i dati")}</button>
+                <button type="button" onClick={() => goStep(1)} className="rounded-md border border-line bg-surface px-2 py-1 font-semibold text-txt hover:bg-wash max-sm:min-h-10 max-sm:px-3">{t("Controlla i dati")}</button>
               </div>
             )}
             {!aiOff && !photoFront && !extractMsg && <p className="mt-3 text-[11px] text-faint">{t("Fotografa il documento: i campi del passo 1 si compilano da soli.")}</p>}
@@ -812,9 +812,9 @@ function Engine() {
                         <div className="text-xs text-dim">{eur(extraUnit(e))}{e.per === "night" ? ` · ${nightsN} ${nightsN === 1 ? t("notte") : t("notti")}` : e.per === "person" ? ` · ${t("a persona")}` : ""}</div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash">−</button>
+                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-10 max-sm:w-10">−</button>
                         <span className="w-5 text-center font-mono text-sm">{qy}</span>
-                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash">+</button>
+                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-10 max-sm:w-10">+</button>
                       </div>
                     </div>
                   );
@@ -862,7 +862,7 @@ function Engine() {
               <h2 className="mb-1 font-display text-base font-bold text-txt">{t("Firma")} <span style={{ color: "var(--err)" }}>*</span></h2>
               <p className="mb-3 text-xs text-dim">{t("Firma per confermare la correttezza dei dati e l'accettazione delle condizioni.")}</p>
               {signature && isMediaRef(signature)
-                ? <div className="flex items-end gap-3"><MediaImg src={signature} alt={t("Firma")} className="h-24 rounded-lg border border-line bg-white p-1" /><button type="button" onClick={() => setSignature(undefined)} className="text-[11px] font-medium text-dim hover:text-[color:var(--err)]">{t("Cancella firma")}</button></div>
+                ? <div className="flex items-end gap-3"><MediaImg src={signature} alt={t("Firma")} className="h-24 rounded-lg border border-line bg-white p-1" /><button type="button" onClick={() => setSignature(undefined)} className="text-[11px] font-medium text-dim hover:text-[color:var(--err)] max-sm:py-2">{t("Cancella firma")}</button></div>
                 : <SignaturePad value={signature} onChange={setSignature} placeholder={t("Firma qui col dito o col mouse")} clearLabel={t("Cancella firma")} />}
               {showErr && missIds.has("f-signature") && <p className="mt-1 text-xs font-medium" style={{ color: "var(--err)" }}>{t("Firma nel riquadro")}</p>}
             </div>

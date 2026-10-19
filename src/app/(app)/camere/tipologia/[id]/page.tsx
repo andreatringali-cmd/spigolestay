@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -16,6 +16,7 @@ import { useBulkGuard } from "@/components/useBulkGuard";
 import { amenityIcon } from "@/lib/amenities";
 import { useLang } from "@/lib/i18n";
 import Toggle from "@/components/Toggle";
+import Popover from "@/components/Popover";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -60,6 +61,7 @@ function TipologiaScheda() {
   const num = (v: string) => (v === "" ? undefined : Number(v));
   const [lang, setLang] = useState("it");
   const [nameOpen, setNameOpen] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null); // ancora dei suggerimenti (Popover)
   const nameSuggestions = ROOM_TYPE_OPTIONS.filter((o) => { const s = (f.name ?? "").trim().toLowerCase(); return !s || (o.toLowerCase().includes(s) && o.toLowerCase() !== s); });
 
   const structure = structures.find((s) => s.id === structureId);
@@ -190,12 +192,10 @@ function TipologiaScheda() {
             </div>
             <label className={lbl}>{t("Nome tipologia")} *
               <div className="relative mt-1">
-                <input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} onFocus={() => setNameOpen(true)} onBlur={() => setTimeout(() => setNameOpen(false), 120)} autoComplete="off" className={inp} placeholder={t("Es. Camera Matrimoniale Deluxe")} />
-                {nameOpen && nameSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-lg max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
+                <input ref={nameInputRef} value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} onFocus={() => setNameOpen(true)} onBlur={() => setTimeout(() => setNameOpen(false), 120)} autoComplete="off" className={inp} placeholder={t("Es. Camera Matrimoniale Deluxe")} />
+                <Popover open={nameOpen && nameSuggestions.length > 0} anchorRef={nameInputRef} onClose={() => setNameOpen(false)} maxHeight={224} label={t("Nome tipologia")}>
                     {nameSuggestions.map((o) => <button key={o} type="button" onMouseDown={(e) => { e.preventDefault(); set("name", o); setNameOpen(false); }} className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm text-txt hover:bg-wash">{o}</button>)}
-                  </div>
-                )}
+                </Popover>
               </div>
             </label>
             <label className={`${lbl} mt-3`}>{t("Descrizione breve")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Sintesi mostrata nei listini interni…")} /></label>
