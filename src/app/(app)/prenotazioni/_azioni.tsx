@@ -12,6 +12,7 @@ import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlin
 import { chatPayGuestMessage, parseEurInput } from "@/lib/chat-pay-core";
 import { bookingGrandTotal } from "@/lib/booking";
 import { stayDue } from "@/lib/incassi";
+import { cityTaxOfBooking } from "@/lib/booking";
 import { reviewLinksBlockFromStorage, reviewRequestMessage, reviewRequestSubject } from "@/lib/reviews";
 import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, reminderIntro, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
@@ -59,7 +60,11 @@ export default function StepActions(p: StepActionsProps) {
   const hist = useReminderLog([b])[b.id] ?? {}; // cronologia dei messaggi già inviati per questa prenotazione
   const lastTs = (k: string) => hist[k]?.[hist[k].length - 1]?.ts;
   const [force, setForce] = useState<Record<string, boolean>>({}); // invio sbloccato a mano dopo un messaggio recente
-  const [amount, setAmount] = useState("");
+  // Importo del link già compilato: saldo = quanto manca sul soggiorno, tassa = tutta la tassa di soggiorno (modificabile verso il basso).
+  const [amount, setAmount] = useState(() => {
+    const n = step.key === "pay" ? stayDue(b, structure) : step.key === "tax" ? cityTaxOfBooking(structure, b) : 0;
+    return n > 0 ? n.toFixed(2).replace(".", ",") : "";
+  });
   const [cfg, setCfg] = useState<{ auto: boolean; ready: boolean } | null>(null);
   const [draftDoc, setDraftDoc] = useState<{ id: string; stato: string } | null | undefined>(undefined); // fattura già creata per questa prenotazione (undefined = in verifica)
   const hasPhone = !!(guest?.phone ?? "").replace(/\D/g, "");
