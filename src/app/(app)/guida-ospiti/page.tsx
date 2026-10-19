@@ -822,14 +822,14 @@ export default function GuidaOspitiPage() {
   // (WiFi, orari, telefoni, link) compila solo i campi ancora vuoti.
   const loadDemo = async () => {
     if (hasRealContent && !confirm("Sostituire i testi della guida con l'esempio di Siracusa?\n\nI dati già inseriti (indirizzo, telefoni, WiFi, orari, link) NON vengono toccati: l'esempio compila solo i campi vuoti. Le traduzioni verranno rigenerate.")) return;
+    // I testi si copiano dall'esempio del telefono «Esempio»: la tua guida parte identica. Se l'esempio non si carica NON si applica nulla (niente testi diversi dall'esempio).
+    let content: GContent;
+    try { content = exampleContentFrom(await loadExampleIt(), DEMO_CONTENT as never) as unknown as GContent; } catch { alert("Non riesco a caricare l'esempio. Riprova tra un attimo."); return; }
     const sRec = (struct ?? {}) as unknown as Record<string, unknown>;
     const structPatch = Object.fromEntries(Object.entries(DEMO_STRUCT).filter(([k]) => !String(sRec[k] ?? "").trim()));
     if (Object.keys(structPatch).length) updateStructure(sid, structPatch);
     const gRec = guide as unknown as Record<string, unknown>;
     const guidePatch = Object.fromEntries(Object.entries(DEMO_GUIDE).filter(([k]) => !String(gRec[k] ?? "").trim()));
-    // I testi si copiano dall'esempio del telefono «Esempio»: la tua guida parte identica (se l'esempio non si carica, resta la copia interna).
-    let content: GContent = DEMO_CONTENT;
-    try { content = exampleContentFrom(await loadExampleIt(), DEMO_CONTENT as never) as unknown as GContent; } catch { /* copia interna */ }
     set({ ...guidePatch, content, i18n: {} });
     refresh();
   };

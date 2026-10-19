@@ -36,3 +36,20 @@ test("«Parti dall'esempio»: passaggi e blocchi con gli stessi testi (senza par
   assert.deepEqual(sec("checkin").amenities.map((a: any) => a.label), checkin.amenities.map((a: any) => a.label));
   assert.ok(sec("checkin").steps.some((st: any) => st.code === "door" && st.codeNote === "+ i 2 tasti laterali"));
 });
+
+// Prova vera: la guida salvata con «Parti dall'esempio» passa dal motore (content.js) e deve dare ESATTAMENTE ciò che mostra l'esempio.
+test("«Parti dall'esempio» attraversa il motore e coincide con l'esempio (benvenuto, gruppi, sezioni)", async () => {
+  const vm = await import("node:vm");
+  const read = (f: string) => readFileSync(new URL("../public/guida/" + f, import.meta.url), "utf8");
+  const clone = (o: unknown) => JSON.parse(JSON.stringify(o));
+  const store = { "spigolestay:guides": JSON.stringify({ x: { content: out, i18n: {}, wifiNetwork: "n", wifiPassword: "p", phone: "1", whatsapp: "1", reviewUrl: "u" } }) } as Record<string, string>;
+  const w: any = { I18N: {}, PROPERTY: { city: "Siracusa" } };
+  for (const l of ["it", "en", "fr", "de", "es"]) new Function("window", read(`js/content/${l}.js`))(w);
+  const ctx = vm.createContext({ window: w, localStorage: { getItem: (k: string) => store[k] ?? null }, location: { search: "?p=x" }, URLSearchParams, JSON, Object, Array, String });
+  vm.runInContext(read("js/content.js"), ctx);
+  const res = w.I18N.it;
+  assert.deepEqual(clone(res.home), { welcomeTitle: it.home.welcomeTitle, welcomeSub: "", welcome: it.home.welcome });
+  assert.deepEqual(clone(res.groups), clone(it.groups));
+  const view = (s: any) => ({ title: s.title, sub: s.sub, intro: s.intro || "", steps: (s.steps || []).filter((x: any) => !x.parkOnly).map((x: any) => [x.h, x.p]), items: (s.items || []).map((x: any) => [x.h, x.p || ""]), am: (s.amenities || []).map((a: any) => a.label) });
+  for (const s of it.sections) assert.deepEqual(clone(view(res.sections.find((x: any) => x.id === s.id))), clone(view(s)), `sezione ${s.id}`);
+});

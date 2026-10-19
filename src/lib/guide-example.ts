@@ -35,7 +35,7 @@ export function exampleContentFrom(it: Json, old: ExampleContent): ExampleConten
   const sections = ids.map((id) => {
     const s = byId.get(id) as Json;
     const o = old.sections.find((x) => x.id === id) as Json | undefined;
-    const base: Json = { id, icon: str(s.icon), title: str(s.title), sub: str(s.sub), intro: FUNC_IDS.has(id) ? "" : str(s.intro), photos: arr<string>(o?.photos) };
+    const base: Json = { id, icon: str(s.icon), title: str(s.title), sub: str(s.sub), intro: str(s.intro), photos: arr<string>(o?.photos) };
     if (FUNC_IDS.has(id)) return { ...base, items: [] };
     const steps = arr(s.steps).filter((st) => !st.parkOnly).map((st) => {
       const o2: Json = { h: str(st.h), p: str(st.p), code: CODE_OF[str(st.codeKey)] ?? "" };

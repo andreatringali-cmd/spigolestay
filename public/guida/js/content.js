@@ -52,11 +52,16 @@
     { title: "Esplorare " + ((window.PROPERTY && window.PROPERTY.city) || ""), ids: ["attractions", "restaurants", "excursions"] },
     { title: "Servizi utili", ids: ["taxi", "info", "faq", "extras", "contacts", "review"] }
   ];
-  var groups = GROUPS.map(function (g) { return { title: g.title, sections: g.ids.filter(has) }; }).filter(function (g) { return g.sections.length; });
-  // Sezioni non previste nei gruppi standard → gruppo finale.
-  var known = groups.reduce(function (a, g) { return a.concat(g.sections); }, []);
-  var rest = ids.filter(function (id) { return known.indexOf(id) < 0; });
-  if (rest.length) groups.push({ title: "Altro", sections: rest });
+  // I titoli dei gruppi sono quelli dell'esempio NELLA LINGUA dell'ospite (così la guida dell'host e l'esempio coincidono: «Scoprire Siracusa», non «Esplorare…»).
+  var groupsFor = function (base) {
+    var titles = (base && base.groups) || [];
+    var gs = GROUPS.map(function (g, i) { return { title: (titles[i] && titles[i].title) || g.title, sections: g.ids.filter(has) }; }).filter(function (g) { return g.sections.length; });
+    // Sezioni non previste nei gruppi standard → gruppo finale.
+    var known = gs.reduce(function (a, g) { return a.concat(g.sections); }, []);
+    var rest = ids.filter(function (id) { return known.indexOf(id) < 0; });
+    if (rest.length) gs.push({ title: "Altro", sections: rest });
+    return gs;
+  };
 
   // Operative "pure": credenziali/contatti automatici → si tiene il pacchetto, si sovrascrivono solo i testi.
   var FUNC = { wifi: 1, contacts: 1, review: 1 };
@@ -102,6 +107,6 @@
     // Home: se l'host non ha scritto il benvenuto, resta VUOTA (niente fallback "Benvenuti · nome").
     // Solo ciò che l'host compila qui compare: i dati della struttura vivono nelle loro sezioni.
     var homeOut = homeFilled(src.home) ? src.home : { welcomeTitle: "", welcomeSub: "", welcome: [] };
-    window.I18N[l] = { ui: base.ui, home: homeOut, groups: groups, sections: merged, sectionsByProperty: {} };
+    window.I18N[l] = { ui: base.ui, home: homeOut, groups: groupsFor(base), sections: merged, sectionsByProperty: {} };
   });
 })();
