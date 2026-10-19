@@ -177,6 +177,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const evs = useMemo(() => scopeFilter(events, activeStructureId).filter((e) => e.from <= to && e.to > from), [events, activeStructureId, from, to]);
 
   const openStep = (r: Row, s: JourneyStep) => {
+    if (s.locked) return; // Schedina e ISTAT sono automatiche: niente clic
     if (stepOpensModal(s)) setModal({ id: r.b.id, key: s.key });
     else if (s.href) router.push(s.href);
   };

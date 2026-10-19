@@ -82,7 +82,7 @@ export function StatoProvider({ ids, children }: { ids: string[]; children: Reac
     progress: (id) => progMap.get(id) ?? null,
     // Stesso comportamento della Dettagliata: non ancora fatto → finestra "Risolvi"; fatto/non applicabile → pagina collegata.
     open: (b, s) => {
-      if (!s.step) return;
+      if (!s.step || s.step.locked) return; // Schedina e ISTAT sono automatiche: niente clic
       if (stepOpensModal(s)) setModal({ id: b.id, key: s.key });
       else if (s.step.href) router.push(s.step.href);
     },

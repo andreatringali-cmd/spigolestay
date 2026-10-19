@@ -145,7 +145,7 @@ function StepButton({ s, onStep, structureId }: { s: JourneyStep; onStep: (s: Jo
   const sentTag = m?.[1] ?? "";                                  // "inviato 2 volte", accanto al nome
   const detail = m ? s.detail.slice(0, m.index) : s.detail;       // il dettaglio senza il tratto già mostrato accanto al nome
   return (
-    <button onClick={(e) => { e.stopPropagation(); onStep(s); }} title={`${label}: ${s.detail}`} className="flex min-w-0 items-start gap-2 rounded-lg text-left transition hover:bg-wash">
+    <button disabled={s.locked} onClick={(e) => { e.stopPropagation(); if (!s.locked) onStep(s); }} title={s.locked ? `${label}: ${s.detail} · parte da sola dal check-in online` : `${label}: ${s.detail}`} className={`flex min-w-0 items-start gap-2 rounded-lg text-left transition ${s.locked ? "cursor-default" : "hover:bg-wash"}`}>
       <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: col, border: `1.5px solid ${col}`, background: s.state === "done" ? `color-mix(in srgb, ${col} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
       <span className="min-w-0">
         <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate text-xs font-semibold text-txt">{label}</span>{sentTag && <span className="shrink-0 text-[10px] font-semibold" style={{ color: "var(--warn)" }}>{sentTag}</span>}</span>

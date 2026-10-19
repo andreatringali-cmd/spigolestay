@@ -3,41 +3,33 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 
 register("./helpers/alias-loader.mjs", import.meta.url);
-const { journeyOf, internalNote } = await import("../src/lib/booking-journey.ts");
+const { journeyOf, internalNote, stepOpensModal } = await import("../src/lib/booking-journey.ts");
 
 const b: any = { id: "b1", structureId: "s1", channel: "booking", status: "confirmed", checkIn: "2026-10-19", checkOut: "2026-10-23", adults: 1, children: 0, total: 100, paid: 0 };
 const step = (r: any, key: string) => r.steps.find((s: any) => s.key === key);
 
-test("Check-in: dopo l'invio del messaggio il passaggio è verde (fatto), il dettaglio dice cosa manca", () => {
-  const before = journeyOf(b, { today: "2026-10-19", guideSent: false });
-  assert.equal(step(before, "checkin").state, "late");
-  const after = journeyOf(b, { today: "2026-10-19", guideSent: false, reminderNotes: { checkin: "inviato 2 volte" } });
-  assert.equal(step(after, "checkin").state, "done");
-  assert.ok(step(after, "checkin").detail.includes("non ha ancora compilato") && step(after, "checkin").detail.includes("inviato 2 volte"));
+test("Check-in: rosso finché l'ospite non compila (anche dopo l'invio del messaggio), verde quando ha compilato", () => {
+  const sentNotYet = journeyOf(b, { today: "2026-10-19", guideSent: false, reminderNotes: { checkin: "inviato 2 volte" } });
+  assert.equal(step(sentNotYet, "checkin").state, "late");
+  assert.notEqual(step(sentNotYet, "checkin").sent, true);               // niente arancione «inviato»
+  assert.ok(step(sentNotYet, "checkin").detail.includes("inviato 2 volte")); // l'informazione resta
+  assert.equal(step(journeyOf(b, { today: "2026-10-10", guideSent: false }), "checkin").state, "late"); // anche prima dell'arrivo
+  const done = journeyOf({ ...b, webCheckin: true } as any, { today: "2026-10-19", guideSent: false });
+  assert.equal(step(done, "checkin").state, "done");
 });
-test("Pagamento: il link inviato non lo rende fatto (resta da incassare)", () => {
+test("Schedina Questura e ISTAT: automatiche, non cliccabili", () => {
+  const r = journeyOf(b, { today: "2026-10-19", guideSent: false });
+  for (const k of ["alloggiati", "istat"]) { assert.equal(step(r, k).locked, true); assert.equal(stepOpensModal(step(r, k)), false); }
+});
+test("Pagamento: il link inviato non lo rende fatto; Pagamento e Tassa aprono sempre le azioni", () => {
   const r = journeyOf(b, { today: "2026-10-19", guideSent: false, reminderNotes: { pay: "inviato 1 volta" } });
   assert.notEqual(step(r, "pay").state, "done");
-});
-test("nota interna: via la dicitura «Importato da Octorate»", () => {
-  assert.equal(internalNote("Importato da Octorate · Late arrival"), "Late arrival");
-  assert.equal(internalNote("Importato da CSV"), "");
-});
-
-test("Check-in verde per messaggio inviato: il clic riapre l'azione (non porta ad Adempimenti)", async () => {
-  const { stepOpensModal } = await import("../src/lib/booking-journey.ts");
-  const after = journeyOf(b, { today: "2026-10-19", guideSent: false, reminderNotes: { checkin: "inviato 2 volte" } });
-  assert.equal(stepOpensModal(step(after, "checkin")), true);
-  // dati davvero completi: fatto davvero, il clic porta alla pagina
-  const full = journeyOf({ ...b, webCheckin: true } as any, { today: "2026-10-19", guideSent: false });
-  assert.equal(step(full, "checkin").state, "done");
-  assert.equal(stepOpensModal(step(full, "checkin")), false);
-});
-
-test("Pagamento e Tassa: il clic apre sempre le azioni, anche se saldati; passaggi senza compito vanno alla pagina", async () => {
-  const { stepOpensModal } = await import("../src/lib/booking-journey.ts");
   assert.equal(stepOpensModal({ key: "pay", state: "done" }), true);
   assert.equal(stepOpensModal({ key: "tax", state: "done" }), true);
   assert.equal(stepOpensModal({ key: "pay", state: "na" }), false);
   assert.equal(stepOpensModal({ key: "invoice", state: "done" }), false);
+});
+test("nota interna: via la dicitura «Importato da Octorate»", () => {
+  assert.equal(internalNote("Importato da Octorate · Late arrival"), "Late arrival");
+  assert.equal(internalNote("Importato da CSV"), "");
 });
