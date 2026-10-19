@@ -626,6 +626,7 @@ export default function PuliziePage() {
         </>)}
         <div className="relative ml-auto flex items-center gap-2">
           {copied && <span className="text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
+          <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
           <button
             onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
             disabled={!autoShareStructure}
@@ -633,7 +634,6 @@ export default function PuliziePage() {
             title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
             className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           ><Icon name="clock" size={16} /></button>
-          <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
           {planShare && (<>
             <button aria-label={t("Chiudi")} onClick={() => setPlanShare(false)} className="fixed inset-0 z-20 cursor-default" />
             <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:top-auto max-sm:z-[120] max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 max-sm:max-w-none max-sm:max-h-[75dvh] max-sm:overflow-y-auto max-sm:shadow-2xl">
