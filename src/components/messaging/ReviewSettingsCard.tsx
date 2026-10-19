@@ -70,14 +70,6 @@ export default function ReviewSettingsCard() {
               </div>
             );
           })}
-          <label className="flex items-start gap-2 text-xs text-dim">
-            <input type="checkbox" checked={s.skipIfIssueNotes} onChange={(e) => setS({ ...s, skipIfIssueNotes: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" />
-            <span><span className="font-semibold text-txt">{t("Non inviare a chi ha segnalato un problema")}</span><br />{t("Salta le prenotazioni con parole come «reclamo», «problema», «sporco», «rotto» nelle note della prenotazione o dell'ospite. Spento di default.")}</span>
-          </label>
-          <label className="flex items-start gap-2 text-xs text-dim">
-            <input type="checkbox" checked={s.skipBookingChannel} onChange={(e) => setS({ ...s, skipBookingChannel: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" />
-            <span><span className="font-semibold text-txt">{t("Non inviare agli ospiti arrivati da Booking.com")}</span><br />{t("Booking.com invia già il suo invito: attivalo se non vuoi che l'ospite riceva due richieste. Spento di default.")}</span>
-          </label>
         </div>
       )}
     </Card>
