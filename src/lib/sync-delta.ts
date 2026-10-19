@@ -144,6 +144,23 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
   return delta;
 }
 
+/**
+ * Una cancellazione di massa è un SPOSTAMENTO (non una perdita) se ogni entità cancellata esiste ancora, con lo stesso id, in un'altra riga dello stesso utente
+ * (es. le copie che il personale tiene delle strutture condivise: passano nell'organizzazione). Solo in quel caso il server può accettarla senza conferma.
+ */
+export function deletesAreMoves(delta: Delta, otherRows: Array<Record<string, string> | null | undefined>): boolean {
+  const have: Record<string, Set<string>> = {};
+  for (const row of otherRows) {
+    const d = parseObj(row?.[DATA_KEY]); if (!d) continue;
+    for (const coll of ENTITY_COLLECTIONS) { const set = (have[coll] ??= new Set<string>()); for (const it of asArr(d[coll])) { const id = idOf(it); if (id) set.add(id); } }
+  }
+  let any = false;
+  for (const [coll, c] of Object.entries(delta.colls)) {
+    for (const id of c.del) { any = true; if (!have[coll]?.has(String(id))) return false; }
+  }
+  return any && Object.values(delta.tombs).every((t) => t.length === 0); // lapidi nuove = vere cancellazioni: mai considerate spostamenti
+}
+
 export class DeltaError extends Error {
   code: "mass_delete" | "bad_data";
   constructor(code: "mass_delete" | "bad_data", message: string) { super(message); this.code = code; }

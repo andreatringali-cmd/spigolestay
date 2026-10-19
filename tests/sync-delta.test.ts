@@ -186,3 +186,15 @@ test("delta con entità identiche a quelle sul server: nessuna modifica (changed
   const newOne = D.emptyDelta(); newOne.colls.bookings = { upsert: [bk("brandnew", "2026-11-01", "2026-11-02")], del: [] };
   assert.equal(D.applyDelta(full, newOne).stats.changed, true);
 });
+
+test("spostamenti: cancellazioni di massa dalla riga personale di entità che esistono ancora nell'organizzazione = accettabili; vere perdite no", () => {
+  const org = fullRow();                                           // l'organizzazione ha le stesse entità
+  const moves = D.emptyDelta(); moves.colls.bookings = { upsert: [], del: ["old1", "recent", "now"] };
+  assert.equal(D.deletesAreMoves(moves, [org]), true);
+  const loss = D.emptyDelta(); loss.colls.bookings = { upsert: [], del: ["old1", "inesistente"] };
+  assert.equal(D.deletesAreMoves(loss, [org]), false);             // una non esiste altrove: è una perdita
+  assert.equal(D.deletesAreMoves(moves, []), false);               // nessuna altra riga: nessuno spostamento
+  const withTomb = D.emptyDelta(); withTomb.colls.bookings = { upsert: [], del: ["old1"] }; withTomb.tombs.bookings = ["old1"];
+  assert.equal(D.deletesAreMoves(withTomb, [org]), false);         // una lapide nuova = cancellazione vera
+  assert.equal(D.deletesAreMoves(D.emptyDelta(), [org]), false);   // niente da cancellare
+});

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncAuth, idColOf, isSyncTable } from "@/lib/sync-server";
-import { applyDelta, isEmptyDelta, describeDelta, describeFieldChanges, DeltaError, type Delta } from "@/lib/sync-delta";
+import { applyDelta, isEmptyDelta, describeDelta, describeFieldChanges, deletesAreMoves, DeltaError, type Delta } from "@/lib/sync-delta";
 import { deltaAllowedFor } from "@/lib/delta-allow";
 
 export const runtime = "nodejs";
@@ -35,7 +35,24 @@ export async function POST(req: Request) {
   console.log("[sync/delta]", table, id.slice(0, 8), "rev", expectedRev, describeDelta(delta), describeFieldChanges(row.data ?? null, delta)); // diagnostica: cosa viene rimandato a ogni ciclo (solo conteggi e nomi di chiavi)
   let next: Record<string, string>;
   try {
-    const applied = applyDelta(row.data ?? null, delta);
+    let applied;
+    try { applied = applyDelta(row.data ?? null, delta); }
+    catch (e) {
+      // Cancellazione di massa: accettata solo se sono SPOSTAMENTI (le entità esistono ancora in un'altra riga dell'utente, tipicamente l'organizzazione).
+      if (!(e instanceof DeltaError) || e.code !== "mass_delete") throw e;
+      const others: Array<Record<string, string> | null> = [];
+      if (table === "app_state") {
+        const { data: ms } = await auth.userClient.from("memberships").select("org_id").eq("user_id", auth.userId);
+        for (const m of (ms ?? []) as { org_id?: string }[]) {
+          if (!m.org_id) continue;
+          const { data: o } = await auth.userClient.from("org_state").select("data").eq("org_id", m.org_id).maybeSingle();
+          others.push(((o as { data?: Record<string, string> } | null)?.data) ?? null);
+        }
+      }
+      if (!others.length || !deletesAreMoves(delta, others)) throw e;
+      console.log("[sync/delta] cancellazione di massa accettata: sono spostamenti verso le organizzazioni");
+      applied = applyDelta(row.data ?? null, { ...delta, confirm: true });
+    }
     if (!applied.stats.changed) return NextResponse.json({ ok: true, rev: expectedRev, noop: true }); // già tutto uguale sul server: nessuna scrittura, la versione non cambia
     next = applied.row;
   }

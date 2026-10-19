@@ -754,10 +754,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastSynced.current = merged;
           revRef.current = serverRev ?? 0;
           // Se la fusione ha aggiunto qualcosa al server, riallineo il server.
-          if (DELTA_MODE) {
-            const delta = buildDelta(serverData, {}, merged);
-            if (!isEmptyDelta(delta) && serverRev !== null) { const nr = await postDelta("app_state", uid, serverRev, delta); if (nr !== null) revRef.current = nr; }
-          } else if (contentSig(merged) !== contentSig(serverData ?? {})) {
+          // In modalità veloce NON si riscrive qui il «fuso» intero: contiene anche le strutture condivise (che vanno nell'organizzazione, non nella riga personale).
+          // Ci pensa subito la prima sincronizzazione (syncOnce), che divide per organizzazione e invia solo le modifiche vere.
+          if (DELTA_MODE) { /* niente scrittura all'avvio */ }
+          else if (contentSig(merged) !== contentSig(serverData ?? {})) {
             const nr = await writeWithLock(supabase!, uid, merged, serverRev);
             if (nr !== null) revRef.current = nr;
           }
