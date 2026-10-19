@@ -38,3 +38,11 @@ test("restano dovuti extra e pulizia aggiunti dalla struttura; l'incassato regis
 test("prenotazione diretta: la regola non c'entra", () => {
   assert.equal(balanceDue(bk({ channel: "direct" }), st({ direct: { collect: "ota" } })), 200);
 });
+
+test("Accelerator Fee di Expedia dalle note di Channex", async () => {
+  const { otaAcceleratorFee } = await import("../src/lib/booking.ts");
+  assert.equal(otaAcceleratorFee({ otaInfo: { notes: "Accelerator Fee: €18.78\nCollect Amount: €154.92\nOTA Commission: €28.14" } }), 18.78);
+  assert.equal(otaAcceleratorFee({ otaInfo: { notes: "Accelerator Fee: 7,5" } }), 7.5);
+  assert.equal(otaAcceleratorFee({ otaInfo: { notes: "Collect Amount: €10" } }), 0);
+  assert.equal(otaAcceleratorFee({}), 0);
+});

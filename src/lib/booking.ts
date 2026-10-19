@@ -254,6 +254,12 @@ export function lordoOf(b: CommissionBookingLike): number {
   if (!acc) return 0;
   return acc + (b.cleaningFee ?? 0) + (Array.isArray(b.extras) ? b.extras.reduce((a, e) => a + (e?.price || 0), 0) : 0);
 }
+/** Accelerator Fee di Expedia, scritta da Channex nelle note («Accelerator Fee: €18.78»). 0 se non c'è. */
+export function otaAcceleratorFee(b: { otaInfo?: { notes?: string } | null }): number {
+  const m = /Accelerator Fee:s*[€$]?s*(d+(?:[.,]d{1,2})?)/i.exec(b.otaInfo?.notes ?? "");
+  const n = m ? Number(m[1].replace(",", ".")) : 0;
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+}
 /** Netto = lordo − commissioni (stessi numeri che si vedono nell'elenco). */
 export function nettoOf(b: CommissionBookingLike): number {
   const lordo = lordoOf(b);
