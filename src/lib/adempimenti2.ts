@@ -53,9 +53,10 @@ export function questuraDeadline(arrivalISO: string, nowMs: number): { over: boo
 // ───────────────────────── Tipi ─────────────────────────
 export type Ente = "questura" | "istat" | "tassa" | "checkin" | "pagamenti" | "fatture";
 /** Ordine di lettura: prima gli enti con una scadenza di legge. */
-export const ENTI: readonly Ente[] = ["questura", "istat", "tassa", "checkin", "pagamenti", "fatture"];
+// Stesso ordine del percorso nella scheda prenotazione (dal check-in al check-out): Check-in, Pagamenti, Tassa di soggiorno, Fatture, Alloggiati (Questura), ISTAT (ordine scelto da Andrea).
+export const ENTI: readonly Ente[] = ["checkin", "pagamenti", "tassa", "fatture", "questura", "istat"];
 export const ENTE_META: Record<Ente, { label: string; short: string; sub: string; icon: string; allDone: string }> = {
-  questura: { label: "Questura · Alloggiati Web", short: "Questura", sub: "Schedine entro 24 ore dall'arrivo (scadenza stimata: arrivo alle 14:00)", icon: "shield", allDone: "Tutte le schedine sono state inviate" },
+  questura: { label: "Alloggiati Web · Questura", short: "Alloggiati", sub: "Schedine entro 24 ore dall'arrivo (scadenza stimata: arrivo alle 14:00)", icon: "shield", allDone: "Tutte le schedine sono state inviate" },
   istat: { label: "ISTAT · Turist@t", short: "ISTAT", sub: "Movimenti turistici dagli arrivi", icon: "chart", allDone: "Nessun movimento da comunicare" },
   tassa: { label: "Tassa di soggiorno", short: "Tassa", sub: "Da incassare dopo la partenza", icon: "coins", allDone: "Nessuna tassa da incassare" },
   checkin: { label: "Check-in online e documenti", short: "Check-in", sub: "Dati e documenti di tutti gli ospiti", icon: "id", allDone: "Check-in completi" },
