@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
+import { ensureLoaded } from "@/lib/struct-load";
 
 // Link diretto alla scheda prenotazione (usato dalle email al titolare): `/prenotazioni?b=<id>`.
 // All'apertura legge `?b=`, aspetta che i dati della prenotazione siano caricati (la sincronizzazione col server può arrivare dopo il primo
@@ -19,7 +20,8 @@ function cleanUrl() {
 }
 
 export default function OpenBookingFromUrl() {
-  const { raw, openBooking, selectedStructureIds, setActiveStructure } = useData();
+  const { raw, openBooking, selectedStructureIds, setActiveStructure, allStructures } = useData();
+  const askedAll = useRef(false);
   const wanted = useRef<string | null>(null);
   const opened = useRef(false);
 
@@ -38,13 +40,17 @@ export default function OpenBookingFromUrl() {
     const id = wanted.current;
     if (!id || opened.current) return;
     const b = raw.bookings.find((x) => x.id === id);
-    if (!b) return;
+    if (!b) {
+      // Modalità veloce: la prenotazione può essere di una struttura non ancora caricata → si caricano tutte (una volta) e poi si riprova; fuori dalla modalità veloce non fa nulla.
+      if (!askedAll.current) { askedAll.current = true; void ensureLoaded(allStructures.map((s) => s.id), "tutte le strutture", true); }
+      return;
+    }
     opened.current = true;
     wanted.current = null;
     if (!selectedStructureIds.includes(b.structureId)) setActiveStructure("all");
     openBooking(id);
     cleanUrl();
-  }, [raw.bookings, selectedStructureIds, openBooking, setActiveStructure]);
+  }, [raw.bookings, selectedStructureIds, openBooking, setActiveStructure, allStructures]);
 
   return null;
 }

@@ -28,9 +28,12 @@ import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig } from "./org-cassa-config";
 import { buildDelta, isEmptyDelta } from "./sync-delta";
 import { flatHash as flatHashOf } from "./sync-flat";
-import { deltaAllowedFor } from "./delta-allow";
+import { deltaAllowedFor, deltaWantedFrom } from "./delta-allow";
 import { applyRaceChanges } from "./sync-merge";
-import { isSyncKey, LOCAL_OWNER_KEY, SYNCBASE_KEY, decideEntry, syncBaseText, readSyncBase, contentSig, settingsSig, mergeSnapshots } from "./sync-core";
+import { isSyncKey, LOCAL_OWNER_KEY, SYNCBASE_KEY, decideEntry, syncBaseText, readSyncBase, contentSig, settingsSig, mergeSnapshots, stableStringify } from "./sync-core";
+import { pruneLocalToStructures } from "./sync-window";
+import { HOME_PREF_KEY, HOME_APPLIED_KEY, START_HINT_KEY, sortStructures, resolveSelection, selectionIds, startRequest } from "./home-struct";
+import { setDeltaScopeActive, initRequested, requestedParam, requestedIds, requestedSnapshot, addRequested, markLoaded, structureLoaded, noteCodeMax, registerLoader } from "./struct-load";
 
 // Pulizia una tantum: la vecchia copia nel localStorage occupava ~400 KB di una quota di ~5 MB.
 if (typeof window !== "undefined") { try { localStorage.removeItem("spigolestay:channex-arisnapshot"); } catch { /* storage non disponibile */ } }
@@ -139,28 +142,38 @@ function hasRealData(obj: Record<string, string> | null | undefined): boolean {
 }
 
 type SbClient = NonNullable<typeof supabase>;
-type ServerRow = { data: Record<string, string> | null; rev: number | null };
+type ServerRow = { data: Record<string, string> | null; rev: number | null; hadData?: boolean }; // hadData: (solo lettura a finestra) la riga ha prenotazioni/ospiti sul server anche se la finestra per struttura non li contiene
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODALITÀ VELOCE (Fase 2), per dispositivo: il browser scarica solo una FINESTRA di prenotazioni/ospiti (/api/sync/window) e rimanda al server solo le
 // MODIFICHE (/api/sync/delta), che il server applica all'archivio completo. Il server resta completo, quindi si può tornare alla modalità normale in ogni momento.
 // Nella modalità normale non cambia nulla. Acceso da Impostazioni → «Modalità veloce» (chiave locale), mai in automatico.
 // ─────────────────────────────────────────────────────────────────────────────
-export const DELTA_FLAG_KEY = "xn-delta-sync";        // "1" = modalità veloce voluta su questo dispositivo (non si sincronizza)
+export const DELTA_FLAG_KEY = "xn-delta-sync";        // assente o "1" = modalità veloce (DEFAULT per gli account abilitati); "0" = spenta dall'utente su questo dispositivo (non si sincronizza)
+export const DELTA_FAILED_KEY = "xn-delta-failed";    // sessione: uid per cui la lettura a finestra è fallita → in questa sessione si resta in modalità normale
 const DELTA_ACTIVE_KEY = "xn-delta-active";           // uid per cui la copia locale è già passata a finestra
 const DELTA_PAST_KEY = "xn-delta-past";               // sessione: "all" = carica tutto lo storico (finestra illimitata)
 let DELTA_MODE = false;
 export { deltaAllowedFor };
-export const deltaWanted = (uid: string): boolean => { if (!deltaAllowedFor(uid)) return false; try { return localStorage.getItem(DELTA_FLAG_KEY) === "1"; } catch { return false; } };
+export const deltaWanted = (uid: string): boolean => {
+  if (!deltaAllowedFor(uid)) return false;
+  let flag: string | null = null, failed: string | null = null;
+  try { flag = localStorage.getItem(DELTA_FLAG_KEY); } catch { /* storage non disponibile: default */ }
+  try { failed = sessionStorage.getItem(DELTA_FAILED_KEY); } catch { /* niente */ }
+  return deltaWantedFrom(uid, flag, failed);
+};
 export const deltaIsActive = (): boolean => DELTA_MODE;
 function deltaPast(): string { try { return sessionStorage.getItem(DELTA_PAST_KEY) === "all" ? "all" : ""; } catch { return ""; } }
 
 async function readViaWindow(table: string, idVal: string): Promise<ServerRow> {
-  const res = await fetch(`/api/sync/window?table=${encodeURIComponent(table)}&id=${encodeURIComponent(idVal)}${deltaPast() ? "&past=all" : ""}`, { cache: "no-store" });
+  // Apertura per struttura: solo le strutture richieste (vedi struct-load.ts); strutture/tipologie/camere di tutte arrivano sempre. Nessun parametro = tutte.
+  const sp = requestedParam();
+  const res = await fetch(`/api/sync/window?table=${encodeURIComponent(table)}&id=${encodeURIComponent(idVal)}${deltaPast() ? "&past=all" : ""}${sp ? "&structureIds=" + encodeURIComponent(sp) : ""}`, { cache: "no-store" });
   if (!res.ok) throw new Error("window_" + res.status); // un errore NON è «nessun dato»
-  const j = await res.json() as { ok?: boolean; data?: Record<string, string> | null; rev?: number | null };
+  const j = await res.json() as { ok?: boolean; data?: Record<string, string> | null; rev?: number | null; stats?: { bookingsTotal?: number; guestsTotal?: number } | null; codeMax?: Record<string, number> };
   if (!j || j.ok !== true) throw new Error("window_bad");
-  return { data: j.data ?? null, rev: typeof j.rev === "number" ? j.rev : null };
+  noteCodeMax(table + ":" + idVal, j.codeMax); // massimo progressivo dei codici prenotazione sull'archivio completo (anche delle strutture non caricate)
+  return { data: j.data ?? null, rev: typeof j.rev === "number" ? j.rev : null, hadData: !!j.stats && ((j.stats.bookingsTotal ?? 0) > 0 || (j.stats.guestsTotal ?? 0) > 0) };
 }
 
 let deltaBlocked = 0;
@@ -290,30 +303,33 @@ async function writeRowWithLock(client: SbClient, table: string, idCol: string, 
 
 type SyncRef = { rev: number; last: Record<string, string> };
 // Salva un singolo store (personale o org) con fusione 3 vie + lucchetto. Aggiorna ref. Ritorna il merge.
-async function saveOne(client: SbClient, table: string, idCol: string, idVal: string, snap: Record<string, string>, ref: SyncRef, baseHashes?: Record<string, string> | null): Promise<{ merged: Record<string, string>; wrote: boolean }> {
+// ok = false se NON tutto è arrivato sul server (conflitto o rifiuto): serve a sapere se lo stato locale è «tutto sincronizzato».
+async function saveOne(client: SbClient, table: string, idCol: string, idVal: string, snap: Record<string, string>, ref: SyncRef, baseHashes?: Record<string, string> | null): Promise<{ merged: Record<string, string>; wrote: boolean; ok: boolean }> {
+  const scope = DELTA_MODE ? requestedIds() : null; // strutture richieste: preso PRIMA della lettura (la lettura ne userà almeno altrettante)
   const { data: serverData, rev: serverRev } = await readRow(client, table, idCol, idVal);
   const merged = mergeSnapshots(snap, serverData, ref.last, baseHashes);
   if (DELTA_MODE) {
     // Modalità veloce: solo le modifiche, mai il blocco intero (una finestra riscritta come se fosse tutto cancellerebbe l'archivio).
-    const delta = buildDelta(serverData, ref.last, merged);
+    // scope: le entità delle strutture non caricate non si inviano mai (un dato non caricato non è un dato cambiato né cancellato).
+    const delta = buildDelta(serverData, ref.last, merged, scope);
     if (!isEmptyDelta(delta) && serverRev !== null) {
       const nr = await postDelta(table, idVal, serverRev, delta);
-      if (nr === null) return { merged, wrote: false }; // conflitto o rifiuto: ritenta al ciclo dopo
-      ref.rev = nr; ref.last = merged; return { merged, wrote: true };
+      if (nr === null) return { merged, wrote: false, ok: false }; // conflitto o rifiuto: ritenta al ciclo dopo
+      ref.rev = nr; ref.last = merged; return { merged, wrote: true, ok: true };
     }
     if (serverRev !== null) ref.rev = serverRev;
     ref.last = merged;
-    return { merged, wrote: false };
+    return { merged, wrote: false, ok: true };
   }
   const changedServer = contentSig(merged) !== contentSig(serverData ?? {});
   if (changedServer) {
     const nr = await writeRowWithLock(client, table, idCol, idVal, merged, serverRev);
-    if (nr === null) return { merged, wrote: false }; // conflitto: ritenta al ciclo dopo
-    ref.rev = nr; ref.last = merged; return { merged, wrote: true };
+    if (nr === null) return { merged, wrote: false, ok: false }; // conflitto: ritenta al ciclo dopo
+    ref.rev = nr; ref.last = merged; return { merged, wrote: true, ok: true };
   }
   if (serverRev !== null) ref.rev = serverRev;
   ref.last = merged;
-  return { merged, wrote: false };
+  return { merged, wrote: false, ok: true };
 }
 
 async function fetchOrgIds(client: SbClient, uid: string): Promise<string[]> {
@@ -329,7 +345,7 @@ async function syncOnce(
   revRef: { current: number },
   lastSynced: { current: Record<string, string> },
   orgRefs: { current: Record<string, SyncRef> },
-): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean; synced?: boolean }> {
+): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean; synced?: boolean; allOk?: boolean; roSig?: string }> {
   const versionAtStart = kvVersion(); // contatore delle scritture locali al momento della fotografia (per l'anti-race più sotto)
   const snap = snapshot();
   if (!("spigolestay:data:v1" in snap)) return { changedLocal: false, wrote: false };
@@ -389,7 +405,11 @@ async function syncOnce(
   // server non veniva mai adottato dal browser (restava "da fare" finché non ricaricavi).
   // Il reload della pagina resta gated su reloadSig (id-set) più avanti, così non introduce loop.
   const changedLocal = contentSig(newBlob) !== contentSig(snap);
-  return { changedLocal, newBlob, wrote: pRes.wrote, synced: personalRef.last !== lastBefore }; // synced: il ciclo dello stato personale è arrivato in fondo (non un conflitto da ritentare)
+  // Modalità veloce: se TUTTO è arrivato sul server (nessun conflitto) ricordo l'impronta dei prezzi forzati locali (serve ad avviare la volta dopo senza copie stantie, vedi pruneLocalForStart).
+  const allOk = pRes.ok && orgResults.every((r) => r.ok);
+  let roSig: string | undefined;
+  if (DELTA_MODE && allOk) { try { roSig = stableStringify((JSON.parse(newBlob["spigolestay:data:v1"] || "{}") as DataObj).rateOverrides ?? {}); } catch { /* impronta non disponibile: nessuna potatura dei prezzi */ } }
+  return { changedLocal, newBlob, wrote: pRes.wrote, synced: personalRef.last !== lastBefore, allOk, roSig }; // synced: il ciclo dello stato personale è arrivato in fondo (non un conflitto da ritentare)
 }
 
 // Prepara (o disattiva) la modalità veloce per questo dispositivo. Ritorna true se DELTA_MODE è attivo dopo la chiamata.
@@ -424,6 +444,64 @@ orgRefs: { current: Record<string, SyncRef> },
     DELTA_MODE = true;
     return true;
   } catch { DELTA_MODE = false; return false; } // salvataggio non riuscito: modalità normale, nessun dato toccato
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APERTURA PER STRUTTURA (solo modalità veloce): all'avvio si scaricano le prenotazioni/ospiti/eventi/prezzi della sola struttura di apertura (la principale, o quella
+// scelta); le altre si caricano quando servono (cambio struttura, «Tutte»…) tramite il «caricatore» registrato da startPush. Vedi struct-load.ts e home-struct.ts.
+// ─────────────────────────────────────────────────────────────────────────────
+const SYNCED_AT_KEY = "xn-delta-syncedat";   // per dispositivo: quando è iniziato l'ultimo ciclo in cui TUTTO è arrivato sul server
+const RO_SIG_KEY = "xn-delta-ro-sig";        // impronta dei prezzi forzati locali in quel momento
+const lsRead = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
+
+function noteDeltaSynced(startedAt: number, roSig: string | undefined) {
+  try { localStorage.setItem(SYNCED_AT_KEY, String(startedAt)); if (roSig !== undefined) localStorage.setItem(RO_SIG_KEY, roSig); } catch { /* storage non disponibile */ }
+}
+
+// Toglie dalla copia locale (rimasta dalla sessione precedente) le entità delle strutture NON richieste che sono certamente già sul server: sono stantie, appesantiscono
+// il telefono e i lavori in sottofondo le scambierebbero per dati freschi. Tutto ciò che potrebbe non essere ancora sincronizzato si tiene (vedi pruneLocalToStructures).
+function pruneLocalForStart(ids: string[] | null) {
+  if (!ids) return; // "tutte": niente da togliere
+  try {
+    const raw = kvGet("spigolestay:data:v1"); if (!raw) return;
+    const syncedAt = Number(lsRead(SYNCED_AT_KEY) || 0); if (!(syncedAt > 0)) return;
+    const d = JSON.parse(raw) as Record<string, unknown>;
+    const pruneRates = lsRead(RO_SIG_KEY) === stableStringify(d.rateOverrides ?? {}); // prezzi invariati dall'ultima sincronizzazione riuscita
+    kvSet("spigolestay:data:v1", JSON.stringify(pruneLocalToStructures(d, ids, syncedAt, 120000, pruneRates)));
+  } catch { /* non si tocca nulla */ }
+}
+
+// Fissa la richiesta iniziale (prima di qualsiasi lettura a finestra) e pulisce il locale dalle strutture non richieste.
+function initDeltaRequest() {
+  let applied = false; try { applied = sessionStorage.getItem(HOME_APPLIED_KEY) === "1"; } catch { /* niente */ }
+  initRequested(startRequest({ sessionApplied: applied, savedActive: lsRead("spigolestay:activestruct"), savedSubset: lsRead("spigolestay:activestructs"), hintRaw: lsRead(START_HINT_KEY) }));
+  pruneLocalForStart(requestedIds());
+}
+
+// Prima sincronizzazione della modalità veloce, PRIMA di mostrare l'app: legge personale + organizzazioni con la sola struttura di apertura, poi (se l'elenco reale delle
+// strutture dice che l'apertura è un'altra: indicazione vecchia o mancante) la completa. Gli errori si lasciano al sync periodico, che riprova e usa la stessa richiesta.
+async function deltaStartupSync(
+  client: SbClient, uid: string,
+  revRef: { current: number }, lastSynced: { current: Record<string, string> }, orgRefs: { current: Record<string, SyncRef> },
+): Promise<void> {
+  for (let pass = 0; pass < 3; pass++) {
+    const req = requestedSnapshot();
+    const startedAt = Date.now();
+    const r = await syncOnce(client, uid, revRef, lastSynced, orgRefs);
+    if (r.changedLocal && r.newBlob) { if (!restore(r.newBlob)) return; if (r.synced) commitSyncBase(uid, lastSynced.current); }
+    else if (r.synced) commitSyncBase(uid, lastSynced.current);
+    if (r.synced === undefined) return; // locale senza dati: niente da verificare
+    markLoaded(req);
+    if (r.allOk) noteDeltaSynced(startedAt, r.roSig);
+    let sids: string[] = [];
+    try { const d = JSON.parse(kvGet("spigolestay:data:v1") || "{}") as { structures?: { id: string; orgId?: string; order?: number; name?: string }[] }; sids = sortStructures(Array.isArray(d.structures) ? d.structures : []).map((s) => s.id); } catch { /* elenco non leggibile */ }
+    let applied = false; try { applied = sessionStorage.getItem(HOME_APPLIED_KEY) === "1"; } catch { /* niente */ }
+    const sel = resolveSelection({ pref: lsRead(HOME_PREF_KEY), sortedIds: sids, savedActive: lsRead("spigolestay:activestruct"), savedSubset: lsRead("spigolestay:activestructs"), sessionApplied: applied });
+    const want = selectionIds(sel, sids);
+    const missing = (want === "all" ? sids : want).filter((id) => !structureLoaded(id));
+    if (!missing.length) return;
+    addRequested(missing, want === "all");
+  }
 }
 
 
@@ -533,6 +611,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hydratedUidRef = useRef<string>(""); // utente per cui questo AuthProvider ha avviato la sincronizzazione (se cambia sotto i piedi, es. login con un altro account in un'altra scheda, si riparte da zero)
 
   const stopPush = () => {
+    registerLoader(null);
     if (pushTimer.current) { clearInterval(pushTimer.current); pushTimer.current = null; }
     if (focusSyncRef.current) {
       try { window.removeEventListener("focus", focusSyncRef.current); document.removeEventListener("visibilitychange", focusSyncRef.current); } catch {}
@@ -680,18 +759,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const startPush = (userId: string) => {
       stopPush();
-      const runSync = async () => {
+      // force: sincronizzazione richiesta (es. caricamento di un'altra struttura): salta il controllo «non è cambiato nulla».
+      const runSync = async (force: boolean = false) => {
         if (syncingRef.current) return; // già in corso: evita run concorrenti (intervallo + focus)
         syncingRef.current = true;
         let syncOk = false;
+        const reqAtStart = DELTA_MODE ? requestedSnapshot() : null; // strutture richieste all'INIZIO del ciclo: sono quelle che il ciclo, se riesce, avrà caricato
+        const startedAt = Date.now();
         try {
           // Niente di nuovo né sul server né qui (e sincronizzato da meno di 45 s): non si scarica e non si fonde 4 MB per niente.
           const sigNow = await remoteSyncSig(supabase!, userId);
           const fullSig = sigNow ? sigNow + "#" + cheapLocalSig() : "";
-          if (fullSig && fullSig === lastSigRef.current && Date.now() - lastFullRef.current < 45000) return;
+          if (!force && fullSig && fullSig === lastSigRef.current && Date.now() - lastFullRef.current < 45000) return;
           // Sincronizzazione completa: personale (app_state) + eventuali strutture condivise (org_state),
           // con fusione 3 vie + lucchetto. Se non sei in nessuna org, è identico a prima.
-          const { newBlob, changedLocal, wrote, synced } = await syncOnce(supabase!, userId, revRef, lastSynced, orgRefs);
+          const { newBlob, changedLocal, wrote, synced, allOk, roSig } = await syncOnce(supabase!, userId, revRef, lastSynced, orgRefs);
           if (hydratedUidRef.current !== userId) return; // l'utente è cambiato durante il ciclo: il risultato è di un altro account, non si applica
           syncOk = true;
           if (changedLocal && newBlob) {
@@ -702,6 +784,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // …e avviso lo store di ri-leggere in-place (riflette anche i cambi di singolo campo,
             // es. check-in completato/pagamento, senza dover ricaricare la pagina).
             try { window.dispatchEvent(new Event("spigolestay:datasync")); } catch {}
+            if (reqAtStart) { markLoaded(reqAtStart); if (allOk) noteDeltaSynced(startedAt, roSig); } // strutture arrivate (DOPO l'aggiornamento dello store: chi aspettava può ora mostrarle)
             // …e NON si ricarica la pagina per prenotazioni, ospiti, camere ecc.: prima ogni novità dal server (altra scheda, Channex, un
             // collega) faceva ricomparire la farfalla per diversi secondi, anche mentre si scorreva un elenco. Si ricarica solo se è cambiato
             // qualcosa che si legge soltanto all'apertura (utenti e permessi, piano, moduli) e mai in mezzo a un'operazione.
@@ -724,6 +807,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (synced) commitSyncBase(userId, lastSynced.current);
+          if (reqAtStart) { markLoaded(reqAtStart); if (allOk) noteDeltaSynced(startedAt, roSig); }
           if (wrote) void syncProfile(userId);
         } catch {} finally {
           if (syncOk) {
@@ -734,7 +818,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           syncingRef.current = false;
         }
       };
-      pushTimer.current = setInterval(runSync, 4000);
+      pushTimer.current = setInterval(() => { void runSync(); }, 4000);
+      // Modalità veloce: caricamento di altre strutture su richiesta (cambio struttura, «Tutte»…). Si aggiungono alla richiesta e si fa subito un ciclo completo;
+      // se ne sta già girando uno (con la richiesta di prima) si aspetta che finisca e se ne fa un altro. true = arrivate; false = non riuscito (la vista resta com'è).
+      registerLoader(async (need, all) => {
+        addRequested(need, all);
+        for (let attempt = 0; attempt < 4; attempt++) {
+          for (let w = 0; w < 100 && syncingRef.current; w++) await new Promise((r) => setTimeout(r, 150));
+          if (syncingRef.current) return false;
+          await runSync(true);
+          if (need.every((i) => structureLoaded(i))) return true;
+        }
+        return false;
+      });
       // Sync IMMEDIATO quando torni sulla scheda: così un check-in/pagamento fatto in un altro
       // tab si riflette subito (la riga/azione sparisce appena rientri), senza aspettare i 4s.
       const onFocus = () => { void runSync(); };
@@ -755,16 +851,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const wantDelta = deltaWanted(uid);
         let activeUid = ""; try { activeUid = localStorage.getItem(DELTA_ACTIVE_KEY) || ""; } catch { /* niente */ }
         const switching = wantDelta !== (activeUid === uid);
-        if (!switching) DELTA_MODE = wantDelta;
+        if (!switching) { DELTA_MODE = wantDelta; setDeltaScopeActive(DELTA_MODE); if (DELTA_MODE) initDeltaRequest(); } // modalità veloce: si fissa PRIMA di qualsiasi lettura quali strutture scaricare
         // La scorciatoia vale solo se i dati locali sono DAVVERO di questo utente: il flag è per scheda ma il localStorage è condiviso tra le schede, quindi un'altra scheda
         // con un altro login può aver messo lì i dati di un altro account (decideEntry: proprietario diverso → niente scorciatoia, si svuota).
         let localOwner: string | null = null; try { localOwner = localStorage.getItem(LOCAL_OWNER_KEY); } catch { /* storage non disponibile */ }
         const entry = decideEntry({ localOwner, uid, sessionFlag: sessionStorage.getItem(flagKey), localHasData });
         if (!switching && entry === "shortcut") {
           try {
-            const res = await syncOnce(supabase!, uid, revRef, lastSynced, orgRefs);
-            if (res.changedLocal && res.newBlob) { if (restore(res.newBlob) && res.synced) commitSyncBase(uid, lastSynced.current); } // l'app non è ancora montata: parte già con i dati aggiornati
-            else if (res.synced) commitSyncBase(uid, lastSynced.current);
+            if (DELTA_MODE) await deltaStartupSync(supabase!, uid, revRef, lastSynced, orgRefs); // apertura per struttura: prima la sola struttura di apertura, poi (se serve) il completamento
+            else {
+              const res = await syncOnce(supabase!, uid, revRef, lastSynced, orgRefs);
+              if (res.changedLocal && res.newBlob) { if (restore(res.newBlob) && res.synced) commitSyncBase(uid, lastSynced.current); } // l'app non è ancora montata: parte già con i dati aggiornati
+              else if (res.synced) commitSyncBase(uid, lastSynced.current);
+            }
           } catch { /* rete assente: riproverà il push periodico */ }
           void syncProfile(uid);
           if (localOwner === null) markLocalOwner(uid); // marcatore mancante ma scheda già reidratata per questo utente: si ripristina (mai su dati di un altro proprietario)
@@ -779,9 +878,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Modalità veloce: prima volta su questo dispositivo → si salva TUTTO ciò che c'è in locale con la modalità normale, poi la copia locale dei dati
         // si scarta e si riparte dalla finestra. Se il salvataggio non riesce non si cambia nulla (resta la modalità normale).
         await prepareDeltaMode(uid, revRef, lastSynced, orgRefs); // se non riesce DELTA_MODE resta falso: modalità normale
-        const { data: serverData, rev: serverRev } = await readServer(supabase!, uid);
+        setDeltaScopeActive(DELTA_MODE);
+        if (DELTA_MODE) initDeltaRequest(); // quali strutture scaricare (la principale / quella scelta) e pulizia delle copie locali stantie delle altre
+        const { data: serverData, rev: serverRev, hadData: serverHadData } = await readServer(supabase!, uid);
         if (cancelled) return;
-        const serverReal = hasRealData(serverData);
+        const serverReal = hasRealData(serverData) || (DELTA_MODE && serverHadData); // a finestra per struttura la riga può sembrare vuota (ospiti e prenotazioni di altre strutture non sono nella finestra)
         let localReal = false;
         try { localReal = hasRealData({ "spigolestay:data:v1": kvGet("spigolestay:data:v1") ?? "" }); } catch {}
 
@@ -806,6 +907,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           if (okR && pushedOk && !DELTA_MODE) commitSyncBase(uid, merged);
           sessionStorage.setItem(flagKey, uid); markLocalOwner(uid);
+          // Modalità veloce: prima di mostrare l'app si legge anche l'elenco delle strutture condivise (organizzazioni) con la sola struttura di apertura, così all'apertura
+          // c'è già tutto ciò che serve. Se fallisce non è grave: il sync periodico riprova con la stessa richiesta.
+          if (DELTA_MODE && okR) { try { await deltaStartupSync(supabase!, uid, revRef, lastSynced, orgRefs); } catch { /* riprova il sync periodico */ } }
           void syncProfile(uid);
           setHydrated(true);
           if (okR) startPush(uid); // senza spazio nel browser non si spinge nulla (sarebbe uno stato vecchio)
@@ -816,9 +920,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (localReal) {
           const snap = snapshot();
           const merged = mergeSnapshots(snap, serverData, {});
-          const nr = await writeWithLock(supabase!, uid, merged, serverRev);
+          // Modalità veloce: mai riscrivere la riga intera con uno stato parziale (finestra per struttura): ci pensa il sync a delta.
+          const nr = DELTA_MODE ? null : await writeWithLock(supabase!, uid, merged, serverRev);
           revRef.current = nr ?? (serverRev ?? 0);
-          lastSynced.current = merged;
+          lastSynced.current = DELTA_MODE ? (serverData ?? {}) : merged;
           if (nr !== null && !DELTA_MODE) commitSyncBase(uid, merged);
           void syncProfile(uid);
           sessionStorage.setItem(flagKey, uid); markLocalOwner(uid);
@@ -873,8 +978,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         startPush(uid);
         return;
       } catch {
-        // Modalità veloce: se la lettura a finestra non riesce si spegne l'interruttore, così il «Riprova» riparte dalla modalità normale (mai bloccati fuori dai propri dati).
-        if (DELTA_MODE) { try { localStorage.removeItem(DELTA_FLAG_KEY); } catch { /* niente */ } }
+        // Modalità veloce: se la lettura a finestra non riesce il «Riprova» riparte dalla modalità normale per tutta la sessione (mai bloccati fuori dai propri dati).
+        // (marcatore di SESSIONE: niente loop di tentativi a ogni ricaricamento, ma la scelta dell'utente non si spegne per sempre per un errore passeggero.)
+        if (DELTA_MODE) { try { sessionStorage.setItem(DELTA_FAILED_KEY, uid); } catch { /* niente */ } }
         // Errore di rete/server: se il browser ha già i dati si lavora in locale (il sync riprende da solo);
         // se è vuoto NON si entra (sembrerebbe un account nuovo e partirebbe l'onboarding): schermata con "Riprova".
         let localHas = false;

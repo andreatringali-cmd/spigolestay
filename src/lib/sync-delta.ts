@@ -25,6 +25,7 @@ export interface Delta {
   colls: Record<string, CollDelta>;
   tombs: Record<string, string[]>;          // lapidi NUOVE da aggiungere per collezione (il server le unisce a quelle che ha)
   fields: Record<string, unknown>;          // altri campi del blocco dati (rateOverrides, activities, …)
+  rates?: { set: Record<string, unknown>; del: string[] }; // prezzi forzati (rateOverrides) PER CHIAVE: il server ne vede solo una parte (strutture richieste), quindi mai sostituire la mappa intera
   flat: Record<string, string>;             // altre chiavi della riga (impostazioni, conversazioni…): valore intero
   confirm?: boolean;                        // consenso esplicito a cancellazioni oltre soglia
   v?: number;                               // versione del formato (informativa)
@@ -36,6 +37,7 @@ export function describeDelta(d: Delta): string {
   if (d.diag) parts.push("perché:" + Object.entries(d.diag).map(([k, n]) => k + "=" + n).join(","));
   for (const [c, v] of Object.entries(d.colls)) if (v.upsert.length || v.del.length) parts.push(`${c}:+${v.upsert.length}/-${v.del.length}`);
   for (const [c, v] of Object.entries(d.tombs)) if (v.length) parts.push(`lapidi.${c}:${v.length}`);
+  if (d.rates && (Object.keys(d.rates.set).length || d.rates.del.length)) parts.push(`prezzi:+${Object.keys(d.rates.set).length}/-${d.rates.del.length}`);
   if (Object.keys(d.fields).length) parts.push("campi:" + Object.keys(d.fields).join(","));
   if (Object.keys(d.flat).length) parts.push("chiavi:" + Object.keys(d.flat).join(","));
   return parts.join(" ") || "vuoto";
@@ -78,6 +80,7 @@ function sameFlat(server: string | undefined, merged: string): boolean {
 
 const asObj = (x: unknown): Json => (x && typeof x === "object" && !Array.isArray(x) ? (x as Json) : {});
 const asArr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
+const tsOf = (it: unknown): number => { const t = it && typeof it === "object" ? (it as { updatedAt?: unknown }).updatedAt : undefined; return typeof t === "number" && isFinite(t) ? t : 0; };
 const idOf = (it: unknown): string | null => {
   const id = it && typeof it === "object" ? (it as { id?: unknown }).id : undefined;
   return id !== undefined && id !== null && id !== "" ? String(id) : null;
@@ -91,25 +94,34 @@ function parseObj(raw: string | undefined): Json | null {
 
 /** True se il delta non contiene alcuna modifica. */
 export function isEmptyDelta(d: Delta): boolean {
-  return !Object.values(d.colls).some((c) => c.upsert.length || c.del.length) && !Object.values(d.tombs).some((t) => t.length) && !Object.keys(d.fields).length && !Object.keys(d.flat).length;
+  return !Object.values(d.colls).some((c) => c.upsert.length || c.del.length) && !Object.values(d.tombs).some((t) => t.length) && !Object.keys(d.fields).length && !Object.keys(d.flat).length
+    && !(d.rates && (Object.keys(d.rates.set).length || d.rates.del.length));
 }
 
 /**
  * BROWSER. `server` = la riga come l'ha data il server (finestra); `base` = ultima versione sincronizzata (finestra, già fusa); `merged` = risultato della fusione.
  * Un'entità si invia solo se è cambiata rispetto a ENTRAMBE: così quelle uscite dalla finestra ma ancora in locale non vengono rimandate a ogni ciclo.
  * Una cancellazione si invia solo per ciò che il server ci ha DATO e che nel fuso non c'è più.
+ * `scope` (apertura per struttura): elenco delle strutture di cui il server ci ha dato prenotazioni/eventi/recensioni/prezzi (null = tutte). Un'entità di una struttura
+ * NON in elenco (rimasta in locale da una sessione precedente) non si invia mai: non l'abbiamo caricata, quindi non possiamo averla cambiata e la copia locale può essere stantia.
  */
-export function buildDelta(server: Record<string, string> | null, base: Record<string, string> | null, merged: Record<string, string>): Delta {
+export function buildDelta(server: Record<string, string> | null, base: Record<string, string> | null, merged: Record<string, string>, scope?: string[] | null): Delta {
   const delta = emptyDelta();
   const sData = parseObj(server?.[DATA_KEY]) ?? {};
   const bData = parseObj(base?.[DATA_KEY]) ?? {};
   const mData = parseObj(merged[DATA_KEY]);
   if (mData) {
+    const scoped = Array.isArray(scope);
+    const scopeSet = new Set<string>(scoped ? scope : []);
+    const knownSids = new Set<string>(asArr(mData.structures).map((x) => idOf(x)).filter((x): x is string => !!x));
+    const outOfScope = (sid: unknown): boolean => scoped && typeof sid === "string" && sid !== "" && knownSids.has(sid) && !scopeSet.has(sid);
     for (const coll of ENTITY_COLLECTIONS) {
       const sMap = byId(asArr(sData[coll])), bMap = byId(asArr(bData[coll])), mList = asArr(mData[coll]), mMap = byId(mList);
       const upsert: Json[] = [], del: string[] = [];
+      const hasSid = coll === "bookings" || coll === "events" || coll === "directReviews";
       for (const it of mList) {
         const id = idOf(it); if (!id) continue;
+        if (hasSid && outOfScope((it as Json).structureId)) continue; // struttura non caricata: mai inviata
         const s = sMap.get(id), b = bMap.get(id);
         if ((s === undefined || !same(s, it)) && (b === undefined || !same(b, it))) {
           upsert.push(it as Json);
@@ -128,9 +140,20 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
       const add = asArr(mTomb[coll]).map(String).filter((id) => !have.has(id));
       if (add.length) delta.tombs[coll] = add;
     }
+    // prezzi forzati: per CHIAVE (il server ci ha dato solo i prezzi delle strutture richieste: la mappa intera non va mai sostituita)
+    {
+      const sRo = asObj(sData.rateOverrides), bRo = asObj(bData.rateOverrides), mRo = asObj(mData.rateOverrides);
+      const sidOfRt = new Map<string, string>();
+      for (const rt of asArr(mData.roomTypes)) { const id = idOf(rt), sid = (rt as Json)?.structureId; if (id && typeof sid === "string") sidOfRt.set(id, sid); }
+      const skipKey = (k: string): boolean => { const rtId = k.includes("|") ? k.split("|")[0] : ""; return !!rtId && outOfScope(sidOfRt.get(rtId)); };
+      const set: Record<string, unknown> = {}, rdel: string[] = [];
+      for (const k of Object.keys(mRo)) { if (skipKey(k)) continue; if (!same(mRo[k], sRo[k]) && !(k in bRo && same(mRo[k], bRo[k]))) set[k] = mRo[k]; }
+      for (const k of Object.keys(sRo)) if (!(k in mRo)) rdel.push(k);
+      if (Object.keys(set).length || rdel.length) delta.rates = { set, del: rdel };
+    }
     // altri campi del blocco dati (non finestrati: confronto diretto col server)
     for (const k of Object.keys(mData)) {
-      if (COLL_SET.has(k) || k === "_deleted") continue;
+      if (COLL_SET.has(k) || k === "_deleted" || k === "rateOverrides") continue;
       if (!same(mData[k], sData[k])) delta.fields[k] = mData[k];
     }
   }
@@ -208,6 +231,9 @@ export function applyDelta(row: Record<string, string> | null, delta: Delta): { 
       for (const it of c.upsert) {
         const id = idOf(it); if (!id) continue;
         const at = idx.get(id);
+        // Mai sovrascrivere una versione PIÙ RECENTE presente sul server (stessa regola «vince l'ultima modifica» della fusione nel browser):
+        // un'entità stantia rimasta in un dispositivo non può far tornare indietro un'altra modificata altrove nel frattempo.
+        if (at !== undefined && tsOf(list[at]) > tsOf(it)) continue;
         if (at !== undefined) list[at] = it; else { idx.set(id, list.length); list.push(it); }
         upserts++;
       }
@@ -232,6 +258,14 @@ export function applyDelta(row: Record<string, string> | null, delta: Delta): { 
       }
     }
     d._deleted = tomb;
+  }
+
+  // prezzi forzati: aggiunte/modifiche e rimozioni per CHIAVE sulla mappa completa del server (le chiavi non citate restano)
+  if (delta.rates && (Object.keys(delta.rates.set ?? {}).length || (delta.rates.del ?? []).length)) {
+    const ro: Json = { ...asObj(d.rateOverrides) };
+    for (const [k, v] of Object.entries(delta.rates.set ?? {})) ro[k] = v;
+    for (const k of delta.rates.del ?? []) delete ro[k];
+    d.rateOverrides = ro;
   }
 
   for (const [k, v] of Object.entries(delta.fields)) {

@@ -131,6 +131,8 @@ test("delta: campi del blocco (rateOverrides) e chiavi piatte cambiano per valor
   assert.equal(res.row["spigolestay:promos"], "[1,2,3]");
   assert.equal(res.row["spigolestay:threads:v1"], "{}");              // mancante nel fuso ≠ cancellata sul server
   assert.deepEqual(Object.keys(delta.flat), ["spigolestay:promos"]);
+  assert.deepEqual(delta.rates, { set: { "rt1|2026-10-21": 99 }, del: [] }); // i prezzi forzati viaggiano PER CHIAVE (mai la mappa intera: il server può averne più della finestra)
+  assert.equal("rateOverrides" in delta.fields, false);
 });
 
 test("delta: «activities» e «_deletedLeads» si uniscono, non si sovrascrivono (il server può averne di nuove)", () => {

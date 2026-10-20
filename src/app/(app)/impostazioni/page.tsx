@@ -17,6 +17,7 @@ import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import StyleChooser from "@/components/StyleChooser";
 import FastModeCard from "@/components/FastModeCard";
+import HomeStructureCard from "@/components/HomeStructureCard";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { NOTIF_DEF, loadNotifPrefs } from "@/lib/notifPrefs";
@@ -352,6 +353,8 @@ export default function ImpostazioniPage() {
       </Card>
 
       <AdsSettingsCard />
+
+      <HomeStructureCard />
 
       <FastModeCard />
 

@@ -6,6 +6,8 @@ import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
 import Icon from "./Icon";
 import Popover from "./Popover";
+import { useStructLoad } from "@/lib/struct-load";
+import { HOME_PREF_KEY } from "@/lib/home-struct";
 
 export default function StructureSwitcher() {
   const { allStructures, activeStructureId, setActiveStructure, selectedStructureIds, setActiveStructures } = useData();
@@ -15,6 +17,12 @@ export default function StructureSwitcher() {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const sl = useStructLoad(); // modalità veloce: "Carico <struttura>…" mentre arrivano i dati di un'altra struttura (la vista di prima resta finché non sono pronti)
+  const loadingLabel = sl.loading.length ? sl.loading[sl.loading.length - 1] : "";
+  // Struttura di apertura: «Apri sempre su questa» (preferenza per dispositivo, vedi lib/home-struct.ts). Assente = la principale (prima dell'elenco).
+  const readHomePref = () => { if (typeof window === "undefined") return ""; try { return localStorage.getItem(HOME_PREF_KEY) || ""; } catch { return ""; } };
+  const [homePref, setHomePref] = useState(readHomePref);
+  const setHome = (id: string) => { try { localStorage.setItem(HOME_PREF_KEY, id); window.dispatchEvent(new Event("spigolestay:homepref")); } catch { /* niente */ } setHomePref(id); };
 
   // Selezione multipla: spunta le strutture che vuoi vedere (insieme). Una sola = come prima; tutte = "Tutte le strutture".
   const chosen = new Set(selectedStructureIds.filter((id) => structures.some((s) => s.id === id)));
@@ -29,11 +37,13 @@ export default function StructureSwitcher() {
     <div className="relative shrink-0">
       <button
         ref={btnRef}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setHomePref(readHomePref()); setOpen((o) => !o); }}
         className="flex items-center gap-2 rounded-lg border border-line bg-paper py-1.5 pl-2.5 pr-2 text-sm transition hover:border-focus max-sm:min-h-10"
       >
         <span style={{ color: "var(--focus)" }}><Icon name="building" size={16} /></span>
-        {current ? (
+        {loadingLabel ? (
+          <span className="max-w-[150px] truncate font-medium text-dim sm:max-w-[220px]" role="status">{t("Carico")} {loadingLabel}…</span>
+        ) : current ? (
           <span className="flex items-baseline gap-1.5">
             <span className="max-w-[110px] truncate font-medium text-txt sm:max-w-[180px] md:max-w-[110px] lg:max-w-[180px]">{current.name}</span>
             {current.city && <span className="hidden text-[11px] text-faint sm:inline md:hidden xl:inline">{current.city}</span>}
@@ -51,6 +61,11 @@ export default function StructureSwitcher() {
             <Item key={x.id} checked={chosen.has(x.id)} onClick={() => toggle(x.id)} name={x.name} sub={x.city} onOnly={structures.length > 1 ? () => only(x.id) : undefined} onlyLabel={t("solo")} />
           ))}
           {structures.length > 1 && <div className="mt-1 border-t border-line px-2.5 pb-1 pt-1.5 text-[11px] text-faint">{t("Spunta le strutture che vuoi vedere insieme.")}</div>}
+          {current && structures.length > 1 && !allowedStructureIds && (
+            homePref === current.id
+              ? <div className="px-2.5 pb-1.5 text-[11px] font-semibold text-focus">✓ {t("L'app si apre sempre su questa struttura")}</div>
+              : <button onClick={() => setHome(current.id)} className="mx-1 mb-1 rounded-md px-1.5 py-1.5 text-left text-[11px] font-semibold text-focus hover:bg-wash max-sm:min-h-10">{t("Apri sempre su questa")}</button>
+          )}
       </Popover>
     </div>
   );

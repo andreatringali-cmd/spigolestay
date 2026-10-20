@@ -4,11 +4,13 @@
 // Avvisa anche se una cancellazione di massa è stata bloccata per sicurezza.
 import { useEffect, useState } from "react";
 import { deltaIsActive } from "@/lib/authsync";
+import { useStructLoad, clearLoadError } from "@/lib/struct-load";
 
 const PAST_KEY = "xn-delta-past";
 const ACTIVE_KEY = "xn-delta-active";
 
 export default function DeltaBar() {
+  const sl = useStructLoad(); // caricamento di altre strutture: «Carico …» e, se non riesce, un messaggio chiaro (la vista resta com'è)
   const [blocked, setBlocked] = useState("");
   const [all, setAll] = useState(() => { try { return sessionStorage.getItem(PAST_KEY) === "all"; } catch { return false; } });
   useEffect(() => {
@@ -27,6 +29,8 @@ export default function DeltaBar() {
       {all
         ? <button onClick={backToFast} className="font-semibold text-focus hover:underline">Torna alla vista veloce</button>
         : <button onClick={loadAll} className="font-semibold text-focus hover:underline">Carica storico</button>}
+      {sl.loading.length > 0 && <span className="font-semibold text-txt" role="status">Carico {sl.loading[sl.loading.length - 1]}…</span>}
+      {sl.error && <span className="font-semibold" style={{ color: "var(--err)" }} role="alert">{sl.error} <button onClick={clearLoadError} className="font-semibold text-focus hover:underline">Ok</button></span>}
       {blocked && <span className="font-semibold" style={{ color: "var(--err)" }}>{blocked}</span>}
     </div>
   );

@@ -23,6 +23,8 @@ import { moveGuestChats } from "./merge-threads";
 import { orphanedRefs, privateRefsIn } from "./media-orphans";
 import { keepsCheckinFiles } from "./checkin-sanitize";
 import { deleteMedia } from "./media-client";
+import { HOME_PREF_KEY, HOME_APPLIED_KEY, START_HINT_KEY, sortStructures, resolveSelection, nextOpenHint, serializeStartHint } from "./home-struct";
+import { useStructLoad, ensureLoaded, structureLoaded, loadedSet, codeMaxFor, addLocalStructure } from "./struct-load";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -252,6 +254,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const readyRef = useRef(false);
   useEffect(() => { readyRef.current = ready; }, [ready]);
+  const [activeStructureId, setActiveStructureId] = useState<string>("all");
+  // Sottoinsieme di 2+ strutture (vuoto = nessun sottoinsieme: vale activeStructureId).
+  const [subsetIds, setSubsetIds] = useState<string[]>([]);
+  const sl = useStructLoad(); // stato del caricamento per struttura (modalità veloce): cosa è già arrivato, "Carico…", errori
+  const valueRef = useRef<DataContextValue | null>(null); // ultimo valore del contesto (per le azioni che aspettano il caricamento di altre strutture)
+  const pendingRef = useRef<{ ids: string[]; fn: () => void }[]>([]);
+  const selTokenRef = useRef(0); // l'ultima richiesta di cambio struttura vince (due clic ravvicinati)
+  const homeDone = useRef(false);
+  const [prefTick, setPrefTick] = useState(0);
+  // Applica la struttura di apertura (una volta per sessione del browser; i ricaricamenti mantengono la scelta fatta). Ritorna false se non ci sono strutture.
+  const applyHome = (list: Structure[]): boolean => {
+    if (!list.length) return false;
+    try {
+      const sortedIds = sortStructures(list).map((x) => x.id);
+      const sel = resolveSelection({
+        pref: localStorage.getItem(HOME_PREF_KEY), sortedIds,
+        savedActive: localStorage.getItem("spigolestay:activestruct"), savedSubset: localStorage.getItem("spigolestay:activestructs"),
+        sessionApplied: sessionStorage.getItem(HOME_APPLIED_KEY) === "1",
+      });
+      setActiveStructureId(sel.active); setSubsetIds(sel.subset);
+      localStorage.setItem("spigolestay:activestruct", sel.active);
+      localStorage.setItem("spigolestay:activestructs", sel.subset.join(","));
+      sessionStorage.setItem(HOME_APPLIED_KEY, "1");
+      window.dispatchEvent(new Event("spigolestay:activestruct"));
+    } catch { /* storage non disponibile: resta la vista di prima */ }
+    return true;
+  };
   useEffect(() => {
     // Modalità sito pubblico (xenora.it/<slug>): i dati arrivano dallo snapshot in
     // memoria, non dal localStorage. Non si esegue reset/onboarding e NON si salva.
@@ -288,12 +317,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Prima di configurare (onboarding non completato) NON si caricano i dati demo.
       const onboarded = localStorage.getItem("spigolestay:onboarded") === "1";
       const raw = onboarded ? kvGet(KEY) : null;
+      let mountStructs: Structure[] = [];
       // Migrazione una-tantum: azzera i prezzi dei dati già esistenti (basePrice + tariffe forzate).
       // Si esegue una sola volta, poi imposta un flag e non interviene più.
       const zeroPrices = localStorage.getItem("spigolestay:zeroprices:v1") !== "1";
       if (raw) {
         const d = JSON.parse(raw);
-        if (Array.isArray(d.structures)) setStructures(d.structures as Structure[]);
+        if (Array.isArray(d.structures)) { setStructures(d.structures as Structure[]); mountStructs = d.structures as Structure[]; }
         if (Array.isArray(d.roomTypes)) {
           let rts = d.roomTypes as RoomType[];
           if (zeroPrices) rts = rts.map((r) => ({ ...r, basePrice: 0 }));
@@ -313,10 +343,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setStructures([]); setRoomTypes([]); setUnits([]); setGuests([]); setBookings([]); setEvents([]); setRateOverrides({});
       }
       if (zeroPrices) localStorage.setItem("spigolestay:zeroprices:v1", "1");
-      const savedStruct = localStorage.getItem("spigolestay:activestruct");
-      if (savedStruct) setActiveStructureId(savedStruct);
+      // Struttura di APERTURA: la principale (o quella scelta in Impostazioni), non «Tutte» né l'ultima usata. Se l'elenco delle strutture non c'è ancora
+      // (primo accesso, dati in arrivo dal server) si applica appena compare (effetto più sotto).
+      if (applyHome(mountStructs)) homeDone.current = true;
+      else { const savedStruct = localStorage.getItem("spigolestay:activestruct"); if (savedStruct) setActiveStructureId(savedStruct); }
     } catch {}
     setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
@@ -367,9 +400,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ready]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [newBooking, setNewBooking] = useState<NewBookingPrefill | null>(null);
-  const [activeStructureId, setActiveStructureId] = useState<string>("all");
-  // Sottoinsieme di 2+ strutture (vuoto = nessun sottoinsieme: vale activeStructureId).
-  const [subsetIds, setSubsetIds] = useState<string[]>([]);
   useEffect(() => { try { const v = localStorage.getItem("spigolestay:activestructs"); if (v) setSubsetIds(v.split(",").filter(Boolean)); } catch {} }, []);
   // Se la struttura selezionata non esiste più (eliminata), torna a "Tutte".
   useEffect(() => {
@@ -380,6 +410,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const kept = subsetIds.filter((id) => structures.some((s) => s.id === id));
       if (kept.length >= 2) setSubsetIds(kept); else { setSubsetIds([]); if (kept.length === 1) setActiveStructureId(kept[0]); }
     }
+  }, [ready, structures, activeStructureId, subsetIds]);
+
+  // Struttura di apertura rimandata: i dati delle strutture sono arrivati dopo il primo rendering (primo accesso, sincronizzazione in corso).
+  useEffect(() => {
+    if (!ready || homeDone.current || isPublicMode()) return;
+    if (structures.length && applyHome(structures)) homeDone.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, structures]);
+  // Cosa scaricare per prima alla PROSSIMA apertura (modalità veloce): si ricorda a ogni cambio di strutture, di selezione o di preferenza.
+  useEffect(() => {
+    const h = () => setPrefTick((t) => t + 1);
+    window.addEventListener("spigolestay:homepref", h);
+    return () => window.removeEventListener("spigolestay:homepref", h);
+  }, []);
+  useEffect(() => {
+    if (!ready || isPublicMode() || !structures.length) return;
+    try {
+      const hint = nextOpenHint(localStorage.getItem(HOME_PREF_KEY), sortStructures(structures).map((x) => x.id), activeStructureId, subsetIds.join(","));
+      const txt = serializeStartHint(hint);
+      if (localStorage.getItem(START_HINT_KEY) !== txt) localStorage.setItem(START_HINT_KEY, txt);
+    } catch { /* storage non disponibile */ }
+  }, [ready, structures, activeStructureId, subsetIds, prefTick]);
+  // Modalità veloce: la selezione corrente deve avere i dati caricati (apertura con indicazione vecchia, sottoinsiemi ripristinati…). Nessun effetto fuori dalla modalità veloce.
+  useEffect(() => {
+    if (!ready || isPublicMode() || !structures.length) return;
+    const sorted = sortStructures(structures);
+    const ids = subsetIds.length >= 2 ? subsetIds : activeStructureId === "all" ? sorted.map((x) => x.id) : [activeStructureId];
+    const need = ids.filter((id) => !structureLoaded(id));
+    if (need.length) void ensureLoaded(need, need.length === 1 ? (structures.find((x) => x.id === need[0])?.name ?? "la struttura") : "le strutture", activeStructureId === "all" && subsetIds.length < 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, structures, activeStructureId, subsetIds]);
 
   // Stima della commissione per le prenotazioni senza cifra reale: si ricalcola quando cambiano le prenotazioni, PRIMA che i componenti figli la leggano.
@@ -399,6 +459,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const ob = typeof b.order === "number" ? b.order : 1e9;
       return oa !== ob ? oa - ob : (a.name || "").localeCompare(b.name || "", "it");
     });
+    // Modalità veloce: i lavori in sottofondo e le pagine che leggono i dati COMPLETI (raw) vedono solo le strutture già caricate (null = tutte): una struttura
+    // non caricata ha camere ma non prenotazioni, e sembrerebbe libera. Fuori dalla modalità veloce nulla cambia.
+    const lf = loadedSet();
+    const inLoaded = (sid?: string | null) => !lf || !sid || lf.has(sid) || !sortedStructures.some((x) => x.id === sid);
+    const rawStructures = lf ? sortedStructures.filter((x) => lf.has(x.id)) : sortedStructures;
+    const rawRoomTypes = lf ? roomTypes.filter((x) => inLoaded(x.structureId)) : roomTypes;
+    const rawUnits = lf ? units.filter((x) => inLoaded(x.structureId)) : units;
+    const rawBookings = lf ? bookings.filter((x) => inLoaded(x.structureId)) : bookings;
+    const rawEvents = lf ? events.filter((x) => inLoaded(x.structureId)) : events;
+    // Cambio struttura: se i dati non sono ancora arrivati si caricano prima (con «Carico <nome>…»), poi si cambia; se fallisce resta la vista di prima.
+    const nameOf = (id: string) => structures.find((x) => x.id === id)?.name ?? "la struttura";
+    const switchWhenLoaded = (need: string[], label: string, all: boolean, go: () => void) => {
+      const token = ++selTokenRef.current;
+      if (need.every((i) => structureLoaded(i))) { go(); return; }
+      void ensureLoaded(need, label, all).then((ok) => { if (ok && token === selTokenRef.current) go(); });
+    };
+    // Azioni che toccano dati di altre strutture (eliminare una struttura/tipologia/camera, unire o eliminare ospiti): servono quelle strutture caricate, altrimenti si
+    // lascerebbero prenotazioni orfane. Se mancano si caricano e l'azione riparte da sola con i dati completi. true = si può procedere subito.
+    const whenLoaded = (need: string[] | "all", label: string, redo: () => void): boolean => {
+      const ids = need === "all" ? structures.map((x) => x.id) : need;
+      if (ids.every((i) => structureLoaded(i))) return true;
+      const p = { ids, fn: redo };
+      pendingRef.current.push(p);
+      void ensureLoaded(ids, label, need === "all").then((ok) => { if (!ok) pendingRef.current = pendingRef.current.filter((x) => x !== p); });
+      return false;
+    };
     const sub = subsetIds.length >= 2 ? new Set(subsetIds) : null;
     const inSub = (sid?: string | null) => !sub || !sid || sub.has(sid);
     const xStructures = sub ? sortedStructures.filter((x) => sub.has(x.id)) : sortedStructures;
@@ -411,19 +497,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return {
       structures: xStructures,
       allStructures: sortedStructures,
-      raw: { structures: sortedStructures, roomTypes, units, bookings, events },
+      raw: { structures: rawStructures, roomTypes: rawRoomTypes, units: rawUnits, bookings: rawBookings, events: rawEvents },
       selectedStructureIds: sub ? subsetIds : activeStructureId === "all" ? sortedStructures.map((x) => x.id) : [activeStructureId],
       setActiveStructures: (ids) => {
         const valid = ids.filter((id) => structures.some((x) => x.id === id));
         const all = valid.length === 0 || valid.length >= structures.length;
         const single = !all && valid.length === 1;
-        setActiveStructureId(all ? "all" : single ? valid[0] : "all");
-        setSubsetIds(!all && !single ? valid : []);
-        try {
-          localStorage.setItem("spigolestay:activestruct", all ? "all" : single ? valid[0] : "all");
-          localStorage.setItem("spigolestay:activestructs", !all && !single ? valid.join(",") : "");
-          window.dispatchEvent(new Event("spigolestay:activestruct"));
-        } catch {}
+        const go = () => {
+          setActiveStructureId(all ? "all" : single ? valid[0] : "all");
+          setSubsetIds(!all && !single ? valid : []);
+          try {
+            localStorage.setItem("spigolestay:activestruct", all ? "all" : single ? valid[0] : "all");
+            localStorage.setItem("spigolestay:activestructs", !all && !single ? valid.join(",") : "");
+            window.dispatchEvent(new Event("spigolestay:activestruct"));
+          } catch {}
+        };
+        const need = all ? structures.map((x) => x.id) : valid;
+        switchWhenLoaded(need, all ? "tutte le strutture" : valid.length === 1 ? nameOf(valid[0]) : valid.map(nameOf).join(", "), all, go);
       },
       roomTypes: xRoomTypes,
       units: xUnits,
@@ -445,9 +535,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       closeNewBooking: () => setNewBooking(null),
 
       activeStructureId,
-      setActiveStructure: (id) => { setSubsetIds([]); try { localStorage.setItem("spigolestay:activestructs", ""); } catch {} setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); window.dispatchEvent(new Event("spigolestay:activestruct")); } catch {} },
+      setActiveStructure: (id) => {
+        const go = () => { setSubsetIds([]); try { localStorage.setItem("spigolestay:activestructs", ""); } catch {} setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); window.dispatchEvent(new Event("spigolestay:activestruct")); } catch {} };
+        if (id === "all") switchWhenLoaded(structures.map((x) => x.id), "tutte le strutture", true, go);
+        else switchWhenLoaded([id], nameOf(id), false, go);
+      },
 
-      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s, updatedAt: Date.now() }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
+      addStructure: (s) => { const id = uid(); addLocalStructure(id); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s, updatedAt: Date.now() }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
       updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
       // Sposta una struttura su/giù nell'ordine di visualizzazione. Normalizza il campo
       // order su TUTTE le strutture (0..n) così l'ordine è stabile ovunque.
@@ -490,6 +584,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, outOfService: !u.outOfService, updatedAt: Date.now() } : u))),
 
       deleteStructure: (id) => {
+        if (!whenLoaded([id], nameOf(id), () => valueRef.current?.deleteStructure(id))) return; // le prenotazioni della struttura devono essere caricate: si eliminano con lei
         const nm = structures.find((s) => s.id === id)?.name;
         const rtIds = roomTypes.filter((rt) => rt.structureId === id).map((rt) => rt.id);
         const uIds = units.filter((u) => u.structureId === id).map((u) => u.id);
@@ -502,6 +597,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         logAct("config", `Struttura eliminata${nm ? " — " + nm : ""}`);
       },
       deleteRoomType: (id) => {
+        const rtSid = roomTypes.find((rt) => rt.id === id)?.structureId;
+        if (rtSid && !whenLoaded([rtSid], nameOf(rtSid), () => valueRef.current?.deleteRoomType(id))) return;
         const nm = roomTypes.find((rt) => rt.id === id)?.name;
         // Cascata: la tipologia + TUTTE le tariffe derivate che pendono da lei (anche a più
         // livelli, es. Matrimoniale → Dus Tripla). Così sparisce anche da "Tariffe".
@@ -518,6 +615,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         logAct("config", `Tipologia eliminata${nm ? " — " + nm : ""}${extra > 0 ? ` (+${extra} tariffe derivate)` : ""}`);
       },
       deleteUnit: (id) => {
+        const uSid = units.find((u) => u.id === id)?.structureId;
+        if (uSid && !whenLoaded([uSid], nameOf(uSid), () => valueRef.current?.deleteUnit(id))) return;
         const nm = units.find((u) => u.id === id)?.name;
         tomb("units", id);
         // I blocchi "fuori servizio" (channel "blocked") della camera vanno eliminati con lei: senza camera ripiegherebbero sulla tipologia
@@ -543,6 +642,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: Date.now() } : g))),
       updateGuests: (patches) => { if (!patches.length) return; const by = new Map(patches.map((x) => [x.id, x.patch])); const ts = Date.now(); setGuests((prev) => prev.map((g) => (by.has(g.id) ? { ...g, ...by.get(g.id), updatedAt: ts } : g))); },
       deleteGuest: (id) => {
+        if (!whenLoaded("all", "tutte le strutture", () => valueRef.current?.deleteGuest(id))) return; // l'ospite potrebbe avere prenotazioni in strutture non ancora caricate
         // Conserva i dati dell'ospite sulla prenotazione (per Alloggiati Web) prima di sganciarlo.
         const g = guests.find((x) => x.id === id);
         const snap = g ? { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber, docPlace: g.docPlace } : undefined;
@@ -556,6 +656,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (g) dropOrphanFiles([g], { bookings, guests: guests.filter((x) => x.id !== id) }); // foto documento dell'anagrafica eliminata, se nessuna prenotazione le usa più
       },
       mergeGuestGroups: (groups) => {
+        if (!whenLoaded("all", "tutte le strutture", () => valueRef.current?.mergeGuestGroups(groups))) return; // le prenotazioni dei doppioni vanno riagganciate in TUTTE le strutture
         const dropToKeep = new Map<string, string>();
         const patches = new Map<string, Partial<Guest>>();
         for (const g of groups) {
@@ -571,6 +672,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         logAct("config", `Anagrafica: ${dropToKeep.size} doppioni uniti in ${groups.length} schede`);
       },
       mergeGuests: (keepId, dropIds) => {
+        if (!whenLoaded("all", "tutte le strutture", () => valueRef.current?.mergeGuests(keepId, dropIds))) return;
         const drop = new Set(dropIds.filter((d) => d && d !== keepId));
         if (drop.size === 0) return;
         tomb("guests", ...drop);
@@ -583,7 +685,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Codice leggibile progressivo per anno di arrivo: XEN-2026-0001.
         const year = (b.checkIn || ymdRome(new Date())).slice(0, 4);
         const prefix = `XEN-${year}-`;
-        const maxN = bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0);
+        // (in modalità veloce le prenotazioni di strutture non caricate non sono qui: il massimo dei codici già usati lo dà il server a ogni lettura, per anno)
+        const maxN = Math.max(codeMaxFor(year), bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0));
         const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
         // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
         // Origine (logo): una diretta creata dal gestionale senza id esterno è "manuale"; chi chiama può passare source esplicito (es. booking engine = "sito"). Gli import (con extId) restano senza campo: li deduce directOriginOf.
@@ -710,7 +813,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       getGuest: (id) => guests.find((g) => g.id === id),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, selectedBookingId, newBooking, activeStructureId, subsetIds]);
+  }, [structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, selectedBookingId, newBooking, activeStructureId, subsetIds, sl.version]);
+  // (dopo il rendering, non durante: le azioni rimandate partono solo quando il contesto è già aggiornato con le strutture appena caricate)
+  useEffect(() => { valueRef.current = value; }, [value]);
+  // Azioni rimandate (eliminazioni, unioni di ospiti…) che aspettavano il caricamento di altre strutture: appena arrivano si eseguono, con i dati completi.
+  useEffect(() => {
+    const run = pendingRef.current.filter((p) => p.ids.every((i) => structureLoaded(i)));
+    if (!run.length) return;
+    pendingRef.current = pendingRef.current.filter((p) => !run.includes(p));
+    run.forEach((p) => p.fn());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sl.version, value]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
