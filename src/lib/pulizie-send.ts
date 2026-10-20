@@ -7,7 +7,7 @@ import { logInvio } from "@/lib/invii-log";
 import { computePuliziePlan, buildPuliziePlanText, buildPuliziePlanSummary, buildPuliziePlanFields, fmtLongIT } from "@/lib/puliziePlan";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
-export interface PulizieSendCfg { email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
+export interface PulizieSendCfg { email: boolean; emailTo: string; emailCc?: string[]; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
 export interface PulizieSendResult { channel: "email" | "whatsapp"; ok: boolean; detail: string }
 
 /** Data (Y-M-D) e "HH:MM" adesso nel fuso Europe/Rome. */
@@ -48,10 +48,10 @@ export async function deliverPuliziePlan(a: {
     try {
       const resp = await internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "guest_message", lang: "it", to: cfg.emailTo, subject, text: emailText, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
+        body: JSON.stringify({ kind: "guest_message", lang: "it", to: cfg.emailTo, ...(cfg.emailCc?.length ? { cc: cfg.emailCc } : {}), subject, text: emailText, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
       });
       const j = await resp.json().catch(() => ({}));
-      r = resp.ok && j?.ok ? { channel: "email", ok: true, detail: cfg.emailTo } : { channel: "email", ok: false, detail: errText(j, resp.status) };
+      r = resp.ok && j?.ok ? { channel: "email", ok: true, detail: cfg.emailCc?.length ? `${cfg.emailTo} (in copia: ${cfg.emailCc.join(", ")})` : cfg.emailTo } : { channel: "email", ok: false, detail: errText(j, resp.status) };
     } catch (e) { r = { channel: "email", ok: false, detail: e instanceof Error ? e.message : "errore" }; }
     await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: r.ok, detail: r.detail });
     out.push(r);

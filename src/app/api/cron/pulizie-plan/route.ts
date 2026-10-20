@@ -30,7 +30,7 @@ const CFG_PREFIX = "spigolestay:pulizie:autoshare:";
 const s = (v: unknown) => (typeof v === "string" ? v : "");
 const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 
-interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
+interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; emailCc?: string[]; whatsapp: boolean; whatsappTo: string; intro?: string; outro?: string; subject?: string }
 
 export async function GET(req: Request) {
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -105,12 +105,16 @@ export async function GET(req: Request) {
 
   try {
     // 1) Righe in scadenza: invio attivo con email, orario già passato, non ancora inviato oggi (tabella piccola, nessun dato pesante).
-    const { data: sched, error: schedErr } = await admin.from("pulizie_schedule").select("tenant_id, structure_id, send_time, email_to").eq("enabled", true).eq("email", true);
+    const { data: sched, error: schedErr } = await admin.from("pulizie_schedule").select("tenant_id, structure_id, send_time, email_to, enabled, email, updated_at");
     if (schedErr) throw new Error(`pulizie_schedule: ${schedErr.message}`);
-    type Sch = { tenant_id: string; structure_id: string; send_time: string; email_to: string };
+    type Sch = { tenant_id: string; structure_id: string; send_time: string; email_to: string; enabled?: boolean; email?: boolean; updated_at?: string };
     const minOf = (hm: string) => { const [h, m] = (hm || "08:00").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
     const nowMin = minOf(nowSlot);
-    const all = (sched ?? []) as Sch[];
+    // UNA sola impostazione per struttura: se più utenti (titolare e collaboratori di una struttura in società) hanno ciascuno la propria riga, vale l'ULTIMA salvata. Prima ogni riga
+    // inviava per conto suo, quindi una vecchia copia di un altro utente continuava a mandare l'email all'indirizzo di prima.
+    const latest = new Map<string, Sch>();
+    for (const r of (sched ?? []) as Sch[]) { const cur = latest.get(r.structure_id); if (!cur || String(r.updated_at ?? "") > String(cur.updated_at ?? "")) latest.set(r.structure_id, r); }
+    const all = Array.from(latest.values()).filter((r) => r.enabled === true && r.email !== false); // l'ultima impostazione deve essere ATTIVA con email: se l'hai spenta, le vecchie copie di altri utenti non la riaccendono
     // Più utenti possono avere lo stesso invio (stessa struttura, stessa email): parte una volta sola al giorno.
     const dest = (r: Sch) => `${r.structure_id}|${(r.email_to || "").trim().toLowerCase()}`;
     const { data: done } = await admin.from("pulizie_share_log").select("tenant_id, structure_id").eq("slot_date", todayRome);

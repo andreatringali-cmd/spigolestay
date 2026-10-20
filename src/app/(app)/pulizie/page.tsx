@@ -276,7 +276,7 @@ export default function PuliziePage() {
   // serve una struttura sola selezionata, non "tutte le strutture" senza filtro.
   const autoShareStructure = activeStructureId !== "all"
     ? structures.find((s) => s.id === activeStructureId)
-    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : structures.length === 1 ? structures[0] : undefined); // con una sola struttura nell'account non serve sceglierla
+    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : structures[0]); // con «Tutte» si apre sulla prima: nella finestra si sceglie la struttura da configurare
 
   // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione
   // (calcolato per struttura, come nella pagina Camere — non fa parte della logica condivisa col cron).
@@ -298,7 +298,7 @@ export default function PuliziePage() {
   // Testo del programma da condividere con la signora delle pulizie (stessa logica del cron di invio automatico).
   // Riga iniziale e finale scelte nell'invio programmato: valgono con una sola struttura selezionata.
   const buildPlanText = (style: "whatsapp" | "plain" = "whatsapp") => {
-    const c = autoShareStructure ? loadAutoShareCfg(autoShareStructure.id) : null;
+    const c = autoShareStructure && scopedStructures.length === 1 ? loadAutoShareCfg(scopedStructures[0].id) : null; // riga iniziale/finale solo con UNA struttura in vista
     return buildPuliziePlanText({ date, scopedStructures, rooms, guests, notes, t, style, intro: c?.intro, outro: c?.outro });
   };
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
@@ -657,7 +657,7 @@ export default function PuliziePage() {
             onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
             disabled={!autoShareStructure}
             aria-label={t("Invio programmato")}
-            title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
+            title={t("Invio programmato: scegli orario ed email di ogni struttura")}
             className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-sm:hidden"
           ><Icon name="clock" size={16} /></button>
           <Popover open={planShare} anchorRef={planShareBtnRef} onClose={() => setPlanShare(false)} align="end" width={176} label={t("Condividi")}>
@@ -668,7 +668,7 @@ export default function PuliziePage() {
       </div>
         );
       })()}
-      {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} onClose={() => setAutoOpen(false)} />}
+      {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} structures={structures.map((x) => ({ id: x.id, name: x.name }))} onClose={() => setAutoOpen(false)} />}
 
       {/* Segnalazioni aperte dalla signora */}
       {openIssues.length > 0 && (

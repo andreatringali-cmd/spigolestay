@@ -61,13 +61,15 @@ async function resolveLogoUrl(brand?: Brand): Promise<Brand | undefined> {
 // fromName: nome visualizzato del mittente (es. "B&b Spigolehouse") — l'indirizzo resta sempre
 // quello verificato su Resend, cambia solo il nome che l'ospite vede in casella, come fa Octorate
 // (mittente = la struttura, non la piattaforma). "Xenora" resta il default per le email di sistema.
-async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[], fromName?: string) {
+async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[], fromName?: string, cc?: string[]) {
   if (!validEmail(to)) throw new MailInputError("Indirizzo email del destinatario non valido");
+  // Destinatari «in copia»: solo indirizzi validi, senza doppioni né il destinatario principale, al massimo 10.
+  const ccList = Array.from(new Set((cc ?? []).map((x) => String(x ?? "").trim()).filter((x) => validEmail(x) && x.toLowerCase() !== to.trim().toLowerCase()))).slice(0, 10);
   const reply = validEmail(replyTo) ? replyTo.trim() : undefined; // reply_to non valido: si omette (l'email parte comunque)
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: fromHeader(fromName, FROM_ADDR), to: [to.trim()], subject: String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300), html, ...(reply ? { reply_to: reply } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
+    body: JSON.stringify({ from: fromHeader(fromName, FROM_ADDR), to: [to.trim()], ...(ccList.length ? { cc: ccList } : {}), subject: String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300), html, ...(reply ? { reply_to: reply } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || `Resend ${res.status}`);
@@ -113,6 +115,7 @@ export async function POST(req: Request) {
     // PDF già pronto generato lato browser (kind: "quote") catturando l'anteprima reale (QuoteDoc) con
     // html2canvas+jsPDF: quando presente si usa questo, niente rigenerazione via pdf-lib.
     pdfBase64?: string; pdfFilename?: string;
+    cc?: string[]; // destinatari in copia (solo messaggi liberi: es. planning pulizie)
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b: BookingPayload = body.booking || {};
@@ -196,7 +199,7 @@ export async function POST(req: Request) {
       const accent = body.accent || inBrand?.accent || b.color || "#285f92";
       const brand = await resolveLogoUrl(inBrand || (b.structureName ? { ...brandFrom(b), accent } : undefined));
       const html = messageEmailHtml({ lang: L, title: body.subject || et(L, "Messaggio"), text: body.text || "", accent, brand, ctaUrl: body.ctaUrl, ctaLabel: body.ctaLabel });
-      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail || brand?.email, undefined, brand?.name || b.structureName);
+      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail || brand?.email, undefined, brand?.name || b.structureName, Array.isArray(body.cc) ? body.cc : undefined);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "quote") {

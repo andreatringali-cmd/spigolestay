@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     try { data = JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { continue; }
     const st = arr(data.structures).find((x) => x.id === structureId) as unknown as Structure | undefined;
     if (!st) continue;
-    let cfg: { enabled?: boolean; email?: boolean; emailTo?: string; whatsapp?: boolean; whatsappTo?: string; intro?: string; outro?: string; subject?: string } = {};
+    let cfg: { enabled?: boolean; email?: boolean; emailTo?: string; emailCc?: string[]; whatsapp?: boolean; whatsappTo?: string; intro?: string; outro?: string; subject?: string } = {};
     // Impostazioni e note stanno nei dati personali dell'utente, anche se la struttura vive in un'organizzazione condivisa (prima: «Nessun destinatario salvato»).
     const personalBlob = (personal?.data ?? {}) as Record<string, string>;
     try { cfg = JSON.parse(personalBlob[CFG_PREFIX + structureId] || blob[CFG_PREFIX + structureId] || "{}"); } catch { cfg = {}; }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     try { notes = JSON.parse(personalBlob[NOTES_KEY] || blob[NOTES_KEY] || "{}") as Record<string, string>; } catch { notes = {}; }
     const results = await deliverPuliziePlan({
       admin: auth.admin, tenantId: auth.tenantId, origin: siteOrigin(req), structure: st,
-      cfg: { email: !!cfg.email, emailTo: cfg.emailTo ?? "", whatsapp: false, whatsappTo: "", intro: cfg.intro, outro: cfg.outro, subject: cfg.subject },
+      cfg: { email: !!cfg.email, emailTo: cfg.emailTo ?? "", emailCc: Array.isArray(cfg.emailCc) ? cfg.emailCc.filter((x) => typeof x === "string") : [], whatsapp: false, whatsappTo: "", intro: cfg.intro, outro: cfg.outro, subject: cfg.subject },
       date: romeNowSlot().ymd,
       units: arr(data.units) as unknown as Unit[], roomTypes: arr(data.roomTypes) as unknown as RoomType[],
       bookings: arr(data.bookings) as unknown as Booking[], guests: arr(data.guests) as unknown as Guest[], notes,
