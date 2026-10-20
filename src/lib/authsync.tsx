@@ -582,7 +582,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabaseEnabled || !supabase) { setAccessAllowed(true); return; }
     if (!session) { setAccessAllowed(null); return; }
-    if (!mfaChecked || mfaNeeded) return; // prima la verifica 2FA
+    // VELOCITÀ: il controllo parte subito, in parallelo alla verifica 2FA (prima aspettava che finisse: due viaggi di rete uno dopo l'altro prima ancora di scaricare i dati).
+    // Se questo utente è già stato abilitato nelle ultime 24 ore su questo dispositivo si prosegue SUBITO e il controllo si ripete in sottofondo
+    // (se nel frattempo è stato tolto l'accesso, esce come prima). Il server resta comunque protetto da RLS.
+    const okKey = "xn-access-ok:" + (session.user?.id ?? "");
+    let cachedOk = false;
+    try { const t = Number(localStorage.getItem(okKey) || 0); cachedOk = t > 0 && Date.now() - t < 24 * 3600 * 1000; } catch { /* storage non disponibile */ }
+    if (cachedOk) setAccessAllowed(true);
     let cancelled = false;
     (async () => {
       try {
@@ -592,18 +598,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         if (j && j.allowed === false) {
           setAccessAllowed(false);
-          try { localStorage.setItem("xn-access-denied", "1"); } catch {}
+          try { localStorage.setItem("xn-access-denied", "1"); localStorage.removeItem(okKey); } catch {}
           await supabase!.auth.signOut();
         } else {
           setAccessAllowed(true);
-          try { localStorage.removeItem("xn-access-denied"); } catch {}
+          try { localStorage.removeItem("xn-access-denied"); if (j && j.allowed === true) localStorage.setItem(okKey, String(Date.now())); } catch {}
         }
       } catch {
         if (!cancelled) setAccessAllowed(true); // fail-open: nessun lockout su errore di rete
       }
     })();
     return () => { cancelled = true; };
-  }, [sessionUid, mfaChecked, mfaNeeded]);
+  }, [sessionUid]);
 
   // 3) Al login: scarica lo stato dal server e reidrata una sola volta per questo utente/tab.
   useEffect(() => {
