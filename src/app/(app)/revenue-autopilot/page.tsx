@@ -192,7 +192,7 @@ export default function RevenueAutopilotPage() {
       <PageHeader title="Revenue Autopilot" subtitle="Il pilota prezzi: suggerisce e applica tariffe ottimali giorno per giorno" />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] max-sm:hidden">{sourceChips}</div>
-      <div className="mb-3 flex items-center text-[11px] sm:hidden"><FilterSheet label="Fonti dati"><div className="flex flex-col items-start gap-2 text-[11px]">{sourceChips}</div></FilterSheet></div>
+      <div className="mb-3 flex items-center text-[11px] sm:hidden"><FilterSheet label="Fonti dati" keepOpen><div className="flex flex-col items-start gap-2 text-[11px]">{sourceChips}</div></FilterSheet></div>
 
       {/* Previsione storica per il prossimo weekend: solo se la confidenza è sufficiente (mai un numero inventato). */}
       {weekendForecast.length > 0 && (

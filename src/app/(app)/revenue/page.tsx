@@ -164,7 +164,7 @@ export default function RevenuePage() {
       <PageHeader title={t("Revenue · prezzi dinamici")} subtitle={t("Suggerimenti di prezzo in base a occupazione ed eventi")} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] max-sm:hidden">{sourceChips}</div>
-      <div className="mb-3 flex items-center text-[11px] sm:hidden"><FilterSheet label={t("Fonti dati")}><div className="flex flex-col items-start gap-2 text-[11px]">{sourceChips}</div></FilterSheet></div>
+      <div className="mb-3 flex items-center text-[11px] sm:hidden"><FilterSheet label={t("Fonti dati")} keepOpen><div className="flex flex-col items-start gap-2 text-[11px]">{sourceChips}</div></FilterSheet></div>
 
       <div className="mb-5 grid gap-3 max-sm:mb-3 max-sm:grid-cols-2 sm:grid-cols-3">
         <StatCard label={`${t("Occupazione media")} ${days} ${t("gg")}`} value={`${Math.round(avgOcc * 100)}%`} />
