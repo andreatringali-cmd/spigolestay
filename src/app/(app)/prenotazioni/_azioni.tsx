@@ -164,7 +164,7 @@ export default function StepActions(p: StepActionsProps) {
     const partial = dec > 0 && dec < exp;
     const missing = exp - dec;
     const build = async () => {
-      const model = partial ? null : await fromModel("selfcheckin");
+      const model = await fromModel("selfcheckin"); // anche con il check-in incompleto parte il modello «Check-in online»; il testo di base («mancano i dati di N ospiti») resta solo senza modello
       if (model) return { text: model, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` };
       const url = await shortenLink(fullCheckin);
       const core = partial ? CHECKIN_MORE_MSG[lang](missing, url) : CHECKIN_MSG[lang](url);
