@@ -195,7 +195,7 @@ export default function Adempimenti2() {
 
       <ElaboraPanel busy={elabora.busy} steps={elabora.steps} onClose={elabora.closeSteps} />
 
-      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_21rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="flex min-w-0 flex-col gap-2.5">
           {!loading && res.tasks.length > 0 && <Toolbar view={view} onView={setView} filter={filter} onFilter={setFilter} summary={summary} totalSoon={summary.soon} />}
           {loading ? (
@@ -210,7 +210,7 @@ export default function Adempimenti2() {
             </>
           )}
         </div>
-        <aside className="flex min-w-0 flex-col gap-3" aria-label="Calendario e cronologia">
+        <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-3" aria-label="Calendario e cronologia">
           <Calendario days={calendar} loading={loading} />
           <Cronologia entries={timeline} structOf={(id) => structName(id)} nameOf={(bid) => { const b = bid ? byId.get(bid) : undefined; return b ? nameOf(b) : undefined; }} loading={loading} />
         </aside>
