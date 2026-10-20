@@ -43,8 +43,7 @@ const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
 export default function ModelliPanel() {
   const ask = useConfirm();
   const { t } = useLang();
-  const { structures, raw, activeStructureId } = useData();
-  const allStructures = raw.structures; // TUTTE le strutture (con una selezione multipla `structures` ne contiene solo alcune)
+  const { structures, allStructures, activeStructureId } = useData(); // allStructures = TUTTE le strutture (con una selezione `structures` ne contiene solo alcune)
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [ready, setReady] = useState(false);
   const [search, setSearch] = useState("");

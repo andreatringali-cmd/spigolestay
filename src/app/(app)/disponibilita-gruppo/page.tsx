@@ -5,6 +5,7 @@
 // Logica in src/lib/inventory-pool.ts.
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
+import { allLoaded, ensureLoaded, useStructLoad } from "@/lib/struct-load";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { POOL_DEF, POOL_KEY, parsePool, poolFamilies, poolListings, poolOccupancy, type PoolConfig } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
@@ -32,7 +33,12 @@ function Pill({ children, color }: { children: React.ReactNode; color: string })
 }
 
 export default function GruppoPage() {
-  const { raw } = useData();
+  const { raw, allStructures } = useData();
+  // Il gruppo riguarda TUTTE le strutture, anche se in alto ne è selezionata una sola (apertura su una struttura): l'elenco è completo e i dati di tutte si caricano qui.
+  const allIds = useMemo(() => allStructures.map((x) => x.id), [allStructures]);
+  const slState = useStructLoad();
+  const allReady = allLoaded(allIds);
+  useEffect(() => { if (allIds.length > 1 && !allLoaded(allIds)) void ensureLoaded(allIds, "le strutture del gruppo", true); }, [allIds]);
   const [cfg, setCfg] = useState<PoolConfig>(POOL_DEF);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { setCfg(parsePool(typeof window === "undefined" ? null : localStorage.getItem(POOL_KEY))); setLoaded(true); }, []);
@@ -43,7 +49,7 @@ export default function GruppoPage() {
     return n;
   });
 
-  const structures = raw.structures;
+  const structures = allStructures;
   const sOf = (id: string) => structures.find((s) => s.id === id);
   const sName = (id: string) => sOf(id)?.name ?? "—";
   const sColor = (id: string) => sOf(id)?.photoColor;
@@ -118,6 +124,7 @@ export default function GruppoPage() {
         )}
       </Card>
 
+      {!allReady && allIds.length > 1 && <p role="status" className="mt-3 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-dim">{slState.error || "Carico i dati delle altre strutture del gruppo… i numeri si completano tra un attimo."}</p>}
       {ready && (
         <>
           {/* 2 · Tipologie e camere reali */}

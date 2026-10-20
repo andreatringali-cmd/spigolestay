@@ -276,7 +276,7 @@ export default function PuliziePage() {
   // serve una struttura sola selezionata, non "tutte le strutture" senza filtro.
   const autoShareStructure = activeStructureId !== "all"
     ? structures.find((s) => s.id === activeStructureId)
-    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : structures[0]); // con «Tutte» si apre sulla prima: nella finestra si sceglie la struttura da configurare
+    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : structures.length === 1 ? structures[0] : undefined); // con una sola struttura nell'account non serve sceglierla
 
   // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione
   // (calcolato per struttura, come nella pagina Camere — non fa parte della logica condivisa col cron).
@@ -657,7 +657,7 @@ export default function PuliziePage() {
             onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
             disabled={!autoShareStructure}
             aria-label={t("Invio programmato")}
-            title={t("Invio programmato: scegli orario ed email di ogni struttura")}
+            title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
             className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-sm:hidden"
           ><Icon name="clock" size={16} /></button>
           <Popover open={planShare} anchorRef={planShareBtnRef} onClose={() => setPlanShare(false)} align="end" width={176} label={t("Condividi")}>
@@ -668,7 +668,7 @@ export default function PuliziePage() {
       </div>
         );
       })()}
-      {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} structures={structures.map((x) => ({ id: x.id, name: x.name }))} onClose={() => setAutoOpen(false)} />}
+      {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} onClose={() => setAutoOpen(false)} />}
 
       {/* Segnalazioni aperte dalla signora */}
       {openIssues.length > 0 && (
