@@ -632,7 +632,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 2) Reindirizza al login se non autenticato.
   useEffect(() => {
     if (!supabaseEnabled) return;
-    if (!loading && !session) { const p = window.location.pathname + window.location.search; router.replace(p === "/" || p.startsWith("/login") ? "/login" : "/login?next=" + encodeURIComponent(p)); } // conserva il link (es. /prenotazioni?b=<id>) per dopo l'accesso
+    // Dopo l'accesso si apre SEMPRE la dashboard, non l'ultima pagina in cui eri: il percorso si conserva solo per un link preciso (con parametri, es. /prenotazioni?b=<id>).
+    if (!loading && !session) { const p = window.location.pathname + window.location.search; router.replace(p === "/" || p.startsWith("/login") || !window.location.search ? "/login" : "/login?next=" + encodeURIComponent(p)); }
   }, [loading, session, router]);
 
   // 2b) Livello di sicurezza (2FA): se l'account ha il 2FA attivo e la sessione è ancora a un fattore,
