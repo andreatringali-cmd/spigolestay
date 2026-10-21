@@ -38,7 +38,7 @@ export interface StepActionsProps {
 }
 
 const btn = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-50";
-const btnPrimary = `${btn} border-transparent text-white hover:opacity-90`;
+const btnPrimary = `${btn} border-transparent text-on-focus hover:opacity-90`;
 const btnGhost = `${btn} border-line bg-surface text-txt hover:border-focus hover:text-focus`;
 
 export default function StepActions(p: StepActionsProps) {
@@ -139,7 +139,7 @@ export default function StepActions(p: StepActionsProps) {
       {isRecent(remKind) && <button className="self-start text-left text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: hai scritto da poco ({whenLabel(lastTs(remKind) ?? Date.now())}), meglio aspettare prima di rimandare. Sblocca comunque</button>}
     </div>
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !!blockedWhy || !hasPhone || isRecent(remKind)} title={blockedWhy ?? (hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite")} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
+      <button className={`${btnPrimary} whitespace-nowrap !text-on-wa`} style={{ background: "var(--wa)" }} disabled={!!busy || !!blockedWhy || !hasPhone || isRecent(remKind)} title={blockedWhy ?? (hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite")} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
       <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "var(--focus)" }} disabled={!!busy || !!blockedWhy || !hasMail || isRecent(remKind)} title={blockedWhy ?? (hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite")} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : "Email"}</button>
       <button className={`${btnGhost} px-2.5`} disabled={!!busy || !!blockedWhy} title={blockedWhy ?? "Copia il testo del messaggio"} aria-label="Copia il testo del messaggio" onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}><Icon name="copy" size={16} /></button>
       {extra}

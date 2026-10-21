@@ -449,7 +449,7 @@ export default function BookingDrawer() {
 
   const contactIcons = (
     <div className="flex shrink-0 gap-1.5">
-      <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white max-sm:h-10 max-sm:w-10 ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
+      <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg bg-wa text-on-wa max-sm:h-10 max-sm:w-10 ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
       <a href={safeTelHref(guest?.phone)} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-on-focus max-sm:h-10 max-sm:w-10 ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
       <a href={safeMailtoHref(guest?.email) ?? "mailto:"} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
     </div>
@@ -574,7 +574,7 @@ export default function BookingDrawer() {
               <>
                 <p className="mb-2 text-[13px] text-dim">{t("Ospite in partenza: chiedi ora una recensione, aumenta il ranking.")}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  <a href={rwa || undefined} target="_blank" rel="noopener noreferrer" onClick={() => { if (!booking.reviewRequestedAt) updateBooking(booking.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "whatsapp" }); }} className={`flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                  <a href={rwa || undefined} target="_blank" rel="noopener noreferrer" onClick={() => { if (!booking.reviewRequestedAt) updateBooking(booking.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "whatsapp" }); }} className={`flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-on-wa bg-wa ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-40"}`}>WhatsApp</a>
                   <a href={safeMailtoHref(guest?.email) ? `${safeMailtoHref(guest?.email)}?subject=${encodeURIComponent("Grazie del soggiorno!")}&body=${encodeURIComponent(rmsg)}` : undefined} onClick={() => { if (!booking.reviewRequestedAt) updateBooking(booking.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "email" }); }} className={`flex h-8 items-center rounded-lg border border-line px-3 text-sm font-medium text-txt hover:bg-wash ${guest?.email ? "" : "pointer-events-none opacity-40"}`}>Email</a>
                   <button onClick={() => navigator.clipboard?.writeText(rmsg)} className="flex h-8 items-center rounded-lg border border-line px-3 text-sm font-medium text-txt hover:bg-wash">{t("Copia")}</button>
                 </div>
@@ -791,7 +791,7 @@ export default function BookingDrawer() {
             <div className="flex items-center gap-3 pt-0.5">
               {checkinQr && <img src={checkinQr} alt="QR" title={t("Inquadra per gestire la prenotazione")} className="h-16 w-16 shrink-0 rounded-lg border border-line" />}
               <div className="flex flex-1 flex-col gap-2">
-                {phoneDigits && <button onClick={sendCiWa} className="rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</button>}
+                {phoneDigits && <button onClick={sendCiWa} className="rounded-lg py-2 text-center text-xs font-semibold text-on-wa bg-wa">{t("Invia link WhatsApp")}</button>}
                 <button onClick={copyCi} className="rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
               </div>
             </div>
@@ -831,7 +831,7 @@ export default function BookingDrawer() {
             <div className="mt-2 border-t border-line pt-3">
               <div className="mb-1 flex items-center gap-1.5 text-sm text-dim">📖 {t("Guida ospiti")}{!unitV && <span className="text-[11px]" style={{ color: "var(--warn)" }}>· {t("assegna la camera per i codici")}</span>}</div>
               <div className="flex flex-wrap gap-2">
-                {phoneDigits && <button onClick={sendGuideWa} className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia guida")}</button>}
+                {phoneDigits && <button onClick={sendGuideWa} className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-on-wa bg-wa">{t("Invia guida")}</button>}
                 <button onClick={sendGuideEmail} className="flex-1 rounded-lg bg-focus py-2 text-center text-xs font-semibold text-on-focus">{t("Email")}</button>
                 <button onClick={copyGuide} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
                 <a href={gLink} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-3 py-2 text-center text-xs font-semibold text-txt hover:bg-wash">↗</a>
@@ -986,7 +986,7 @@ export default function BookingDrawer() {
         </div>
         <Field label={t("Email")}><input className={inputCls} value={form.email} onChange={(e) => set({ email: e.target.value })} placeholder="nome@email.it" /></Field>
         <div className="flex gap-2 pt-0.5">
-          <ContactBtn href={form.phone.replace(/[^\d]/g, "") ? `https://wa.me/${form.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Buongiorno${form.firstName ? " " + form.firstName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(form.checkIn)}.`)}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={form.phone.replace(/[^\d]/g, "") ? `https://wa.me/${form.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Buongiorno${form.firstName ? " " + form.firstName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(form.checkIn)}.`)}` : undefined} label="WhatsApp" color="var(--wa)" missingTitle={t("Dato mancante")} />
           <ContactBtn href={safeTelHref(form.phone)} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
           <ContactBtn href={safeMailtoHref(form.email) ?? "mailto:"} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
         </div>
@@ -1213,7 +1213,7 @@ function ContactBtn({ href, label, color, missingTitle }: { href?: string; label
     <span className="flex-1 cursor-not-allowed rounded-lg border border-line bg-paper py-2 text-center text-xs font-semibold text-dim" title={missingTitle}>{label}</span>
   );
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white transition hover:opacity-90 max-sm:py-3" style={{ backgroundColor: color }}>{label}</a>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-on-focus transition hover:opacity-90 max-sm:py-3" style={{ backgroundColor: color }}>{label}</a>
   );
 }
 

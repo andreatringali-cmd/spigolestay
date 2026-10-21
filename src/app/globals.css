@@ -52,6 +52,11 @@
   --on-warn: #FFFFFF;
   --on-err: #FFFFFF;
 
+  /* Verde WhatsApp: in chiaro scurito (bianco 5,0:1; il #25D366 originale dava 2,0:1), in scuro il verde pieno con testo scuro (9,5:1) */
+  --wa: #14804A;
+  --cl-rest: #065F73; /* azzurro «riassetto» (pulizie) come TESTO: 5,0:1 su surface, 4,6:1 su wash; le barre restano #0891B2 */
+  --on-wa: #FFFFFF;
+
   /* Scala z-index (valori allineati all'esistente: header sticky z-30, modali 50-200 sparsi, Toast 100, Popover 1000).
      Da adottare nei componenti nuovi e nelle migrazioni; NON ancora riscritti i punti d'uso. */
   --z-sticky: 30;     /* barra superiore, intestazioni fisse */
@@ -106,6 +111,9 @@
   --on-ok: #0F1115;
   --on-warn: #0F1115;
   --on-err: #0F1115;
+  --wa: #25D366;
+  --cl-rest: #3DB7D4;
+  --on-wa: #0F1115;
 
   /* ombre più marcate (su fondo scuro quelle chiare quasi non si vedono) */
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
@@ -133,6 +141,8 @@
   --color-on-ok: var(--on-ok);
   --color-on-warn: var(--on-warn);
   --color-on-err: var(--on-err);
+  --color-wa: var(--wa);
+  --color-on-wa: var(--on-wa);
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-archivo);

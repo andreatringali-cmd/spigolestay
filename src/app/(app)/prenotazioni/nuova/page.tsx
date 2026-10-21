@@ -655,7 +655,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               )}
 
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
+              <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-on-wa bg-wa transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`}><Icon name="chat" size={15} /> WhatsApp</a>
               {!(sendConfirm && g?.email) && <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>}
               <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
               {!sendConfirm && g?.email && (

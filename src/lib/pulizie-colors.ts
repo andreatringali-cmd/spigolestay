@@ -9,6 +9,9 @@ export type CleanAct = "turnover" | "partenza" | "arrivo" | "riassetto" | "nient
 const ERR = "var(--err)", OK = "var(--ok)";
 const SOLID: Record<Exclude<CleanAct, "turnover">, string> = { partenza: ERR, arrivo: OK, riassetto: "#0891B2", niente: "var(--faint)" };
 
+// Come SOLID ma per il TESTO e i contatori: il riassetto usa un azzurro più scuro in chiaro (token --cl-rest) per restare leggibile (>= 4,5:1).
+const INK: Record<Exclude<CleanAct, "turnover">, string> = { ...SOLID, riassetto: "var(--cl-rest)" };
+
 /** Colore pieno (testo, puntino, barra). Il turnover è metà e metà. */
 export const cleanBar = (a: CleanAct): string => (a === "turnover" ? `linear-gradient(90deg, ${ERR} 50%, ${OK} 50%)` : SOLID[a]);
 /** Fondo tenue di pillole e tessere. */
@@ -17,6 +20,6 @@ export const cleanTint = (a: CleanAct, pct = 14): string => {
   return a === "turnover" ? `linear-gradient(90deg, ${mix(ERR)} 50%, ${mix(OK)} 50%)` : mix(SOLID[a]);
 };
 /** Colore del testo sopra il fondo tenue (il turnover usa il testo normale, perché ha due colori). */
-export const cleanText = (a: CleanAct): string => (a === "turnover" ? "var(--txt)" : SOLID[a]);
+export const cleanText = (a: CleanAct): string => (a === "turnover" ? "var(--txt)" : INK[a]);
 /** Colore unico per contatori e icone dove una sfumatura non si può usare (il turnover è un po' di entrambi: si mostra il rosso della partenza). */
-export const cleanSolid = (a: CleanAct): string => (a === "turnover" ? ERR : SOLID[a]);
+export const cleanSolid = (a: CleanAct): string => (a === "turnover" ? ERR : INK[a]);

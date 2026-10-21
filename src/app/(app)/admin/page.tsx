@@ -253,7 +253,7 @@ export default function AdminPage() {
   const ContactBtns = ({ r }: { r: Row }) => (
     <div className="flex items-center gap-1.5">
       {r.email && <a href={`mailto:${r.email}`} onClick={(e) => e.stopPropagation()} title={`Email a ${r.email}`} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">✉ Email</a>}
-      {waLink(r.phone) && <a href={waLink(r.phone)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Scrivi su WhatsApp" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white" style={{ backgroundColor: "#25D366" }}>WhatsApp</a>}
+      {waLink(r.phone) && <a href={waLink(r.phone)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Scrivi su WhatsApp" className="rounded-md px-2 py-1 text-[11px] font-semibold text-on-wa bg-wa">WhatsApp</a>}
     </div>
   );
 

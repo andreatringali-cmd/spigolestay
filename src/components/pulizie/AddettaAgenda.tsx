@@ -71,7 +71,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {([
             { key: "dafare", label: "Da fare", count: tot.dafare, color: "var(--txt)" },
-            { key: "riassetto", label: "Riassetti", count: tot.riassetto, color: "#0891B2" },
+            { key: "riassetto", label: "Riassetti", count: tot.riassetto, color: "var(--cl-rest)" },
             { key: "partenze", label: "Partenze", count: tot.partenze, color: "var(--err)" },
             { key: "arrivi", label: "Arrivi", count: tot.arrivi, color: "var(--ok)" },
           ] as const).map((c) => {
@@ -103,7 +103,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
                   {empty ? <span className="text-faint">Nessun movimento</span> : (<>
                     <span style={{ color: "var(--ok)" }}>{d.arrivi} {d.arrivi === 1 ? "arrivo" : "arrivi"}</span>
                     <span style={{ color: "var(--err)" }}>{d.partenze} {d.partenze === 1 ? "partenza" : "partenze"}</span>
-                    <span style={{ color: "#0891B2" }}>{d.fermi} {d.fermi === 1 ? "fermo" : "fermi"}</span>
+                    <span style={{ color: "var(--cl-rest)" }}>{d.fermi} {d.fermi === 1 ? "fermo" : "fermi"}</span>
                   </>)}
                 </span>
               </span>
