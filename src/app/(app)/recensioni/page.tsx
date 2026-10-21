@@ -18,7 +18,7 @@ import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChann
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 import { waDigits } from "@/lib/contacts-check";
 
-import { onSolid } from "@/lib/on-solid";
+import { onSolid, solidBg } from "@/lib/on-solid";
 const fmt = (iso: string) => fmtDate(iso);
 
 // Fonti recensioni: Google (reale via API) + OTA (collegamento partner in arrivo, per ora inserimento manuale).
@@ -673,7 +673,7 @@ export default function RecensioniPage() {
   const fonteChips = (<>
     <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === "all" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>Tutte</button>
     {connectedSources.map((c) => (
-      <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
+      <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === c ? onSolid(SRC[c].color) : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: solidBg(SRC[c].color) } : undefined}>{SRC[c].label}</button>
     ))}
   </>);
   const votoChips = (<>
@@ -881,7 +881,7 @@ export default function RecensioniPage() {
           const showConnectedBadge = isGoogle || chxBadgeOn(s.k);
           return (
             <button key={s.k} onClick={() => (isGoogle ? setCfgOpen(true) : setSrcCfg(s.k))} className="group relative flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[color:var(--focus)] hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus)] active:translate-y-0" style={{ borderColor: on ? s.color : "var(--line)" }} title="Apri impostazioni">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white transition-transform duration-200 group-hover:scale-110" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold ${onSolid(s.color)} transition-transform duration-200 group-hover:scale-110`} style={{ backgroundColor: solidBg(s.color) }}>{s.label[0]}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-txt">{s.label}</div>
                 <div className="truncate text-[11px] text-faint">{noteFor(s)}</div>
@@ -899,7 +899,7 @@ export default function RecensioniPage() {
 
       {/* Impostazioni di una fonte OTA (Booking/Airbnb/…): come Google, ma via connettore partner o inserimento manuale */}
       {srcCfg && srcCfg !== "google" && (
-        <Modal open onClose={() => setSrcCfg(null)} title={<span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: SRC[srcCfg].color }}>{SRC[srcCfg].label[0]}</span>{SRC[srcCfg].label}</span>} description="Impostazioni recensioni" size="md" closeLabel="Chiudi">
+        <Modal open onClose={() => setSrcCfg(null)} title={<span className="flex items-center gap-2.5"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold ${onSolid(SRC[srcCfg].color)}`} style={{ backgroundColor: solidBg(SRC[srcCfg].color) }}>{SRC[srcCfg].label[0]}</span>{SRC[srcCfg].label}</span>} description="Impostazioni recensioni" size="md" closeLabel="Chiudi">
 
             <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
               {srcCfg === "direct"
@@ -994,7 +994,7 @@ export default function RecensioniPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
               <span className="font-semibold text-txt">{r.guest}</span>
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: SRC[r.source as SourceKey]?.color ?? "var(--dim)" }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${onSolid(SRC[r.source as SourceKey]?.color ?? "var(--dim)")}`} style={{ backgroundColor: solidBg(SRC[r.source as SourceKey]?.color ?? "var(--dim)") }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
               <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
               {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-dim">manuale</span>}

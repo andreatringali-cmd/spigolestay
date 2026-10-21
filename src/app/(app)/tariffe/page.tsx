@@ -1,5 +1,6 @@
 "use client";
 
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { Fragment, useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { addDays, isWeekend, toISO, weekdayShort } from "@/lib/dates";
@@ -235,7 +236,7 @@ export default function TariffePage() {
           [t("Piano tariffario"), "#B3453A"],
         ] as const).map(([h, col], i, arr) => (
           <span key={h} className="flex shrink-0 items-center gap-1.5">
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: col }}>{h}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${onSolid(col)}`} style={{ backgroundColor: solidBg(col) }}>{h}</span>
             {i < arr.length - 1 && <span className="text-faint">→</span>}
           </span>
         ))}

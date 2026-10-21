@@ -469,8 +469,8 @@ export default function OspitiPage() {
             </div>
             <div className="flex items-center justify-between gap-2">
               <div className="flex gap-2 text-xs">
-                <button onClick={() => setExportCols(new Set(EXPORT_COLUMNS.map((c) => c.key)))} className="font-semibold text-focus hover:underline">{t("Tutte")}</button>
-                <button onClick={() => setExportCols(new Set())} className="font-semibold text-dim hover:underline">{t("Nessuna")}</button>
+                <Button variant="ghost" size="xs" onClick={() => setExportCols(new Set(EXPORT_COLUMNS.map((c) => c.key)))} className="text-focus">{t("Tutte")}</Button>
+                <Button variant="ghost" size="xs" onClick={() => setExportCols(new Set())}>{t("Nessuna")}</Button>
               </div>
               </div>
               </Modal>
