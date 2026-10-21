@@ -245,7 +245,7 @@ export default function PrenotazioniPage() {
   // Percentuale delle commissioni: più piccola dell'importo, con la virgola; "~" davanti quando è una stima (stesso segno usato in Canali e nel pannello prezzi).
   const pctIt = (n: number) => String(n).replace(".", ",");
   const CancTag = () => <span className="font-semibold text-[color:var(--err)]">{t("Cancellata")}</span>;
-  const rowDim = (b: { status: BookingStatus }) => isCounted(b) ? "" : b.status === "cancelled" ? "[&>td:not([data-room])]:opacity-70" : "opacity-70";
+  const rowDim = (b: { status: BookingStatus }) => isCounted(b) ? "" : b.status === "cancelled" ? "[&>td:not([data-room])]:opacity-80" : "opacity-80";
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => (isCounted(b) ? a + f(b) : a), 0);
   const grand = (b: typeof sorted[number]) => bookingPaidTotal(b); // quanto ha pagato l'ospite (soggiorno+pulizia+extra), SENZA tassa di soggiorno — torna con l'OTA
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
@@ -513,7 +513,7 @@ export default function PrenotazioniPage() {
           if (item.kind === "group") {
             const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
             return (
-              <div key={gid} className={`rounded-xl border border-line bg-surface shadow-sm ${members.some(isCounted) ? "" : members.every((x) => x.status === "cancelled") ? "[&>button:first-child]:opacity-70" : "opacity-70"}`}>
+              <div key={gid} className={`rounded-xl border border-line bg-surface shadow-sm ${members.some(isCounted) ? "" : members.every((x) => x.status === "cancelled") ? "[&>button:first-child]:opacity-80" : "opacity-80"}`}>
                 <button onClick={() => toggleGroup(gid)} className="block w-full p-3 text-left active:bg-wash">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 font-semibold text-txt"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-on-focus" style={{ backgroundColor: "var(--focus)" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><span className="truncate">{guestName(b) || "—"}</span></span>
@@ -528,9 +528,9 @@ export default function PrenotazioniPage() {
                 {open && (
                   <div className="border-t border-line">
                     {members.map((m) => (
-                      <button key={m.id} onClick={() => openBooking(m.id)} className={`flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash ${m.status === "no_show" ? "opacity-70" : ""}`}>
-                        <span className="truncate text-xs text-dim">{m.status === "cancelled" ? <CancTag /> : (unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={m.status === "cancelled" ? "opacity-70" : ""}> · {m.adults + m.children} {t("osp.")}</span>{m.status === "no_show" && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
-                        <span className={`shrink-0 font-mono text-xs text-txt ${m.status === "cancelled" ? "opacity-70" : ""}`}>{m.total ? eur(grand(m)) : "—"}</span>
+                      <button key={m.id} onClick={() => openBooking(m.id)} className={`flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash ${m.status === "no_show" ? "opacity-80" : ""}`}>
+                        <span className="truncate text-xs text-dim">{m.status === "cancelled" ? <CancTag /> : (unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={m.status === "cancelled" ? "opacity-80" : ""}> · {m.adults + m.children} {t("osp.")}</span>{m.status === "no_show" && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
+                        <span className={`shrink-0 font-mono text-xs text-txt ${m.status === "cancelled" ? "opacity-80" : ""}`}>{m.total ? eur(grand(m)) : "—"}</span>
                       </button>
                     ))}
                   </div>
@@ -542,7 +542,7 @@ export default function PrenotazioniPage() {
           const ch = CHANNELS[b.channel]; const counted = isCounted(b); const alOk = alloggiatiOk(b); const pay = payStatus(b);
           const underprice = underpriceOf(b);
           return (
-            <button key={b.id} onClick={() => openBooking(b.id)} className={`block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash ${counted ? "" : b.status === "cancelled" ? "[&>div:not([data-room])]:opacity-70" : "opacity-70"}`}>
+            <button key={b.id} onClick={() => openBooking(b.id)} className={`block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash ${counted ? "" : b.status === "cancelled" ? "[&>div:not([data-room])]:opacity-80" : "opacity-80"}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>{!counted && b.status !== "cancelled" && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{STATUS_LABEL[b.status] ?? b.status}</span>}</span>
                 <BookingChannelLogo booking={b} size={18} title={ch.label} />
@@ -553,8 +553,8 @@ export default function PrenotazioniPage() {
                 <span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span>
               </div>
               <div data-room className="mt-1 flex items-center justify-between gap-2">
-                <span className="truncate text-xs text-dim">{b.status === "cancelled" ? <CancTag /> : (unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={b.status === "cancelled" ? "opacity-70" : ""}> · {b.adults + b.children} {t("osp.")}</span></span>
-                <span className={`shrink-0 font-mono font-semibold text-txt ${b.status === "cancelled" ? "opacity-70" : ""}`}>
+                <span className="truncate text-xs text-dim">{b.status === "cancelled" ? <CancTag /> : (unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={b.status === "cancelled" ? "opacity-80" : ""}> · {b.adults + b.children} {t("osp.")}</span></span>
+                <span className={`shrink-0 font-mono font-semibold text-txt ${b.status === "cancelled" ? "opacity-80" : ""}`}>
                   {b.total ? eur(grand(b)) : "—"}
                   {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="ml-1 font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
                 </span>
