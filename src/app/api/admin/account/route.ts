@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+import { shadowOwnersData } from "@/lib/entities-shadow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
   // ── 2) Blob strutture/camere: personale + org possedute ─────────────────────
   const { data: appRow } = await admin.from("app_state").select("data").eq("user_id", userId).maybeSingle();
   const blobs: J[] = [parseBlob(appRow?.data)];
+  const blobOwners: { type: "u" | "o"; id: string }[] = [{ type: "u", id: userId }];
 
   // Org di cui l'utente è OWNER (attivo).
   const { data: memRows } = await admin.from("memberships").select("org_id,user_id,role,active").eq("user_id", userId);
@@ -71,7 +73,10 @@ export async function POST(req: Request) {
     if (!oid) continue;
     const { data: os } = await admin.from("org_state").select("data").eq("org_id", oid).maybeSingle();
     blobs.push(parseBlob(os?.data));
+    blobOwners.push({ type: "o", id: oid });
   }
+  // Fase 3, passo 1: con SERVER_READ_ENTITIES=compare strutture / tipologie / camere si confrontano con le tabelle; il risultato resta quello del blocco.
+  await shadowOwnersData(admin, "admin/account.structures", blobOwners, blobs, { kinds: ["structures", "roomTypes", "units"] });
 
   // Unisci structures/units/roomTypes di tutti i blob (dedup per id).
   const structById = new Map<string, J>();

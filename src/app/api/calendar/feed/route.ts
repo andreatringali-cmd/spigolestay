@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { verifyFeedToken, parseTenantBlob, bookingEvents, pulizieEvents, buildIcs, type FeedKind } from "@/lib/calendar-feed";
+import { verifyFeedToken, parseTenantBlob, bookingEvents, pulizieEvents, buildIcs, shadowCalendarFeed, type FeedKind } from "@/lib/calendar-feed";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ export async function GET(req: Request) {
   const data = parseTenantBlob((row as { data?: unknown } | null)?.data);
 
   const events = kind === "bookings" ? bookingEvents(data) : pulizieEvents(data);
+  await shadowCalendarFeed(admin, tenantId, kind, events); // Fase 3, passo 1: solo con SERVER_READ_ENTITIES=compare confronta con le tabelle; il feed resta sempre quello del blocco
   const calName = kind === "bookings" ? "Xenora — Prenotazioni" : "Xenora — Pulizie";
   const ics = buildIcs(calName, events);
 

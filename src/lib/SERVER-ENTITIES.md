@@ -23,7 +23,7 @@ Variabile d'ambiente `SERVER_READ_ENTITIES` (letta a ogni chiamata; su Vercel ba
 ## Cosa guardare nei log
 
 Ogni riga è `[entities-compare] {json}` con `label` (il punto: `loadOrgDatas`, `loadOrgData`, `loadTenantData`, `findBookingStoreById`,
-`loadOwnerStructureData`, `loadOrgDataParts`, `findOwnerStructure`, `stripe-reconcile.lastResort`, `public-lead.guestLookup`) e `result`:
+`loadOwnerStructureData`, `loadOrgDataParts`, `findOwnerStructure`, `stripe-reconcile.lastResort`, `public-lead.guestLookup` e i punti «solo confronto» elencati più sotto) e `result`:
 
 - `ok` (livello info): tutto uguale. Al massimo una riga ogni 10 minuti per punto.
 - `diff` (warn): differenza. `colls.<collezione>` dà `block` / `tables` (conteggi), `onlyBlock` / `onlyTables` / `changed` (primi 10 id) e `fields`
@@ -47,6 +47,33 @@ Nulla è stato scritto nelle tabelle da questo passo, quindi non c'è niente da 
 - `stripe-reconcile.ts`: l'«ultima risorsa» senza metadata cerca il payment intent in `entities`.
 - `server-booking-guard.ts`: `loadOwnerStructureData`, `loadOrgDataParts`, `findOwnerStructure`.
 - `api/public-lead`: solo confronto (`compare`) della ricerca ospite; la lettura è legata alla scrittura sul blocco, quindi `on` non la cambia.
+
+## Lettori in SOLO CONFRONTO (seconda tornata, `src/lib/entities-shadow.ts`)
+
+Questi punti leggono il blocco **sempre**, come prima, e il loro risultato non cambia mai. Solo con `SERVER_READ_ENTITIES=compare` leggono anche le tabelle,
+confrontano e scrivono `[entities-compare]`. Con `off` **e con `on`** non fanno nulla (nessuna chiamata a `entities`): non sono ancora promossi, quindi passare a `on`
+non li cambia. Per promuoverne uno basta sostituire la chiamata `shadow…` con `entitiesSwitch` (come in `concierge-orgdata.ts`) dopo aver visto `ok` per qualche giorno.
+Ogni errore (tabelle, confronto, rete, dato malformato) viene catturato dentro la funzione e non arriva alla richiesta.
+
+| `label` | Dove | Cosa si confronta | Limite di frequenza |
+|---|---|---|---|
+| `health.structureNames` | `api/health` | nomi (id -> nome) delle strutture personali | 1 al minuto per account |
+| `calendar/feed.bookings`, `calendar/feed.pulizie` | `api/calendar/feed` (`shadowCalendarFeed` in `calendar-feed.ts`) | gli EVENTI iCal ricalcolati dalle tabelle (finestra: check-out dal giorno -60), per `uid` | 1 ogni 5 minuti per account e tipo |
+| `admin/account.structures` | `api/admin/account` | strutture, tipologie, camere del personale e delle org possedute | nessuno (solo admin) |
+| `org/access.firstStructure` | `api/org/access` | id, nome e numero della prima struttura dell'org (il blocco usa l'ordine dell'array, le tabelle il campo `order`: se l'org ha piu' strutture compare come `diff`) | nessuno |
+| `org/members.resolveOwnerOrg`, `org/leave.orgOfStructure` | `api/org/members`, `api/org/leave` | in quale org (tra le membership, nello stesso ordine) sta la struttura | nessuno |
+| `stripe-guard.userOwnsStripeAccount` | `lib/stripe-guard.ts` | `true/false`: il conto `acct_` e' in una struttura personale (se non esclusa dal `metadata.uid`) o di una sua org | nessuno |
+| `concierge/ask.personal` | `api/concierge/ask` | le 5 collezioni del blocco personale (la parte org e' gia' coperta da `loadOrgDatas`) | 1 ogni 10 minuti per account |
+| `pulizie-plan.personal` | `api/cron/pulizie-plan` | idem, per chi ha un invio in scadenza | 1 ogni 10 minuti per account |
+| `pulizie/send-now.structure` | `api/pulizie/send-now` | solo la struttura richiesta: sue tipologie, camere, prenotazioni e gli ospiti di quelle prenotazioni | nessuno (pulsante) |
+
+Gia' coperti dalla prima tornata (nessuna modifica): Alloggiati Web e ISTAT (`loadTenantData`), `server-booking-guard` (`loadOwnerStructureData`, `loadOrgDataParts`, `findOwnerStructure`),
+concierge/ask, pulizie-plan, WhatsApp e messaggi Channex per la parte org (`loadOrgDatas`).
+
+**Non applicabili** (leggono solo chiavi piatte, che restano nel blocco per scelta): `book-order.ts` (`loadOwnerPromos` = `spigolestay:promos`) e `loadOwnerRatePlans` in `server-booking-guard.ts` (`spigolestay:rateplans`).
+**Non ancora fatti**: invoicing/service, booking-timeline, channex/relink e channex/sync, la parte personale di WhatsApp e messaggi Channex, i cron checkin-reminders / auto-messages (spenti), `calendar/feed` per le org (il feed legge solo lo stato personale, come prima).
+
+Nota sul feed del calendario e sul confronto per `uid`: l'ordine degli eventi dalle tabelle puo' essere diverso da quello del blocco (il confronto lo ignora); se un domani il feed passasse a `on` bisognera' ordinarli.
 
 ## Modulo `server-entities.ts`
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { siteOrigin } from "@/lib/server-auth";
+import { shadowStructureScope } from "@/lib/entities-shadow";
 import { deliverPuliziePlan, romeNowSlot } from "@/lib/pulizie-send";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
@@ -27,18 +28,20 @@ export async function POST(req: Request) {
 
   // La struttura può stare nei dati personali o in un'org condivisa di cui l'utente fa parte.
   const blobs: Record<string, string>[] = [];
+  const blobOwners: { type: "u" | "o"; id: string }[] = []; // di chi e' ciascun blocco (per il confronto con le tabelle)
   const { data: personal } = await auth.admin.from("app_state").select("data").eq("user_id", auth.tenantId).maybeSingle();
-  if (personal?.data) blobs.push(personal.data as Record<string, string>);
+  if (personal?.data) { blobs.push(personal.data as Record<string, string>); blobOwners.push({ type: "u", id: auth.tenantId }); }
   const { data: mships } = await auth.admin.from("memberships").select("org_id").eq("user_id", auth.tenantId);
   for (const oid of Array.from(new Set((mships ?? []).map((m) => m.org_id as string).filter(Boolean)))) {
     const { data: os } = await auth.admin.from("org_state").select("data").eq("org_id", oid).maybeSingle();
-    if (os?.data) blobs.push(os.data as Record<string, string>);
+    if (os?.data) { blobs.push(os.data as Record<string, string>); blobOwners.push({ type: "o", id: oid }); }
   }
-  for (const blob of blobs) {
+  for (const [bi, blob] of blobs.entries()) {
     let data: Json = {};
     try { data = JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { continue; }
     const st = arr(data.structures).find((x) => x.id === structureId) as unknown as Structure | undefined;
     if (!st) continue;
+    await shadowStructureScope(auth.admin, "pulizie/send-now.structure", blobOwners[bi], structureId, data); // Fase 3, passo 1: solo con SERVER_READ_ENTITIES=compare; i dati usati restano quelli del blocco
     let cfg: { enabled?: boolean; email?: boolean; emailTo?: string; emailCc?: string[]; whatsapp?: boolean; whatsappTo?: string; intro?: string; outro?: string; subject?: string } = {};
     // Impostazioni e note stanno nei dati personali dell'utente, anche se la struttura vive in un'organizzazione condivisa (prima: «Nessun destinatario salvato»).
     const personalBlob = (personal?.data ?? {}) as Record<string, string>;

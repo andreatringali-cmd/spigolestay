@@ -97,13 +97,14 @@ export async function entitiesSwitch<T>(opts: {
   }
 }
 
-/** Solo per i punti dove la lettura e' legata a una scrittura del blocco: in "compare" confronta e registra, in "off" e "on" non fa nulla (vale il blocco). */
-export async function entitiesShadow<T>(label: string, fromBlock: T, tables: () => Promise<T>, project?: (v: T) => unknown): Promise<void> {
+/** Solo per i punti dove la lettura e' legata a una scrittura del blocco, o non ancora promossa a "on": in "compare" confronta e registra, in "off" e "on" non fa nulla (vale il blocco).
+ *  `diff` facoltativo: un confronto per id (diffBlockParts) invece che sul JSON intero. */
+export async function entitiesShadow<T>(label: string, fromBlock: T, tables: () => Promise<T>, project?: (v: T) => unknown, diff?: (a: T, b: T) => Json | null): Promise<void> {
   if (entitiesReadMode() !== "compare") return;
   try {
     const fromTables = await tables();
     const p = project ?? ((v: T) => v);
-    const d = diffValues(p(fromBlock), p(fromTables));
+    const d = diff ? diff(fromBlock, fromTables) : diffValues(p(fromBlock), p(fromTables));
     if (d) logCompare("warn", { label, result: "diff", ...d }); else logOk(label);
   } catch (e) {
     logCompare("warn", { label, result: "error", message: errMsg(e) });

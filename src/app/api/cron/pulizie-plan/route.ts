@@ -3,6 +3,7 @@ import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { deliverPuliziePlan, romeNowSlot } from "@/lib/pulizie-send";
 import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
+import { shadowOwnerData } from "@/lib/entities-shadow";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -64,6 +65,7 @@ export async function GET(req: Request) {
   const processRow = async (tenantId: string, blob: Record<string, string>, allowed: Set<string>) => {
     let data: Json = {};
     try { data = JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { return; }
+    await shadowOwnerData(admin, "pulizie-plan.personal", { type: "u", id: tenantId }, data, { everyMs: 10 * 60_000 }); // Fase 3, passo 1: solo con SERVER_READ_ENTITIES=compare; i dati usati restano quelli del blocco
     try { data = mergeOrgData(data, await loadOrgDatas(admin, tenantId)); } catch { /* restano i dati personali */ } // le strutture in società vivono solo nell'org
     const structures = arr(data.structures) as unknown as Structure[];
     if (!structures.length) return;

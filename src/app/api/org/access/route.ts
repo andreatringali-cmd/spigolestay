@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { shadowOrgFirstStructure } from "@/lib/entities-shadow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ export async function GET(req: Request) {
       const { data: os } = await admin.from("org_state").select("data").eq("org_id", orgId).maybeSingle();
       let od: J = {}; try { od = JSON.parse(((os?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
       const st = arr(od.structures)[0] as J | undefined;
+      // Fase 3, passo 1: con SERVER_READ_ENTITIES=compare la stessa struttura si confronta con le tabelle; il risultato resta quello del blocco.
+      await shadowOrgFirstStructure(admin, orgId, { id: String(st?.id ?? ""), name: String(st?.name ?? ""), count: arr(od.structures).length });
       let ownerEmail = "";
       const { data: owner } = await admin.from("memberships").select("user_id").eq("org_id", orgId).eq("role", "owner").maybeSingle();
       if (owner?.user_id) { const { data: p } = await admin.from("profiles").select("email").eq("user_id", owner.user_id).maybeSingle(); ownerEmail = (p?.email as string) || ""; }

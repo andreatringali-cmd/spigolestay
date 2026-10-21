@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { shadowOrgOfStructure } from "@/lib/entities-shadow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +37,8 @@ export async function POST(req: Request) {
         let od: J = {}; try { od = JSON.parse(((os?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
         if (arr(od.structures).some((s) => s?.id === structureId)) { orgId = oid; break; }
       }
+      // Fase 3, passo 1: con SERVER_READ_ENTITIES=compare l'organizzazione trovata si confronta con le tabelle; il risultato resta quello del blocco.
+      await shadowOrgOfStructure(admin, "org/leave.orgOfStructure", arr(ms).map((m) => String(m.org_id || "")), structureId, orgId || null);
     }
     if (!orgId) return NextResponse.json({ error: "not_found" }, { status: 404 });
 

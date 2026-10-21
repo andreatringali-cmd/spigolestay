@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { whatsappStatus } from "@/lib/whatsapp";
 import { channexEnabled, listProperties } from "@/lib/channex";
+import { shadowStructureNames } from "@/lib/entities-shadow";
 import { classificaSalute, ultimiMessaggiWa, ENV_NAMES, type ChannexPing, type ChannexMapRow, type EnvFlag, type InvioRow } from "@/lib/health";
 
 export const runtime = "nodejs";
@@ -40,6 +41,8 @@ export async function GET(req: Request) {
     const d = JSON.parse(blob[DATA_KEY] || "{}") as { structures?: { id?: string; name?: string }[] };
     for (const s of d.structures ?? []) if (s?.id && s.name) names.set(s.id, String(s.name).slice(0, 60));
   } catch { /* dato non leggibile: si usano etichette generiche */ }
+  // Fase 3, passo 1: con SERVER_READ_ENTITIES=compare gli stessi nomi si confrontano con le tabelle; il risultato resta quello del blocco (con off e on non fa nulla).
+  await shadowStructureNames(admin, "health.structureNames", { type: "u", id: tenantId }, Object.fromEntries(names), 60_000);
 
   const maps: ChannexMapRow[] = ((mapRes.data ?? []) as ChannexMapRow[]).map((m) => ({ structure_id: m.structure_id, last_import_at: m.last_import_at ?? null, updated_at: m.updated_at ?? null, name: m.structure_id ? names.get(m.structure_id) ?? null : null }));
 

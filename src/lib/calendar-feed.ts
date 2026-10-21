@@ -10,6 +10,9 @@ import { DATA_KEY } from "@/lib/manage-booking";
 import { warnFallbackOnce } from "@/lib/warn-fallback";
 import { addDaysYmd, todayRome } from "@/lib/dates-rome";
 import { CHANNELS, type Channel } from "@/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { diffBlockParts, entitiesShadow, readBookings, readGuests, readStructures, readUnits } from "@/lib/server-entities";
+import { shadowDue } from "@/lib/entities-shadow";
 
 export type FeedKind = "bookings" | "pulizie";
 
@@ -164,4 +167,24 @@ export function pulizieEvents(data: Json): IcsEvent[] {
     });
   }
   return out;
+}
+
+// ── Confronto con le tabelle (Fase 3, passo 1; vedi src/lib/SERVER-ENTITIES.md) ──
+// Solo con SERVER_READ_ENTITIES=compare: gli stessi eventi si ricalcolano dalle tabelle (public.entities) e si confrontano per uid con quelli del blocco.
+// Il feed restituito e' SEMPRE quello del blocco; con off e on questa funzione non fa nulla. Un confronto ogni 5 minuti per tenant e tipo di feed (i calendari interrogano spesso).
+const FEED_COMPARE_EVERY_MS = 5 * 60_000;
+export async function shadowCalendarFeed(admin: SupabaseClient, tenantId: string, kind: FeedKind, fromBlock: IcsEvent[]): Promise<void> {
+  try {
+    if (!shadowDue("calendar/feed|" + tenantId + "|" + kind, FEED_COMPARE_EVERY_MS)) return;
+    const owner = { type: "u" as const, id: tenantId };
+    const asRows = (evs: IcsEvent[]): Json => ({ events: evs.map((e) => ({ id: e.uid, ...e })) });
+    await entitiesShadow<Json>(`calendar/feed.${kind}`, asRows(fromBlock), async () => {
+      const cutoffISO = addDaysYmd(todayRome(), -60); // le prenotazioni con check-out prima non entrano mai nel feed
+      const [structures, units, guests, bookings] = await Promise.all([
+        readStructures(admin, owner), readUnits(admin, owner), kind === "bookings" ? readGuests(admin, owner) : Promise.resolve([] as Json[]), readBookings(admin, owner, { from: cutoffISO }),
+      ]);
+      const data: Json = { structures, units, guests, bookings };
+      return asRows(kind === "bookings" ? bookingEvents(data) : pulizieEvents(data));
+    }, undefined, (a, b) => diffBlockParts([a], [b], ["events"]));
+  } catch { /* il confronto non deve mai rompere il feed */ }
 }

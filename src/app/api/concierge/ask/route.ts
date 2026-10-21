@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { conciergeAnswer } from "@/lib/concierge-engine";
 import { withOrgData } from "@/lib/concierge-orgdata";
+import { shadowOwnerData } from "@/lib/entities-shadow";
 import { normalizeLang, isGuestLang } from "@/lib/concierge-i18n";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs } from "@/lib/aiConcierge";
 import { rateLimited } from "@/lib/server-auth";
@@ -34,6 +35,8 @@ export async function POST(req: Request) {
     if (draft && !parseAiConciergePrefs(blob[AI_CONCIERGE_KEY]).enabled) return NextResponse.json({ ok: true, answered: false, disabled: true, reason: "Il Concierge AI è spento: accendilo in Impostazioni → Concierge AI per avere i suggerimenti di risposta." });
     let personal: Record<string, unknown> = {};
     try { personal = JSON.parse(blob["spigolestay:data:v1"] || "{}"); } catch { personal = {}; }
+    // Fase 3, passo 1: con SERVER_READ_ENTITIES=compare la parte personale si confronta con le tabelle (al massimo ogni 10 minuti per account); il risultato resta quello del blocco.
+    await shadowOwnerData(auth.admin, "concierge/ask.personal", { type: "u", id: auth.tenantId }, personal, { everyMs: 10 * 60_000 });
     // Strutture condivise (Structure.orgId): vivono in org_state, non nel blob personale. Sola lettura.
     const data = await withOrgData(auth.admin, auth.tenantId, personal);
 

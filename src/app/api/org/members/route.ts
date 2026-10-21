@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { shadowOrgOfStructure } from "@/lib/entities-shadow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,13 +15,16 @@ const DATA_KEY = "spigolestay:data:v1";
 
 async function resolveOwnerOrg(admin: SupabaseClient, callerId: string, structureId: string): Promise<string | null> {
   const { data: ms } = await admin.from("memberships").select("org_id, role").eq("user_id", callerId);
+  let result: string | null = null, foundOrg: string | null = null;
   for (const m of arr(ms)) {
     const oid = String(m.org_id || "");
     const { data: os } = await admin.from("org_state").select("data").eq("org_id", oid).maybeSingle();
     let od: J = {}; try { od = JSON.parse(((os?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
-    if (arr(od.structures).some((s) => s?.id === structureId)) return m.role === "owner" ? oid : "__notowner__";
+    if (arr(od.structures).some((s) => s?.id === structureId)) { result = m.role === "owner" ? oid : "__notowner__"; foundOrg = oid; break; }
   }
-  return null;
+  // Fase 3, passo 1: con SERVER_READ_ENTITIES=compare l'organizzazione trovata si confronta con le tabelle; il risultato resta quello del blocco.
+  await shadowOrgOfStructure(admin, "org/members.resolveOwnerOrg", arr(ms).map((m) => String(m.org_id || "")), structureId, foundOrg);
+  return result;
 }
 
 async function auth(req: Request, admin: SupabaseClient) {
