@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { toISO, fmtDate } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import DateField from "@/components/DateField";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Modal, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS, promoRecipientEmail } from "@/lib/promos";
@@ -292,22 +292,17 @@ export default function PromozioniPage() {
 
       {/* Modale invio */}
       {sending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setSending(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">Invia «{sending.name}»</span><button aria-label="Chiudi" onClick={() => setSending(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setSending(null)} title={<>Invia «{sending.name}»</>} size="md" closeLabel="Chiudi" footer={<>
+        <Button variant="secondary" onClick={() => setSending(null)}>Annulla</Button>
+        <Button onClick={doSend} disabled={audience.length === 0 || limitReached || promoSending} loading={promoSending}><Icon name="mail" size={14} /> {promoSending ? "Invio in corso…" : `Invia ora (${audience.length})`}</Button>
+        </>}>
             {limitReached && <div className="mb-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)", color: "var(--warn)" }}>Hai già inviato 4 promo quest'anno. Meglio non sovraccaricare gli ospiti.</div>}
             <label className="block text-xs font-medium text-dim">Destinatari<select value={segment} onChange={(e) => setSegment(e.target.value as Segment)} className={`${inp} mt-1`}>
               <optgroup label="Segmenti">{SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
               <optgroup label="Per categoria">{TAG_SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
             </select></label>
             <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b>{excluded > 0 && <span> · {excluded} esclusi (senza consenso marketing o con email di inoltro OTA)</span>}</div>
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
-              <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-              <button onClick={doSend} disabled={audience.length === 0 || limitReached || promoSending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> {promoSending ? "Invio in corso…" : `Invia ora (${audience.length})`}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
     </div>
   );

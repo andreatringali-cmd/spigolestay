@@ -3,6 +3,7 @@
 // Gestione → incassi extra: la tassa di soggiorno (link di pagamento o «incassata») e il CONTO delle altre voci
 // (extra, late checkout, voci libere) da stampare o mandare all'ospite, con un link di pagamento per l'importo che decidi tu.
 import { useState } from "react";
+import { Modal } from "@/components/ui";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -117,9 +118,8 @@ export default function BookingBillActions({ booking, structure, guest }: { book
       {msg && !open && <p className="text-xs font-semibold" style={{ color: msg.ok ? "var(--ok)" : "var(--err)" }} role="status">{msg.text}</p>}
 
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="flex max-h-[90dvh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-xl">
-            <div className="flex items-center justify-between"><div className="text-sm font-bold text-txt">{t("Conto del soggiorno")}</div><button onClick={() => setOpen(false)} aria-label={t("Chiudi")} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setOpen(false)} title={t("Conto del soggiorno")} size="sm" closeLabel={t("Chiudi")}>
+        <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1 rounded-lg bg-wash p-2.5 text-sm">
               {bill.lines.map((l, i) => <div key={i} className="flex justify-between gap-3"><span className="text-dim">{l.label}</span><span className="font-mono tabular-nums">{eur(l.amount)}</span></div>)}
               {bill.paidAtPortal > 0 && <div className="flex justify-between gap-3"><span className="text-dim">{t("Già pagato al portale")}</span><span className="font-mono tabular-nums">−{eur(bill.paidAtPortal)}</span></div>}
@@ -144,7 +144,7 @@ export default function BookingBillActions({ booking, structure, guest }: { book
             </div>
             {msg && <p className="text-xs font-semibold" style={{ color: msg.ok ? "var(--ok)" : "var(--err)" }} role="status">{msg.text}</p>}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

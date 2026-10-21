@@ -13,7 +13,7 @@ import { shortenLink } from "@/lib/guestlink";
 import { supabase } from "@/lib/supabase";
 import { loadPlans, planApplies, planDepositPct, cancelText, plansForStructure, type RatePlan } from "@/lib/rate-plans";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
@@ -1068,13 +1068,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         const mail = `mailto:${q.email ?? ""}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`;
         const confirmed = q.status === "confermato";
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
-            <button aria-label={t("Chiudi")} onClick={() => setConfirming(null)} className="absolute inset-0 bg-black/40" />
-            <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="font-display text-lg font-bold text-txt">{t("Conferma prenotazione")}</span>
-                <button aria-label="Chiudi" onClick={() => setConfirming(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash hover:text-txt">✕</button>
-              </div>
+          <Modal open onClose={() => setConfirming(null)} title={t("Conferma prenotazione")} size="md" closeLabel={t("Chiudi")}>
               <div className="mb-3 text-sm text-dim">{q.name} · {q.structure} · <span className="font-mono">{fmt(q.checkIn)} → {fmt(q.checkOut)}</span> · <b className="text-txt">{eur(q.total)}</b></div>
 
               <div className="text-xs font-medium text-dim">{t("Anticipo")}</div>
@@ -1111,8 +1105,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 max-sm:py-2.5 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>
               {confMail.msg && <div className={`mt-2 rounded-lg px-3 py-2 text-xs font-medium ${confMail.ok ? "text-[color:var(--ok)]" : confMail.sending ? "text-dim" : "text-[color:var(--err)]"}`} style={{ backgroundColor: confMail.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : confMail.sending ? "var(--wash)" : "color-mix(in srgb, var(--err) 10%, transparent)" }}>{confMail.ok ? "✓ " : ""}{confMail.msg}</div>}
-            </div>
-          </div>
+            </Modal>
         );
       })()}
     </div>

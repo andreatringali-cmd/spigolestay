@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf } from "@/lib/booking";
-import { PageHeader, Card, StatCard } from "@/components/ui";
+import { PageHeader, Card, StatCard, Modal, Button } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import FilterSheet from "@/components/FilterSheet";
@@ -549,10 +549,7 @@ export default function FatturePassivePage() {
       )}
 
       {fic && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setFic(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button aria-label="Chiudi" onClick={() => setFic(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setFic(null)} title="Importa da Fatture in Cloud" size="lg" closeLabel="Chiudi">
             <p className="mb-3 text-[11px] text-faint">Legge le fatture e le spese dei fornitori che Fatture in Cloud ha ricevuto (anche dal cassetto fiscale). Sola lettura: su Fatture in Cloud non viene modificato nulla.</p>
             <div className="flex flex-wrap items-end gap-2">
               <label className={lbl}>Dal<DateField value={fic.from} max={fic.to} onChange={(v) => setFic({ ...fic, from: v, items: null })} className={inp} /></label>
@@ -598,20 +595,16 @@ export default function FatturePassivePage() {
                 </div>
                 <p className="mt-1 text-[11px] text-faint">Le «Forse già presente» hanno stesso fornitore, numero e anno di una fattura inserita a mano: non sono selezionate di default.</p>
                 <div className="mt-3 flex items-center gap-2">
-                  <button onClick={ficImport} disabled={fic.busy !== "" || fic.pick.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{fic.busy === "import" ? "Importo…" : `Importa ${fic.pick.size} ${fic.pick.size === 1 ? "fattura" : "fatture"}`}</button>
-                  <button onClick={() => setFic(null)} className="ml-auto rounded-lg border border-line px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
+                  <Button onClick={ficImport} disabled={fic.busy !== "" || fic.pick.size === 0} loading={fic.busy === "import"}>{fic.busy === "import" ? "Importazione…" : `Importa ${fic.pick.size} ${fic.pick.size === 1 ? "fattura" : "fatture"}`}</Button>
+                  <Button variant="secondary" className="ml-auto" onClick={() => setFic(null)}>Annulla</Button>
                 </div>
               </>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
 
       {ota && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setOta(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button aria-label="Chiudi" onClick={() => setOta(false)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setOta(false)} title="Autofattura OTA — precompila" size="md" closeLabel="Chiudi">
             <div className="grid gap-2 sm:grid-cols-2">
               <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
               <label className={lbl}>Mese<input type="month" value={otaMonth} max={monthNow()} onChange={(e) => setOtaMonth(e.target.value)} className={inp} /></label>
@@ -636,15 +629,15 @@ export default function FatturePassivePage() {
               <button onClick={precompileCsv} disabled={csvTotal == null || csvTotal <= 0} className="mt-2 w-full rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Precompila da CSV</button>
             </div>
             <p className="mt-3 text-[11px] text-faint">Dopo la precompilazione controlla l&apos;imponibile con la fattura del portale, salva, poi premi &quot;Genera autofattura TD17&quot;.</p>
-          </div>
-        </div>
+          </Modal>
       )}
 
       {edit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button aria-label="Chiudi" onClick={() => setEdit(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setEdit(null)} title={edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"} size="md" closeLabel="Chiudi" footer={<>
+        {edit.id && <Button variant="danger" className="mr-auto" onClick={del}>Elimina</Button>}
+        <Button variant="secondary" onClick={() => setEdit(null)}>Annulla</Button>
+        <Button onClick={save} loading={saving}>{saving ? "Salvataggio…" : "Salva"}</Button>
+        </>}>
             <div className="grid gap-2 sm:grid-cols-2">
               {single ? (
                 <div className="sm:col-span-2"><span className={lbl}>Struttura</span><div className="mt-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{structName(activeStructureId)}</div></div>
@@ -698,13 +691,7 @@ export default function FatturePassivePage() {
                     : <span className="text-xs text-faint">Segna la fattura come pagata per poterla registrare in Cassa.</span>}
               </div>
             )}
-            <div className="mt-3 flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
-              {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 max-sm:py-2.5 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}
-              <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
     </div>
   );

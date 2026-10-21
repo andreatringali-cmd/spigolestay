@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
 import { balanceDue } from "@/lib/incassi";
@@ -420,10 +420,7 @@ export default function DocumentoPage() {
       {msg && <Card className="mb-4"><p className="text-sm text-dim">{msg}</p></Card>}
 
       {bookingPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[80dvh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Collega una prenotazione</span><button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setBookingPicker(false)} title="Collega una prenotazione" size="md" closeLabel="Chiudi">
             <input value={bq} onChange={(e) => setBq(e.target.value)} placeholder="Cerca ospite o codice…" className={inp} autoFocus />
             <div className="mt-2 flex-1 overflow-y-auto">
               {bookingList.map((b) => (
@@ -435,8 +432,7 @@ export default function DocumentoPage() {
               {bookingList.length === 0 && <p className="py-6 text-center text-sm text-faint">Nessuna prenotazione.</p>}
             </div>
             <p className="mt-2 text-[11px] text-faint">Collegando la prenotazione, le righe del folio (soggiorno, pulizia, extra, tassa) vengono aggiunte alle voci.</p>
-          </div>
-        </div>
+          </Modal>
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-2">

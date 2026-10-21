@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, toISO, fmtDate } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Modal } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
@@ -745,15 +745,7 @@ export default function RecensioniPage() {
 
       {/* Finestra di configurazione Google: ricerca struttura + Place ID */}
       {cfgOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCfgOpen(false)}>
-          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-display text-lg font-bold text-txt">Collega Google</div>
-                <div className="mt-0.5 text-xs text-dim">Trova la struttura o incolla il Place ID{selStructureId && structures.find((s) => s.id === selStructureId) ? ` · ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</div>
-              </div>
-              <button aria-label="Chiudi" onClick={() => setCfgOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setCfgOpen(false)} title="Collega Google" description={<>Trova la struttura o incolla il Place ID{selStructureId && structures.find((s) => s.id === selStructureId) ? ` · ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</>} size="md" closeLabel="Chiudi">
 
             {keyMissing && (
               <div className="mt-3 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
@@ -826,8 +818,7 @@ export default function RecensioniPage() {
               </div>
               <p className="mt-1.5 text-[11px] text-faint">Google Places espone solo le <strong>~5 recensioni più recenti</strong>: media e totale restano completi, l&apos;elenco è parziale.</p>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
@@ -908,18 +899,7 @@ export default function RecensioniPage() {
 
       {/* Impostazioni di una fonte OTA (Booking/Airbnb/…): come Google, ma via connettore partner o inserimento manuale */}
       {srcCfg && srcCfg !== "google" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSrcCfg(null)}>
-          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: SRC[srcCfg].color }}>{SRC[srcCfg].label[0]}</span>
-                <div>
-                  <div className="font-display text-lg font-bold text-txt">{SRC[srcCfg].label}</div>
-                  <div className="text-xs text-dim">Impostazioni recensioni</div>
-                </div>
-              </div>
-              <button aria-label="Chiudi" onClick={() => setSrcCfg(null)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setSrcCfg(null)} title={<span className="flex items-center gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: SRC[srcCfg].color }}>{SRC[srcCfg].label[0]}</span>{SRC[srcCfg].label}</span>} description="Impostazioni recensioni" size="md" closeLabel="Chiudi">
 
             <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
               {srcCfg === "direct"
@@ -939,8 +919,7 @@ export default function RecensioniPage() {
                 {!chxSourceInfo(srcCfg)?.mapped && <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriva collegando Channex (pagina Canali), oppure con le integrazioni partner.</p>}
               </>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
 
       {/* Filtro per fonte + aggiunta manuale */}
