@@ -2,6 +2,7 @@
 
 // Riconciliazione a fine importazione: confronta il FILE con quello che c'è davvero in Xenora (righe e importi) e mostra
 // cosa è arrivato, cosa c'era già, cosa è stato scartato e perché. Si può scaricare l'elenco riga per riga.
+import { Button } from "@/components/ui";
 import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import type { Booking, Guest } from "@/lib/types";
@@ -119,7 +120,7 @@ export default function RiepilogoImport({ report, bookings, guests, structureNam
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button onClick={download} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Scarica il riepilogo riga per riga (CSV)</button>
+        <Button variant="secondary" size="xs" onClick={download}>Scarica il riepilogo riga per riga (CSV)</Button>
         {s.noRoom > 0 && <span className="text-xs text-faint">Le prenotazioni senza camera compaiono in &quot;Da assegnare&quot; nel calendario.</span>}
       </div>
     </div>

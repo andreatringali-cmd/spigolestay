@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { toISO, shiftISO, nights, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, GUARDRAIL_LABEL, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
@@ -228,7 +228,7 @@ export default function RevenueAutopilotPage() {
               <div className="text-[11px] text-faint">{cfg.on ? "Applica automaticamente entro i limiti impostati, una volta al giorno quando apri l'app (non lavora sul server a app chiusa)." : "Suggerisce soltanto: applichi tu."} {scopeSid ? `Impostazioni valide solo per ${getStructure(scopeSid)?.name ?? "questa struttura"}.` : structures.length > 1 ? "Impostazioni predefinite: valgono per le strutture che non ne hanno di proprie (selezionane una in alto a destra per personalizzarle)." : ""}</div>
             </div>
           </div>
-          <button onClick={() => setPreview(true)} disabled={!suggestions.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Applica tutti ({suggestions.length})</button>
+          <Button size="sm" onClick={() => setPreview(true)} disabled={!suggestions.length}>Applica tutti ({suggestions.length})</Button>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -301,7 +301,7 @@ export default function RevenueAutopilotPage() {
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-dim max-sm:order-4 max-sm:basis-full max-sm:p-0 max-sm:text-left max-sm:before:content-['ora_'] max-sm:after:content-['_→']">{eur(s.current)}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold max-sm:order-5 max-sm:p-0" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[11px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
                     <td className="px-2 py-2 text-[11px] text-faint max-sm:order-7 max-sm:w-full max-sm:p-0">{explainSuggestionCompact(s)}{s.limitedBy && <span className="ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[11px] font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={`Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}. Senza limiti: ${eur(s.rawSuggested)}`}>limitato</span>}</td>
-                    <td className="px-2 py-2 text-right max-sm:order-6 max-sm:ml-auto max-sm:p-0"><button onClick={() => applyOne(s)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">Applica</button></td>
+                    <td className="px-2 py-2 text-right max-sm:order-6 max-sm:ml-auto max-sm:p-0"><Button variant="secondary" size="xs" onClick={() => applyOne(s)}>Applica</Button></td>
                   </tr>
                 ))}
               </tbody>

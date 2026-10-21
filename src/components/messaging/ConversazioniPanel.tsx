@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui";
 import { fmtDate, fmtDM } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -896,9 +897,9 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
           // Vista invii programmati (aperta su richiesta).
           <div className="flex-1 overflow-y-auto p-4">
             <div className="mb-3 flex items-center gap-2">
-              <button onClick={() => setShowInvii(false)} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">← {t("Indietro")}</button>
+              <Button variant="secondary" size="xs" onClick={() => setShowInvii(false)} className="shrink-0">← {t("Indietro")}</Button>
               <div className="min-w-0 flex-1 text-sm font-semibold text-txt">{t("Invii programmati")}</div>
-              <button onClick={sendAllToday} disabled={todayQueue.length === 0 || sendingAll} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Invia oggi")}{todayQueue.length ? ` (${todayQueue.length})` : ""}</button>
+              <Button size="xs" onClick={sendAllToday} disabled={todayQueue.length === 0 || sendingAll} className="shrink-0">{t("Invia oggi")}{todayQueue.length ? ` (${todayQueue.length})` : ""}</Button>
             </div>
             {queue.length === 0 ? (
               <p className="text-sm text-faint">{t("Nessun invio in coda. Crea un modello automatico in «Modelli & automazioni», poi qui lo invii e lo tracci.")}</p>
@@ -936,7 +937,7 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
           <>
             <div className="border-b border-line bg-surface px-4 py-3">
               <div className="flex items-center gap-3">
-                <button aria-label={t("Torna alle conversazioni")} onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-dim hover:bg-wash lg:hidden">←</button>
+                <Button variant="secondary" size="sm" aria-label={t("Torna alle conversazioni")} onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 lg:hidden">←</Button>
                 <span className="relative shrink-0">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(current.name) }}>{initials(current.name)}</span>
                   {current.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><BookingChannelLogo booking={current.b} size={12} /></span>}
@@ -968,7 +969,7 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
                   </div>
                 )}
                 <button onClick={() => togglePin(current.id)} title={isPinned(current.id) ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={isPinned(current.id)} className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${isPinned(current.id) ? "border-focus text-focus" : "border-line text-dim"}`}>📌 {isPinned(current.id) ? t("Fissata") : t("Fissa")}</button>
-                <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>
+                <Button variant="secondary" size="xs" onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</Button>
               </div>
               {current.b && (() => {
                 const b = current.b;
@@ -1101,7 +1102,7 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
                           <span className="text-sm text-dim">€</span>
                           <input value={payAmount} onChange={(e) => { setPayAmount(e.target.value); setPayErr(""); }} inputMode="decimal" className="w-28 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold text-txt outline-none focus:border-focus" aria-label={t("Importo")} />
                           <span className="text-[11px] text-faint">{t("Residuo")} {fmtEur(ctx.balanceCents)}{payKind === "tassa" ? ` · ${t("tassa")} ${fmtEur(ctx.cityTaxCents)}` : ctx.cityTaxCents > 0 && !ctx.cityTaxExempt && !ctx.cityTaxPaid ? ` (${t("tassa di soggiorno inclusa")} ${fmtEur(ctx.cityTaxCents)})` : ""} · {t("massimo")} {fmtEur(maxC)}</span>
-                          <button onClick={createPayLink} disabled={payBusy} className="ml-auto rounded-full bg-focus px-3.5 py-1.5 text-xs font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-50">{payBusy ? t("Creo il link…") : t("Crea link e inseriscilo nel messaggio")}</button>
+                          <Button size="xs" onClick={createPayLink} disabled={payBusy} className="ml-auto">{payBusy ? t("Creo il link…") : t("Crea link e inseriscilo nel messaggio")}</Button>
                         </div>
                         <p className="mt-1.5 text-[11px] text-faint">{t("Il link si inserisce nella bozza: poi lo invii tu col normale invio. Quando l'ospite paga, l'incasso si registra da solo sulla prenotazione e qui compare «Pagamento ricevuto».")}</p>
                       </>
@@ -1117,10 +1118,10 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
                   {templates.length > 0 && <option disabled>──────────</option>}
                   <option value="__manage__">✎ {t("Gestisci modelli…")}</option>
                 </select>
-                <button onClick={insertGuide} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📖 {t("Guida ospiti")}</button>
-                {current.b && <button onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📝 {t("Check-in online")}</button>}
+                <Button variant="secondary" size="xs" onClick={insertGuide}>📖 {t("Guida ospiti")}</Button>
+                {current.b && <Button variant="secondary" size="xs" onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")}>📝 {t("Check-in online")}</Button>}
                 {current.b && <button onClick={openPay} title={t("Crea un link per far pagare all'ospite il saldo (o la tassa di soggiorno) con carta: il pagamento si registra da solo")} className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:bg-wash" style={payOpen ? { borderColor: "var(--focus)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : { borderColor: "var(--line)", color: "var(--dim)" }}>💳 {t("Link di pagamento")}</button>}
-                {!current.b && current.isReturning && <button onClick={insertLoyaltyOffer} title={t("Inserisce una proposta di sconto fedeltà per il prossimo soggiorno")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">🎁 {t("Proponi sconto fedeltà")}</button>}
+                {!current.b && current.isReturning && <Button variant="secondary" size="xs" onClick={insertLoyaltyOffer} title={t("Inserisce una proposta di sconto fedeltà per il prossimo soggiorno")}>🎁 {t("Proponi sconto fedeltà")}</Button>}
                 {aiUnavailable ? (
                   <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-medium text-faint" title={t("La risposta assistita dall'AI non è attiva: chiedi al supporto di abilitarla")}>✨ {t("Bozza con AI")} · {t("non attiva")}</span>
                 ) : (
@@ -1132,14 +1133,14 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
                 <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (!touchKb && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={touchKb ? t("Scrivi un messaggio…") : t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim() || sending} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-on-wa bg-wa shadow-sm transition hover:opacity-90 disabled:opacity-40">💬 WhatsApp</button>
-                  <button onClick={sendMail} disabled={!draft.trim() || !current.email || sending} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
+                  <Button size="sm" onClick={sendMail} disabled={!draft.trim() || !current.email || sending}>✉ Email</Button>
                   {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 {otaName} <span className="text-[10px] font-normal opacity-75">beta</span></button>}
                   {chxBookingId && <>
                     <input ref={attachRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={(e) => { sendChxFile(e.target.files?.[0]); e.target.value = ""; }} />
-                    <button onClick={() => attachRef.current?.click()} title={t("Sperimentale: invia una foto o un PDF (max ~3 MB) nel thread di Booking.com/Airbnb/Expedia — non tutte le OTA accettano allegati")} className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt">📎 {t("Allegato")} <span className="text-[10px] font-normal opacity-75">beta</span></button>
+                    <Button variant="secondary" size="sm" onClick={() => attachRef.current?.click()} title={t("Sperimentale: invia una foto o un PDF (max ~3 MB) nel thread di Booking.com/Airbnb/Expedia — non tutte le OTA accettano allegati")} className="gap-1">📎 {t("Allegato")} <span className="text-[10px] font-normal opacity-75">beta</span></Button>
                   </>}
                   <span className="text-[11px] text-faint">{t("Con Invio rispondi su")} <b className="text-dim">{replyOta ? otaName : "WhatsApp"}</b>{chxBookingId && !replyOta ? ` · ${t("per rispondere su")} ${otaName} ${t("usa il pulsante blu")}` : ""}</span>
-                  <button onClick={logIn} className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
+                  <Button variant="secondary" size="sm" onClick={logIn} title={t("Registra una risposta arrivata dall'ospite")} className="ml-auto">＋ {t("Risposta ricevuta")}</Button>
                 </div>
               </div>
             </div>
@@ -1160,9 +1161,9 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {WA_EMBEDDED_AVAILABLE ? (
-          <button onClick={waEmbedStart} disabled={waEmbedBusy || !fbReady} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">
+          <Button size="sm" onClick={waEmbedStart} disabled={waEmbedBusy || !fbReady}>
             {waEmbedBusy ? t("Collegamento…") : t("Collega con Meta")}
-          </button>
+          </Button>
         ) : (
           <span className="text-[11px] text-faint">{t("Configurazione in corso: usa il collegamento manuale.")}</span>
         )}
@@ -1177,8 +1178,8 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
           <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
           <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
-          <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
+          <Button size="sm" onClick={waSave} disabled={!!waBusy}>{waBusy === "save" ? t("Salvo…") : t("Salva")}</Button>
+          <Button variant="secondary" size="sm" onClick={waTest} disabled={!!waBusy || !wa.connected}>{waBusy === "test" ? t("Test…") : t("Test")}</Button>
         </div>
       )}
       {isOwner && (
@@ -1187,7 +1188,7 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
           <p className="mb-2 text-[11px] text-faint">{t("Setup unico per tutta Xenora (non per singola struttura), da fare una volta sola su Meta Developer Console, nell'app Meta di Xenora: WhatsApp → Configurazione → Webhook. Incolla l'URL qui sotto come \"Callback URL\" insieme al \"Verify token\" (una stringa a tua scelta, da impostare anche come variabile d'ambiente WHATSAPP_WEBHOOK_VERIFY_TOKEN su Vercel — deve essere identica nei due posti), poi iscriviti al campo \"messages\".")}</p>
           <div className="flex items-center gap-2">
             <code className="truncate rounded-lg border border-line bg-paper px-2 py-1 text-[11px] text-txt">{WEBHOOK_URL}</code>
-            <button onClick={copyWebhookUrl} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{webhookCopied ? "✓" : t("Copia")}</button>
+            <Button variant="secondary" size="xs" onClick={copyWebhookUrl} className="shrink-0">{webhookCopied ? "✓" : t("Copia")}</Button>
           </div>
         </div>
       )}

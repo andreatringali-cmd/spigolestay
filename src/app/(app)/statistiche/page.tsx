@@ -7,7 +7,7 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf, revenueInRange, nightlyRevenue } from "@/lib/booking";
 import { toISO, addDays, nights, parseISO, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { PageHeader, StatCard } from "@/components/ui";
+import { PageHeader, StatCard, Button } from "@/components/ui";
 import Donut from "@/components/Donut";
 import Bars from "@/components/Bars";
 import ColumnChart from "@/components/ColumnChart";
@@ -402,7 +402,7 @@ export default function StatistichePage() {
   const RepTableView = ({ periodLabel, rows, totStorico, totPrevis, totAll, fileLabel }: { periodLabel: string; rows: RepRow[]; totStorico: RepTotal; totPrevis: RepTotal; totAll: RepTotal; fileLabel: string }) => (
     <>
     <div className="mb-2 flex justify-end">
-      <button onClick={() => exportRegistro(fileLabel, periodLabel, rows, totAll)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash" title={t("Scarica la tabella in CSV (si apre in Excel)")}>{t("Esporta CSV")}</button>
+      <Button variant="secondary" size="xs" onClick={() => exportRegistro(fileLabel, periodLabel, rows, totAll)} title={t("Scarica la tabella in CSV (si apre in Excel)")}>{t("Esporta CSV")}</Button>
     </div>
     <div className="max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
       <table className="w-full min-w-[1000px] table-fixed text-sm">

@@ -404,7 +404,7 @@ export default function FatturePassivePage() {
               <button onClick={openFic} className="h-9 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
             </div>
           </FilterSheet>
-          <button onClick={openNew} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-on-focus hover:opacity-90 sm:hidden">+ Nuova</button>
+          <Button size="sm" onClick={openNew} className="w-[4.75rem] shrink-0 sm:hidden">+ Nuova</Button>
           <div className="flex flex-wrap items-center gap-2 max-sm:hidden sm:col-span-3">
             {filterControls}
             {filtersActive ? <button onClick={resetFilters} className="text-xs font-semibold text-focus hover:underline">Azzera filtri</button> : null}
@@ -417,10 +417,10 @@ export default function FatturePassivePage() {
           </div>
           <span className="text-xs text-faint max-sm:shrink-0 max-sm:whitespace-nowrap">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
           <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
-            <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
-            <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
-            <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
-            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">+ Nuova fattura</button>
+            <Button variant="secondary" size="sm" onClick={view === "elenco" ? exportCsv : exportSummary}>{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</Button>
+            <Button variant="secondary" size="sm" onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</Button>
+            <Button variant="secondary" size="xs" onClick={openFic} title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</Button>
+            <Button size="sm" onClick={openNew}>+ Nuova fattura</Button>
           </div>
         </div>
       </Card>
@@ -471,8 +471,8 @@ export default function FatturePassivePage() {
       {view === "elenco" && sel.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-sm">
           <span className="font-semibold text-txt">{sel.size} selezionat{sel.size === 1 ? "o" : "i"}</span>
-          <button onClick={bulkPaid} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Segna come pagate</button>
-          <button onClick={() => registerCash(filtered.filter((r) => sel.has(r.id) && r.paid))} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash" title="Crea in Cassa il movimento di uscita dei documenti pagati selezionati">Registra in Cassa</button>
+          <Button variant="secondary" size="xs" onClick={bulkPaid}>Segna come pagate</Button>
+          <Button variant="secondary" size="xs" onClick={() => registerCash(filtered.filter((r) => sel.has(r.id) && r.paid))} title="Crea in Cassa il movimento di uscita dei documenti pagati selezionati">Registra in Cassa</Button>
           <button onClick={() => setSel(new Set())} className="ml-auto text-xs font-semibold text-dim hover:text-txt">Annulla selezione</button>
         </div>
       )}
@@ -554,12 +554,12 @@ export default function FatturePassivePage() {
             <div className="flex flex-wrap items-end gap-2">
               <label className={lbl}>Dal<DateField value={fic.from} max={fic.to} onChange={(v) => setFic({ ...fic, from: v, items: null })} className={inp} /></label>
               <label className={lbl}>Al<DateField value={fic.to} min={fic.from} onChange={(v) => setFic({ ...fic, to: v, items: null })} className={inp} /></label>
-              <button onClick={ficPreview} disabled={fic.busy !== "" || !fic.from || !fic.to} className="rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{fic.busy === "list" ? "Leggo…" : "Mostra anteprima"}</button>
+              <Button size="xs" onClick={ficPreview} disabled={fic.busy !== "" || !fic.from || !fic.to}>{fic.busy === "list" ? "Leggo…" : "Mostra anteprima"}</Button>
             </div>
             {fic.msg && (
               <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-txt">
                 {fic.msg}
-                {fic.reconnect && <button onClick={ficReconnect} className="mt-2 block rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">Ricollega Fatture in Cloud</button>}
+                {fic.reconnect && <Button size="xs" onClick={ficReconnect} className="mt-2 block">Ricollega Fatture in Cloud</Button>}
               </div>
             )}
             {fic.items && fic.items.length > 0 && (
@@ -617,7 +617,7 @@ export default function FatturePassivePage() {
                 <span className="text-sm text-dim">{otaCommission.count} prenotazioni · stimato</span>
                 <span className="font-mono text-lg font-bold text-txt">{eur(otaCommission.sum)}</span>
               </div>
-              <button onClick={precompileCommissions} disabled={otaCommission.sum <= 0} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Precompila da commissioni</button>
+              <Button size="sm" onClick={precompileCommissions} disabled={otaCommission.sum <= 0} className="mt-2 w-full">Precompila da commissioni</Button>
             </div>
 
             <div className="mt-3 rounded-lg border border-line p-3">
@@ -626,7 +626,7 @@ export default function FatturePassivePage() {
               <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) onCsv(f); }} className="mt-2 block w-full text-xs text-dim file:mr-2 file:rounded-lg file:border file:border-line file:bg-paper file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-txt" />
               {csvInfo && <p className="mt-1 text-[11px] text-faint">{csvInfo}</p>}
               {csvTotal != null && <div className="mt-2 flex items-center justify-between"><span className="text-sm text-dim">Totale rilevato</span><span className="font-mono text-lg font-bold text-txt">{eur(csvTotal)}</span></div>}
-              <button onClick={precompileCsv} disabled={csvTotal == null || csvTotal <= 0} className="mt-2 w-full rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Precompila da CSV</button>
+              <Button variant="secondary" size="md" onClick={precompileCsv} disabled={csvTotal == null || csvTotal <= 0} className="mt-2 w-full">Precompila da CSV</Button>
             </div>
             <p className="mt-3 text-[11px] text-faint">Dopo la precompilazione controlla l&apos;imponibile con la fattura del portale, salva, poi premi &quot;Genera autofattura TD17&quot;.</p>
           </Modal>
@@ -675,8 +675,8 @@ export default function FatturePassivePage() {
                 </div>
                 <p className="mt-1 text-[11px] text-faint">Per commissioni/servizi da fornitori esteri (OTA) va emessa l&apos;autofattura in reverse charge. L&apos;imponibile è l&apos;importo indicato sopra; IVA 22%.</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button onClick={genAutofattura} disabled={!!afBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{afBusy === "gen" ? "Genero…" : af.status ? "Rigenera autofattura" : "Genera autofattura TD17"}</button>
-                  {af.status && <button onClick={dlAutofattura} disabled={!!afBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</button>}
+                  <Button size="sm" onClick={genAutofattura} disabled={!!afBusy}>{afBusy === "gen" ? "Genero…" : af.status ? "Rigenera autofattura" : "Genera autofattura TD17"}</Button>
+                  {af.status && <Button variant="secondary" size="md" onClick={dlAutofattura} disabled={!!afBusy}>{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</Button>}
                 </div>
                 {afMsg && <p className="mt-2 text-[12px] text-dim">{afMsg}</p>}
               </div>
@@ -685,9 +685,9 @@ export default function FatturePassivePage() {
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash/50 p-3">
                 <span className="text-sm font-semibold text-txt">Cassa</span>
                 {inCassa.has(edit.id)
-                  ? (<><span className="text-xs text-dim">Registrata in Cassa come uscita.</span><button onClick={async () => { await unregisterCash(edit.id); setEdit(null); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Rimuovi dalla Cassa</button></>)
+                  ? (<><span className="text-xs text-dim">Registrata in Cassa come uscita.</span><Button variant="secondary" size="xs" onClick={async () => { await unregisterCash(edit.id); setEdit(null); }} className="ml-auto">Rimuovi dalla Cassa</Button></>)
                   : edit.paid
-                    ? (<><span className="text-xs text-dim">Non ancora in Cassa. Salva prima eventuali modifiche.</span><button onClick={async () => { const d = docs.find((x) => x.id === edit.id); if (d) { await registerCash([d]); setEdit(null); } }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Registra in Cassa</button></>)
+                    ? (<><span className="text-xs text-dim">Non ancora in Cassa. Salva prima eventuali modifiche.</span><Button variant="secondary" size="xs" onClick={async () => { const d = docs.find((x) => x.id === edit.id); if (d) { await registerCash([d]); setEdit(null); } }} className="ml-auto">Registra in Cassa</Button></>)
                     : <span className="text-xs text-faint">Segna la fattura come pagata per poterla registrare in Cassa.</span>}
               </div>
             )}

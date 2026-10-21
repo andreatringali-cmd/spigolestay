@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle, StatCard, Modal } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Modal, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { eur } from "@/lib/format";
 import Icon from "@/components/Icon";
@@ -322,13 +322,13 @@ export default function CanaliPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2 max-sm:flex-nowrap lg:w-auto lg:shrink-0">
             <button onClick={() => setChartsOn((v) => !v)} aria-pressed={chartsOn} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} aria-label={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line transition ${chartsOn ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-            {!otaOff && <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10 max-sm:flex-1">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>}
+            {!otaOff && <Button size="sm" onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 max-sm:flex-1">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</Button>}
             {chxMap[effStructure] ? (
-              <button onClick={() => { importOta(); doFullSync(); void loadOtaStatus(); }} disabled={impSync.running || fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:shrink-0 max-sm:place-items-center max-sm:p-0 lg:w-auto" aria-label={t("Sincronizza ora")} title={t("Controlla le nuove prenotazioni dalle OTA e rimanda a Channex l'intera finestra di disponibilità/prezzi, in un colpo solo. Normalmente entrambe avvengono già da sole.")}>{impSync.running || fullSync.running ? <><span className="sm:hidden" aria-hidden>…</span><span className="max-sm:hidden">{t("Sincronizzo…")}</span></> : <><span aria-hidden>⟳</span><span className="max-sm:hidden"> {t("Sincronizza ora")}</span></>}</button>
+              <Button variant="secondary" size="sm" onClick={() => { importOta(); doFullSync(); void loadOtaStatus(); }} disabled={impSync.running || fullSync.running} aria-label={t("Sincronizza ora")} title={t("Controlla le nuove prenotazioni dalle OTA e rimanda a Channex l'intera finestra di disponibilità/prezzi, in un colpo solo. Normalmente entrambe avvengono già da sole.")} className="w-full max-sm:grid max-sm:w-10 max-sm:shrink-0 max-sm:place-items-center max-sm:p-0 lg:w-auto">{impSync.running || fullSync.running ? <><span className="sm:hidden" aria-hidden>…</span><span className="max-sm:hidden">{t("Sincronizzo…")}</span></> : <><span aria-hidden>⟳</span><span className="max-sm:hidden"> {t("Sincronizza ora")}</span></>}</Button>
             ) : (
               <>
-                <button onClick={() => doRelink(true)} disabled={relink.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 max-sm:w-auto lg:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
-                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:w-auto max-sm:flex-1 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
+                <Button variant="secondary" size="sm" onClick={() => doRelink(true)} disabled={relink.running} className="w-full max-sm:w-auto lg:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</Button>
+                <Button size="sm" onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full max-sm:w-auto max-sm:flex-1 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</Button>
               </>
             )}
           </div>

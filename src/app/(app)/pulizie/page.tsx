@@ -526,7 +526,7 @@ export default function PuliziePage() {
             <FilterSheet count={prodFilter !== "all" ? 1 : 0} onReset={() => setProdFilter("all")}>
               {segs("grid grid-cols-2 gap-1.5", "h-9 rounded-lg border border-line px-2 text-xs font-semibold transition")}
             </FilterSheet>
-            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:ml-0 max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
+            <Button size="sm" onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 whitespace-nowrap max-sm:ml-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</Button>
           </div>
             );
           })()}
@@ -607,7 +607,7 @@ export default function PuliziePage() {
       {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi.
           Telefono: [‹ data ›] [Filtri] [Condividi]; struttura, Oggi, vista e invio programmato stanno nella tendina «Filtri». */}
       {(() => {
-        const oggiBtn = <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>;
+        const oggiBtn = <Button variant="secondary" size="xs" onClick={() => setDate(todayISO)} className="shrink-0">{t("Oggi")}</Button>;
         const vistaCtl = (<>
           <div className="flex items-center rounded-lg border border-line p-0.5">
             <Seg v="cards" icon="grid" title={t("Vista card")} />
@@ -619,37 +619,37 @@ export default function PuliziePage() {
                 <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
               ))}
             </div>
-            <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
+            <Button variant="secondary" size="xs" onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</Button>
           </>)}
         </>);
         return (
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:p-1.5">
         <div className="flex min-w-0 items-center gap-1 max-sm:shrink-0 max-sm:gap-0.5">
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">‹</button>
+          <Button variant="secondary" size="xs" onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="shrink-0 text-base leading-none w-8 !px-0 max-sm:w-10 max-sm:!px-0">‹</Button>
           <div className="min-w-0 sm:flex-none"><DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:justify-between max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px]" /></div>
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">›</button>
+          <Button variant="secondary" size="xs" onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="shrink-0 text-base leading-none w-8 !px-0 max-sm:w-10 max-sm:!px-0">›</Button>
         </div>
         <div className="contents max-sm:hidden">{oggiBtn}{vistaCtl}</div>
         <div className="ml-auto sm:hidden">
           <FilterSheet className="max-sm:px-2">
             <div className="flex flex-wrap items-center gap-2">{oggiBtn}{vistaCtl}</div>
-            <button
-              onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
-              disabled={!autoShareStructure}
-              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-line text-sm text-dim hover:bg-wash disabled:opacity-40"
-            ><Icon name="clock" size={16} /> {t("Invio programmato")}</button>
+            <Button variant="secondary" size="sm"
+ onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
+ disabled={!autoShareStructure}
+ 
+ className="flex gap-2"><Icon name="clock" size={16} /> {t("Invio programmato")}</Button>
           </FilterSheet>
         </div>
         <div className="relative flex items-center gap-2 sm:ml-auto max-sm:shrink-0">
           {copied && <span className="text-xs font-medium text-[color:var(--ok)] max-sm:hidden">{t("Copiato ✓")}</span>}
           <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:px-2 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
-          <button
-            onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
-            disabled={!autoShareStructure}
-            aria-label={t("Invio programmato")}
-            title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-sm:hidden"
-          ><Icon name="clock" size={16} /></button>
+          <Button variant="secondary" size="xs"
+ onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
+ disabled={!autoShareStructure}
+ aria-label={t("Invio programmato")}
+ title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
+ 
+ className="disabled:hover:bg-transparent max-sm:hidden w-8 !px-0 max-sm:w-10 max-sm:!px-0"><Icon name="clock" size={16} /></Button>
           <Popover open={planShare} anchorRef={planShareBtnRef} onClose={() => setPlanShare(false)} align="end" width={176} label={t("Condividi")}>
             <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
             <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
@@ -704,7 +704,7 @@ export default function PuliziePage() {
                     <div className="mt-0.5 text-[11px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return fmtDM(d) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">
-                    <button aria-label={t("Riapri")} onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>
+                    <Button variant="secondary" size="sm" aria-label={t("Riapri")} onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center">↺</Button>
                     <button aria-label={t("Elimina dallo storico")} onClick={() => deleteIssue(iss.id)} title={t("Elimina dallo storico")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
                   </div>
                 </div>

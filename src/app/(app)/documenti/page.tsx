@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
-import { PageHeader, Card, StatCard } from "@/components/ui";
+import { PageHeader, Card, StatCard, Button } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import FilterSheet from "@/components/FilterSheet";
@@ -206,12 +206,12 @@ export default function DocumentiPage() {
               <button onClick={() => router.push("/impostazioni-fattura")} className="h-9 flex-1 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash">Impostazioni</button>
             </div>
           </FilterSheet>
-          <button onClick={createNew} disabled={creating} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50 sm:hidden">{creating ? "Creo…" : "+ Nuovo"}</button>
+          <Button size="sm" onClick={createNew} disabled={creating} className="w-[4.75rem] shrink-0 sm:hidden">{creating ? "Creo…" : "+ Nuovo"}</Button>
           <div className="contents max-sm:hidden">{filterControls}</div>
           <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
-            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
-            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
+            <Button size="sm" onClick={createNew} disabled={creating}>{creating ? "Creo…" : "+ Nuovo documento"}</Button>
+            <Button variant="secondary" size="sm" onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)">Esporta CSV</Button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/impostazioni-fattura")}>Impostazioni</Button>
           </div>
         </div>
       </Card>

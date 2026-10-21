@@ -35,8 +35,8 @@ Tema scuro: la classe `dark` sta su `<html>`; basta usare i token.
 ## 3. Componenti
 
 ### Button
-`<Button variant="primary|secondary|ghost|danger|icon" size="sm|md" loading fullWidth>`
-- `sm` = 36 px, `md` = 40 px; **su telefono entrambe 44 px** (bersaglio di tocco).
+`<Button variant="primary|secondary|ghost|danger|icon" size="xs|sm|md" loading fullWidth>`
+- `xs` = 32 px (righe compatte di tabelle e barre strumenti, testo 12 px), `sm` = 36 px, `md` = 40 px; **su telefono 40 / 44 / 44 px** (bersaglio di tocco).
 - Una sola azione `primary` per finestra/sezione. `danger` (rosso pieno) per eliminare, **sempre** dopo `useConfirm({ danger: true })`.
 - `loading` mostra l'anello, blocca i clic e mette `aria-busy`. `disabled`: opacità 50 % + `cursor-not-allowed`.
 - Pulsante **solo icona**: `variant="icon"` con `aria-label` obbligatorio (lo impone il tipo) oppure `<IconButton label="Chiudi">`.

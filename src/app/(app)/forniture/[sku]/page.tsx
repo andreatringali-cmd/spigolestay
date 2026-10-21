@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { eur } from "@/lib/format";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import { productImage } from "@/lib/forniture/image";
 import { addToCart } from "@/lib/forniture/cart";
@@ -156,9 +156,9 @@ export default function ProductPage() {
               <input type="number" min={minQty} step={Math.max(1, p.min_order_qty)} value={qty} onChange={(e) => setQty(parseInt(e.target.value) || minQty)} className="w-20 border-x border-line bg-surface px-2 py-2 text-center text-sm" />
               <button aria-label="Aumenta quantità" onClick={() => setQty((q) => q + Math.max(1, p.min_order_qty))} className="px-3 py-2 text-lg text-dim hover:text-txt">+</button>
             </div>
-            <button onClick={add} className="flex-1 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">
+            <Button size="md" onClick={add} className="flex-1">
               {added ? "Aggiunto ✓" : `Aggiungi · ${c(p.sale_price_cents * Math.max(minQty, qty))}`}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

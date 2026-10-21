@@ -170,8 +170,8 @@ function TipologiaScheda() {
         actions={
           <div className="flex items-center gap-2">
             {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
-            <button onClick={() => router.push("/camere")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea tipologia") : t("Salva")}</button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/camere")}>{t("Annulla")}</Button>
+            <Button size="sm" onClick={save} disabled={!valid}>{isNew ? t("Crea tipologia") : t("Salva")}</Button>
           </div>
         }
       />
@@ -222,7 +222,7 @@ function TipologiaScheda() {
                 <label className={lbl}>{t("Numero camere")}
                   <input type="number" min={0} value={targetRooms} onChange={(e) => setTargetRooms(e.target.value.replace(/\D/g, ""))} className={`${inp} mt-1 w-28`} />
                 </label>
-                <button type="button" onClick={applyRoomCount} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{(Number(targetRooms) || 0) !== nUnits ? `${t("Applica")} · ${nUnits} → ${Number(targetRooms) || 0}` : t("Applica")}</button>
+                <Button size="sm" type="button" onClick={applyRoomCount}>{(Number(targetRooms) || 0) !== nUnits ? `${t("Applica")} · ${nUnits} → ${Number(targetRooms) || 0}` : t("Applica")}</Button>
                 <span className="text-xs text-faint">{t("Attualmente")}: <b className="text-dim">{nUnits}</b></span>
               </div>
               {roomMsg && <div className="mt-2 rounded-lg bg-wash px-3 py-2 text-xs text-dim">{roomMsg}</div>}
@@ -266,7 +266,7 @@ function TipologiaScheda() {
               {(f.composition ?? []).length === 0 && <div className="text-sm text-faint">{t("Nessun ambiente.")}</div>}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {ROOM_SPACES.map((sp2) => <button key={sp2} onClick={() => addSpace(sp2)} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">+ {t(sp2)}</button>)}
+              {ROOM_SPACES.map((sp2) => <Button variant="secondary" size="xs" key={sp2} onClick={() => addSpace(sp2)}>+ {t(sp2)}</Button>)}
             </div>
           </Card>
 

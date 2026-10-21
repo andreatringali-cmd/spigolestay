@@ -16,7 +16,7 @@ import { commissionOf, cityTaxOfBooking } from "@/lib/booking";
 import { nights, toISO, fmtDate } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import FascicoloFiscaleDoc, { type ChannelRow } from "@/components/pdf/FascicoloFiscaleDoc";
@@ -225,12 +225,12 @@ export default function FascicoloFiscalePage() {
         subtitle={t("Un unico PDF con incassi per canale, tassa di soggiorno e fatture emesse — pronto per il commercialista")}
         actions={
           <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
-            <button onClick={exportDocsCsv} disabled={loadingDocs || invoiceCount + creditNoteCount === 0} title="Elenco dei documenti emessi dell'anno (CSV per Excel; note di credito in negativo)" className="rounded-lg border border-line px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">
+            <Button variant="secondary" size="md" onClick={exportDocsCsv} disabled={loadingDocs || invoiceCount + creditNoteCount === 0} title="Elenco dei documenti emessi dell'anno (CSV per Excel; note di credito in negativo)" className="max-sm:flex-1">
               {t("Esporta documenti (CSV)")}
-            </button>
-            <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">
+            </Button>
+            <Button size="md" onClick={downloadPdf} disabled={generating || loadingDocs} className="max-sm:flex-1">
               {generating ? t("Genero…") : t("Genera fascicolo fiscale (PDF)")}
-            </button>
+            </Button>
           </div>
         }
       />

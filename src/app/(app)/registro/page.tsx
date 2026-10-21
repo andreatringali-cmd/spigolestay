@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { useData, type ActivityType } from "@/lib/store";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Button } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import { useLang } from "@/lib/i18n";
 import { fmtDateTime } from "@/lib/dates";
@@ -53,7 +53,7 @@ export default function RegistroPage() {
           <option value="all">{t("Tutti gli eventi")}</option>
           {(Object.keys(META) as ActivityType[]).map((k) => <option key={k} value={k}>{t(META[k].label)}</option>)}
         </select>
-        {(q || type !== "all") && <button onClick={() => { setQ(""); setType("all"); }} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:py-0">✕ {t("Azzera")}</button>}
+        {(q || type !== "all") && <Button variant="secondary" size="xs" onClick={() => { setQ(""); setType("all"); }} className="max-sm:shrink-0 max-sm:whitespace-nowrap">✕ {t("Azzera")}</Button>}
         <span className="ml-auto text-xs text-faint max-sm:shrink-0 max-sm:whitespace-nowrap">{rows.length} {rows.length === 1 ? t("evento") : t("eventi")}</span>
         </div>
       </div>

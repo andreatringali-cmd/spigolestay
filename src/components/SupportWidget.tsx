@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui";
 import { useState } from "react";
 import { useLang } from "@/lib/i18n";
 
@@ -45,21 +46,21 @@ export default function SupportWidget() {
               placeholder={t("Scrivi un messaggio…")}
               className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus"
             />
-            <button onClick={send} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus">{t("Invia")}</button>
+            <Button size="sm" onClick={send}>{t("Invia")}</Button>
           </div>
         </div>
       )}
       {/* Pulsante assistente: linguetta laterale colorata sul bordo destro (in basso), icona chat */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label={t("Assistenza")}
-        title={t("Assistenza")}
-        className="no-print fixed bottom-24 max-sm:bottom-20 right-0 z-30 flex h-14 w-9 items-center justify-center overflow-hidden rounded-l-xl bg-focus text-on-focus shadow-lg transition hover:w-11 max-sm:h-16 max-sm:w-5 max-sm:hover:w-5"
-      >
+      <Button size="xs"
+ onClick={() => setOpen((o) => !o)}
+ aria-label={t("Assistenza")}
+ title={t("Assistenza")}
+ 
+ className="no-print fixed bottom-24 max-sm:bottom-20 right-0 z-30 flex h-14 overflow-hidden rounded-l-xl shadow-lg hover:w-11 max-sm:h-16 max-sm:hover:w-5 w-8 !px-0 max-sm:w-10 max-sm:!px-0">
         <svg className="shrink-0 max-sm:h-[14px] max-sm:w-[14px]" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-      </button>
+      </Button>
     </>
   );
 }

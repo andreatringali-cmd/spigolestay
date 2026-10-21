@@ -4,6 +4,7 @@
 // online) con prezzo, modalità, categoria, stagionalità, soggiorno minimo e quantità massima.
 // I prezzi li decide il gestore: gli esempi precaricati restano "da confermare" e non vengono proposti.
 
+import { Button } from "@/components/ui";
 import { useState } from "react";
 import { eur } from "@/lib/format";
 import type { ExtraKind, ExtraService, Structure } from "@/lib/types";
@@ -92,7 +93,7 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
                     <label className="flex items-end gap-1.5 pb-1.5 text-[11px] text-dim"><input type="checkbox" checked={!!e.free} onChange={(ev) => upd(e.id, ev.target.checked ? { free: true, price: 0, confirmed: true } : { free: undefined })} /> Gratuito (prezzo 0 voluto)</label>
                   </div>
                   <div className="text-[11px] text-faint">Stagione, notti minime e quantità max guidano le <b>proposte</b> di questo modulo; il motore di prenotazione online e il check-in mostrano l&apos;extra finché è attivo.</div>
-                  <div className="flex justify-end gap-2"><button onClick={() => del(e)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus">Fatto</button></div>
+                  <div className="flex justify-end gap-2"><button onClick={() => del(e)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><Button size="xs" onClick={() => setEditId(null)}>Fatto</Button></div>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">

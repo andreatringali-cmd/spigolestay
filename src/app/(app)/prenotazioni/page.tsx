@@ -17,7 +17,7 @@ import { loadWeekendPct } from "@/lib/pricing";
 import { otaGroupName, MIXED_OTA_LABEL } from "@/lib/channel-name";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel } from "@/lib/export";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import ScrollStrip from "@/components/ScrollStrip";
@@ -649,7 +649,7 @@ export default function PrenotazioniPage() {
       {displayList.length > limit && (
         <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">
           <span>{t("Mostrate")} {limit} {t("di")} {displayList.length}</span>
-          <button onClick={() => setLimit((l) => l + PAGE)} className="rounded-lg border border-line px-3 py-1.5 font-semibold text-txt hover:bg-wash max-sm:min-h-10">{t("Mostra altre")} {Math.min(PAGE, displayList.length - limit)}</button>
+          <Button variant="secondary" size="sm" onClick={() => setLimit((l) => l + PAGE)}>{t("Mostra altre")} {Math.min(PAGE, displayList.length - limit)}</Button>
           <button onClick={() => setLimit(displayList.length)} className="rounded-lg px-2 py-1.5 font-semibold text-focus hover:underline max-sm:min-h-10">{t("Mostra tutte")}</button>
         </div>
       )}

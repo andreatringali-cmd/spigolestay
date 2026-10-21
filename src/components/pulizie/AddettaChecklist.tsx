@@ -2,6 +2,7 @@
 
 // Checklist di cose da fare per camere e zone comuni, con frequenza settimanale decisa dal titolare.
 // L'addetta spunta (data e ora si registrano da sole); il titolare crea, modifica ed elimina le voci.
+import { Button } from "@/components/ui";
 import { useEffect, useMemo, useState } from "react";
 import type { Structure, Unit } from "@/lib/types";
 import {
@@ -129,9 +130,9 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              <button onClick={() => shiftWeek(-1)} aria-label="Settimana precedente" title="Settimana precedente" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash">‹</button>
+              <Button variant="secondary" size="xs" onClick={() => shiftWeek(-1)} aria-label="Settimana precedente" title="Settimana precedente" className="w-8 !px-0 max-sm:w-10 max-sm:!px-0">‹</Button>
               <div className="text-sm font-bold text-txt">{isCurrent ? "Questa settimana" : isPast ? "Settimana passata" : "Settimana futura"} <span className="font-normal text-dim">{fmtDMY(wd[0]).slice(0, 5)} – {fmtDMY(wd[6]).slice(0, 5)}</span></div>
-              <button onClick={() => shiftWeek(1)} aria-label="Settimana successiva" title="Settimana successiva" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash">›</button>
+              <Button variant="secondary" size="xs" onClick={() => shiftWeek(1)} aria-label="Settimana successiva" title="Settimana successiva" className="w-8 !px-0 max-sm:w-10 max-sm:!px-0">›</Button>
               <DateField value={viewDay} onChange={(v) => setPick(v)} title="Scegli una data: si apre la sua settimana" className="w-36 rounded-lg border border-line bg-paper px-2 py-2 text-sm" />
               {!isCurrent && <button onClick={() => setPick("")} className="min-h-[36px] rounded-lg border border-line px-2.5 text-xs font-semibold text-focus hover:bg-wash">Questa settimana</button>}
             </div>
@@ -142,7 +143,7 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => setOnlyTodo((v) => !v)} aria-pressed={onlyTodo} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${onlyTodo ? "border-transparent bg-focus text-on-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>Solo da fare</button>
-  {isManager && <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="flex h-9 items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-on-focus hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>}
+  {isManager && <Button size="xs" onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="flex"><Icon name="plus" size={14} /> Nuova voce</Button>}
           </div>
         </div>
       </Card>
@@ -226,9 +227,9 @@ function TaskEditor({ task, structures, units, onChange, onClose, onSave, onDele
       </Field>
       {freq.kind === "weekly" ? (
         <div className="mt-2 flex items-center justify-center gap-4">
-          <button type="button" onClick={() => onChange({ ...task, freq: { kind: "weekly", times: Math.max(1, freq.times - 1) } })} className="grid h-11 w-11 place-items-center rounded-full border border-line text-xl text-dim hover:bg-wash" aria-label="Meno">−</button>
+          <Button variant="secondary" size="sm" type="button" onClick={() => onChange({ ...task, freq: { kind: "weekly", times: Math.max(1, freq.times - 1) } })} aria-label="Meno" className="grid w-11 place-items-center text-xl">−</Button>
           <span className="min-w-[8rem] text-center text-sm font-bold text-txt">{freqLabel(freq)}</span>
-          <button type="button" onClick={() => onChange({ ...task, freq: { kind: "weekly", times: Math.min(7, freq.times + 1) } })} className="grid h-11 w-11 place-items-center rounded-full border border-line text-xl text-dim hover:bg-wash" aria-label="Più">+</button>
+          <Button variant="secondary" size="sm" type="button" onClick={() => onChange({ ...task, freq: { kind: "weekly", times: Math.min(7, freq.times + 1) } })} aria-label="Più" className="grid w-11 place-items-center text-xl">+</Button>
         </div>
       ) : (
         <div className="mt-2 grid grid-cols-7 gap-1">

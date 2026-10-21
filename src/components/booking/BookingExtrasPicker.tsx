@@ -4,6 +4,7 @@
 // più, in fondo, una voce libera (descrizione + importo) per ciò che non è a catalogo. Non salva nulla da solo: restituisce le nuove voci
 // a chi lo usa (vista → updateBooking, modifica → bozza del form), così il totale non si calcola mai due volte.
 
+import { Button } from "@/components/ui";
 import { useState } from "react";
 import NumInput from "@/components/NumInput";
 import { eur } from "@/lib/format";
@@ -86,7 +87,7 @@ export default function BookingExtrasPicker({ entries, onChange, catalog, stay, 
       <div className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line p-2">
         <input value={freeName} onChange={(e) => setFreeName(e.target.value)} placeholder={t("Altra voce (es. Transfer)")} className={`${inp} min-w-[140px] flex-1`} />
         <span className="flex items-center gap-1 text-xs text-dim">€<NumInput value={freePrice} allowNull onChange={setFreePrice} className={`${inp} w-20 text-right font-mono`} placeholder="0" aria-label={t("Importo")} /></span>
-        <button type="button" onClick={addFree} disabled={!freeName.trim() || !freePrice} className="rounded-md bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+        <Button size="xs" type="button" onClick={addFree} disabled={!freeName.trim() || !freePrice}>{t("Aggiungi")}</Button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-faint">

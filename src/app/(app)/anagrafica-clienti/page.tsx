@@ -97,9 +97,9 @@ export default function AnagraficaClientiPage() {
           {/* Telefono: un solo filtro (il tipo) → resta in riga, a tutta larghezza, senza pulsante «Filtri»; con Fatture in Cloud collegato «Sincronizza» gli sta accanto */}
           <div className="flex items-center gap-2 max-sm:order-3 max-sm:w-full sm:contents">
             <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${sel} max-sm:h-9 max-sm:min-h-0 max-sm:min-w-0 max-sm:flex-1 max-sm:py-0 max-sm:text-[13px]`}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-            {ficOn && <button onClick={openSync} className="ml-auto whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:ml-0 max-sm:h-9 max-sm:min-h-0 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px] sm:order-1">Sincronizza<span className="max-sm:hidden"> con Fatture in Cloud</span></button>}
+            {ficOn && <Button variant="secondary" size="xs" onClick={openSync} className="ml-auto whitespace-nowrap max-sm:ml-0 max-sm:shrink-0 max-sm:text-[13px] sm:order-1">Sincronizza<span className="max-sm:hidden"> con Fatture in Cloud</span></Button>}
           </div>
-          <button onClick={() => { setErr(""); setEdit(emptyForm()); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:order-2 max-sm:h-9 max-sm:min-h-0 max-sm:w-[5.5rem] max-sm:py-0">+ Nuovo</button>
+          <Button size="sm" onClick={() => { setErr(""); setEdit(emptyForm()); }} className="max-sm:order-2 max-sm:w-[5.5rem]">+ Nuovo</Button>
         </div>
       </Card>
 
@@ -151,7 +151,7 @@ export default function AnagraficaClientiPage() {
                 </div>
               </>
             )}
-            {!sync.prev && !sync.busy && <div className="mt-2"><button onClick={() => setSync((p) => ({ ...p, open: false }))} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Chiudi</button></div>}
+            {!sync.prev && !sync.busy && <div className="mt-2"><Button variant="secondary" size="xs" onClick={() => setSync((p) => ({ ...p, open: false }))}>Chiudi</Button></div>}
           </Modal>
       )}
 

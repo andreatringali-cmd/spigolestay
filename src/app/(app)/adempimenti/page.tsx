@@ -4,7 +4,7 @@ import { fmtDM } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Button } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
@@ -54,7 +54,7 @@ function StepCard({ n, tone, label, count, badge, action, onAction, children }: 
           </div>
         </div>
         {children ? <div className="mt-3 flex-1 space-y-1.5">{children}</div> : <div className="flex-1" />}
-        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 max-sm:py-3 max-sm:text-sm text-xs font-semibold text-on-focus transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
+        <Button size="md" onClick={onAction} className="mt-3.5 w-full">{action}<span aria-hidden>→</span></Button>
       </div>
     </article>
   );
@@ -301,7 +301,7 @@ export default function AdempimentiPage() {
         <section className="mb-5 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="text-sm font-bold text-txt">Esito «Elabora tutto»</h2>
-            <button onClick={() => setRunSteps(null)} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-dim hover:bg-wash" aria-label="Chiudi riepilogo">✕</button>
+            <Button variant="secondary" size="sm" onClick={() => setRunSteps(null)} aria-label="Chiudi riepilogo" className="grid h-7 w-7 place-items-center">✕</Button>
           </div>
           <ul className="space-y-1.5">
             {runSteps.map((s) => {

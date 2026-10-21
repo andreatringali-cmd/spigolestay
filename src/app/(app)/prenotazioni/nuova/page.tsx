@@ -16,7 +16,7 @@ import { cityTaxOf, cityTaxPayers } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import NumInput from "@/components/NumInput";
 import { selectableExtras, extraUnitAmount, maxQtyOf } from "@/lib/booking-extras";
-import { Card } from "@/components/ui";
+import { Card, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import QRCode from "qrcode";
 import Toggle from "@/components/Toggle";
@@ -403,9 +403,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                   </div>
                 ))}
                 <span className="ml-2 flex items-center gap-2 text-sm text-dim">Culle
-                  <button aria-label="Diminuisci le culle" onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-9 max-sm:w-9">−</button>
+                  <Button variant="secondary" size="sm" aria-label="Diminuisci le culle" onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 text-base leading-none max-sm:w-9">−</Button>
                   <span className="w-4 text-center text-sm font-semibold tabular-nums text-txt">{cribs}</span>
-                  <button aria-label="Aumenta le culle" onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-on-focus hover:opacity-90 disabled:opacity-30 max-sm:h-9 max-sm:w-9">+</button>
+                  <Button size="sm" aria-label="Aumenta le culle" onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 border-focus text-base leading-none max-sm:w-9">+</Button>
                 </span>
               </div>
             </div>
@@ -479,7 +479,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                               <td className="px-3 py-3 text-right max-md:p-0 max-md:text-left"><span className="text-base font-extrabold text-txt">{eur(stayPrice(rt))}</span><div className="text-[11px] text-faint">{nightsN} {nightsN === 1 ? "notte" : "notti"}</div></td>
                               <td className="px-4 py-3 max-md:p-0">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button aria-label="Diminuisci il numero di camere" disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-md:h-10 max-md:w-10">−</button>
+                                  <Button variant="secondary" size="xs" aria-label="Diminuisci il numero di camere" disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex text-lg leading-none max-md:h-10 max-md:w-10 w-8 !px-0 max-sm:w-10 max-sm:!px-0">−</Button>
                                   <span className={`w-6 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
                                   <button aria-label="Aumenta il numero di camere" disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 max-md:h-10 max-md:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                                 </div>
@@ -506,7 +506,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         )}
         <div className="sticky bottom-3 z-10 mt-2 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg">
           <div className="text-sm text-dim">{totalRooms > 0 ? (<>{totalRooms} {totalRooms === 1 ? "camera" : "camere"} · <b className="text-txt">{eur(grandTotal)}</b></>) : "Seleziona almeno una camera"}</div>
-          <button onClick={() => setPhase("details")} disabled={totalRooms < 1} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40">Continua →</button>
+          <Button size="md" onClick={() => setPhase("details")} disabled={totalRooms < 1} className="flex shrink-0 gap-2 whitespace-nowrap">Continua →</Button>
         </div>
         </>
       )}
@@ -574,7 +574,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                       <div key={e.id} className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${q > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]" : "border-line"}`}>
                         <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}<div className="text-[11px] text-faint">{e.free ? "gratis" : eur(e.price)}</div></div>
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <button aria-label="Diminuisci la quantità" disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
+                          <Button variant="secondary" size="sm" aria-label="Diminuisci la quantità" disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 text-base leading-none max-sm:w-10">−</Button>
                           <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
                           <button aria-label="Aumenta la quantità" onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                         </div>
@@ -604,8 +604,8 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                 <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span></div>
                 {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}
                 {depositN > 0 && saldo > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">Saldo in struttura</span><span className="font-mono font-semibold text-txt">{eur(saldo)}</span></div>}
-                <button onClick={confirm} className="mt-3 w-full rounded-lg bg-focus px-5 py-3 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90">Conferma prenotazione</button>
-                <button onClick={() => printVoucher()} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Anteprima voucher / PDF</button>
+                <Button size="md" onClick={confirm} className="mt-3 w-full">Conferma prenotazione</Button>
+                <Button variant="secondary" size="md" onClick={() => printVoucher()} className="mt-2 flex w-full"><Icon name="fileText" size={15} /> Anteprima voucher / PDF</Button>
                 {err && <div className="mt-2 text-center text-sm font-medium text-[color:var(--err)]">{err}</div>}
                 <p className="mt-2 text-center text-[11px] text-faint">{sendConfirm && email.trim() ? "Alla conferma parte il voucher via email all'ospite." : "Tassa di soggiorno, commissioni e fattura si gestiscono dalla scheda."}</p>
               </Card>
@@ -656,10 +656,10 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 
               <div className="mt-5 flex flex-wrap justify-center gap-2">
               <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-on-wa bg-wa transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`}><Icon name="chat" size={15} /> WhatsApp</a>
-              {!(sendConfirm && g?.email) && <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>}
-              <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
+              {!(sendConfirm && g?.email) && <Button variant="secondary" size="md" onClick={() => printVoucher(url)} className="flex"><Icon name="fileText" size={15} /> Voucher PDF (QR)</Button>}
+              <Button variant="secondary" size="md" onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</Button>
               {!sendConfirm && g?.email && (
-                <button onClick={async () => { setEmailState({ sending: true }); const deps = { getStructure, getGuest, getRoomType, getUnit }; const grp = created.groupId ? bookings.filter((x) => x.groupId === created.groupId) : []; const r = grp.length > 1 ? await sendVoucherGroup(grp, deps) : await sendVoucher(created, deps); setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") }); }} disabled={emailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash disabled:opacity-60"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</button>
+                <Button variant="secondary" size="md" onClick={async () => { setEmailState({ sending: true }); const deps = { getStructure, getGuest, getRoomType, getUnit }; const grp = created.groupId ? bookings.filter((x) => x.groupId === created.groupId) : []; const r = grp.length > 1 ? await sendVoucherGroup(grp, deps) : await sendVoucher(created, deps); setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") }); }} disabled={emailState.sending} className="flex"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</Button>
               )}
             </div>
 

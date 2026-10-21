@@ -10,7 +10,7 @@ import { STRUCTURE_TYPES, AMENITIES, PAY_METHODS, CANCEL_POLICIES } from "@/lib/
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
@@ -372,8 +372,8 @@ export default function StrutturaSchedaPage() {
           <div className="flex flex-wrap items-center gap-2">
             {!isNew && <Link href="/camere" className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Camere")} ({nCamere})</Link>}
             {!isNew && autoSavedAt && <span className="flex items-center gap-1 text-xs font-medium text-[color:var(--ok)]" title={t("Le modifiche vengono salvate da sole")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>{t("Salvato in automatico")}</span>}
-            <button onClick={() => router.push("/strutture")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea struttura") : t("Salva")}</button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/strutture")}>{t("Annulla")}</Button>
+            <Button size="sm" onClick={save} disabled={!valid}>{isNew ? t("Crea struttura") : t("Salva")}</Button>
           </div>
         }
       />
@@ -474,7 +474,7 @@ export default function StrutturaSchedaPage() {
               <label className={`${lbl} mt-3`}>{t("Link Google Maps")} <span className="font-normal text-faint">{t("(generato automaticamente)")}</span>
                 <div className="mt-1 flex gap-2">
                   <input value={mapsUrl} readOnly className={`${inp} font-mono text-xs`} />
-                  <button type="button" onClick={() => navigator.clipboard?.writeText(mapsUrl)} className="shrink-0 rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{t("Copia")}</button>
+                  <Button variant="secondary" size="xs" type="button" onClick={() => navigator.clipboard?.writeText(mapsUrl)} className="shrink-0">{t("Copia")}</Button>
                 </div>
               </label>
             )}
@@ -490,7 +490,7 @@ export default function StrutturaSchedaPage() {
             </div>
             <div className="mt-3 flex gap-2">
               <input value={newSvc} onChange={(e) => setNewSvc(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSvc(); } }} placeholder={t("Aggiungi un servizio…")} className={inp} />
-              <button type="button" onClick={addSvc} disabled={!newSvc.trim()} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+              <Button size="sm" type="button" onClick={addSvc} disabled={!newSvc.trim()} className="shrink-0">{t("Aggiungi")}</Button>
             </div>
           </Card>
 
@@ -546,7 +546,7 @@ export default function StrutturaSchedaPage() {
                   <div className="text-sm font-semibold text-txt">{t("Guida ospiti personalizzata")}</div>
                   <div className="text-[11px] text-dim">{t("Pagina web con Wi-Fi, codici, istruzioni e consigli, pronta da inviare all'ospite.")}</div>
                 </div>
-                <button type="button" onClick={openGuide} disabled={!existing} title={!existing ? t("Salva prima la struttura") : undefined} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Apri la guida")} →</button>
+                <Button size="sm" type="button" onClick={openGuide} disabled={!existing} title={!existing ? t("Salva prima la struttura") : undefined} className="shrink-0">{t("Apri la guida")} →</Button>
               </div>
             ) : (
               <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
@@ -555,7 +555,7 @@ export default function StrutturaSchedaPage() {
                   {t("Guida ospiti personalizzata")}
                 </div>
                 <p className="mt-1.5 text-[11px] leading-snug text-dim">{t("Crea una pagina web elegante con Wi-Fi, codici di accesso, istruzioni e consigli, da inviare a ogni ospite. È un servizio incluso nei piani Pro e Ultimate, oppure aggiungibile al tuo piano.")}</p>
-                <button type="button" onClick={() => router.push("/abbonamento")} className="mt-2.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Aggiungi il servizio")} →</button>
+                <Button size="sm" type="button" onClick={() => router.push("/abbonamento")} className="mt-2.5">{t("Aggiungi il servizio")} →</Button>
               </div>
             )}
           </Card>
@@ -675,8 +675,8 @@ export default function StrutturaSchedaPage() {
                   {f.stripeAccount && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: stripeSt.enabled ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--warn) 15%, transparent)", color: stripeSt.enabled ? "var(--ok)" : "var(--warn)" }}>{stripeSt.enabled ? t("Collegato ✓") : t("Da completare")}</span>}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button onClick={connectStripe} disabled={stripeSt.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</button>
-                  {f.stripeAccount && <button onClick={disconnectStripe} disabled={stripeSt.loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{t("Scollega / cambia account")}</button>}
+                  <Button size="sm" onClick={connectStripe} disabled={stripeSt.loading}>{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</Button>
+                  {f.stripeAccount && <Button variant="secondary" size="sm" onClick={disconnectStripe} disabled={stripeSt.loading}>{t("Scollega / cambia account")}</Button>}
                 </div>
                 {f.stripeAccount && <p className="mt-1.5 text-[11px] text-faint">{t("Account collegato")}: <span className="font-mono">{f.stripeAccount}</span></p>}
                 {stripeSt.msg && <p className="mt-1 text-[11px]" style={{ color: stripeSt.enabled === false && /scolleg/i.test(stripeSt.msg) ? "var(--dim)" : "var(--err)" }}>{stripeSt.msg}</p>}
@@ -693,7 +693,7 @@ export default function StrutturaSchedaPage() {
                   <p className="mb-3 text-xs text-dim">{t("Invita un altro proprietario a co-gestire questa struttura. Decidi tu cosa può vedere e modificare; solo tu potrai revocare.")}</p>
                   <div className="flex flex-wrap items-end gap-2">
                     <label className={`${lbl} flex-1`}>{t("Email del socio")}<input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder="socio@esempio.it" className={`${inp} mt-1`} type="email" /></label>
-                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita un socio")}</button>
+                    <Button size="sm" onClick={inviteSocio} disabled={socio.loading}>{socio.loading ? t("Invio…") : t("Invita un socio")}</Button>
                   </div>
                 </>
               ) : myShare?.role === "member" ? (
@@ -712,7 +712,7 @@ export default function StrutturaSchedaPage() {
                   <p className="mb-3 text-xs text-dim">{t("Struttura condivisa. Gestisci i co-gestori: cosa vedono, cosa modificano, sospendi o rimuovi. Solo tu (proprietario) puoi farlo.")}</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder={t("email di un altro proprietario")} className={`${inp} flex-1`} type="email" />
-                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita")}</button>
+                    <Button size="sm" onClick={inviteSocio} disabled={socio.loading}>{socio.loading ? t("Invio…") : t("Invita")}</Button>
                   </div>
                   {members.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
@@ -725,7 +725,7 @@ export default function StrutturaSchedaPage() {
                               <select value={levelOf(m.permissions)} onChange={(e) => setMember(m.userId, { level: e.target.value })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-txt outline-none focus:border-focus">
                                 {CO_LEVELS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
                               </select>
-                              <button onClick={() => setMember(m.userId, { active: !m.active })} title={m.active ? t("Metti in pausa") : t("Riattiva")} className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">{m.active ? "⏸" : "▶"}</button>
+                              <Button variant="secondary" size="xs" onClick={() => setMember(m.userId, { active: !m.active })} title={m.active ? t("Metti in pausa") : t("Riattiva")}>{m.active ? "⏸" : "▶"}</Button>
                               <button aria-label={t("Rimuovi")} onClick={async () => { if (await ask({ title: t("Rimuovi co-gestore"), message: t("Rimuovere questo co-gestore? Perderà l'accesso alla struttura."), danger: true, confirmLabel: t("Rimuovi") })) setMember(m.userId, { remove: true }); }} title={t("Rimuovi")} className="rounded-lg border border-line px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
                             </div>
                           </div>

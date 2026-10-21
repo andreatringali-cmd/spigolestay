@@ -3,6 +3,7 @@
 // Assistente Xenora: risposte immediate calcolate sui dati reali + voce (parlato in/out) e
 // briefing del giorno. Nessun LLM: capisce le domande via parole chiave. La voce usa le Web
 // Speech API del browser (nessuna API esterna). L'assistente conversazionale vero = upgrade con API key.
+import { Button } from "@/components/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -494,7 +495,7 @@ export default function AssistentePage() {
               {ans.value && <div className="mt-1 font-display text-4xl font-bold tabular-nums leading-none text-txt">{ans.value}</div>}
               {ans.detail && <p className="mt-2 max-w-xl text-sm leading-relaxed text-dim">{ans.detail}</p>}
             </div>
-            <button aria-label="Rileggi ad alta voce" onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="chat" size={14} /></button>
+            <Button variant="secondary" size="xs" aria-label="Rileggi ad alta voce" onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="shrink-0 w-8 !px-0 max-sm:w-10 max-sm:!px-0"><Icon name="chat" size={14} /></Button>
           </div>
 
           {ans.list && ans.list.length > 0 && (

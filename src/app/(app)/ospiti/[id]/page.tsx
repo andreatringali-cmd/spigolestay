@@ -13,7 +13,7 @@ import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { contactReportCached } from "@/lib/contacts-check";
 import { guestLangOf } from "@/lib/guest-lang";
-import { PageHeader, Card, SectionTitle, Modal } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promosForStructure, promoMailto, promoRecipientEmail } from "@/lib/promos";
 import { useEffect } from "react";
@@ -32,7 +32,7 @@ function Hint({ tone, children, action }: { tone: "ok" | "warn" | "err" | "dim";
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium" style={{ color: col }}>
       <span>{children}</span>
-      {action && <button type="button" onClick={action.onClick} className="rounded-md bg-focus px-2 py-0.5 text-[11px] font-semibold text-on-focus hover:opacity-90">{action.label}</button>}
+      {action && <Button size="sm" type="button" onClick={action.onClick}>{action.label}</Button>}
     </div>
   );
 }
@@ -136,7 +136,7 @@ export default function OspiteSchedaPage() {
       <div>
         <PageHeader title={t("Scheda ospite")} subtitle={t("Ospite non trovato")} />
         <Card><p className="text-sm text-dim">{t("Questo ospite non esiste più o il link non è valido.")}</p>
-          <button onClick={() => router.push("/ospiti")} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna agli ospiti")}</button>
+          <Button variant="secondary" size="sm" onClick={() => router.push("/ospiti")} className="mt-3">← {t("Torna agli ospiti")}</Button>
         </Card>
       </div>
     );
@@ -149,10 +149,10 @@ export default function OspiteSchedaPage() {
         subtitle={isNew ? t("Aggiungi un'anagrafica ospite") : `${fullName}${g.country ? ` · ${g.country}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {!isNew && g.email && <button onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash disabled:opacity-40 max-sm:min-h-10">✉ {t("Invia promo")}</button>}
+            {!isNew && g.email && <Button variant="secondary" size="sm" onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")}>✉ {t("Invia promo")}</Button>}
             {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash max-sm:min-h-10">{t("Elimina")}</button>}
-            <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash max-sm:min-h-10">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{isNew ? t("Crea ospite") : t("Salva")}</button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/ospiti")}>{t("Annulla")}</Button>
+            <Button size="sm" onClick={save} disabled={!valid}>{isNew ? t("Crea ospite") : t("Salva")}</Button>
           </div>
         }
       />

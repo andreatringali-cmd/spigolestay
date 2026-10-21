@@ -342,7 +342,7 @@ export default function AbbonamentoPage() {
                     <div className="grid h-12 w-12 place-items-center rounded-full text-xl text-on-ok" style={{ background: "var(--ok)" }}>✓</div>
                     <div className="mt-3 text-base font-bold text-txt">{t("Richiesta inviata!")}</div>
                     <div className="mt-1 text-sm text-dim">{t("Grazie. Ti ricontattiamo entro 24 ore.")}</div>
-                    <button onClick={() => setContactOpen(false)} className="mt-4 rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Chiudi")}</button>
+                    <Button size="md" onClick={() => setContactOpen(false)} className="mt-4">{t("Chiudi")}</Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -359,7 +359,7 @@ export default function AbbonamentoPage() {
                     <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Come possiamo aiutarti?")}</span><textarea rows={3} value={contact.note} onChange={(e) => setContact((p) => ({ ...p, note: e.target.value }))} className={`${cinp} resize-y`} placeholder={t("Raccontaci il tuo progetto: quante strutture, quali OTA, cosa ti serve…")} /></label>
                     <label className="flex items-start gap-2 text-[12px] text-dim"><input type="checkbox" checked={contact.privacy} onChange={(e) => setContact((p) => ({ ...p, privacy: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /><span>{t("Acconsento al trattamento dei dati per essere ricontattato.")} *</span></label>
                     {contactState === "err" && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{t("Compila Nome, Email, Telefono e il consenso. Se persiste, riprova.")}</p>}
-                    <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-xl bg-focus py-2.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
+                    <Button size="md" onClick={submitContact} disabled={contactState === "sending"} className="w-full">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</Button>
                     <p className="text-center text-[11px] text-faint">{t("Nessun impegno · Risposta entro 24 ore")}</p>
                   </div>
                 )}
@@ -438,8 +438,8 @@ export default function AbbonamentoPage() {
             <p className="mt-1.5 max-w-sm text-sm text-dim">{t("Il mese gratis scatta quando l'amico, finita la prova, si abbona col tuo codice.")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-on-wa bg-wa transition hover:opacity-90">💬 WhatsApp</a>
-              <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex items-center gap-1.5 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus transition hover:opacity-90">✉ Email</button>
-              <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-txt transition hover:bg-wash">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
+              <Button size="sm" onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex">✉ Email</Button>
+              <Button variant="secondary" size="sm" onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="flex">{refCopied ? t("Copiato ✓") : t("Copia link")}</Button>
             </div>
           </div>
           {/* QR + codice + statistiche */}

@@ -193,7 +193,7 @@ export default function OspitiPage() {
     <button key={k} onClick={() => setSeg(k)} className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition max-sm:h-9 max-sm:py-0 ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
   ));
   const segSelectBtn = seg !== "all" && guestSorted.length > 0 && (
-    <button onClick={selectSegment} className="whitespace-nowrap rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">{t("Seleziona segmento")} ({guestSorted.length})</button>
+    <Button variant="secondary" size="xs" onClick={selectSegment} className="whitespace-nowrap">{t("Seleziona segmento")} ({guestSorted.length})</Button>
   );
 
   // Esportazione Excel del registro ospiti con colonne a scelta (stesso segmento visibile).
@@ -353,7 +353,7 @@ export default function OspitiPage() {
         {open && list.length > lim && (
           <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">
             <span>{t("Mostrati")} {lim} {t("di")} {list.length}</span>
-            <button onClick={() => setRegLim((v) => ({ ...v, [lead ? "nl" : "ospiti"]: lim + PAGE }))} className="rounded-lg border border-line px-3 py-1.5 font-semibold text-txt hover:bg-wash">{t("Mostra altri")} {Math.min(PAGE, list.length - lim)}</button>
+            <Button variant="secondary" size="sm" onClick={() => setRegLim((v) => ({ ...v, [lead ? "nl" : "ospiti"]: lim + PAGE }))}>{t("Mostra altri")} {Math.min(PAGE, list.length - lim)}</Button>
             <button onClick={() => setRegLim((v) => ({ ...v, [lead ? "nl" : "ospiti"]: list.length }))} className="rounded-lg px-2 py-1.5 font-semibold text-focus hover:underline">{t("Mostra tutti")}</button>
           </div>
         )}
@@ -378,7 +378,7 @@ export default function OspitiPage() {
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
           <span className="text-sm font-semibold text-txt">{dupCount} {t("possibili doppioni")}</span>
           <span className="text-xs text-dim">{t("Stessa persona con più schede: controlla l'anteprima e conferma, nulla viene unito da solo.")}</span>
-          <button onClick={() => { setMergeSkip(new Set()); setMergeOpen(true); }} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Rivedi e unisci")}</button>
+          <Button size="sm" onClick={() => { setMergeSkip(new Set()); setMergeOpen(true); }} className="ml-auto">{t("Rivedi e unisci")}</Button>
         </div>
       )}
 
@@ -392,17 +392,17 @@ export default function OspitiPage() {
             <div className="flex flex-wrap gap-1.5">{segChips}</div>
             {segSelectBtn}
             <div className="flex gap-2">
-              <button onClick={() => router.push("/promozioni")} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-sm font-semibold text-txt hover:bg-wash"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></button>
-              <button onClick={() => { close(); setExportPick(true); }} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-sm font-semibold text-txt hover:bg-wash"><Icon name="fileText" size={14} /> <span>Excel</span></button>
+              <Button variant="secondary" size="sm" onClick={() => router.push("/promozioni")} className="flex flex-1"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></Button>
+              <Button variant="secondary" size="sm" onClick={() => { close(); setExportPick(true); }} className="flex flex-1"><Icon name="fileText" size={14} /> <span>Excel</span></Button>
             </div>
           </>)}
         </FilterSheet>
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 max-sm:contents sm:col-span-3">
           <div className="contents max-sm:hidden">{segChips}{segSelectBtn}</div>
           <div className="ml-auto flex items-center gap-2 max-sm:contents">
-            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]">+ {t("Nuovo ospite")}</button>
-            <button onClick={() => router.push("/promozioni")} aria-label={t("Promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:hidden"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></button>
-            <button onClick={() => setExportPick(true)} aria-label="Excel" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:hidden"><Icon name="fileText" size={14} /> <span>Excel</span></button>
+            <Button size="sm" onClick={() => router.push("/ospiti/nuovo")} className="max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:text-[13px]">+ {t("Nuovo ospite")}</Button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/promozioni")} aria-label={t("Promozioni")} className="flex max-sm:hidden"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></Button>
+            <Button variant="secondary" size="sm" onClick={() => setExportPick(true)} aria-label="Excel" className="flex max-sm:hidden"><Icon name="fileText" size={14} /> <span>Excel</span></Button>
           </div>
         </div>
       </div>
@@ -412,8 +412,8 @@ export default function OspitiPage() {
           <span className="text-sm font-semibold text-txt">{sel.size} {t("selezionati")}</span>
           <span className="text-xs text-faint">· {selEmails.length} {t("contattabili via email")}{selExcluded > 0 ? ` · ${selExcluded} ${t("esclusi (senza consenso marketing o con email di inoltro)")}` : ""}</span>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setSel(new Set())} className="rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Deseleziona")}</button>
-            <button onClick={() => setPickPromo(true)} disabled={selEmails.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">✉ {t("Invia promo")} ({selEmails.length})</button>
+            <Button variant="secondary" size="sm" onClick={() => setSel(new Set())}>{t("Deseleziona")}</Button>
+            <Button size="sm" onClick={() => setPickPromo(true)} disabled={selEmails.length === 0}>✉ {t("Invia promo")} ({selEmails.length})</Button>
           </div>
         </div>
       )}

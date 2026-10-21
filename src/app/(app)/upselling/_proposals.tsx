@@ -5,6 +5,7 @@
 // rifiutati), con ricavo potenziale, testo pronto in lingua ospite e invio WhatsApp/email/copia.
 // Ogni invio viene registrato sulla prenotazione (registro offerte).
 
+import { Button } from "@/components/ui";
 import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
@@ -134,9 +135,9 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
                         </div>
                         {p.maxQty > 1 && on && (
                           <div className="flex shrink-0 items-center gap-1">
-                            <button aria-label={`Diminuisci quantità: ${p.extra.name}`} onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.max(1, q - 1) }))} className="grid h-6 w-6 place-items-center rounded border border-line text-txt hover:bg-wash">−</button>
+                            <Button variant="secondary" size="sm" aria-label={`Diminuisci quantità: ${p.extra.name}`} onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.max(1, q - 1) }))} className="grid h-6 w-6 place-items-center">−</Button>
                             <span className="w-5 text-center font-mono text-xs">{q}</span>
-                            <button aria-label={`Aumenta quantità: ${p.extra.name}`} onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.min(p.maxQty, q + 1) }))} className="grid h-6 w-6 place-items-center rounded border border-line text-txt hover:bg-wash">+</button>
+                            <Button variant="secondary" size="sm" aria-label={`Aumenta quantità: ${p.extra.name}`} onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.min(p.maxQty, q + 1) }))} className="grid h-6 w-6 place-items-center">+</Button>
                           </div>
                         )}
                         <span className="shrink-0 font-mono text-sm font-bold text-txt">{eur(p.unit * q)}</span>

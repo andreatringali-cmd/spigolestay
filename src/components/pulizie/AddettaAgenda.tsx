@@ -1,6 +1,7 @@
 "use client";
 
 // Arrivi, partenze e fermi (ospiti in casa) per i giorni a venire, camera per camera.
+import { Button } from "@/components/ui";
 import { useEffect, useMemo, useState } from "react";
 import type { Booking, Guest, RoomType, Structure, Unit } from "@/lib/types";
 import { buildAgenda, WEEKDAY_LONG, isoWeekday } from "@/lib/pulizie-addetta";
@@ -88,7 +89,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
       )}
       {spanProp === undefined && <div className="flex flex-wrap items-center gap-2">
         <Seg value={span} onChange={setSpan} options={[{ key: "3", label: "3 giorni" }, { key: "7", label: "7 giorni" }, { key: "14", label: "14 giorni" }]} className="w-full sm:w-auto sm:min-w-[16rem]" />
-        <button onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px] rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{allOpen ? "Chiudi tutti" : "Apri tutti"}</button>
+        <Button variant="secondary" size="xs" onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px]">{allOpen ? "Chiudi tutti" : "Apri tutti"}</Button>
       </div>}
 
       {days.map((d) => {

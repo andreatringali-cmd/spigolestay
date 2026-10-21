@@ -8,7 +8,7 @@ import type { RoomType } from "@/lib/types";
 import { AV_COLORS } from "@/lib/users";
 import { effectiveBase, effectiveMinStay, effectiveClosed, bookingsLostWithRoomType, roomTypeCascadeIds } from "@/lib/pricing";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useToast } from "@/components/ToastProvider";
@@ -112,11 +112,11 @@ export default function TariffeDerivatePage() {
           <span className="flex items-center gap-1.5 max-sm:mr-2 max-sm:inline"><span className="text-focus max-sm:inline-block max-sm:align-middle"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
           <span className="flex items-center gap-1.5 max-sm:inline"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
         </div>
-        <button
-          onClick={() => setDerivModal({ structureIds: scoped.map((s) => s.id) })}
-          disabled={!scoped.some((s) => roomTypes.some((rt) => rt.structureId === s.id && !rt.deriveFrom))}
-          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:w-full max-sm:py-0 max-sm:text-[13px]"
-        >＋ {t("Crea tariffa derivata")}</button>
+        <Button size="sm"
+ onClick={() => setDerivModal({ structureIds: scoped.map((s) => s.id) })}
+ disabled={!scoped.some((s) => roomTypes.some((rt) => rt.structureId === s.id && !rt.deriveFrom))}
+ 
+ className="ml-auto max-sm:order-3 max-sm:ml-0 max-sm:w-full max-sm:text-[13px]">＋ {t("Crea tariffa derivata")}</Button>
       </div>
 
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
@@ -494,8 +494,8 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
 
           <div className="mt-4 flex items-center gap-2">
             {editing && <button onClick={async () => { if (await blockedByBookings(ask, t, editing.id, editing.name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${editing.name}"? ${roomTypeCascadeIds(editing.id, roomTypes).length > 1 ? `${t("Verranno eliminate anche le sue tariffe derivate")} (${roomTypeCascadeIds(editing.id, roomTypes).length - 1}).` : ""}`, danger: true, confirmLabel: t("Elimina") })) { deleteRoomType(editing.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
-            <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{editing ? t("Salva") : t("Crea derivata")}</button>
+            <Button variant="secondary" size="sm" onClick={onClose} className="ml-auto">{t("Annulla")}</Button>
+            <Button size="sm" onClick={save} disabled={!canSave}>{editing ? t("Salva") : t("Crea derivata")}</Button>
           </div>
         </>
       )}

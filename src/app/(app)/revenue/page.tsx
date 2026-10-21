@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import FilterSheet from "@/components/FilterSheet";
 import ImpactPreview from "@/components/ImpactPreview";
@@ -229,7 +229,7 @@ export default function RevenuePage() {
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <SectionTitle>{t("Prossimi")} {days} {t("giorni")}</SectionTitle>
-          <button onClick={() => setPreview(true)} disabled={pending.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Applica tutti i suggerimenti")}{pending.length ? ` (${pending.length})` : ""}</button>
+          <Button size="xs" onClick={() => setPreview(true)} disabled={pending.length === 0}>{t("Applica tutti i suggerimenti")}{pending.length ? ` (${pending.length})` : ""}</Button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

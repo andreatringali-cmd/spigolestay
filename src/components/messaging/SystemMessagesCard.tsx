@@ -3,7 +3,7 @@
 // Modelli & automazioni → «Messaggi dei pulsanti»: i testi che Xenora prepara quando premi un pulsante (invito al check-in, link di pagamento,
 // promemoria di partenza, conto, recensione…). Ogni testo è modificabile, per lingua; «Ripristina» torna al testo predefinito.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import VarLegend from "@/components/VarLegend";
 import { MSG_LANGS, MSG_LANG_LABEL, MSG_OVERRIDES_EVENT, SYSTEM_MESSAGES, loadOverrides, saveOverride, type MsgLang, type OverrideMap, type SystemMessageDef } from "@/lib/msg-overrides";
@@ -73,7 +73,7 @@ export default function SystemMessagesCard() {
                     {m.vars.length > 0 && <div className="mt-2"><VarLegend vars={m.vars.map((v) => ({ token: `{${v.key}}`, desc: v.hint }))} onInsert={(tok) => insert(m, tok)} /></div>}
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <p className="text-[11px] text-faint">{t("Se togli un segnaposto, quella parte non compare nel messaggio.")}</p>
-                      <button type="button" disabled={!langEdited} onClick={() => saveOverride(m.id, lang, null)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash disabled:opacity-40">{t("Ripristina il testo predefinito")}</button>
+                      <Button variant="secondary" size="xs" type="button" disabled={!langEdited} onClick={() => saveOverride(m.id, lang, null)}>{t("Ripristina il testo predefinito")}</Button>
                     </div>
                   </div>
                 )}

@@ -4,7 +4,7 @@
 // Si incollano l'ID del tag (AW-…) e l'etichetta della conversione; si può anche incollare l'intero codice di Google, che qui si legge da solo.
 // I due valori non sono segreti (compaiono nel codice delle pagine). Per applicarli alla pagina di prenotazione bisogna ripubblicare il sito della struttura.
 import { useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { adsConfigOf, extractAdsFromText, isValidAdsId, isValidAdsLabel } from "@/lib/ads";
@@ -67,7 +67,7 @@ function AdsForm({ st, needPick, saved, setSaved }: { st: St | undefined; needPi
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+        <Button size="sm" onClick={save} disabled={!canSave}>{t("Salva")}</Button>
         {saved && <span className="text-xs font-semibold" style={{ color: "var(--ok)" }}>✓ {t("Salvato. Ora ripubblica il sito della struttura per applicarlo alla pagina di prenotazione.")}</span>}
         {!saved && active && label.trim() === "" && <span className="text-xs" style={{ color: "var(--warn)" }}>{t("Senza etichetta il tag si carica ma non si inviano conversioni.")}</span>}
       </div>

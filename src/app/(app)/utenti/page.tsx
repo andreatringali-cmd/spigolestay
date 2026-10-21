@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Button } from "@/components/ui";
 import { loadUsers, PERM_TEMPLATES, initials, userHasStructure, type User } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
@@ -90,8 +90,8 @@ export default function UtentiPage() {
         title={t("Utenti")}
         subtitle={t("Chi accede al gestionale e con quali permessi")}
         actions={canMulti
-          ? <button onClick={() => router.push("/utenti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">+ {t("Nuovo utente")}</button>
-          : <button onClick={() => router.push("/abbonamento")} title={t("Il multiutente è incluso nei piani superiori")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> {t("Aggiungi utente (piano superiore)")}</button>}
+          ? <Button size="sm" onClick={() => router.push("/utenti/nuovo")}>+ {t("Nuovo utente")}</Button>
+          : <Button variant="secondary" size="sm" onClick={() => router.push("/abbonamento")} title={t("Il multiutente è incluso nei piani superiori")} className="flex"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> {t("Aggiungi utente (piano superiore)")}</Button>}
       />
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">

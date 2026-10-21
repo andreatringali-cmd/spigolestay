@@ -221,9 +221,9 @@ export default function PromozioniPage() {
                 {p.description && <p className="mt-1 text-xs text-dim">{p.description}</p>}
                 <p className="mt-1.5 line-clamp-2 flex-1 text-xs text-dim">{p.body}</p>
                 <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
-                  <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 max-sm:min-h-10"><Icon name="mail" size={13} /> Invia</button>
-                  <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Modifica</button>
-                  <button aria-label="Duplica" onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash max-sm:min-h-10"><Icon name="copy" size={13} /></button>
+                  <Button size="xs" onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex gap-1"><Icon name="mail" size={13} /> Invia</Button>
+                  <Button variant="secondary" size="xs" onClick={() => editPromo(p)}>Modifica</Button>
+                  <Button variant="secondary" size="xs" aria-label="Duplica" onClick={() => dupPromo(p)} title="Duplica"><Icon name="copy" size={13} /></Button>
                   <button aria-label="Elimina" onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)] max-sm:min-h-10">✕</button>
                 </div>
               </div>
@@ -251,8 +251,8 @@ export default function PromozioniPage() {
             <div className="col-span-2"><VarLegend vars={PROMO_VARS} onInsert={(tk) => setBody((b) => `${b}${tk}`)} /></div>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
-            {editId && <button onClick={resetEditor} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">Annulla modifica</button>}
-            <button onClick={savePromo} disabled={!name.trim() && !subject.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{editId ? "Salva modifiche" : "Salva promo"}</button>
+            {editId && <Button variant="secondary" size="sm" onClick={resetEditor} className="mr-auto">Annulla modifica</Button>}
+            <Button size="sm" onClick={savePromo} disabled={!name.trim() && !subject.trim()}>{editId ? "Salva modifiche" : "Salva promo"}</Button>
           </div>
         </Card>
 

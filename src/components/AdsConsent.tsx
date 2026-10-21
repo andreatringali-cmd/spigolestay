@@ -3,6 +3,7 @@
 // Avviso cookie per le pagine pubbliche di prenotazione: chiede il consenso alla misurazione pubblicitaria (Google Ads) e, solo se accettato, carica il tag.
 // Compare solo se la struttura ha un account Google Ads (`config`). Scelta salvata nel browser; "Rifiuta" non carica nulla.
 // Nessun cookie di marketing viene impostato prima del consenso.
+import { Button } from "@/components/ui";
 import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { getAdsConsent, setAdsConsent, loadAdsTag, type AdsConfig } from "@/lib/ads";
@@ -23,8 +24,8 @@ export default function AdsConsent({ config }: { config: AdsConfig | null }) {
         Usiamo un cookie di Google Ads per capire quali annunci portano prenotazioni. Lo attiviamo solo se acconsenti. <Link href="/cookie" className="font-semibold text-focus underline">Cookie policy</Link>
       </p>
       <div className="flex shrink-0 gap-2">
-        <button onClick={() => pick("denied")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Rifiuta</button>
-        <button onClick={() => pick("granted")} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">Accetta</button>
+        <Button variant="secondary" size="xs" onClick={() => pick("denied")}>Rifiuta</Button>
+        <Button size="xs" onClick={() => pick("granted")}>Accetta</Button>
       </div>
     </div>
   );

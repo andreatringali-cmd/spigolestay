@@ -6,7 +6,7 @@ import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Button } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 
@@ -127,8 +127,8 @@ export default function AlloggiatiArchivioPage() {
                     <td className="py-2.5 pr-3 text-[12px] text-faint">{it.esito || "—"}{it.hasPdf ? " · ricevuta salvata" : ""}</td>
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button onClick={() => download(it)} disabled={!!busy} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica la ricevuta PDF">{busy === it.id + "d" ? "…" : "⬇ Scarica"}</button>
-                        <button onClick={() => print(it)} disabled={!!busy} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Stampa la ricevuta">{busy === it.id + "p" ? "…" : "🖨 Stampa"}</button>
+                        <Button variant="secondary" size="xs" onClick={() => download(it)} disabled={!!busy} title="Scarica la ricevuta PDF">{busy === it.id + "d" ? "…" : "⬇ Scarica"}</Button>
+                        <Button variant="secondary" size="xs" onClick={() => print(it)} disabled={!!busy} title="Stampa la ricevuta">{busy === it.id + "p" ? "…" : "🖨 Stampa"}</Button>
                       </div>
                     </td>
                   </tr>

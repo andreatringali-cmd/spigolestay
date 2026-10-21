@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Modal } from "@/components/ui";
+import { Modal, Button } from "@/components/ui";
 
 interface Guide {
   title: string;
@@ -407,7 +407,7 @@ export default function PageHelp() {
   if (!guide) return null;
   return (
     <>
-      <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-sm font-bold max-sm:h-10 max-sm:w-10 text-dim transition hover:bg-wash hover:text-txt">?</button>
+      <Button variant="secondary" size="xs" onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="shrink-0 w-8 !px-0 max-sm:w-10 max-sm:!px-0">?</Button>
       {open && (
         <Modal open onClose={() => setOpen(false)} title={<span className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-on-focus" aria-hidden="true">?</span>Guida · {guide.title}</span>} size="md" closeLabel="Chiudi">
             {guide.intro && <p className="mb-4 text-sm text-dim">{guide.intro}</p>}

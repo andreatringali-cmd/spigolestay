@@ -10,7 +10,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { eur } from "@/lib/format";
 import { plural } from "@/lib/plural";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import { loadHistory, subscribeHistory, planUndo, markUndone, SOURCE_LABEL, type PriceBatch, type RevenueSource } from "@/lib/revenue-history";
 
 const fmtTs = (ts: number) => fmtDateTime(ts);
@@ -67,7 +67,7 @@ export default function PriceHistoryCard({ structureId, sources, onUndone }: { s
                   <div className="text-[11px] text-dim">{plural(b.changes.length, "tariffa", "tariffe")} · variazione media {avg > 0 ? "+" : ""}{avg}%{sample ? ` · es. ${sample.typeName} ${fmtDM(sample.iso)}: ${eur(sample.effBefore)} → ${eur(sample.after)}` : ""}</div>
                 </div>
                 {stillOn
-                  ? <button onClick={() => void undo(b)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">Annulla</button>
+                  ? <Button variant="secondary" size="xs" onClick={() => void undo(b)} className="shrink-0">Annulla</Button>
                   : <span className="shrink-0 rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-medium text-faint">annullata · {fmtTs(b.undoneAt!)}</span>}
               </li>
             );

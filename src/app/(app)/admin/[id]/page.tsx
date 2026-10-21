@@ -8,7 +8,7 @@ import { fmtDate } from "@/lib/dates";
 import { eur as fmtEur } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PageHeader, Card, StatCard } from "@/components/ui";
+import { PageHeader, Card, StatCard, Button } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { TIERS } from "@/lib/plans";
 
@@ -195,7 +195,7 @@ export default function AccountDetailPage() {
         <div className="mb-1.5 text-sm font-semibold text-txt">Note interne (private)</div>
         <textarea value={note} onChange={(e) => { setNote(e.target.value); setNoteState({}); }} rows={4} placeholder="Appunti su questo cliente: contatti, accordi, promemoria…" className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
         <div className="mt-2 flex items-center gap-2">
-          <button onClick={saveNote} disabled={noteState.saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{noteState.saving ? "Salvo…" : "Salva nota"}</button>
+          <Button size="sm" onClick={saveNote} disabled={noteState.saving}>{noteState.saving ? "Salvo…" : "Salva nota"}</Button>
           {noteState.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
         </div>
       </Card>

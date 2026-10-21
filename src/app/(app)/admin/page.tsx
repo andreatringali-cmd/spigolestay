@@ -12,7 +12,7 @@ import { eur as fmtEur } from "@/lib/format";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PageHeader, Card, StatCard } from "@/components/ui";
+import { PageHeader, Card, StatCard, Button } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { TIERS, ROOMS_PER_STRUCT } from "@/lib/plans";
@@ -82,9 +82,9 @@ function Pager({ total, page, pageSize, onPage, onPageSize }: { total: number; p
         <select value={pageSize} onChange={(e) => { onPageSize(Number(e.target.value)); onPage(0); }} className="rounded-md border border-line bg-paper px-2 py-1 text-[13px] text-txt">
           <option value={25}>25 / pag.</option><option value={50}>50 / pag.</option><option value={100}>100 / pag.</option>
         </select>
-        <button aria-label="Pagina precedente" disabled={cur <= 0} onClick={() => onPage(cur - 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">←</button>
+        <Button variant="secondary" size="sm" aria-label="Pagina precedente" disabled={cur <= 0} onClick={() => onPage(cur - 1)}>←</Button>
         <span className="text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{cur + 1}/{pages}</span>
-        <button aria-label="Pagina successiva" disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">→</button>
+        <Button variant="secondary" size="sm" aria-label="Pagina successiva" disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)}>→</Button>
       </div>
     </div>
   );
@@ -284,9 +284,9 @@ export default function AdminPage() {
         </select>
       )}
       <div className="ml-auto flex items-center gap-2">
-        <button onClick={exportCsv} disabled={loading || !accounts?.length} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">⤓ CSV</button>
-        {stripeOn && <button onClick={backfillFromStripe} disabled={backfilling} title="Rilegge da Stripe lo stato abbonamento di tutti gli abbonati e aggiorna il database" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{backfilling ? "Sincronizzo…" : "⟳ Aggiorna da Stripe"}</button>}
-        <button onClick={load} disabled={loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? "Aggiorno…" : "↻ Aggiorna"}</button>
+        <Button variant="secondary" size="sm" onClick={exportCsv} disabled={loading || !accounts?.length}>⤓ CSV</Button>
+        {stripeOn && <Button variant="secondary" size="sm" onClick={backfillFromStripe} disabled={backfilling} title="Rilegge da Stripe lo stato abbonamento di tutti gli abbonati e aggiorna il database">{backfilling ? "Sincronizzo…" : "⟳ Aggiorna da Stripe"}</Button>}
+        <Button variant="secondary" size="sm" onClick={load} disabled={loading}>{loading ? "Aggiorno…" : "↻ Aggiorna"}</Button>
       </div>
     </>
   );

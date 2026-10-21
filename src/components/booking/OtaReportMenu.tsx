@@ -57,9 +57,9 @@ export default function OtaReportMenu({ booking }: { booking: Booking }) {
         <summary className="cursor-pointer select-none font-medium text-dim">{t("Segnala all'OTA")} (Booking.com)</summary>
         <div className="mt-2 flex flex-col gap-1.5">
           {OTA_ACTIONS.map((a) => (
-            <button key={a} onClick={() => { setMsg(null); setWord(""); setPending(a); }} className="rounded-md border border-line px-2.5 py-1.5 text-left text-xs text-txt hover:bg-wash">
+            <Button variant="secondary" size="xs" key={a} onClick={() => { setMsg(null); setWord(""); setPending(a); }} className="text-left">
               {t(OTA_ACTION_INFO[a].label)}
-            </button>
+            </Button>
           ))}
           <p className="text-[11px] text-faint">{t("Azioni con effetto reale su ospite e commissioni: chiedono sempre conferma e non partono mai in automatico.")}</p>
         </div>

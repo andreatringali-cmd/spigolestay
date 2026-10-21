@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -144,7 +144,7 @@ export default function PagamentoPage() {
             </div>
           </div>
           {customer
-            ? <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : t("Gestisci carta su Stripe")}</button>
+            ? <Button size="sm" onClick={addCard} disabled={busy} className="mt-3 w-full">{busy ? t("Attendi…") : t("Gestisci carta su Stripe")}</Button>
             : <Link href="/abbonamento" className="mt-3 block w-full rounded-lg bg-focus py-2 text-center text-sm font-semibold text-on-focus transition hover:opacity-90">{t("Scegli un piano")} →</Link>}
           <div className="mt-3 border-t border-line pt-3">
             <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Metodi accettati")}</div>
@@ -179,7 +179,7 @@ export default function PagamentoPage() {
             <label className={lbl}>{t("Email per le fatture")}<input value={b.email} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="nome@email.it" /></label>
             {srvErr && <p className="col-span-2 text-xs font-medium text-[color:var(--err)]">{srvErr}</p>}
             <div className="flex items-end">
-              <button onClick={save} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
+              <Button size="sm" onClick={save} className="flex w-full">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</Button>
             </div>
           </div>
         </Card>

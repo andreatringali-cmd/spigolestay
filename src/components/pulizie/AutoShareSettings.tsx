@@ -201,7 +201,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
         <div className="mt-3 rounded-xl border border-line bg-paper px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 text-[11px] leading-snug text-dim">{t("Prova adesso con queste impostazioni: invia il planning di oggi all'indirizzo email scelto.")}</div>
-            <button type="button" onClick={sendNow} disabled={nowBusy || !(cfg.email && cfg.emailTo.trim())} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:bg-wash disabled:opacity-50">{nowBusy ? t("Invio…") : t("Invia ora")}</button>
+            <Button variant="secondary" size="xs" type="button" onClick={sendNow} disabled={nowBusy || !(cfg.email && cfg.emailTo.trim())} className="shrink-0">{nowBusy ? t("Invio…") : t("Invia ora")}</Button>
           </div>
           {nowRes && (
             <ul className="mt-2 flex flex-col gap-1 text-[11px] leading-snug">

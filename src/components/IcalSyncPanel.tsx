@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { parseICS, importIcsEvents } from "@/lib/ics";
@@ -132,7 +132,7 @@ export default function IcalSyncPanel() {
           <label className="flex items-center gap-1.5 text-xs text-dim">{t("Auto ogni 15 min")}
             <button type="button" onClick={toggleAuto} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: auto ? "var(--ok)" : "var(--line)" }} role="switch" aria-checked={auto}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: auto ? "22px" : "2px" }} /></button>
           </label>
-          <button onClick={runAll} disabled={!!busy || feeds.length === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">↻ {busy === "all" ? t("Sincronizzo…") : t("Sincronizza tutti")}</button>
+          <Button size="sm" onClick={runAll} disabled={!!busy || feeds.length === 0}>↻ {busy === "all" ? t("Sincronizzo…") : t("Sincronizza tutti")}</Button>
         </div>
       </div>
       <p className="mb-3 text-xs text-dim">{t("Incolla i link iCal esportati da Octorate (o dalle OTA). Xenora legge e importa le prenotazioni senza toccare la sincronizzazione live: Octorate resta il gestore, tu vedi tutto anche qui.")}</p>
@@ -153,7 +153,7 @@ export default function IcalSyncPanel() {
                       : <span className="text-faint">{t("mai sincronizzato")}</span>}
                 </div>
               </div>
-              <button onClick={() => runFeed(f.id)} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{busy === f.id ? t("Sincronizzo…") : t("Sincronizza")}</button>
+              <Button variant="secondary" size="xs" onClick={() => runFeed(f.id)} disabled={!!busy}>{busy === f.id ? t("Sincronizzo…") : t("Sincronizza")}</Button>
               <button aria-label={t("Rimuovi")} onClick={() => removeFeed(f.id)} disabled={!!busy} title={t("Rimuovi")} className="rounded-lg px-2 py-1.5 text-faint hover:text-[color:var(--err)] disabled:opacity-40">✕</button>
             </div>
           ))}
@@ -172,7 +172,7 @@ export default function IcalSyncPanel() {
           <select value={form.structureId} disabled={activeStructureId !== "all"} onChange={(e) => setForm({ ...form, structureId: e.target.value })} className={`${inp} disabled:opacity-60`}>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <button onClick={addFeed} disabled={!/^https?:\/\//i.test(form.url.trim()) || !form.structureId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+          <Button size="sm" onClick={addFeed} disabled={!/^https?:\/\//i.test(form.url.trim()) || !form.structureId} className="shrink-0">{t("Aggiungi")}</Button>
         </div>
       </div>
       {structures.length === 0 && <p className="mt-2 text-xs text-[color:var(--warn)]">{t("Prima crea una struttura.")}</p>}
