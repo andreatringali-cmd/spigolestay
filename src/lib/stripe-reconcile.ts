@@ -9,6 +9,7 @@ import { refundedCentsOf } from "./chat-pay-server";
 import { findBookingStoreById } from "./manage-booking";
 import { entitiesReadMode, entitiesShadow, findBookingsByPaymentIntent, logCompare, ownerState } from "./server-entities";
 import { eur } from "./format";
+import { mutateEntitySet } from "./server-entities-write";
 
 const DATA_KEY = "spigolestay:data:v1";
 type Json = Record<string, unknown>;
@@ -114,6 +115,19 @@ export async function reconcileCharge(
   const charge = { amount: Number(ch.amount) || 0, amountRefunded: Number(ch.amount_refunded) || 0 };
 
   const patchOnce = async (t: Target): Promise<"ok" | "none" | "conflict"> => {
+    // Fase 3, passo 3a (src/lib/server-entities-write.ts): se l'autorita' delle prenotazioni di questo proprietario e' 'table' si riscrivono le righe di public.entities;
+    // altrimenti ({ handled:false }, il caso di oggi) prosegue il percorso attuale sul blocco, invariato.
+    const ownerType = t.table === "org_state" ? "o" : "u";
+    const viaTables = await mutateEntitySet(admin, {
+      ownerType, ownerId: t.val, kind: "bookings",
+      load: async () => (await findBookingsByPaymentIntent(admin, pi)).filter((h) => h.owner.type === ownerType && h.owner.id === t.val).map((h) => h.row),
+      compute: (list) => {
+        const plan = planRefundOnBookings(list, pi, charge, isDispute, Date.now());
+        if (!plan.found) return { action: "none" };
+        return plan.changes.length ? { action: "changes", changes: plan.changes } : { action: "noop" };
+      },
+    });
+    if (viaTables.handled) return viaTables.outcome === "ok" ? "ok" : viaTables.outcome === "none" ? "none" : "conflict";
     const { data: row } = await admin.from(t.table).select("data, rev").eq(t.col, t.val).maybeSingle();
     if (!row) return "none";
     const blob = (((row as { data?: unknown }).data ?? {}) as Record<string, string>) || {};

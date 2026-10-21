@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { patchEntity } from "./server-entities-write";
 
 // Traccia nell'app (solo server) dei messaggi automatici partiti dal cron: senza, la chat non sa che il messaggio è stato mandato e la coda
 // «Invii programmati» lo riproporrebbe (doppioni all'ospite), la scheda prenotazione direbbe «Guida non inviata», la recensione risulterebbe «da richiedere».
@@ -99,6 +100,16 @@ export async function recordAutoSent(admin: SupabaseClient, t: AutoSentTrace): P
 /** Segna sulla prenotazione che la richiesta di recensione è partita (così il percorso dice «Richiesta inviata» e il cron non la rimanda). */
 export async function markReviewRequested(admin: SupabaseClient, store: { table: Table; keyCol: KeyCol; keyVal: string }, bookingId: string, channel: "email" | "whatsapp"): Promise<boolean> {
   try {
+    // Fase 3, passo 3a (src/lib/server-entities-write.ts): se l'autorita' delle prenotazioni di questo proprietario e' 'table' si aggiorna la riga di public.entities;
+    // altrimenti ({ handled:false }, il caso di oggi) prosegue il percorso attuale sul blocco, invariato. (I thread e il registro invii restano nel blocco: chiavi piatte.)
+    const tr = await patchEntity(admin, {
+      ownerType: store.table === "org_state" ? "o" : "u", ownerId: store.keyVal, kind: "bookings", id: bookingId,
+      mutate: (cur) => {
+        if (typeof cur.reviewRequestedAt === "number" && cur.reviewRequestedAt > 0) return null; // gia' segnata
+        return { ...cur, reviewRequestedAt: Date.now(), reviewRequestChannel: channel };
+      },
+    });
+    if (tr.handled) return tr.ok;
     return await writeBlob(admin, store.table, store.keyCol, store.keyVal, (blob) => {
       let data: Record<string, unknown> = {};
       try { data = JSON.parse(blob[DATA_KEY] || "{}"); } catch { return false; }

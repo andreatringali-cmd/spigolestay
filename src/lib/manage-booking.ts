@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDaysYmd, ymdRome } from "./dates-rome";
 import { entitiesSwitch, findBookingsById, ownerState } from "./server-entities";
+import { mutateBookingScope, patchEntity } from "./server-entities-write";
 
 // Helper server-side per la GESTIONE prenotazione da parte dell'OSPITE (pagina /gestisci).
 // Una prenotazione può vivere in app_state (struttura personale) oppure in org_state
@@ -81,8 +82,16 @@ export async function findBookingStore(admin: SupabaseClient, slug: string, book
 // Applica una mutazione al contenuto dello store e scrive con lucchetto sul rev.
 // mutate riceve (data, bookingIndex) e modifica in place; deve essere ri-applicabile
 // perché in caso di conflitto rileggiamo lo stato fresco e ri-mutiamo una volta.
-export async function mutateStore(admin: SupabaseClient, store: BookingStore, mutate: (data: Json, bookingIndex: number) => boolean): Promise<boolean> {
+// opts.tables (Fase 3, passo 3a, src/lib/server-entities-write.ts): "scope" = questo chiamante e' verificato per la scrittura sulle righe di public.entities (usa solo
+// `bookings` e `structures` di `data`); "skip" = il chiamante ha gia' provato la via delle tabelle; nessuna opzione = scrittore non ancora migrato (se l'autorita' di
+// quel proprietario fosse 'table' si rifiuta di scrivere il blocco). Oggi nessun proprietario e' 'table' (e SERVER_WRITE_ENTITIES e' spento): percorso del blocco invariato.
+export async function mutateStore(admin: SupabaseClient, store: BookingStore, mutate: (data: Json, bookingIndex: number) => boolean, opts: { tables?: "scope" | "skip" } = {}): Promise<boolean> {
   const bookingId = String((store.booking as { id?: string }).id || "");
+  if (opts.tables !== "skip") {
+    const tr = await mutateBookingScope(admin, { ownerType: store.table === "org_state" ? "o" : "u", ownerId: store.keyVal, bookingId, mutate, supported: opts.tables === "scope" });
+    if (tr.handled) return tr.ok && !tr.skipped;
+    // non gestita: percorso attuale (blocco) invariato
+  }
   const writeOnce = async (data: Json, idx: number, blob: Record<string, string>, keyCol: "user_id" | "org_id", keyVal: string, rev: number | null) => {
     if (!mutate(data, idx)) return "skip" as const;
     const nb = { ...blob, [DATA_KEY]: JSON.stringify(data) };
@@ -202,13 +211,16 @@ export async function findBookingStoreForTenant(admin: SupabaseClient, tenantId:
 
 // Scrive una patch sull'oggetto prenotazione (rev-locked, un retry).
 export async function writeBookingPatch(admin: SupabaseClient, store: BookingStore, patch: Json): Promise<boolean> {
+  // Fase 3, passo 3a: se l'autorita' delle prenotazioni di questo proprietario e' 'table' si aggiorna la riga di public.entities; altrimenti percorso attuale (blocco).
+  const r = await patchEntity(admin, { ownerType: store.table === "org_state" ? "o" : "u", ownerId: store.keyVal, kind: "bookings", id: String((store.booking as { id?: string }).id || ""), patch });
+  if (r.handled) return r.ok;
   return mutateStore(admin, store, (data, idx) => {
     const bookings = arr(data.bookings);
     if (idx < 0 || idx >= bookings.length) return false;
     bookings[idx] = { ...(bookings[idx] as Json), ...patch };
     data.bookings = bookings;
     return true;
-  });
+  }, { tables: "skip" });
 }
 
 // Valuta la politica di rimborso: entro la finestra gratuita?

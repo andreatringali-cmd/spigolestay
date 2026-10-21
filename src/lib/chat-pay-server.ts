@@ -106,7 +106,7 @@ export async function recordChatPayment(admin: SupabaseClient, session: Stripe.C
     }
     data.bookings = bookings;
     return true;
-  });
+  }, { tables: "scope" }); // Fase 3, passo 3a: la funzione usa solo bookings e structures di data (scrittura su public.entities solo se l'autorita' e' 'table')
   const res = outcome as Outcome | null;
   if (!res) return { ok: false, error: "booking_not_found" };
   // applied ma scrittura non riuscita (conflitto di versione anche dopo il retry): fai ritentare.
