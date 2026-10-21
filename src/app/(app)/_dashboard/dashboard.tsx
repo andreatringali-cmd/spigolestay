@@ -253,8 +253,8 @@ export default function Dashboard() {
       sub: payItem?.amount || taxToday > 0 ? [payItem?.amount ? `saldi ${eur(payItem.amount)}` : "", taxToday > 0 ? `tassa di soggiorno ${eur(taxToday)} (check-out oggi)` : ""].filter(Boolean).join(" · ") : "Niente da incassare oggi",
     },
     {
-      key: "ade", label: "Adempimenti", value: String(stato.total), href: "/adempimenti", loading: loadingAdem, tone: stato.urgent > 0 ? "err" : undefined,
-      sub: stato.urgent > 0 ? `${stato.urgent} ${plural(stato.urgent, "urgente", "urgenti")}` : stato.total > 0 ? "Da fare oggi" : "Niente in scadenza",
+      key: "ade", label: "Adempimenti oggi", value: String(stato.today), href: "/adempimenti", loading: loadingAdem, tone: stato.today > 0 && stato.urgent > 0 ? "err" : undefined,
+      sub: stato.backlog > 0 ? `+ ${stato.backlog} ${plural(stato.backlog, "arretrato", "arretrati")}` : stato.today > 0 ? "Da fare oggi" : "Niente in scadenza",
     },
   ];
 

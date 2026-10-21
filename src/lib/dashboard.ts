@@ -136,7 +136,8 @@ export const cumulative = (xs: number[]): number[] => { let a = 0; return xs.map
 // ---------- Adempimenti ----------
 export interface StepLite { key: string; state: "done" | "todo" | "late" | "na" }
 export type Tone = "err" | "warn";
-export interface AdempimentoItem { key: string; short: string; one: string; many: string; count: number; tone: Tone; detail: string; amount?: number; href: string; bookingIds: string[] }
+export interface AdempimentoItem { key: string; short: string; one: string; many: string; count: number; tone: Tone; detail: string; amount?: number; href: string; bookingIds: string[];
+  /** quante di queste voci riguardano OGGI (arrivo o partenza di oggi); le altre sono arretrati */ todayCount?: number }
 export interface AdempimentiInput<B extends DBooking> {
   bookings: B[];                                   // prenotazioni vere dello scope (la funzione filtra da sola le finestre utili)
   today: string;
@@ -173,9 +174,9 @@ export function namesLine(names: string[], max = 2): string {
  */
 export function buildAdempimenti<B extends DBooking>(inp: AdempimentiInput<B>): AdempimentoItem[] {
   const { today } = inp;
-  type Acc = { list: { b: B; tone: Tone }[]; amount: number };
+  type Acc = { list: { b: B; tone: Tone; isToday: boolean }[]; amount: number };
   const acc: Record<string, Acc> = {};
-  const add = (key: string, b: B, tone: Tone, amount = 0) => { (acc[key] ??= { list: [], amount: 0 }).list.push({ b, tone }); acc[key].amount += amount; };
+  const add = (key: string, b: B, tone: Tone, amount = 0) => { (acc[key] ??= { list: [], amount: 0 }).list.push({ b, tone, isToday: b.checkIn === today || b.checkOut === today }); acc[key].amount += amount; };
   for (const b of inp.bookings) {
     const diff = diffDays(b.checkIn, today);     // <0 già arrivato, 0 oggi, >0 futuro
     const dep = diffDays(b.checkOut, today);     // <0 già partito, 0 oggi
@@ -205,7 +206,7 @@ export function buildAdempimenti<B extends DBooking>(inp: AdempimentiInput<B>): 
     const tone: Tone = a.list.some((x) => x.tone === "err") ? "err" : "warn";
     const sorted = [...a.list].sort((x, y) => x.b.checkIn.localeCompare(y.b.checkIn));
     out.push({
-      key, short: d.short, one: d.one, many: d.many, count: a.list.length, tone, amount: a.amount > 0 ? a.amount : undefined, href: d.href,
+      key, short: d.short, one: d.one, many: d.many, count: a.list.length, todayCount: a.list.filter((x) => x.isToday).length, tone, amount: a.amount > 0 ? a.amount : undefined, href: d.href,
       detail: namesLine(sorted.map((x) => inp.nameOf(x.b))), bookingIds: sorted.map((x) => x.b.id),
     });
   }
@@ -216,10 +217,11 @@ export function buildAdempimenti<B extends DBooking>(inp: AdempimentiInput<B>): 
 const pick = (d: { short: string; one: string; many: string }) => ({ short: d.short, one: d.one, many: d.many });
 
 /** Totali per lo stato complessivo: quante voci, quante urgenti. */
-export function adempimentiStato(items: AdempimentoItem[]): { total: number; urgent: number; tone: "ok" | "warn" | "err" } {
+export function adempimentiStato(items: AdempimentoItem[]): { total: number; urgent: number; today: number; backlog: number; tone: "ok" | "warn" | "err" } {
   const total = items.reduce((a, i) => a + i.count, 0);
+  const today = items.reduce((a, i) => a + (i.todayCount ?? 0), 0);
   const urgent = items.filter((i) => i.tone === "err").reduce((a, i) => a + i.count, 0);
-  return { total, urgent, tone: total === 0 ? "ok" : urgent > 0 ? "err" : "warn" };
+  return { total, urgent, today, backlog: total - today, tone: total === 0 ? "ok" : urgent > 0 ? "err" : "warn" };
 }
 
 // ---------- Da controllare ----------
