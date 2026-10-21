@@ -322,7 +322,7 @@ export default function MetaSearchPage() {
         <StatCard label={t("Guadagno extra medio")} value={eur(avgExtra)} color="var(--ok)" hint={t("a notte, per prenotazione diretta")} />
       </div>
       {types.length === 0 ? (
-        <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia per questa struttura.")}</div></Card>
+        <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia per questa struttura")}</div></Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[560px] text-sm">

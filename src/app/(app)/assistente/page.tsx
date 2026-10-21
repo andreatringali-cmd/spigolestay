@@ -127,7 +127,7 @@ export default function AssistentePage() {
       arrivalsToday, departuresToday, noCheckin,
       ricavo: { title: "Ricavo del mese", value: eur(ricavoMese), detail: `${monthArr.length} ${monthArr.length === 1 ? "prenotazione con arrivo" : "prenotazioni con arrivo"} questo mese.`, go: { label: "Statistiche", href: "/statistiche" } } as Ans,
       incassato: { title: "Incassato del mese", value: eur(incassatoMese), detail: `Su ${eur(ricavoMese)} di ricavo previsto.`, go: { label: "Incassi", href: "/pagamenti" } } as Ans,
-      prossimo: { title: "Prossimo arrivo", value: nextArrival ? fmtDate(nextArrival.checkIn) : "—", detail: nextArrival ? `${getGuest(nextArrival.guestId)?.fullName || "Ospite"} · ${getStructure(nextArrival.structureId)?.name ?? ""}` : "Nessun arrivo futuro.", go: { label: "Calendario", href: "/calendario" } } as Ans,
+      prossimo: { title: "Prossimo arrivo", value: nextArrival ? fmtDate(nextArrival.checkIn) : "—", detail: nextArrival ? `${getGuest(nextArrival.guestId)?.fullName || "Ospite"} · ${getStructure(nextArrival.structureId)?.name ?? ""}` : "Nessun arrivo futuro", go: { label: "Calendario", href: "/calendario" } } as Ans,
     };
   }, [active, t, ym, getGuest, getStructure]);
 
@@ -268,7 +268,7 @@ export default function AssistentePage() {
     }
     if (/pulizi|da pulire|riassett/.test(s)) {
       const n = cleanSet.size;
-      const intro = n === 0 ? "Nessuna camera da pulire oggi." : `Oggi ci ${n === 1 ? "è" : "sono"} ${n} camer${n === 1 ? "a" : "e"} da pulire.`;
+      const intro = n === 0 ? "Nessuna camera da pulire oggi" : `Oggi ci ${n === 1 ? "è" : "sono"} ${n} camer${n === 1 ? "a" : "e"} da pulire.`;
       return { title: "Camere da pulire", value: String(n), detail: intro, speech: intro, go: { label: "Pulizie", href: "/pulizie" } };
     }
     if (/prossimi arriv|arrivi 7|7 giorni|settiman/.test(s)) {
@@ -346,7 +346,7 @@ export default function AssistentePage() {
       } catch (err) {
         const name = (err as { name?: string })?.name || "";
         console.warn("[Assistente] getUserMedia error:", err, { embedded, granted });
-        if (name === "NotFoundError" || name === "DevicesNotFoundError") { setMicHint("Nessun microfono rilevato sul dispositivo."); return; }
+        if (name === "NotFoundError" || name === "DevicesNotFoundError") { setMicHint("Nessun microfono rilevato sul dispositivo"); return; }
         if (name === "NotReadableError" || name === "TrackStartError") { setMicHint("Il microfono è occupato da un'altra app (es. Zoom/Teams). Chiudila e riprova."); return; }
         preErr = embedded
           ? `Qui la pagina gira dentro un'altra app e il microfono non passa (${name || "sconosciuto"}). Apri xenora.it in una scheda di Chrome o Edge.`
@@ -372,7 +372,7 @@ export default function AssistentePage() {
       console.warn("[Assistente] SpeechRecognition error:", err);
       if (err === "not-allowed" || err === "service-not-allowed") setMicHint(preErr || "Microfono bloccato: clicca il lucchetto accanto all'indirizzo, consenti il microfono e ricarica.");
       else if (err === "no-speech") setMicHint("Non ho sentito nulla, riprova");
-      else if (err === "audio-capture") setMicHint("Nessun microfono trovato.");
+      else if (err === "audio-capture") setMicHint("Nessun microfono trovato");
       else if (err === "network") setMicHint("Il riconoscimento vocale non raggiunge il server: serve Chrome o Edge con connessione attiva.");
       else if (err === "aborted") setMicHint("");
       else setMicHint(`Microfono non disponibile qui (${err || "sconosciuto"}).`);

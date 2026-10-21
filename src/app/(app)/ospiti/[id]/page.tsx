@@ -267,7 +267,7 @@ export default function OspiteSchedaPage() {
 
           <Card>
             <SectionTitle>{t("Storico soggiorni")}</SectionTitle>
-            {list.length === 0 ? <p className="text-sm text-faint">{isNew ? t("Salva l'ospite per iniziare a tracciare i soggiorni.") : t("Nessun soggiorno registrato.")}</p> : (
+            {list.length === 0 ? <p className="text-sm text-faint">{isNew ? t("Salva l'ospite per iniziare a tracciare i soggiorni.") : t("Nessun soggiorno registrato")}</p> : (
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {list.map((b) => {
                   const st = getStructure(b.structureId);
@@ -294,7 +294,7 @@ export default function OspiteSchedaPage() {
         <Modal open onClose={() => setPickPromo(false)} title={<>{t("Invia promo a")} {fullName}</>} size="sm" closeLabel={t("Chiudi")}>
             <div className="mb-3 text-xs text-dim">{g.email}</div>
             {promos.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
+              <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
             ) : (
               <div className="flex flex-col gap-2">
                 {promos.map((p) => (

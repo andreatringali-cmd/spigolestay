@@ -131,7 +131,7 @@ export default function PagamentiPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={8}><EmptyState title={t("Nessun pagamento con questi filtri.")} /></td></tr>}
+            {rows.length === 0 && <tr><td colSpan={8}><EmptyState title={t("Nessun pagamento con questi filtri")} /></td></tr>}
           </tbody>
         </table>
       </div>
@@ -158,7 +158,7 @@ export default function PagamentiPage() {
             {balance > 0 && <Button size="md" onClick={() => updateBooking(b.id, { paid: due })} className="mt-2 w-full">{t("Salda")}</Button>}
           </div>
         ))}
-        {rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessun pagamento con questi filtri.")} /></div>}
+        {rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessun pagamento con questi filtri")} /></div>}
       </div>
       <p className="mt-3 text-xs text-faint">{t("Modifica l'importo incassato direttamente in tabella o usa «Salda» per registrare il pagamento completo. Gli incassi si riflettono nella scheda prenotazione e nella Cassa.")}</p>
     </div>

@@ -138,7 +138,7 @@ export default function ModelliPanel() {
         ))}
       </div>
 
-      {ready && groups.length === 0 && <p className="rounded-xl border border-dashed border-line py-8 text-center text-sm text-faint">{search.trim() ? t("Nessun modello trovato.") : t("Nessun modello.")}</p>}
+      {ready && groups.length === 0 && <p className="rounded-xl border border-dashed border-line py-8 text-center text-sm text-faint">{search.trim() ? t("Nessun modello trovato") : t("Nessun modello")}</p>}
 
       {/* Editor */}
       {editing && (

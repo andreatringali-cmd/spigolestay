@@ -286,7 +286,7 @@ export default function FascicoloFiscalePage() {
                     <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{eur(c.lordo - c.commissioni)}</td>
                   </tr>
                 ))}
-                {channelRows.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-faint">{t("Nessun incasso nell'anno selezionato.")}</td></tr>}
+                {channelRows.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-faint">{t("Nessun incasso nell'anno selezionato")}</td></tr>}
               </tbody>
             </table>
           </div>

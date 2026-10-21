@@ -973,7 +973,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
       {/* Archivio */}
       {tab === "archivio" && scopedSaved.length === 0 && (
-        <Card><EmptyState title={t("Nessun preventivo in archivio.")} sub={t("Crea e invia un preventivo per ritrovarlo qui.")} /></Card>
+        <Card><EmptyState title={t("Nessun preventivo in archivio")} sub={t("Crea e invia un preventivo per ritrovarlo qui.")} /></Card>
       )}
       {tab === "archivio" && scopedSaved.length > 0 && (
         <div>

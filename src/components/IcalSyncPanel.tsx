@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
-import { Card, SectionTitle, Button } from "@/components/ui";
+import { Card, SectionTitle, Button, Switch } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { parseICS, importIcsEvents } from "@/lib/ics";
@@ -129,8 +129,8 @@ export default function IcalSyncPanel() {
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <SectionTitle>{t("Sincronizzazione iCal")} <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-wide text-[color:var(--ok)]">{t("reale · sola lettura")}</span></SectionTitle>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-dim">{t("Auto ogni 15 min")}
-            <button type="button" onClick={toggleAuto} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: auto ? "var(--ok)" : "var(--line)" }} role="switch" aria-checked={auto}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: auto ? "22px" : "2px" }} /></button>
+          <label className="flex items-center gap-1.5 text-xs text-dim"><span id="ical-auto-label">{t("Auto ogni 15 min")}</span>
+            <Switch checked={auto} onCheckedChange={() => toggleAuto()} labelledBy="ical-auto-label" color="var(--ok)" />
           </label>
           <Button size="sm" onClick={runAll} disabled={!!busy || feeds.length === 0}>↻ {busy === "all" ? t("Sincronizzo…") : t("Sincronizza tutti")}</Button>
         </div>

@@ -418,8 +418,8 @@ export default function OspitiPage() {
         </div>
       )}
 
-      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} open={openReg.ospiti} onToggle={() => setOpenReg((v) => ({ ...v, ospiti: !v.ospiti }))} />
-      <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
+      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento")} open={openReg.ospiti} onToggle={() => setOpenReg((v) => ({ ...v, ospiti: !v.ospiti }))} />
+      <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
 
       {mergeOpen && (
         <Modal open onClose={() => setMergeOpen(false)} title={t("Unisci i doppioni")} size="lg" closeLabel={t("Chiudi")} footer={<>
@@ -480,7 +480,7 @@ export default function OspitiPage() {
         <Modal open onClose={() => setPickPromo(false)} title={t("Scegli la promo da inviare")} size="sm" closeLabel={t("Chiudi")}>
             <div className="mb-3 text-xs text-dim">{selEmails.length} {t("destinatari con email")}</div>
             {promos.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
+              <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
             ) : (
               <div className="flex flex-col gap-2">
                 {promos.map((p) => (

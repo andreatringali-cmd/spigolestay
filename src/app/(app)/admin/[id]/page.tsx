@@ -195,7 +195,7 @@ export default function AccountDetailPage() {
         <div className="mb-1.5 text-sm font-semibold text-txt">Note interne (private)</div>
         <textarea value={note} onChange={(e) => { setNote(e.target.value); setNoteState({}); }} rows={4} placeholder="Appunti su questo cliente: contatti, accordi, promemoria…" className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
         <div className="mt-2 flex items-center gap-2">
-          <Button size="sm" onClick={saveNote} disabled={noteState.saving}>{noteState.saving ? "Salvo…" : "Salva nota"}</Button>
+          <Button size="sm" onClick={saveNote} disabled={noteState.saving}>{noteState.saving ? "Salvataggio…" : "Salva nota"}</Button>
           {noteState.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
         </div>
       </Card>

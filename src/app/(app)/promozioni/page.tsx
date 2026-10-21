@@ -252,7 +252,7 @@ export default function PromozioniPage() {
           </div>
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
             {editId && <Button variant="secondary" size="sm" onClick={resetEditor} className="mr-auto">Annulla modifica</Button>}
-            <Button size="sm" onClick={savePromo} disabled={!name.trim() && !subject.trim()}>{editId ? "Salva modifiche" : "Salva promo"}</Button>
+            <Button size="sm" onClick={savePromo} disabled={!name.trim() && !subject.trim()}>Salva</Button>
           </div>
         </Card>
 

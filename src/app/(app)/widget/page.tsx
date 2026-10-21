@@ -277,7 +277,7 @@ export default function WidgetPage() {
           {!structures.length ? (
             <EmptyState title="Nessuna struttura" sub="Crea prima una struttura (menu Strutture): il widget di prenotazione si collega a una struttura." />
           ) : shownWidgets.length === 0 ? (
-            <EmptyState title={t("Nessun widget per questa struttura.")} sub="Con «+ Crea un nuovo widget» ottieni il codice da incollare nel tuo sito: il motore di prenotazione compare nella pagina e le prenotazioni entrano nel calendario." />
+            <EmptyState title={t("Nessun widget per questa struttura")} sub="Con «+ Crea un nuovo widget» ottieni il codice da incollare nel tuo sito: il motore di prenotazione compare nella pagina e le prenotazioni entrano nel calendario." />
           ) : (
             <>
               {/* Telefono: lista a schede (tap affidabile; niente tabella larga da scorrere) */}

@@ -70,7 +70,7 @@ export default function RegistroPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata")}</td></tr>}
               {rows.map((a) => {
                 const m = META[a.type] ?? { label: a.type, color: "var(--faint)" };
                 return (

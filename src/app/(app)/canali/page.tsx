@@ -165,7 +165,7 @@ export default function CanaliPage() {
     // condividono le camere della tipologia madre (vedi RoomType.deriveFrom in lib/types.ts).
     // Vanno escluse dal push: altrimenti Channex le vede come tipologie/camere fantasma in più.
     const rts = roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom);
-    if (rts.length === 0) { setChxSync({ running: false, ok: false, msg: "Nessuna tipologia in questa struttura." }); return; }
+    if (rts.length === 0) { setChxSync({ running: false, ok: false, msg: "Nessuna tipologia in questa struttura" }); return; }
     const rooms = rts.map((rt) => ({
       xid: rt.id,
       title: rt.name,
@@ -347,7 +347,7 @@ export default function CanaliPage() {
           ) : otaLoading && !otaByStructure ? (
             <p className="text-sm text-faint">{t("Verifico…")}</p>
           ) : otaGroups.every((g) => g.list.length === 0) ? (
-            <p className="text-sm text-faint">{t("Nessun canale OTA collegato.")}</p>
+            <p className="text-sm text-faint">{t("Nessun canale OTA collegato")}</p>
           ) : (
             <div className="flex flex-col gap-4">
               {otaGroups.filter((g) => g.list.length > 0).map((g, gi) => (

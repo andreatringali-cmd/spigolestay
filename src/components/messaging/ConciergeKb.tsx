@@ -161,7 +161,7 @@ function EntryForm({ draft, setDraft, onSave, onCancel, saving, isNew, structure
       <p className="text-[11px] text-faint">Link mappa: lascia vuoto, la mappa si genera dall&apos;indirizzo.</p>
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="xs" onClick={onCancel} disabled={saving}>Annulla</Button>
-        <Button size="xs" onClick={onSave} disabled={saving || invalid}>{saving ? "Salvo…" : isNew ? "Crea voce" : "Salva"}</Button>
+        <Button size="xs" onClick={onSave} disabled={saving || invalid}>{saving ? "Salvataggio…" : isNew ? "Crea voce" : "Salva"}</Button>
       </div>
     </div>
   );

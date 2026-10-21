@@ -263,7 +263,7 @@ function TipologiaScheda() {
                   <button aria-label={t("Rimuovi spazio")} onClick={() => delSpace(i)} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>
                 </div>
               ))}
-              {(f.composition ?? []).length === 0 && <div className="text-sm text-faint">{t("Nessun ambiente.")}</div>}
+              {(f.composition ?? []).length === 0 && <div className="text-sm text-faint">{t("Nessun ambiente")}</div>}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {ROOM_SPACES.map((sp2) => <Button variant="secondary" size="xs" key={sp2} onClick={() => addSpace(sp2)}>+ {t(sp2)}</Button>)}

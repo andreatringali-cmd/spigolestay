@@ -307,7 +307,7 @@ export default function UserSchedaPage() {
             </div>
             <div className="mb-3 text-xs text-dim">{t("Ultimo accesso:")} {u.lastLogin ? <>{fmtDateTime(u.lastLogin.at)} {t("da")} <span className="font-mono">{u.lastLogin.ip}</span></> : <span className="text-faint">{t("mai")}</span>}</div>
             {(u.sessions ?? []).length === 0 ? (
-              <div className="text-sm text-faint">{t("Nessuna sessione attiva.")}</div>
+              <div className="text-sm text-faint">{t("Nessuna sessione attiva")}</div>
             ) : (
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {(u.sessions ?? []).map((s) => (

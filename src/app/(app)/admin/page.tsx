@@ -395,7 +395,7 @@ export default function AdminPage() {
             {allPay.loading ? (
               <div className="py-10 text-center text-sm text-faint">Carico i pagamenti…</div>
             ) : filteredPay.inv.length === 0 ? (
-              <div className="py-10 text-center text-sm text-dim">{allPay.error ? `Errore: ${allPay.error}` : "Nessuna fattura."}</div>
+              <div className="py-10 text-center text-sm text-dim">{allPay.error ? `Errore: ${allPay.error}` : "Nessuna fattura"}</div>
             ) : (
               <table className="w-full min-w-[840px] text-sm">
                 <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">

@@ -305,7 +305,7 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
           {allTypes.map((rt) => { const on = selectedRooms.includes(rt.id); return (
             <button key={rt.id} type="button" onClick={() => toggleRoom(rt.id)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{on ? "✓ " : ""}{roomName(rt.id)}</button>
           ); })}
-          {allTypes.length === 0 && <span className="text-xs text-faint">{t("Nessuna tipologia disponibile.")}</span>}
+          {allTypes.length === 0 && <span className="text-xs text-faint">{t("Nessuna tipologia disponibile")}</span>}
         </div>
         <p className="mt-1 text-[11px] text-faint">{allSelected ? t("Si applica a tutte le tipologie.") : selectedRooms.length === 0 ? t("Scegli almeno una tipologia, oppure premi Tutte.") : `${selectedRooms.length} ${t("tipologie selezionate")}`}</p>
       </div>

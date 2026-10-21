@@ -876,7 +876,7 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
               </div>
             );
           })}
-          {people.length === 0 && <div className="px-3 py-10 text-center text-sm text-faint">{t("Nessun ospite.")}</div>}
+          {people.length === 0 && <div className="px-3 py-10 text-center text-sm text-faint">{t("Nessun ospite")}</div>}
         </div>
         {/* «Invii programmati»: nascosto, i messaggi automatici sono spenti (si manda tutto a mano dalla scheda della prenotazione) */}
       </div>
@@ -1178,7 +1178,7 @@ ${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"),
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
           <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
           <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <Button size="sm" onClick={waSave} disabled={!!waBusy}>{waBusy === "save" ? t("Salvo…") : t("Salva")}</Button>
+          <Button size="sm" onClick={waSave} disabled={!!waBusy}>{waBusy === "save" ? t("Salvataggio…") : t("Salva")}</Button>
           <Button variant="secondary" size="sm" onClick={waTest} disabled={!!waBusy || !wa.connected}>{waBusy === "test" ? t("Test…") : t("Test")}</Button>
         </div>
       )}

@@ -65,7 +65,7 @@ export default function AlloggiatiWebPage() {
     try {
       const r = await apiPost<{ ok: boolean; message?: string; text?: string }>("alloggiati/tracciato", { structureId: sid });
       if (r.text) { const blob = new Blob([r.text], { type: "text/plain" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `alloggiati_${ymdRome(new Date())}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); setMsg(r.message || "Tracciato scaricato ✓"); }
-      else setMsg(r.message || "Nessuna schedina pronta.");
+      else setMsg(r.message || "Nessuna schedina pronta");
     } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
 

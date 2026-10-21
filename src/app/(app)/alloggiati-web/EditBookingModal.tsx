@@ -108,7 +108,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
       description={`${getStructure(b.structureId)?.name ?? ""}${b.code ? ` · ${b.code}` : ""} · ${declared}/${pax} ospiti dichiarati`}
       footer={<>
         <span className="mr-auto text-[11px] text-dim">Le modifiche si salvano da sole. Chiudendo, le schedine vengono rigenerate.</span>
-        <Button onClick={onClose}>Fatto</Button>
+        <Button onClick={onClose}>Chiudi</Button>
       </>}
     >
         <div>

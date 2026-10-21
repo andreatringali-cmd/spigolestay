@@ -52,7 +52,7 @@ export default function StrutturePage() {
   const shared = isStaff ? [] : others;
   const assigned = isStaff ? others : [];
   const groups = [
-    { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà.") },
+    { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà") },
     { key: "shared", title: t("Condivise con me"), desc: "", list: shared, empty: t("Nessuna struttura condivisa con te da un altro proprietario.") },
     { key: "assigned", title: t("Assegnate a te"), desc: "", list: assigned, empty: "" },
   ].filter((g) => g.list.length > 0 || (g.key === "own" && !isStaff) || (g.key === "shared" && !isStaff));

@@ -4,7 +4,7 @@
 // online) con prezzo, modalità, categoria, stagionalità, soggiorno minimo e quantità massima.
 // I prezzi li decide il gestore: gli esempi precaricati restano "da confermare" e non vengono proposti.
 
-import { Button } from "@/components/ui";
+import { Button, Switch } from "@/components/ui";
 import { useState } from "react";
 import { eur } from "@/lib/format";
 import type { ExtraKind, ExtraService, Structure } from "@/lib/types";
@@ -97,7 +97,7 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => upd(e.id, { active: !isActive(e) })} title={isActive(e) ? "Disattiva" : "Attiva"} role="switch" aria-checked={isActive(e)} aria-label={`Attivo: ${e.name}`} className={`relative h-5 w-9 shrink-0 rounded-full transition ${isActive(e) ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all" style={{ left: isActive(e) ? "18px" : "2px" }} /></button>
+                  <Switch checked={isActive(e)} onCheckedChange={(on) => upd(e.id, { active: on })} label={`Attivo: ${e.name}`} />
                   <div className="min-w-0 flex-1 basis-40">
                     <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{e.name}
                       <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-dim">{KIND_LABEL[kind]}</span>

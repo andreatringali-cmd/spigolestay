@@ -341,7 +341,7 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
       <div ref={scrollRef} className={`overflow-y-auto bg-wash/40 py-4 ${pad} ${compact ? "h-[46dvh] max-h-[460px] min-h-[220px]" : "min-h-0 flex-1"}`}>
         {msgLoading && msgs.length === 0 && <p className="text-sm text-dim">{t("Caricamento…")}</p>}
         {msgErr && <p className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{msgErr}</p>}
-        {!msgLoading && !msgErr && msgs.length === 0 && <p className="text-center text-sm text-dim">{t("Nessun messaggio in questa conversazione.")}</p>}
+        {!msgLoading && !msgErr && msgs.length === 0 && <p className="text-center text-sm text-dim">{t("Nessun messaggio in questa conversazione")}</p>}
         <div className="mx-auto flex max-w-3xl flex-col gap-3">
           {msgs.map((m) => {
             if (m.sender === "system") return <div key={m.id} className="mx-auto max-w-[90%] whitespace-pre-wrap rounded-xl bg-wash px-3 py-2 text-center text-xs text-dim">{m.text}</div>;

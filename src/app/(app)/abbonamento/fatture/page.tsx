@@ -46,7 +46,7 @@ export default function FatturePage() {
     : invState === "err" ? t("Impossibile leggere le fatture da Stripe. Riprova più tardi: non vengono mostrate fatture di esempio.")
     : invState === "notconfigured" ? t("Il sistema di pagamento non è ancora collegato: nessuna fattura disponibile.")
     : trial?.inTrial ? t("Nessuna fattura durante la prova gratuita. La prima sarà emessa al termine della prova.")
-    : t("Nessuna fattura ancora emessa.");
+    : t("Nessuna fattura ancora emessa");
 
   return (
     <div>
@@ -55,7 +55,7 @@ export default function FatturePage() {
       {trial?.inTrial && realInv.length === 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--ok) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)", color: "var(--dim)" }}>
           <span className="grid h-6 w-6 place-items-center rounded-full text-[12px] font-bold text-on-ok" style={{ backgroundColor: "var(--ok)" }}>✓</span>
-          <span><b className="text-txt">{t("Prova gratuita in corso")}</b> — {t("hai")} {trial.daysLeft} {trial.daysLeft === 1 ? t("giorno") : t("giorni")} {t("di prova (fino al")} {fmtDay(trial.trialEnd)}). {t("Nessuna fattura durante la prova.")}</span>
+          <span><b className="text-txt">{t("Prova gratuita in corso")}</b> — {t("hai")} {trial.daysLeft} {trial.daysLeft === 1 ? t("giorno") : t("giorni")} {t("di prova (fino al")} {fmtDay(trial.trialEnd)}). {t("Nessuna fattura durante la prova")}</span>
         </div>
       )}
 

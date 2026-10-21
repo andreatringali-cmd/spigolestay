@@ -60,7 +60,7 @@ export default function ActivityLog() {
         <div className="p-1">
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-dim">{t("Registro attività")}</div>
           {activities.length === 0 ? (
-            <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>
+            <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>
           ) : (
             activities.map((a) => (
               <div key={a.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-wash">

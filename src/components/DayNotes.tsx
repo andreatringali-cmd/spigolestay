@@ -36,7 +36,7 @@ export default function DayNotes() {
         <Button size="sm" aria-label="Aggiungi la nota" onClick={add} className="shrink-0">+</Button>
       </div>
       {notes.length === 0 ? (
-        <div className="py-2 text-sm text-faint">{t("Nessun promemoria.")}</div>
+        <div className="py-2 text-sm text-faint">{t("Nessun promemoria")}</div>
       ) : (
         <div className="flex flex-col gap-1">
           {notes.map((n) => (

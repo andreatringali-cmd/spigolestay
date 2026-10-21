@@ -613,7 +613,7 @@ export default function DocumentoPage() {
       {/* AZIONI */}
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {!frozen && <>
-          <Button variant="secondary" size="sm" onClick={onSave} disabled={!!busy}>{busy === "save" ? "Salvo…" : "Salva bozza"}</Button>
+          <Button variant="secondary" size="sm" onClick={onSave} disabled={!!busy}>{busy === "save" ? "Salvataggio…" : "Salva bozza"}</Button>
           <Button size="sm" onClick={onIssue} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined}>{busy === "issue" ? "Emissione…" : "Emetti"}</Button>
           {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <Button size="sm" onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined}>{busy === "savesend" ? "…" : "Salva e invia"}</Button>}
           <button onClick={deleteDraft} disabled={!!busy} className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)] disabled:opacity-50">{busy === "del" ? "Elimino…" : "Elimina bozza"}</button>

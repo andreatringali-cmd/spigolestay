@@ -371,7 +371,7 @@ export default function CassaPage() {
     if (!sid || !from || !to || from === to) return;
     const mv = moveContoOfStructure(manual, sid, from, to);
     const rl = moveContoOfStructure(rules, sid, from, to);
-    if (mv.ids.length + rl.ids.length === 0) { toast(t("Nessun movimento da spostare."), "error"); return; }
+    if (mv.ids.length + rl.ids.length === 0) { toast(t("Nessun movimento da spostare"), "error"); return; }
     const lab = (k: string) => conti.find((c) => c.key === k)?.label ?? k;
     const sname = getStructure(sid)?.name ?? "—";
     const what = `${mv.ids.length} ${t("movimenti")}${rl.ids.length ? ` ${t("e")} ${rl.ids.length} ${t("pagamenti programmati")}` : ""}`;
@@ -696,7 +696,7 @@ export default function CassaPage() {
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
             </Button>
           </div>
-          {catRows.length === 0 ? <p className="text-sm text-faint">{catView === "out" ? t("Nessuna uscita nel periodo.") : t("Nessuna entrata nel periodo.")}</p> : (
+          {catRows.length === 0 ? <p className="text-sm text-faint">{catView === "out" ? t("Nessuna uscita nel periodo") : t("Nessuna entrata nel periodo")}</p> : (
             <div className="flex max-h-[172px] flex-col gap-2.5 overflow-y-auto pr-2">
               {catRows.map(({ cat, v }) => (
                 <button key={cat!.key} type="button" onClick={() => pickCat(cat!.key)} aria-pressed={catF === cat!.key} title={t("clicca per filtrare")} className={`block w-full rounded-md px-1 py-0.5 text-left transition hover:bg-wash ${catF === cat!.key ? "bg-wash ring-1 ring-[color:var(--focus)]" : ""}`}>
@@ -770,7 +770,7 @@ export default function CassaPage() {
       <div className="flex flex-col gap-4">
           <Card>
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
-            {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} sub={rangeInverted ? t("L'intervallo è al contrario: la data «Dal» è dopo la data «Al».") : undefined} /> : (
+            {rows.length === 0 ? <EmptyState title={t("Nessun movimento")} sub={rangeInverted ? t("L'intervallo è al contrario: la data «Dal» è dopo la data «Al».") : undefined} /> : (
               <div className="-mx-1 max-h-[70dvh] overflow-auto px-1 md:max-h-[640px]">
               <div className="md:min-w-[920px]">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 max-md:hidden sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">
@@ -1063,7 +1063,7 @@ export default function CassaPage() {
                     return (
                       <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-line p-2 text-xs">
                         <select aria-label={t("Dal conto")} value={mv.from} onChange={(e) => setMoveCtx({ ...mv, from: e.target.value, to: mv.to === e.target.value ? "" : mv.to })} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-2 py-1.5 text-xs text-txt outline-none focus:border-focus">
-                          <option value="">{withItems.length ? t("Dal conto…") : t("Nessun movimento da spostare.")}</option>
+                          <option value="">{withItems.length ? t("Dal conto…") : t("Nessun movimento da spostare")}</option>
                           {withItems.map((c) => <option key={c.key} value={c.key}>{contoDisplayLabel(c, conti, (id) => getStructure(id)?.name ?? "—")} ({countOnConto(manual, s.id, c.key) + countOnConto(rules, s.id, c.key)}){contoVisible(c, s.id) ? "" : " ⚠"}</option>)}
                         </select>
                         <span className="text-faint">→</span>

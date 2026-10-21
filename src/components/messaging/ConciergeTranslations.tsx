@@ -234,7 +234,7 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
                           {editErr && <p className="text-[11px] font-medium" style={{ color: "var(--err)" }}>{editErr}</p>}
                           <div className="flex justify-end gap-2">
                             <Button variant="secondary" size="xs" onClick={() => { setEdit(null); setEditErr(""); }} disabled={busy}>Annulla</Button>
-                            <Button size="xs" onClick={saveEdit} disabled={busy || !edit.title.trim() || !edit.body.trim()}>{busy ? "Salvo…" : "Salva e approva"}</Button>
+                            <Button size="xs" onClick={saveEdit} disabled={busy || !edit.title.trim() || !edit.body.trim()}>{busy ? "Salvataggio…" : "Salva e approva"}</Button>
                           </div>
                         </div>
                       ) : it ? (

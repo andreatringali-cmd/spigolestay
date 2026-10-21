@@ -198,7 +198,7 @@ export default function ForniturePage() {
       const q = reorderQty({ estimated: r.estimated, min: r.min, dailyRate: r.dailyRate, horizonDays: horizon, packSize: r.p.pack_size, minOrderQty: r.p.min_order_qty });
       if (q > 0) { addToCart(r.p.id, q); n++; }
     }
-    setMsg(n ? `${n} prodotti aggiunti al carrello: controlla le quantità e conferma l'ordine.` : "Nessuna quantità da ordinare.");
+    setMsg(n ? `${n} prodotti aggiunti al carrello: controlla le quantità e conferma l'ordine.` : "Nessuna quantità da ordinare");
     if (n) setTab("catalogo");
   };
 
@@ -215,7 +215,7 @@ export default function ForniturePage() {
   }, [structId, rules, horizon, fcBookings, today, activeProds, stockInfo]);
 
   const createSuggested = async () => {
-    if (!reorderLines.length) { setMsg("Nessun fabbisogno previsto."); return; }
+    if (!reorderLines.length) { setMsg("Nessun fabbisogno previsto"); return; }
     setBusy(true); setMsg("");
     try {
       const items = reorderLines.map((l) => ({ productId: l.product_id, qty: l.qty }));

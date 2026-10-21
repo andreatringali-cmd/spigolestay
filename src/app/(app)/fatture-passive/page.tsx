@@ -331,7 +331,7 @@ export default function FatturePassivePage() {
       const r = await apiPost<{ ok: boolean; needsReconnect?: boolean; message?: string; items?: PreviewItem[] }>("invoicing/fic/received", { action: "preview", from: fic.from, to: fic.to });
       if (!r.ok) { setFic((p) => p && { ...p, busy: "", msg: r.message || "Impossibile leggere le fatture ricevute.", reconnect: !!r.needsReconnect }); return; }
       const items = r.items ?? [];
-      setFic((p) => p && { ...p, busy: "", items, pick: new Set(items.filter((i) => i.status === "new").map((i) => i.ficId)), msg: items.length ? "" : "Nessuna fattura ricevuta nel periodo." });
+      setFic((p) => p && { ...p, busy: "", items, pick: new Set(items.filter((i) => i.status === "new").map((i) => i.ficId)), msg: items.length ? "" : "Nessuna fattura ricevuta nel periodo" });
     } catch (e) { setFic((p) => p && { ...p, busy: "", msg: friendlyError(e) }); }
   };
   const ficImport = async () => {

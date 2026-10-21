@@ -486,7 +486,7 @@ export default function PuliziePage() {
             </div>
             <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
             {shopList.length > 0 && (shopFiltered.length === 0 ? (
-              <div className="py-3 text-center text-xs text-faint">{t("Nessun prodotto trovato.")}</div>
+              <div className="py-3 text-center text-xs text-faint">{t("Nessun prodotto trovato")}</div>
             ) : activeStructureId === "all" ? (
               <div>
                 {scopeStructures.map((s) => { const items = shopFiltered.filter((p) => p.structureId === s.id); if (!items.length) return null; const sc = structColorOf(s.id); return (
@@ -535,7 +535,7 @@ export default function PuliziePage() {
           <div className="order-2 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-3 lg:flex lg:h-[34rem] lg:flex-col">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-txt"><Icon name="grid" size={16} /> {t("Prodotti")} <span className="text-faint">· {stockFiltered.length}/{stockScoped.length}</span></div>
             <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
-              {stockFiltered.length === 0 && <div className="py-4 text-center text-xs text-faint">{t("Nessun prodotto trovato.")}</div>}
+              {stockFiltered.length === 0 && <div className="py-4 text-center text-xs text-faint">{t("Nessun prodotto trovato")}</div>}
               {activeStructureId === "all" ? (
                 scopeStructures.map((s) => { const items = stockFiltered.filter((p) => p.structureId === s.id); if (!items.length) return null; const sc = structColorOf(s.id); return (
                   <div key={s.id} className="mb-2 overflow-hidden rounded-lg border" style={{ borderColor: `color-mix(in srgb, ${sc} 35%, var(--line))` }}>
