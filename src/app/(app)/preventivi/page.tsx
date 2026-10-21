@@ -13,7 +13,7 @@ import { shortenLink } from "@/lib/guestlink";
 import { supabase } from "@/lib/supabase";
 import { loadPlans, planApplies, planDepositPct, cancelText, plansForStructure, type RatePlan } from "@/lib/rate-plans";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
@@ -961,9 +961,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             document.body,
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> {t("Salva")}</button>
-            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
-            <button onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="grid h-9 w-9 max-sm:h-11 max-sm:w-11 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="fileText" size={16} /></button>
+            <Button variant="secondary" size="md" onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex"><Icon name="fileText" size={15} /> {t("Salva")}</Button>
+            <Button size="md" onClick={sendQuoteEmail} disabled={mailState.sending} className="flex"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</Button>
+            <Button variant="secondary" size="xs" onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="w-8 !px-0 max-sm:w-10 max-sm:!px-0"><Icon name="fileText" size={16} /></Button>
             {saveNote && <span className={`text-xs ${saveNote.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{saveNote.ok ? "✓ " : "⚠ "}{t(saveNote.msg)}</span>}
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
@@ -973,7 +973,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
       {/* Archivio */}
       {tab === "archivio" && scopedSaved.length === 0 && (
-        <Card><EmptyState title={t("Nessun preventivo in archivio.")} sub={t("Crea e invia un preventivo per ritrovarlo qui.")} /></Card>
+        <Card><EmptyState title={t("Nessun preventivo in archivio")} sub={t("Crea e invia un preventivo per ritrovarlo qui.")} /></Card>
       )}
       {tab === "archivio" && scopedSaved.length > 0 && (
         <div>
@@ -1013,10 +1013,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => loadQuote(p)} className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Modifica")}</button>
+                        <Button variant="secondary" size="xs" onClick={() => loadQuote(p)}>{t("Modifica")}</Button>
                         {p.status === "confermato"
                           ? <span className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>{t("Prenotazione creata")}</span>
-                          : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Conferma")}</button>}
+                          : <Button size="xs" onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }}>{t("Conferma")}</Button>}
                         <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="rounded-md border border-line px-2 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                       </div>
                     </td>
@@ -1044,10 +1044,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <button onClick={() => loadQuote(p)} className="flex-1 rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
+                  <Button variant="secondary" size="md" onClick={() => loadQuote(p)} className="flex-1">{t("Modifica")}</Button>
                   {p.status === "confermato"
                     ? <span className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2.5 py-2.5 text-sm font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}>{t("Prenotazione creata")} ✓</span>
-                    : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="flex-1 rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Conferma")}</button>}
+                    : <Button size="md" onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="flex-1">{t("Conferma")}</Button>}
                   <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-line text-sm font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                 </div>
               </div>
@@ -1068,13 +1068,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         const mail = `mailto:${q.email ?? ""}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`;
         const confirmed = q.status === "confermato";
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
-            <button aria-label={t("Chiudi")} onClick={() => setConfirming(null)} className="absolute inset-0 bg-black/40" />
-            <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="font-display text-lg font-bold text-txt">{t("Conferma prenotazione")}</span>
-                <button aria-label="Chiudi" onClick={() => setConfirming(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash hover:text-txt">✕</button>
-              </div>
+          <Modal open onClose={() => setConfirming(null)} title={t("Conferma prenotazione")} size="md" closeLabel={t("Chiudi")}>
               <div className="mb-3 text-sm text-dim">{q.name} · {q.structure} · <span className="font-mono">{fmt(q.checkIn)} → {fmt(q.checkOut)}</span> · <b className="text-txt">{eur(q.total)}</b></div>
 
               <div className="text-xs font-medium text-dim">{t("Anticipo")}</div>
@@ -1096,23 +1090,22 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               )}
 
               <div className="mt-3 flex flex-nowrap items-center gap-1.5 max-sm:flex-wrap">
-                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Crea prenotazione")}</button>}
-                <button disabled={confMail.sending} onClick={async () => {
-                  if (!q.email) { setConfMail({ ok: false, msg: t("Email destinatario mancante") }); return; }
-                  setConfMail({ sending: true, msg: t("Invio…") });
-                  try {
-                    const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: q.lang, to: q.email, subject: etMail(q.lang, "Conferma prenotazione") + " — " + q.structure, text: confMsg, accent: confStructure?.photoColor, replyTo: confStructure?.email, brand: confStructure ? { name: confStructure.name, logo: confStructure.logo, address: [confStructure.address, confStructure.streetNumber, confStructure.city].filter(Boolean).join(" "), phone: confStructure.phone, email: confStructure.email, website: confStructure.website, accent: confStructure.photoColor, cin: confStructure.cin, vat: confStructure.vat } : { name: q.structure } }) });
-                    const j = await r.json().catch(() => ({}));
-                    if (r.ok && j?.ok) setConfMail({ ok: true, msg: t("Email inviata a") + " " + q.email });
-                    else { setConfMail({ ok: false, msg: j?.error || t("Invio non riuscito") }); window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank"); }
-                  } catch (e) { setConfMail({ ok: false, msg: e instanceof Error ? e.message : t("Rete non disponibile") }); }
-                }} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 max-sm:py-2.5 text-xs font-medium text-txt hover:bg-wash disabled:opacity-50">{confMail.sending ? t("Invio…") : t("Email")}</button>
-                <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
-                <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 max-sm:py-2.5 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
+                {!confirmed && <Button size="xs" onClick={() => confirmBooking(false)} className="whitespace-nowrap">{t("Crea prenotazione")}</Button>}
+                <Button variant="secondary" size="xs" disabled={confMail.sending} onClick={async () => {
+ if (!q.email) { setConfMail({ ok: false, msg: t("Email destinatario mancante") }); return; }
+ setConfMail({ sending: true, msg: t("Invio…") });
+ try {
+ const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: q.lang, to: q.email, subject: etMail(q.lang, "Conferma prenotazione") + " — " + q.structure, text: confMsg, accent: confStructure?.photoColor, replyTo: confStructure?.email, brand: confStructure ? { name: confStructure.name, logo: confStructure.logo, address: [confStructure.address, confStructure.streetNumber, confStructure.city].filter(Boolean).join(" "), phone: confStructure.phone, email: confStructure.email, website: confStructure.website, accent: confStructure.photoColor, cin: confStructure.cin, vat: confStructure.vat } : { name: q.structure } }) });
+ const j = await r.json().catch(() => ({}));
+ if (r.ok && j?.ok) setConfMail({ ok: true, msg: t("Email inviata a") + " " + q.email });
+ else { setConfMail({ ok: false, msg: j?.error || t("Invio non riuscito") }); window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank"); }
+ } catch (e) { setConfMail({ ok: false, msg: e instanceof Error ? e.message : t("Rete non disponibile") }); }
+ }} className="whitespace-nowrap">{confMail.sending ? t("Invio…") : t("Email")}</Button>
+                <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-on-wa bg-wa ${digits ? "" : "pointer-events-none opacity-40"}`}>WhatsApp</a>
+                <Button variant="secondary" size="xs" onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap">{t("Copia")}</Button>
               </div>
               {confMail.msg && <div className={`mt-2 rounded-lg px-3 py-2 text-xs font-medium ${confMail.ok ? "text-[color:var(--ok)]" : confMail.sending ? "text-dim" : "text-[color:var(--err)]"}`} style={{ backgroundColor: confMail.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : confMail.sending ? "var(--wash)" : "color-mix(in srgb, var(--err) 10%, transparent)" }}>{confMail.ok ? "✓ " : ""}{confMail.msg}</div>}
-            </div>
-          </div>
+            </Modal>
         );
       })()}
     </div>

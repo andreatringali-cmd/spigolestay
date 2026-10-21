@@ -1,6 +1,7 @@
 "use client";
 
 // Arrivi, partenze e fermi (ospiti in casa) per i giorni a venire, camera per camera.
+import { Button } from "@/components/ui";
 import { useEffect, useMemo, useState } from "react";
 import type { Booking, Guest, RoomType, Structure, Unit } from "@/lib/types";
 import { buildAgenda, WEEKDAY_LONG, isoWeekday } from "@/lib/pulizie-addetta";
@@ -71,7 +72,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {([
             { key: "dafare", label: "Da fare", count: tot.dafare, color: "var(--txt)" },
-            { key: "riassetto", label: "Riassetti", count: tot.riassetto, color: "#0891B2" },
+            { key: "riassetto", label: "Riassetti", count: tot.riassetto, color: "var(--cl-rest)" },
             { key: "partenze", label: "Partenze", count: tot.partenze, color: "var(--err)" },
             { key: "arrivi", label: "Arrivi", count: tot.arrivi, color: "var(--ok)" },
           ] as const).map((c) => {
@@ -88,7 +89,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
       )}
       {spanProp === undefined && <div className="flex flex-wrap items-center gap-2">
         <Seg value={span} onChange={setSpan} options={[{ key: "3", label: "3 giorni" }, { key: "7", label: "7 giorni" }, { key: "14", label: "14 giorni" }]} className="w-full sm:w-auto sm:min-w-[16rem]" />
-        <button onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px] rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{allOpen ? "Chiudi tutti" : "Apri tutti"}</button>
+        <Button variant="secondary" size="xs" onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px]">{allOpen ? "Chiudi tutti" : "Apri tutti"}</Button>
       </div>}
 
       {days.map((d) => {
@@ -103,7 +104,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
                   {empty ? <span className="text-faint">Nessun movimento</span> : (<>
                     <span style={{ color: "var(--ok)" }}>{d.arrivi} {d.arrivi === 1 ? "arrivo" : "arrivi"}</span>
                     <span style={{ color: "var(--err)" }}>{d.partenze} {d.partenze === 1 ? "partenza" : "partenze"}</span>
-                    <span style={{ color: "#0891B2" }}>{d.fermi} {d.fermi === 1 ? "fermo" : "fermi"}</span>
+                    <span style={{ color: "var(--cl-rest)" }}>{d.fermi} {d.fermi === 1 ? "fermo" : "fermi"}</span>
                   </>)}
                 </span>
               </span>

@@ -52,7 +52,7 @@ export default function ReviewSettingsCard({ defaultOpen = false }: { defaultOpe
           <div className="rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">
             {t("Nessuno sconto o regalo in cambio della recensione: i portali lo vietano. Booking.com manda già il suo invito agli ospiti, quindi qui non c'è un link Booking. Non ricevono la richiesta: prenotazioni annullate, no-show o provvisorie, ospiti con il tag «Da recuperare» e prenotazioni a cui l'hai già chiesta a mano.")}
           </div>
-          {structures.length === 0 && <div className="text-xs text-dim">{t("Nessuna struttura configurata.")}</div>}
+          {structures.length === 0 && <div className="text-xs text-dim">{t("Nessuna struttura configurata")}</div>}
           {structures.map((st) => {
             const auto = reviewLinksFor({ structureId: st.id, placeId: st.googlePlaceId, guideReviewUrl: guideReviewUrl(st.id), settings: { ...s, structures: {} } });
             const gRaw = shown(st.id, "googleUrl"), tRaw = shown(st.id, "tripadvisorUrl");

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, toISO, fmtDate } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Modal, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
@@ -18,7 +18,7 @@ import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChann
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 import { waDigits } from "@/lib/contacts-check";
 
-import { onSolid } from "@/lib/on-solid";
+import { onSolid, solidBg } from "@/lib/on-solid";
 const fmt = (iso: string) => fmtDate(iso);
 
 // Fonti recensioni: Google (reale via API) + OTA (collegamento partner in arrivo, per ora inserimento manuale).
@@ -667,13 +667,13 @@ export default function RecensioniPage() {
     {sortSelect}
     <span className="shrink-0 whitespace-nowrap text-[11px] text-faint">{shown.length} di {reviews.length}</span>
     {filtersActive && <button onClick={resetFilters} className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-focus hover:underline">Azzera filtri</button>}
-    <button onClick={exportCsv} disabled={!shown.length} className="ml-auto shrink-0 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
+    <Button variant="secondary" size="xs" onClick={exportCsv} disabled={!shown.length} title="Esporta in CSV le recensioni attualmente mostrate" className="ml-auto shrink-0 whitespace-nowrap">Esporta CSV</Button>
   </>);
   // Chip dei filtri: scritti una volta, mostrati nella barra (da sm in poi) e nella tendina «Filtri» (telefono)
   const fonteChips = (<>
     <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === "all" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>Tutte</button>
     {connectedSources.map((c) => (
-      <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
+      <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === c ? onSolid(SRC[c].color) : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: solidBg(SRC[c].color) } : undefined}>{SRC[c].label}</button>
     ))}
   </>);
   const votoChips = (<>
@@ -745,15 +745,7 @@ export default function RecensioniPage() {
 
       {/* Finestra di configurazione Google: ricerca struttura + Place ID */}
       {cfgOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCfgOpen(false)}>
-          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-display text-lg font-bold text-txt">Collega Google</div>
-                <div className="mt-0.5 text-xs text-dim">Trova la struttura o incolla il Place ID{selStructureId && structures.find((s) => s.id === selStructureId) ? ` · ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</div>
-              </div>
-              <button aria-label="Chiudi" onClick={() => setCfgOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setCfgOpen(false)} title="Collega Google" description={<>Trova la struttura o incolla il Place ID{selStructureId && structures.find((s) => s.id === selStructureId) ? ` · ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</>} size="md" closeLabel="Chiudi">
 
             {keyMissing && (
               <div className="mt-3 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
@@ -771,7 +763,7 @@ export default function RecensioniPage() {
               ) : !gbp.connected ? (
                 <>
                   <p className="mt-1 text-[12px] text-dim">Collega l&apos;account Google che gestisce il profilo: vedrai tutte le recensioni (non solo le ~5 più recenti) e pubblicherai le risposte senza uscire da Xenora.</p>
-                  <button onClick={connectGbp} className="mt-2 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Collega account Google</button>
+                  <Button size="sm" onClick={connectGbp} className="mt-2">Collega account Google</Button>
                 </>
               ) : (
                 <>
@@ -779,7 +771,7 @@ export default function RecensioniPage() {
                   {gbp.error && <p className="mt-1 text-[12px]" style={{ color: "var(--err)" }}>{gbp.error}</p>}
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button onClick={loadGbpLocations} disabled={gbpLocs.loading} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus hover:bg-wash disabled:opacity-50">{gbpLocs.loading ? "Cerco…" : gbp.mappedTitle ? "Cambia sede" : "Mostra le mie sedi"}</button>
-                    <button onClick={unlinkGbp} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-dim hover:bg-wash">Scollega account</button>
+                    <Button variant="secondary" size="sm" onClick={unlinkGbp}>Scollega account</Button>
                   </div>
                   {gbpLocs.error && <p className="mt-1 text-[12px]" style={{ color: "var(--err)" }}>{gbpLocs.error}</p>}
                   {gbpLocs.list.length > 0 && (
@@ -801,7 +793,7 @@ export default function RecensioniPage() {
               <label className="text-[11px] font-semibold uppercase tracking-wide text-dim">Trova la tua struttura</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 <input value={findQ} onChange={(e) => setFindQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") runFind(); }} placeholder="es. Spigolehouse Siracusa" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-                <button onClick={runFind} disabled={finding} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{finding ? "Cerco…" : "Cerca"}</button>
+                <Button size="sm" onClick={runFind} disabled={finding}>{finding ? "Cerco…" : "Cerca"}</Button>
               </div>
               {candidates && (
                 <div className="mt-2 space-y-1.5">
@@ -821,13 +813,12 @@ export default function RecensioniPage() {
               <label className="text-[11px] font-semibold uppercase tracking-wide text-dim">Oppure incolla il Google Place ID</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 <input value={placeIdInput} onChange={(e) => setPlaceIdInput(e.target.value)} placeholder="es. ChIJ...." className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-txt outline-none focus:border-focus" />
-                <button onClick={() => { savePlaceId(); setCfgOpen(false); }} disabled={!selStructureId || placeIdInput.trim() === placeId} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Salva</button>
-                {placeId ? <button onClick={clearPlaceId} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">Rimuovi</button> : null}
+                <Button size="sm" onClick={() => { savePlaceId(); setCfgOpen(false); }} disabled={!selStructureId || placeIdInput.trim() === placeId}>Salva</Button>
+                {placeId ? <Button variant="secondary" size="sm" onClick={clearPlaceId}>Rimuovi</Button> : null}
               </div>
               <p className="mt-1.5 text-[11px] text-faint">Google Places espone solo le <strong>~5 recensioni più recenti</strong>: media e totale restano completi, l&apos;elenco è parziale.</p>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
@@ -890,7 +881,7 @@ export default function RecensioniPage() {
           const showConnectedBadge = isGoogle || chxBadgeOn(s.k);
           return (
             <button key={s.k} onClick={() => (isGoogle ? setCfgOpen(true) : setSrcCfg(s.k))} className="group relative flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[color:var(--focus)] hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus)] active:translate-y-0" style={{ borderColor: on ? s.color : "var(--line)" }} title="Apri impostazioni">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white transition-transform duration-200 group-hover:scale-110" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold ${onSolid(s.color)} transition-transform duration-200 group-hover:scale-110`} style={{ backgroundColor: solidBg(s.color) }}>{s.label[0]}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-txt">{s.label}</div>
                 <div className="truncate text-[11px] text-faint">{noteFor(s)}</div>
@@ -908,18 +899,7 @@ export default function RecensioniPage() {
 
       {/* Impostazioni di una fonte OTA (Booking/Airbnb/…): come Google, ma via connettore partner o inserimento manuale */}
       {srcCfg && srcCfg !== "google" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSrcCfg(null)}>
-          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: SRC[srcCfg].color }}>{SRC[srcCfg].label[0]}</span>
-                <div>
-                  <div className="font-display text-lg font-bold text-txt">{SRC[srcCfg].label}</div>
-                  <div className="text-xs text-dim">Impostazioni recensioni</div>
-                </div>
-              </div>
-              <button aria-label="Chiudi" onClick={() => setSrcCfg(null)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setSrcCfg(null)} title={<span className="flex items-center gap-2.5"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold ${onSolid(SRC[srcCfg].color)}`} style={{ backgroundColor: solidBg(SRC[srcCfg].color) }}>{SRC[srcCfg].label[0]}</span>{SRC[srcCfg].label}</span>} description="Impostazioni recensioni" size="md" closeLabel="Chiudi">
 
             <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
               {srcCfg === "direct"
@@ -935,12 +915,11 @@ export default function RecensioniPage() {
               <p className="mt-3 text-center text-[11px] text-faint">Le recensioni dirette arrivano dal mini-sito (Xenosite) e compaiono qui automaticamente.</p>
             ) : (
               <>
-                <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
+                <Button size="md" onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</Button>
                 {!chxSourceInfo(srcCfg)?.mapped && <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriva collegando Channex (pagina Canali), oppure con le integrazioni partner.</p>}
               </>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
 
       {/* Filtro per fonte + aggiunta manuale */}
@@ -1003,8 +982,8 @@ export default function RecensioniPage() {
             </label>
           </div>
           <div className="mt-2.5 flex gap-2">
-            <button onClick={addManual} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">Salva recensione</button>
-            <button onClick={() => setShowManual(false)} className="rounded-lg border border-line px-3.5 py-1.5 text-sm font-semibold text-dim hover:bg-wash">Annulla</button>
+            <Button size="sm" onClick={addManual}>Salva recensione</Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowManual(false)}>Annulla</Button>
           </div>
         </Card>
       )}
@@ -1015,7 +994,7 @@ export default function RecensioniPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
               <span className="font-semibold text-txt">{r.guest}</span>
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: SRC[r.source as SourceKey]?.color ?? "var(--dim)" }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${onSolid(SRC[r.source as SourceKey]?.color ?? "var(--dim)")}`} style={{ backgroundColor: solidBg(SRC[r.source as SourceKey]?.color ?? "var(--dim)") }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
               <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
               {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-dim">manuale</span>}
@@ -1056,15 +1035,15 @@ export default function RecensioniPage() {
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash max-sm:min-h-10 disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
                   {isChx(r) ? (
-                    <button onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</button>
+                    <Button size="xs" onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</Button>
                   ) : isGbp(r) ? (
-                    <button onClick={() => publishGbpReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!gbpReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta su Google">{gbpReplyBusy[r.id] ? "Invio…" : "Pubblica su Google"}</button>
+                    <Button size="xs" onClick={() => publishGbpReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!gbpReplyBusy[r.id]} title="Pubblica la risposta su Google">{gbpReplyBusy[r.id] ? "Invio…" : "Pubblica su Google"}</Button>
                   ) : r.source === "google" ? (
-                    <button onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="inline-flex items-center gap-1 rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)">📋 Copia e rispondi su Google →</button>
+                    <Button size="xs" onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)" className="gap-1">📋 Copia e rispondi su Google →</Button>
                   ) : r.source === "direct" ? (
-                    <button onClick={() => publishDirect(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta sul tuo mini-sito">Pubblica risposta</button>
+                    <Button size="xs" onClick={() => publishDirect(r.id)} disabled={!(draft[r.id] ?? "").trim()} title="Pubblica la risposta sul tuo mini-sito">Pubblica risposta</Button>
                   ) : (
-                    <button onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</button>
+                    <Button size="xs" onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</Button>
                   )}
                   {isChx(r) && chxReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{chxReplyErr[r.id]}</span>}
                   {isGbp(r) && gbpReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{gbpReplyErr[r.id]}</span>}

@@ -1,5 +1,6 @@
 "use client";
 
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { useState, useRef } from "react";
 import { withSplitNames } from "@/lib/guest-key";
 import { useParams, useRouter } from "next/navigation";
@@ -13,7 +14,7 @@ import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { contactReportCached } from "@/lib/contacts-check";
 import { guestLangOf } from "@/lib/guest-lang";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promosForStructure, promoMailto, promoRecipientEmail } from "@/lib/promos";
 import { useEffect } from "react";
@@ -32,7 +33,7 @@ function Hint({ tone, children, action }: { tone: "ok" | "warn" | "err" | "dim";
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium" style={{ color: col }}>
       <span>{children}</span>
-      {action && <button type="button" onClick={action.onClick} className="rounded-md bg-focus px-2 py-0.5 text-[11px] font-semibold text-on-focus hover:opacity-90">{action.label}</button>}
+      {action && <Button size="sm" type="button" onClick={action.onClick}>{action.label}</Button>}
     </div>
   );
 }
@@ -136,7 +137,7 @@ export default function OspiteSchedaPage() {
       <div>
         <PageHeader title={t("Scheda ospite")} subtitle={t("Ospite non trovato")} />
         <Card><p className="text-sm text-dim">{t("Questo ospite non esiste più o il link non è valido.")}</p>
-          <button onClick={() => router.push("/ospiti")} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna agli ospiti")}</button>
+          <Button variant="secondary" size="sm" onClick={() => router.push("/ospiti")} className="mt-3">← {t("Torna agli ospiti")}</Button>
         </Card>
       </div>
     );
@@ -149,10 +150,10 @@ export default function OspiteSchedaPage() {
         subtitle={isNew ? t("Aggiungi un'anagrafica ospite") : `${fullName}${g.country ? ` · ${g.country}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {!isNew && g.email && <button onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash disabled:opacity-40 max-sm:min-h-10">✉ {t("Invia promo")}</button>}
+            {!isNew && g.email && <Button variant="secondary" size="sm" onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")}>✉ {t("Invia promo")}</Button>}
             {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash max-sm:min-h-10">{t("Elimina")}</button>}
-            <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash max-sm:min-h-10">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{isNew ? t("Crea ospite") : t("Salva")}</button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/ospiti")}>{t("Annulla")}</Button>
+            <Button size="sm" onClick={save} disabled={!valid}>{isNew ? t("Crea ospite") : t("Salva")}</Button>
           </div>
         }
       />
@@ -162,7 +163,7 @@ export default function OspiteSchedaPage() {
       {/* Intestazione ospite + statistiche */}
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white" style={{ backgroundColor: color }}>{initials(g.firstName, g.lastName) || "?"}</div>
+          <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold ${onSolid(color)}`} style={{ backgroundColor: solidBg(color) }}>{initials(g.firstName, g.lastName) || "?"}</div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
             <div className="break-words text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
@@ -266,7 +267,7 @@ export default function OspiteSchedaPage() {
 
           <Card>
             <SectionTitle>{t("Storico soggiorni")}</SectionTitle>
-            {list.length === 0 ? <p className="text-sm text-faint">{isNew ? t("Salva l'ospite per iniziare a tracciare i soggiorni.") : t("Nessun soggiorno registrato.")}</p> : (
+            {list.length === 0 ? <p className="text-sm text-faint">{isNew ? t("Salva l'ospite per iniziare a tracciare i soggiorni.") : t("Nessun soggiorno registrato")}</p> : (
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {list.map((b) => {
                   const st = getStructure(b.structureId);
@@ -290,13 +291,10 @@ export default function OspiteSchedaPage() {
       </div>
 
       {pickPromo && (
-        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
-          <button aria-label={t("Chiudi")} onClick={() => setPickPromo(false)} className="fixed inset-0 bg-black/40" />
-          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Invia promo a")} {fullName}</span><button onClick={() => setPickPromo(false)} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
+        <Modal open onClose={() => setPickPromo(false)} title={<>{t("Invia promo a")} {fullName}</>} size="sm" closeLabel={t("Chiudi")}>
             <div className="mb-3 text-xs text-dim">{g.email}</div>
             {promos.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
+              <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
             ) : (
               <div className="flex flex-col gap-2">
                 {promos.map((p) => (
@@ -307,8 +305,7 @@ export default function OspiteSchedaPage() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );

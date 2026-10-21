@@ -5,6 +5,7 @@
 // un click esplicito + finestra di conferma che spiega l'effetto e richiede di scrivere una
 // parola. Nessun automatismo la richiama. L'esito viene accodato alla nota della prenotazione.
 import { useState } from "react";
+import { Modal, Button } from "@/components/ui";
 import { ymdRome } from "@/lib/dates-rome";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
@@ -56,9 +57,9 @@ export default function OtaReportMenu({ booking }: { booking: Booking }) {
         <summary className="cursor-pointer select-none font-medium text-dim">{t("Segnala all'OTA")} (Booking.com)</summary>
         <div className="mt-2 flex flex-col gap-1.5">
           {OTA_ACTIONS.map((a) => (
-            <button key={a} onClick={() => { setMsg(null); setWord(""); setPending(a); }} className="rounded-md border border-line px-2.5 py-1.5 text-left text-xs text-txt hover:bg-wash">
+            <Button variant="secondary" size="xs" key={a} onClick={() => { setMsg(null); setWord(""); setPending(a); }} className="text-left">
               {t(OTA_ACTION_INFO[a].label)}
-            </button>
+            </Button>
           ))}
           <p className="text-[11px] text-faint">{t("Azioni con effetto reale su ospite e commissioni: chiedono sempre conferma e non partono mai in automatico.")}</p>
         </div>
@@ -66,10 +67,10 @@ export default function OtaReportMenu({ booking }: { booking: Booking }) {
       </details>
 
       {pending && info && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <button aria-label={t("Annulla")} onClick={close} className="absolute inset-0 bg-black/45" />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" role="dialog" aria-modal="true">
-            <h3 className="text-sm font-semibold text-txt">{t(info.title)}</h3>
+        <Modal open layer="top" onClose={close} busy={busy} title={t(info.title)} size="sm" closeLabel={t("Annulla")} footer={<>
+        <Button variant="secondary" data-autofocus onClick={close} disabled={busy}>{t("Annulla")}</Button>
+        <Button variant="danger" onClick={run} disabled={word.trim() !== info.confirmWord} loading={busy}>{busy ? t("Invio…") : t("Invia a Booking.com")}</Button>
+        </>}>
             <p className="mt-2 text-xs text-txt">{t(info.effect)}</p>
             <p className="mt-2 text-[11px] text-dim"><span className="font-semibold">{t("Finestra ammessa")}:</span> {t(info.window)}</p>
             {hint && <p className="mt-2 rounded-md bg-wash px-2 py-1.5 text-[11px] text-[color:var(--warn)]">{t(hint)}</p>}
@@ -78,14 +79,7 @@ export default function OtaReportMenu({ booking }: { booking: Booking }) {
               <input autoFocus value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" spellCheck={false}
                 className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
             </label>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={close} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash disabled:opacity-50">{t("Annulla")}</button>
-              <button onClick={run} disabled={busy || word.trim() !== info.confirmWord} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-on-err disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>
-                {busy ? t("Invio…") : t("Invia a Booking.com")}
-              </button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
     </>
   );

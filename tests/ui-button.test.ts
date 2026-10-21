@@ -23,6 +23,15 @@ test("Button: le taglie sm/md hanno altezze 36/40 e 44 su telefono", () => {
   assert.match(html(h(Button, { size: "md" }, "x")), /\bh-10\b/);
 });
 
+test("Button: la taglia xs (righe compatte) è 32 px, 40 su telefono, con testo xs", () => {
+  const x = html(h(Button, { size: "xs" }, "x"));
+  assert.match(x, /\bh-8\b/);
+  assert.match(x, /max-sm:h-10/);
+  assert.match(x, /text-xs/);
+  assert.doesNotMatch(x, /text-sm/);
+  assert.match(html(h(Button, { size: "sm" }, "x")), /text-sm/);
+});
+
 test("Button: varianti secondary, ghost e danger usano i token", () => {
   assert.match(html(h(Button, { variant: "secondary" }, "x")), /border-line-strong/);
   assert.match(html(h(Button, { variant: "ghost" }, "x")), /text-dim/);

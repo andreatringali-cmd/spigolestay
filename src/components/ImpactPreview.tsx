@@ -3,7 +3,7 @@
 // Anteprima dell'impatto in € di una variazione di tariffe, mostrata PRIMA di applicarla.
 // Usata da Revenue, Autopilot e Nèttare. I numeri arrivano da lib/revenue-impact.ts e sono
 // calcolati sulle camere ancora libere (le prenotazioni già confermate non cambiano prezzo).
-import { useEffect } from "react";
+import { Modal, Button } from "@/components/ui";
 import { plural } from "@/lib/plural";
 import { eur } from "@/lib/format";
 import type { ImpactSummary } from "@/lib/revenue-impact";
@@ -14,23 +14,15 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
   open: boolean; title: string; subtitle?: string; impact: ImpactSummary; examples?: ImpactExample[]; notes?: string[];
   confirmLabel?: string; onConfirm: () => void; onCancel: () => void;
 }) {
-  // Esc chiude l'anteprima (come clic fuori).
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
   if (!open) return null;
   const net = impact.net;
   const cell = "rounded-lg border border-line bg-paper px-3 py-2";
   const lab = "text-[11px] font-semibold uppercase tracking-wide text-dim";
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <button aria-label="Annulla" onClick={onCancel} className="absolute inset-0 bg-black/45" />
-      <div className="anim-in relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-        <h2 className="font-display text-base font-bold text-txt">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-sm text-dim">{subtitle}</p>}
+    <Modal open onClose={onCancel} title={title} description={subtitle} size="md" closeLabel="Annulla" footer={<>
+    <Button variant="secondary" onClick={onCancel}>Annulla</Button>
+    <Button onClick={onConfirm} disabled={impact.changes === 0} data-autofocus>{confirmLabel}</Button>
+    </>}>
 
         {impact.changes === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-line px-3 py-6 text-center text-sm text-faint">Nessuna tariffa cambierebbe: non c&apos;è nulla da applicare.</p>
@@ -71,11 +63,6 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
         {notes?.map((n, i) => <p key={i} className="mt-2 text-[11px] text-faint">{n}</p>)}
         <p className="mt-2 text-[11px] text-faint">Potrai annullare questa applicazione dallo storico modifiche (finché non ritocchi quelle tariffe a mano).</p>
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-dim hover:bg-wash">Annulla</button>
-          <button onClick={onConfirm} disabled={impact.changes === 0} autoFocus className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{confirmLabel}</button>
-        </div>
-      </div>
-    </div>
+        </Modal>
   );
 }

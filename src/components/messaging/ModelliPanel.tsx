@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
@@ -102,7 +102,7 @@ export default function ModelliPanel() {
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-2">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 max-sm:h-9 max-sm:min-w-0 max-sm:py-0 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button type="button" disabled={!newTplStructure} title={!newTplStructure ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(newTplStructure ? [newTplStructure] : undefined)); setEditLang("it"); }} className="inline-flex disabled:cursor-not-allowed disabled:opacity-50 items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:gap-1 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
+        <Button size="sm" type="button" disabled={!newTplStructure} title={!newTplStructure ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(newTplStructure ? [newTplStructure] : undefined)); setEditLang("it"); }} className="max-sm:shrink-0 max-sm:gap-1 max-sm:whitespace-nowrap max-sm:text-[13px]"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</Button>
         <button type="button" onClick={() => setShowSettings((v) => !v)} aria-pressed={showSettings} aria-label={t("Impostazioni")} title={t("Impostazioni (link recensioni…)")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition ${showSettings ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
@@ -128,7 +128,7 @@ export default function ModelliPanel() {
                   </div>
                   <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
                   <div className="mt-2 flex gap-2">
-                    <button onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
+                    <Button variant="secondary" size="xs" onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }}>{t("Modifica")}</Button>
                     {!(tpl.srcId && templates.filter((x) => x.srcId === tpl.srcId && (x.structureIds?.[0] ?? "") === (tpl.structureIds?.[0] ?? "")).length <= 1) && <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
                   </div>
                 </Card>
@@ -138,17 +138,14 @@ export default function ModelliPanel() {
         ))}
       </div>
 
-      {ready && groups.length === 0 && <p className="rounded-xl border border-dashed border-line py-8 text-center text-sm text-faint">{search.trim() ? t("Nessun modello trovato.") : t("Nessun modello.")}</p>}
+      {ready && groups.length === 0 && <p className="rounded-xl border border-dashed border-line py-8 text-center text-sm text-faint">{search.trim() ? t("Nessun modello trovato") : t("Nessun modello")}</p>}
 
       {/* Editor */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
-          <button aria-label={t("Chiudi")} onClick={() => setEditing(null)} className="absolute inset-0 bg-black/40" />
-          <Card className="relative w-full max-w-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <SectionTitle>{t("Modello messaggio")}</SectionTitle>
-              <button onClick={() => setEditing(null)} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt max-sm:px-3 max-sm:py-2.5">✕</button>
-            </div>
+        <Modal open onClose={() => setEditing(null)} title={t("Modello messaggio")} size="lg" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setEditing(null)}>{t("Annulla")}</Button>
+        <Button onClick={saveTpl}>{t("Salva")}</Button>
+        </>}>
             <div className="flex items-end gap-2">
               <label className="block flex-1 text-xs font-medium text-dim">{t("Nome modello")} *<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" placeholder={t("Es. Benvenuto pre-arrivo")} /></label>
               <label className="block w-20 text-xs font-medium text-dim" title={t("Numero d'ordine: più basso = più in alto nella lista")}>{t("Ordine")}<input type="number" min={0} value={editing.order ?? ""} onChange={(e) => setEditing({ ...editing, order: e.target.value === "" ? undefined : Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" placeholder="—" /></label>
@@ -173,12 +170,7 @@ export default function ModelliPanel() {
             </label>
             )}
 
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
-              <button onClick={saveTpl} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:min-h-11">{t("Salva modello")}</button>
-            </div>
-          </Card>
-        </div>
+            </Modal>
       )}
     </div>
   );

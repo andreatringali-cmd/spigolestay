@@ -11,7 +11,7 @@ import { guestKey } from "@/lib/guest-key";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { needsBulkGuard, isConfirmWordOk } from "@/lib/bulk-guard";
 import { downloadBackup } from "@/lib/bulk-download";
@@ -557,8 +557,8 @@ export default function ImportaPage() {
             {err && <p className="mt-2 text-sm text-[color:var(--warn)]">{err}</p>}
             {report && <RiepilogoImport report={report} bookings={bookings} guests={guests} structureNames={structureNames} />}
             <div className="mt-5 flex justify-center gap-2">
-              <button onClick={() => router.push("/calendario")} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Vai al calendario")}</button>
-              <button onClick={() => { setRows([]); setMap({}); setDone(null); setReport(null); setErr(""); setFileName(""); }} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Importa un altro file")}</button>
+              <Button size="sm" onClick={() => router.push("/calendario")}>{t("Vai al calendario")}</Button>
+              <Button variant="secondary" size="sm" onClick={() => { setRows([]); setMap({}); setDone(null); setReport(null); setErr(""); setFileName(""); }}>{t("Importa un altro file")}</Button>
             </div>
           </div>
         </Card>
@@ -571,7 +571,7 @@ export default function ImportaPage() {
                 <div className="text-sm font-medium text-txt">{t("Non sai da dove partire?")}</div>
                 <div className="text-xs text-dim">{t("Scarica il modello CSV con le colonne giuste, compilalo con il tuo storico e ricaricalo qui.")}</div>
               </div>
-              <button type="button" onClick={downloadTemplate} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">{t("Scarica il modello CSV")}</button>
+              <Button variant="secondary" size="sm" type="button" onClick={downloadTemplate} className="shrink-0">{t("Scarica il modello CSV")}</Button>
             </div>
             {structures.length === 0 ? (
               <p className="text-sm text-dim">{t("Prima crea una struttura e le camere, poi torna qui a importare.")}</p>
@@ -590,7 +590,7 @@ export default function ImportaPage() {
                 <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("…oppure incolla un URL iCal (.ics)")}</span>
                   <div className="flex gap-2">
                     <input value={icsUrl} onChange={(e) => setIcsUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); fetchIcalUrl(); } }} placeholder="https://…/calendar.ics" className={sel} />
-                    <button type="button" onClick={fetchIcalUrl} disabled={fetching || !/^https?:\/\//i.test(icsUrl.trim())} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{fetching ? t("Scarico…") : t("Carica")}</button>
+                    <Button size="sm" type="button" onClick={fetchIcalUrl} disabled={fetching || !/^https?:\/\//i.test(icsUrl.trim())} className="shrink-0">{fetching ? t("Scarico…") : t("Carica")}</Button>
                   </div>
                   <span className="mt-1 block text-[11px] text-faint">{t("Utile per importare lo storico da un altro gestionale o da una OTA che espone un calendario iCal.")}</span>
                 </label>
@@ -670,7 +670,7 @@ export default function ImportaPage() {
                   <p className="mt-3 text-xs text-faint">{t("Trovati")} {events.length} {t("eventi")}: <b className="text-dim">{resv}</b> {t("prenotazioni")}, <b className="text-dim">{blk}</b> {t("blocchi (fuori servizio)")}.</p>
                   <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={replacePrev} onChange={(e) => setReplacePrev(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Sostituisci le prenotazioni importate in precedenza (evita duplicati)")}</label>
                   <label className="mt-2 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={includeBlocked} onChange={(e) => setIncludeBlocked(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Importa anche i periodi bloccati (fuori servizio)")}</label>
-                  <button onClick={runImportICS} disabled={!structureId || imp === 0} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm hover:opacity-90 disabled:opacity-40">{t("Importa")} {imp} {t("prenotazioni")}</button>
+                  <Button size="md" onClick={runImportICS} disabled={!structureId || imp === 0} className="mt-4">{t("Importa")} {imp} {t("prenotazioni")}</Button>
                 </>);
               })()}
             </Card>
@@ -763,7 +763,7 @@ export default function ImportaPage() {
                 {preStats.already > 0 && <> · <span style={{ color: "var(--ok)" }}>{preStats.already} {t("sono già in Xenora e non verranno duplicate")}</span></>}
                 <div className="mt-1 text-faint">{t("A fine importazione vedrai un riepilogo che confronta il file con Xenora, riga per riga.")}</div>
               </div>
-              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm hover:opacity-90">{t("Importa")} {Math.max(0, dataRows.length - dateIssues - orderIssues)} {t("prenotazioni")}</button>
+              <Button size="md" onClick={runImport} className="mt-4">{t("Importa")} {Math.max(0, dataRows.length - dateIssues - orderIssues)} {t("prenotazioni")}</Button>
             </Card>
           )}
         </div>

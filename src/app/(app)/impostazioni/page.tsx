@@ -9,7 +9,7 @@ import { RATEMODEL_DEF, RATEMODEL_KEY, parseRateModel, type RatePlanDef, type Si
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
 import { isSyncKey } from "@/lib/sync-core";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import AdsSettingsCard from "@/components/AdsSettingsCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useTheme } from "@/lib/theme";
@@ -296,7 +296,7 @@ export default function ImpostazioniPage() {
                   {gcalInfo?.serviceAccountEmail && (
                     <div className="mt-1.5 flex min-w-0 items-center gap-2">
                       <code className="min-w-0 truncate rounded-lg border border-line bg-wash px-2 py-1.5 text-[11px] text-txt">{gcalInfo.serviceAccountEmail}</code>
-                      <button onClick={copyServiceEmail} className="shrink-0 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{gcalCopied ? `✓ ${t("Copiata")}` : t("Copia")}</button>
+                      <Button size="xs" onClick={copyServiceEmail} className="shrink-0">{gcalCopied ? `✓ ${t("Copiata")}` : t("Copia")}</Button>
                     </div>
                   )}
                   <div className="mt-1.5">{t("→ scegli il ruolo \"Apportare modifiche agli eventi\" → Invia.")}</div>
@@ -315,8 +315,8 @@ export default function ImpostazioniPage() {
             <label className="block text-xs font-medium text-dim">{t("ID calendario Google")} {gcalStruct ? `· ${gcalStruct.name}` : ""}
               <div className="mt-1 flex items-center gap-2">
                 <input value={gcalIdInput} disabled={!gcalStructId} onChange={(e) => { setGcalIdInput(e.target.value); setGcalVerifyMsg(null); }} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-                <button onClick={verifyGcal} disabled={!gcalIdInput.trim() || gcalVerifying} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{gcalVerifying ? t("Verifico…") : t("Verifica")}</button>
-                <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+                <Button variant="secondary" size="sm" onClick={verifyGcal} disabled={!gcalIdInput.trim() || gcalVerifying} className="shrink-0">{gcalVerifying ? t("Verifico…") : t("Verifica")}</Button>
+                <Button size="sm" onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0">{t("Salva")}</Button>
               </div>
             </label>
             {gcalVerifyMsg && (
@@ -333,7 +333,7 @@ export default function ImpostazioniPage() {
                   <p className="mt-2 text-xs font-semibold" style={{ color: "var(--warn)" }}>{t("Salvato per")} {gcalStruct.name} — {t("premi \"Verifica\" per controllare che funzioni")}</p>
                 )}
                 <p className="mt-2 text-xs text-dim">{t("Attiva da ora in poi: le prenotazioni già esistenti non compaiono da sole finché non cambiano. Per scriverle subito tutte una volta sola:")}</p>
-                <button onClick={syncExistingNow} disabled={gcalSyncing} className="mt-1.5 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">{gcalSyncing ? t("Sincronizzo…") : t("Sincronizza ora le prenotazioni esistenti")}</button>
+                <Button variant="secondary" size="xs" onClick={syncExistingNow} disabled={gcalSyncing} className="mt-1.5">{gcalSyncing ? t("Sincronizzo…") : t("Sincronizza ora le prenotazioni esistenti")}</Button>
                 {gcalSyncMsg && <p className="mt-1.5 text-xs font-medium" style={{ color: gcalSyncMsg.err ? "var(--err)" : "var(--ok)" }}>{gcalSyncMsg.text}</p>}
               </>
             )}
@@ -351,8 +351,8 @@ export default function ImpostazioniPage() {
         <SectionTitle>{t("Backup & dati")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Esporta tutti i dati del gestionale (prenotazioni, cassa, tariffe, utenti, immagini…) in un file, o ripristinali da un backup. Utile per spostare i dati o metterli al sicuro.")}</p>
         <div className="flex flex-wrap gap-2">
-          <button onClick={doExport} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">↓ {t("Esporta backup (.json)")}</button>
-          <button onClick={() => fileRef.current?.click()} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">↑ {t("Importa backup")}</button>
+          <Button size="sm" onClick={doExport}>↓ {t("Esporta backup (.json)")}</Button>
+          <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()}>↑ {t("Importa backup")}</Button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => doImport(e.target.files?.[0])} />
         </div>
         {msg && <p className="mt-2 text-xs font-medium text-focus">{msg}</p>}

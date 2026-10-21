@@ -4,7 +4,7 @@ import { fmtDM } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Button } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
@@ -54,7 +54,7 @@ function StepCard({ n, tone, label, count, badge, action, onAction, children }: 
           </div>
         </div>
         {children ? <div className="mt-3 flex-1 space-y-1.5">{children}</div> : <div className="flex-1" />}
-        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 max-sm:py-3 max-sm:text-sm text-xs font-semibold text-on-focus transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
+        <Button size="md" onClick={onAction} className="mt-3.5 w-full">{action}<span aria-hidden>→</span></Button>
       </div>
     </article>
   );
@@ -138,7 +138,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
         <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold hover:opacity-90 disabled:opacity-70 ${ws === "sent" ? "text-on-ok" : ws === "err" ? "text-on-err" : "text-white"}`} style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "#25D366" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
+        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold hover:opacity-90 disabled:opacity-70 ${ws === "sent" ? "text-on-ok" : ws === "err" ? "text-on-err" : "text-on-wa"}`} style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "var(--wa)" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
         {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)] text-on-ok" : mail === "err" ? "bg-[color:var(--err)] text-on-err" : "bg-focus text-on-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
         <button onClick={compila} className="rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-on-warn hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
       </div>
@@ -301,7 +301,7 @@ export default function AdempimentiPage() {
         <section className="mb-5 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="text-sm font-bold text-txt">Esito «Elabora tutto»</h2>
-            <button onClick={() => setRunSteps(null)} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-dim hover:bg-wash" aria-label="Chiudi riepilogo">✕</button>
+            <Button variant="secondary" size="sm" onClick={() => setRunSteps(null)} aria-label="Chiudi riepilogo" className="grid h-7 w-7 place-items-center">✕</Button>
           </div>
           <ul className="space-y-1.5">
             {runSteps.map((s) => {

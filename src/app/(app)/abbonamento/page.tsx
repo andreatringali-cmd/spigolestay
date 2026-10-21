@@ -4,7 +4,7 @@ import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE, trialInfo, type TrialInfo } from "@/lib/plans";
@@ -342,7 +342,7 @@ export default function AbbonamentoPage() {
                     <div className="grid h-12 w-12 place-items-center rounded-full text-xl text-on-ok" style={{ background: "var(--ok)" }}>✓</div>
                     <div className="mt-3 text-base font-bold text-txt">{t("Richiesta inviata!")}</div>
                     <div className="mt-1 text-sm text-dim">{t("Grazie. Ti ricontattiamo entro 24 ore.")}</div>
-                    <button onClick={() => setContactOpen(false)} className="mt-4 rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Chiudi")}</button>
+                    <Button size="md" onClick={() => setContactOpen(false)} className="mt-4">{t("Chiudi")}</Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -359,7 +359,7 @@ export default function AbbonamentoPage() {
                     <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Come possiamo aiutarti?")}</span><textarea rows={3} value={contact.note} onChange={(e) => setContact((p) => ({ ...p, note: e.target.value }))} className={`${cinp} resize-y`} placeholder={t("Raccontaci il tuo progetto: quante strutture, quali OTA, cosa ti serve…")} /></label>
                     <label className="flex items-start gap-2 text-[12px] text-dim"><input type="checkbox" checked={contact.privacy} onChange={(e) => setContact((p) => ({ ...p, privacy: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /><span>{t("Acconsento al trattamento dei dati per essere ricontattato.")} *</span></label>
                     {contactState === "err" && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{t("Compila Nome, Email, Telefono e il consenso. Se persiste, riprova.")}</p>}
-                    <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-xl bg-focus py-2.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
+                    <Button size="md" onClick={submitContact} disabled={contactState === "sending"} className="w-full">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</Button>
                     <p className="text-center text-[11px] text-faint">{t("Nessun impegno · Risposta entro 24 ore")}</p>
                   </div>
                 )}
@@ -437,9 +437,9 @@ export default function AbbonamentoPage() {
             <h3 className="mt-1 font-display text-3xl font-bold leading-tight text-txt sm:text-4xl">{t("Regala Xenora,")}<br /><span style={{ color: "var(--focus)" }}>{t("ottieni 1 mese gratis")}</span></h3>
             <p className="mt-1.5 max-w-sm text-sm text-dim">{t("Il mese gratis scatta quando l'amico, finita la prova, si abbona col tuo codice.")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</a>
-              <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex items-center gap-1.5 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus transition hover:opacity-90">✉ Email</button>
-              <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-txt transition hover:bg-wash">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
+              <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-on-wa bg-wa transition hover:opacity-90">💬 WhatsApp</a>
+              <Button size="sm" onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex">✉ Email</Button>
+              <Button variant="secondary" size="sm" onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="flex">{refCopied ? t("Copiato ✓") : t("Copia link")}</Button>
             </div>
           </div>
           {/* QR + codice + statistiche */}
@@ -505,10 +505,10 @@ export default function AbbonamentoPage() {
         const pt = TIERS.find((x) => x.key === pendingTier)!;
         const up = TIERS.findIndex((x) => x.key === pendingTier) > TIERS.findIndex((x) => x.key === tier.key);
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingTier(null)}>
-            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="font-display text-lg font-bold text-txt">{up ? t("Passa al piano") : t("Cambia nel piano")} {pt.name}</div>
-              <p className="mt-1 text-sm text-dim">{t("Vuoi confermare il cambio di piano?")}</p>
+          <Modal open onClose={() => setPendingTier(null)} title={<>{up ? t("Passa al piano") : t("Cambia nel piano")} {pt.name}</>} description={t("Vuoi confermare il cambio di piano?")} size="sm" closeLabel={t("Chiudi")} footer={<>
+          <Button variant="secondary" onClick={() => setPendingTier(null)}>{t("Annulla")}</Button>
+          <Button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }}>{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</Button>
+          </>}>
               <div className="mt-3 space-y-1 rounded-lg border border-line bg-wash p-3 text-sm">
                 <div className="flex justify-between"><span className="text-dim">{t("Da")}</span><span className="font-semibold text-txt">{tier.name} · {eur(tier.price)}{t("/mese")}</span></div>
                 <div className="flex justify-between"><span className="text-dim">{t("A")}</span><span className="font-semibold text-txt">{pt.name} · {eur(annual ? Math.round(pt.price * (1 - ANNUAL_OFF)) : pt.price)}{t("/mese")}</span></div>
@@ -519,12 +519,7 @@ export default function AbbonamentoPage() {
                 <span>{hasRealSub ? t("Hai già un abbonamento attivo: il cambio di piano non è automatico, perché l'addebito si modifica solo su Stripe. Contatta il supporto (info@xenora.it) indicando il piano desiderato, oppure gestisci l'abbonamento dal portale pagamenti. Finché non è confermato, i moduli del tuo piano non cambiano.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
               {!hasRealSub && <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>}
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</button>
-              </div>
-            </div>
-          </div>
+              </Modal>
         );
       })()}
 
@@ -533,21 +528,17 @@ export default function AbbonamentoPage() {
         const m = MODULES.find((x) => x.key === pendingAddon)!;
         const on = !!active[pendingAddon];
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingAddon(null)}>
-            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="font-display text-lg font-bold text-txt">{on ? t("Rimuovere il modulo?") : t("Attivare il modulo?")}</div>
+          <Modal open onClose={() => setPendingAddon(null)} title={on ? t("Rimuovere il modulo?") : t("Attivare il modulo?")} size="sm" closeLabel={t("Chiudi")} footer={<>
+          <Button variant="secondary" data-autofocus onClick={() => setPendingAddon(null)}>{t("Annulla")}</Button>
+          <Button variant={on ? "danger" : "primary"} onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }}>{on ? t("Rimuovi") : t("Attiva")}</Button>
+          </>}>
               <div className="mt-3 rounded-lg border border-line bg-wash p-3">
                 <div className="text-sm font-semibold text-txt">{t(m.name)}</div>
                 <div className="text-[11px] text-faint">{t(m.desc)}</div>
                 {!on && <div className="mt-2 font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[pendingAddon] || 0)}<span className="text-[11px] font-normal text-faint">{t("/mese")}</span></div>}
               </div>
               <p className="mt-2 text-[11px] text-faint">{on ? t("Il modulo verrà disattivato e tolto dal totale mensile.") : t("Il modulo verrà aggiunto al tuo piano e al totale mensile.")}</p>
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => setPendingAddon(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }} className={`flex-1 rounded-lg py-2 text-sm font-semibold hover:opacity-90 ${on ? "text-on-err" : "text-on-focus"}`} style={{ backgroundColor: on ? "var(--err)" : "var(--focus)" }}>{on ? t("Rimuovi") : t("Attiva")}</button>
-              </div>
-            </div>
-          </div>
+              </Modal>
         );
       })()}
     </div>

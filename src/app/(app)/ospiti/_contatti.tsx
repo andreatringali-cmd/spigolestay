@@ -3,6 +3,7 @@
 // Contatti da correggere: gli ospiti in arrivo il cui numero o la cui email non permette ai messaggi automatici di partire.
 // Si avvisa con anticipo (entro 10 giorni è urgente) perché ci sia ancora tempo di correggere il dato, chiedere il contatto
 // all'ospite (anche dalla chat dell'OTA) o trovare un'alternativa. Una riga per ospite, con la correzione proposta a un clic.
+import { Button } from "@/components/ui";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
@@ -51,7 +52,7 @@ export default function ContattiDaCorreggere() {
   const tidyBar = tidyAll.length > 0 && (
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3">
       <span><b className="text-txt">{tidyAll.length}</b> numeri di telefono sono scritti in formati diversi (trattini, spazi, con o senza prefisso).</span>
-      <button onClick={uniforma} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 max-sm:min-h-10">Uniforma i numeri</button>
+      <Button size="xs" onClick={uniforma} className="ml-auto">Uniforma i numeri</Button>
     </div>
   );
   if (list.length === 0) return tidyBar || null;
@@ -99,8 +100,8 @@ export default function ContattiDaCorreggere() {
                 <div className="mt-0.5 truncate font-mono text-[11px] text-dim">{[x.guest.phone || "nessun telefono", x.guest.email ? (isRelayEmail(x.guest.email) ? "email OTA" : x.guest.email) : "nessuna email"].join(" · ")}</div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-                {fixes.map((f) => <button key={f.field + f.value} onClick={() => apply(x, f.field, f.value)} className="rounded-lg bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus hover:opacity-90">{f.label}</button>)}
-                <button onClick={() => copy(x)} title={OTA.has(x.booking.channel) ? `Copia un messaggio per chiedere il contatto: incollalo nella chat di ${ch}` : "Copia un messaggio per chiedere il contatto all'ospite"} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{copied === x.guest.id ? "Copiato ✓" : OTA.has(x.booking.channel) ? `Chiedi su ${ch}` : "Chiedi il contatto"}</button>
+                {fixes.map((f) => <Button size="xs" key={f.field + f.value} onClick={() => apply(x, f.field, f.value)}>{f.label}</Button>)}
+                <Button variant="secondary" size="xs" onClick={() => copy(x)} title={OTA.has(x.booking.channel) ? `Copia un messaggio per chiedere il contatto: incollalo nella chat di ${ch}` : "Copia un messaggio per chiedere il contatto all'ospite"}>{copied === x.guest.id ? "Copiato ✓" : OTA.has(x.booking.channel) ? `Chiedi su ${ch}` : "Chiedi il contatto"}</Button>
                 <Link href={`/ospiti/${x.guest.id}`} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Correggi</Link>
               </div>
             </li>

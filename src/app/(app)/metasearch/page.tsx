@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useData } from "@/lib/store";
 import { effectiveBase } from "@/lib/pricing";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { slugify } from "@/lib/publicdata";
@@ -245,7 +245,7 @@ export default function MetaSearchPage() {
                 </div>
                 <div className="flex flex-wrap items-stretch gap-2">
                   <div className="flex min-w-0 flex-1 items-center overflow-x-auto rounded-lg border border-line bg-wash px-3 py-2 font-mono text-xs text-txt">{feedUrl}</div>
-                  <button onClick={() => copy("feed", feedUrl)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{copied === "feed" ? <span style={{ color: "var(--ok)" }}>✓ {t("Copiato")}</span> : t("Copia")}</button>
+                  <Button variant="secondary" size="sm" onClick={() => copy("feed", feedUrl)} className="shrink-0">{copied === "feed" ? <span style={{ color: "var(--ok)" }}>✓ {t("Copiato")}</span> : t("Copia")}</Button>
                   <a href={feedUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Apri")} ↗</a>
                 </div>
               </div>
@@ -268,7 +268,7 @@ export default function MetaSearchPage() {
                 <div className="mb-1.5 text-xs font-semibold text-txt">{t("URL di atterraggio (deep link al booking engine)")}</div>
                 <div className="flex flex-wrap items-stretch gap-2">
                   <div className="flex min-w-0 flex-1 items-center overflow-x-auto rounded-lg border border-line bg-wash px-3 py-2 font-mono text-xs text-txt">{landingUrl}</div>
-                  <button onClick={() => copy("land", landingUrl)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{copied === "land" ? <span style={{ color: "var(--ok)" }}>✓ {t("Copiato")}</span> : t("Copia")}</button>
+                  <Button variant="secondary" size="sm" onClick={() => copy("land", landingUrl)} className="shrink-0">{copied === "land" ? <span style={{ color: "var(--ok)" }}>✓ {t("Copiato")}</span> : t("Copia")}</Button>
                 </div>
                 <p className="mt-1 text-[11px] text-faint">{t("Ogni riga del feed include già il deep link con data e tipologia: l'ospite arriva sulla camera giusta con le date preselezionate.")}</p>
               </div>
@@ -322,7 +322,7 @@ export default function MetaSearchPage() {
         <StatCard label={t("Guadagno extra medio")} value={eur(avgExtra)} color="var(--ok)" hint={t("a notte, per prenotazione diretta")} />
       </div>
       {types.length === 0 ? (
-        <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia per questa struttura.")}</div></Card>
+        <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia per questa struttura")}</div></Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[560px] text-sm">

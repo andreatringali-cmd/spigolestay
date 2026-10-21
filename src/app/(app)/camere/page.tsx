@@ -10,7 +10,7 @@ import { uploadImage } from "@/lib/media-client";
 import MediaImg from "@/components/MediaImg";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import SearchInput from "@/components/SearchInput";
 import Popover from "@/components/Popover";
@@ -43,7 +43,7 @@ function AddMenu({ onRoom, onType }: { onRoom: () => void; onType: () => void })
   const ref = useRef<HTMLButtonElement>(null);
   return (
     <div className="sm:hidden">
-      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-focus px-3 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:h-11">+ {t("Aggiungi")}</button>
+      <Button size="sm" ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="whitespace-nowrap">+ {t("Aggiungi")}</Button>
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align="end" width={200} label={t("Aggiungi")}>
         <button type="button" onClick={() => { setOpen(false); onRoom(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Camera")}</button>
         <button type="button" onClick={() => { setOpen(false); onType(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Tipologia")}</button>
@@ -226,8 +226,8 @@ export default function CamerePage() {
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm max-sm:mb-2 max-sm:flex-nowrap">
               <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-auto sm:flex-1 max-sm:min-w-0 max-sm:flex-1" />
               <div className="ml-auto flex items-center gap-2 max-sm:shrink-0">
-                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:hidden">{t("+ Tipologia")}</button>
-                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 whitespace-nowrap max-sm:hidden">{t("+ Camera")}</button>
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="max-sm:hidden">{t("+ Tipologia")}</Button>
+                <Button size="sm" onClick={() => addRoom(s.id, sUnits.length)} className="whitespace-nowrap max-sm:hidden">{t("+ Camera")}</Button>
                 {/* Telefono: UN solo «+ Aggiungi» che apre la scelta Camera / Tipologia */}
                 <AddMenu onRoom={() => addRoom(s.id, sUnits.length)} onType={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} />
               </div>
@@ -238,7 +238,7 @@ export default function CamerePage() {
               <div className="mb-2 flex items-center justify-between">
                 {activeStructureId === "all" ? <div className="font-display text-lg font-bold text-txt">{s.name}</div> : <div />}
                 <div className="flex gap-2">
-                  {sUnits.some((u) => u.order != null) && <button onClick={() => sUnits.forEach((u) => updateUnit(u.id, { order: undefined }))} title={t("Riporta le camere all'ordine numerico crescente")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">↕ {t("Ordine numerico")}</button>}
+                  {sUnits.some((u) => u.order != null) && <Button variant="secondary" size="xs" onClick={() => sUnits.forEach((u) => updateUnit(u.id, { order: undefined }))} title={t("Riporta le camere all'ordine numerico crescente")}>↕ {t("Ordine numerico")}</Button>}
                 </div>
               </div>
 
@@ -372,8 +372,8 @@ export default function CamerePage() {
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Piano")}<input value={bulkFloor} onChange={(e) => setBulkFloor(e.target.value)} placeholder={t("Terra / 1° / 2°")} className="w-28 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Vista")}<select value={bulkView} onChange={(e) => setBulkView(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus"><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
             <button onClick={() => setShowAmen((s) => !s)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium ${showAmen || bulkAmen.size ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Dotazioni")}{bulkAmen.size ? ` (${bulkAmen.size})` : ""}</button>
-            <button onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView && bulkAmen.size === 0} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Applica a")} {sel.size}</button>
-            <button onClick={() => { clearSel(); setBulkFloor(""); setBulkView(""); setBulkAmen(new Set()); setShowAmen(false); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
+            <Button size="sm" onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView && bulkAmen.size === 0}>{t("Applica a")} {sel.size}</Button>
+            <Button variant="secondary" size="sm" onClick={() => { clearSel(); setBulkFloor(""); setBulkView(""); setBulkAmen(new Set()); setShowAmen(false); }} className="ml-auto">{t("Annulla")}</Button>
           </div>
           {showAmen && (
             <div className="mt-2 border-t border-line pt-2">
@@ -453,12 +453,12 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       {hasGuide ? (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
           <span className="text-[11px] text-dim">{t("Questi codici e istruzioni possono comparire nella guida ospiti della camera.")}</span>
-          <button type="button" onClick={openGuide} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Apri la guida")} →</button>
+          <Button size="xs" type="button" onClick={openGuide} className="shrink-0">{t("Apri la guida")} →</Button>
         </div>
       ) : (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
           <span className="text-[11px] text-dim">🔒 {t("Con la Guida ospiti, codici e istruzioni della camera compaiono in una pagina web per l'ospite.")}</span>
-          <button type="button" onClick={() => { onClose(); router.push("/abbonamento"); }} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Aggiungi il servizio")} →</button>
+          <Button size="xs" type="button" onClick={() => { onClose(); router.push("/abbonamento"); }} className="shrink-0">{t("Aggiungi il servizio")} →</Button>
         </div>
       )}
       <label className={`${lbl} mt-3`}>{t("Note interne")}<textarea value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Manutenzioni, particolarità…")} /></label>
@@ -499,8 +499,8 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       </div>
       <div className="mt-4 flex items-center gap-2">
         {unit && <button onClick={async () => { if (await ask({ title: t("Elimina camera"), message: `${t("Eliminare")} "${unit.name}"?${(() => { const today = new Date().toLocaleDateString("sv-SE"); const nb = bookings.filter((x) => x.unitId === unit.id && x.channel !== "blocked" && x.status !== "cancelled" && x.checkOut >= today).length; return nb ? ` ${nb} ${nb === 1 ? t("prenotazione in corso o futura resterà") : t("prenotazioni in corso o future resteranno")} ${t("senza camera (da assegnare).")}` : ""; })()}`, danger: true, confirmLabel: t("Elimina") })) { deleteUnit(unit.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
-        <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-        <button onClick={save} disabled={!f.name?.trim() || !f.roomTypeId} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{unit ? t("Salva") : t("Crea")}</button>
+        <Button variant="secondary" size="sm" onClick={onClose} className="ml-auto">{t("Annulla")}</Button>
+        <Button size="sm" onClick={save} disabled={!f.name?.trim() || !f.roomTypeId}>{unit ? t("Salva") : t("Crea")}</Button>
       </div>
     </Modal>
   );

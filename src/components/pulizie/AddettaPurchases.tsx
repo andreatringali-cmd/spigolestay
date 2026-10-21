@@ -3,6 +3,7 @@
 // Materiale acquistato (carta igienica, prodotti per la pulizia…). Usa gli stessi "ordini" di Scorte & spesa:
 // se la voce è un prodotto in scorta, la giacenza sale da sola. Ogni acquisto con importo diventa una USCITA nella Prima nota (Cassa),
 // categoria Forniture, e può avere lo scontrino allegato (foto o PDF su Storage privato: qui resta solo il riferimento).
+import { Button } from "@/components/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Structure } from "@/lib/types";
 import { KEY_ORDERS, KEY_STOCK, matchStock, parseMoney, type PulizieOrder, type ReceiptRef, type StockLite } from "@/lib/pulizie-addetta";
@@ -163,12 +164,12 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
                 ? <img src={att.preview} alt="Anteprima scontrino" className="h-14 w-14 shrink-0 rounded-md border border-line object-cover" />
                 : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-md border border-line bg-surface text-dim"><Icon name="fileText" size={22} /></span>}
               <div className="min-w-0 flex-1"><div className="truncate text-xs font-medium text-txt">{att.ref.name}</div><div className="text-[11px] text-faint">{att.ref.type === "application/pdf" ? "PDF allegato" : "Foto allegata"}</div></div>
-              <button type="button" onClick={dropFile} aria-label="Rimuovi lo scontrino" className="flex min-h-[40px] shrink-0 items-center gap-1 rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash"><Icon name="trash" size={14} /> Rimuovi</button>
+              <Button variant="secondary" size="xs" type="button" onClick={dropFile} aria-label="Rimuovi lo scontrino" className="flex min-h-[40px] shrink-0 gap-1"><Icon name="trash" size={14} /> Rimuovi</Button>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={uploading} onClick={() => camRef.current?.click()} className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-line bg-paper px-3 text-xs font-medium text-txt hover:bg-wash disabled:opacity-50"><Icon name="receipt" size={15} /> {uploading ? "Carico…" : "Scatta foto"}</button>
-              <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-line bg-paper px-3 text-xs font-medium text-txt hover:bg-wash disabled:opacity-50"><Icon name="fileText" size={15} /> {uploading ? "Carico…" : "Scegli foto o PDF"}</button>
+              <Button variant="secondary" size="xs" type="button" disabled={uploading} onClick={() => camRef.current?.click()} className="flex min-h-[44px]"><Icon name="receipt" size={15} /> {uploading ? "Carico…" : "Scatta foto"}</Button>
+              <Button variant="secondary" size="xs" type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="flex min-h-[44px]"><Icon name="fileText" size={15} /> {uploading ? "Carico…" : "Scegli foto o PDF"}</Button>
             </div>
           )}
           <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; void pickFile(f); }} />

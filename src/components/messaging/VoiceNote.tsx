@@ -26,7 +26,7 @@ export default function VoiceNote({ mediaId, transcribed }: { mediaId: string; t
       {url
         ? <audio src={url} controls autoPlay className="h-9 w-full max-w-[240px]" />
         : <button type="button" onClick={load} disabled={state === "loading"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-focus hover:border-focus disabled:opacity-60">
-            🎙️ {state === "loading" ? "Carico…" : "Ascolta vocale"}
+            🎙️ {state === "loading" ? "Caricamento…" : "Ascolta vocale"}
           </button>}
       {err && <div className="mt-1 text-[11px] text-err">{err}</div>}
       {transcribed && <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-dim">Trascrizione</div>}

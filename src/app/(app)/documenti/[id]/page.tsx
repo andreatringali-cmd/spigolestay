@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
 import { balanceDue } from "@/lib/incassi";
@@ -414,16 +414,13 @@ export default function DocumentoPage() {
     <div>
       <PageHeader title={`${DOC_KIND_LABEL[doc.doc_kind] ?? "Documento"} ${doc.number_label ?? "(bozza)"}`}
         subtitle={doc.booking_code ? `Prenotazione ${doc.booking_code}` : undefined}
-        actions={<button onClick={() => router.push("/documenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Documenti</button>} />
+        actions={<Button variant="secondary" size="sm" onClick={() => router.push("/documenti")}>← Documenti</Button>} />
 
       {frozen && <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-wash px-4 py-2.5 text-sm text-dim"><span aria-hidden>🔒</span><span>Documento emesso: i dati fiscali non si modificano più. Per correggerli si emette una <b className="text-txt">nota di credito</b>.</span></div>}
       {msg && <Card className="mb-4"><p className="text-sm text-dim">{msg}</p></Card>}
 
       {bookingPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[80dvh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Collega una prenotazione</span><button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setBookingPicker(false)} title="Collega una prenotazione" size="md" closeLabel="Chiudi">
             <input value={bq} onChange={(e) => setBq(e.target.value)} placeholder="Cerca ospite o codice…" className={inp} autoFocus />
             <div className="mt-2 flex-1 overflow-y-auto">
               {bookingList.map((b) => (
@@ -435,8 +432,7 @@ export default function DocumentoPage() {
               {bookingList.length === 0 && <p className="py-6 text-center text-sm text-faint">Nessuna prenotazione.</p>}
             </div>
             <p className="mt-2 text-[11px] text-faint">Collegando la prenotazione, le righe del folio (soggiorno, pulizia, extra, tassa) vengono aggiunte alle voci.</p>
-          </div>
-        </div>
+          </Modal>
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -458,7 +454,7 @@ export default function DocumentoPage() {
               <div><span className={lbl}>Prenotazione <span className="text-faint">(facoltativa)</span></span>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{link.bookingCode ?? "nessuna"}</span>
-                  <button type="button" onClick={() => { setBq(""); setBookingPicker(true); }} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Collega</button>
+                  <Button variant="secondary" size="xs" type="button" onClick={() => { setBq(""); setBookingPicker(true); }} className="shrink-0">Collega</Button>
                   {link.bookingId && <button aria-label="Scollega la prenotazione" type="button" onClick={() => setLink({ bookingId: null, bookingCode: null })} className="shrink-0 text-faint hover:text-[color:var(--err)]">✕</button>}
                 </div>
               </div>
@@ -493,13 +489,13 @@ export default function DocumentoPage() {
                     <optgroup label="OTA">{OTA_PRESETS.map((o, i) => <option key={i} value={`ota:${i}`}>{o.name}</option>)}</optgroup>
                   </select>
                 </label>
-                <button type="button" onClick={saveCounterpart} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Salva in anagrafica</button>
+                <Button variant="secondary" size="xs" type="button" onClick={saveCounterpart}>Salva in anagrafica</Button>
               </div>
               <label className={`${lbl} sm:col-span-2`}>Tipologia persona<select value={cp.kind} onChange={(e) => setCp({ ...cp, kind: e.target.value })} className={inp}><option value="privato">Privato</option><option value="societa">Società</option><option value="estero">Estero</option><option value="ota">OTA</option></select></label>
               <label className={cp.kind === "privato" ? lbl : `${lbl} sm:col-span-2`}>{cp.kind === "societa" ? "Ragione sociale" : "Nome"}<input value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} className={inp} /></label>
               {cp.kind === "privato" && <label className={lbl}>Cognome<input value={cp.lastName} onChange={(e) => setCp({ ...cp, lastName: e.target.value })} className={inp} /></label>}
               <label className={lbl}>Nazione<input value={cp.country} onChange={(e) => setCp({ ...cp, country: e.target.value })} className={inp} /></label>
-              {cp.kind !== "privato" && <div><span className={lbl}>Partita IVA</span><div className="mt-1 flex gap-1"><input value={cp.vat} onChange={(e) => { setCp({ ...cp, vat: e.target.value }); setVies({}); }} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><button type="button" onClick={verifyVies} className="shrink-0 rounded-lg border border-line px-2 text-xs font-semibold text-txt hover:bg-wash">VIES</button></div>{vies.status && vies.status !== "loading" && <span className="mt-0.5 block text-[11px] font-semibold" style={{ color: vies.status === "valid" ? "var(--ok)" : vies.status === "invalid" ? "var(--err)" : "var(--dim)" }}>{vies.status === "valid" ? "✓ " : vies.status === "invalid" ? "✕ " : ""}{vies.msg}</span>}{vies.status === "loading" && <span className="mt-0.5 block text-[11px] text-faint">Verifica…</span>}</div>}
+              {cp.kind !== "privato" && <div><span className={lbl}>Partita IVA</span><div className="mt-1 flex gap-1"><input value={cp.vat} onChange={(e) => { setCp({ ...cp, vat: e.target.value }); setVies({}); }} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><Button variant="secondary" size="xs" type="button" onClick={verifyVies} className="shrink-0">VIES</Button></div>{vies.status && vies.status !== "loading" && <span className="mt-0.5 block text-[11px] font-semibold" style={{ color: vies.status === "valid" ? "var(--ok)" : vies.status === "invalid" ? "var(--err)" : "var(--dim)" }}>{vies.status === "valid" ? "✓ " : vies.status === "invalid" ? "✕ " : ""}{vies.msg}</span>}{vies.status === "loading" && <span className="mt-0.5 block text-[11px] text-faint">Verifica…</span>}</div>}
               {cp.kind === "privato" && <label className={lbl}>Codice fiscale<input value={cp.tax_code} onChange={(e) => setCp({ ...cp, tax_code: e.target.value })} className={inp} /></label>}
               <label className={`${lbl} sm:col-span-2`}>Indirizzo<input value={cp.address} onChange={(e) => setCp({ ...cp, address: e.target.value })} className={inp} /></label>
               <label className={lbl}>Città<input value={cp.city} onChange={(e) => setCp({ ...cp, city: e.target.value })} className={inp} /></label>
@@ -537,8 +533,8 @@ export default function DocumentoPage() {
           </div>
           {!frozen && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <button onClick={() => addLine({ description: "", sourceKind: "extra" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Riga</button>
-              <button onClick={() => addLine({ description: "Imposta di soggiorno", vat: "N1", sourceKind: "city_tax" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Tassa soggiorno</button>
+              <Button variant="secondary" size="xs" onClick={() => addLine({ description: "", sourceKind: "extra" })}>+ Riga</Button>
+              <Button variant="secondary" size="xs" onClick={() => addLine({ description: "Imposta di soggiorno", vat: "N1", sourceKind: "city_tax" })}>+ Tassa soggiorno</Button>
               <button onClick={delCityTax} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">Elimina tasse soggiorno</button>
             </div>
           )}
@@ -579,8 +575,8 @@ export default function DocumentoPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <input value={payAmt} onChange={(e) => setPayAmt(e.target.value)} inputMode="decimal" placeholder={`€ (max ${e2(residuo)})`} className="w-28 rounded border border-line bg-paper px-2 py-1.5 text-sm" />
                   <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="rounded border border-line bg-paper px-1.5 py-1.5 text-sm"><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select>
-                  <button onClick={() => { const pn = parseDecimalIT(payAmt); if (pn === null) { setMsg("Importo non valido: scrivi un numero, per esempio 1234,56."); return; } const c = Math.round(pn * 100); if (c <= 0) { setMsg("Indica un importo da incassare."); return; } if (c > residuo) { setMsg(`L'importo supera il residuo (${e2(residuo)}).`); return; } setPayAmt(""); addPayment(c, payMethod); }} disabled={!!busy || !payAmt.trim()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">Registra incasso</button>
-                  <button onClick={() => addPayment(residuo, payMethod)} disabled={!!busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>
+                  <Button variant="secondary" size="xs" onClick={() => { const pn = parseDecimalIT(payAmt); if (pn === null) { setMsg("Importo non valido: scrivi un numero, per esempio 1234,56."); return; } const c = Math.round(pn * 100); if (c <= 0) { setMsg("Indica un importo da incassare."); return; } if (c > residuo) { setMsg(`L'importo supera il residuo (${e2(residuo)}).`); return; } setPayAmt(""); addPayment(c, payMethod); }} disabled={!!busy || !payAmt.trim()}>Registra incasso</Button>
+                  <Button size="xs" onClick={() => addPayment(residuo, payMethod)} disabled={!!busy}>Incassa tutto ({e2(residuo)})</Button>
                 </div>
               )}
             </>)}
@@ -617,16 +613,16 @@ export default function DocumentoPage() {
       {/* AZIONI */}
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {!frozen && <>
-          <button onClick={onSave} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "save" ? "Salvo…" : "Salva bozza"}</button>
-          <button onClick={onIssue} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
-          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
+          <Button variant="secondary" size="sm" onClick={onSave} disabled={!!busy}>{busy === "save" ? "Salvataggio…" : "Salva bozza"}</Button>
+          <Button size="sm" onClick={onIssue} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined}>{busy === "issue" ? "Emissione…" : "Emetti"}</Button>
+          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <Button size="sm" onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined}>{busy === "savesend" ? "…" : "Salva e invia"}</Button>}
           <button onClick={deleteDraft} disabled={!!busy} className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)] disabled:opacity-50">{busy === "del" ? "Elimino…" : "Elimina bozza"}</button>
         </>}
-        {sendAct && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : sendButtonLabel(doc.provider)}</button>}
-        {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
-        <button onClick={previewDoc} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Anteprima</button>
-        <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>
-        {doc.provider_ref && <button onClick={downloadXml} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "xml" ? "…" : "Scarica XML"}</button>}
+        {sendAct && <Button size="sm" onClick={send} disabled={!!busy}>{busy === "send" ? "Invio…" : sendButtonLabel(doc.provider)}</Button>}
+        {doc.stato === "inviata_intermediario" && <Button variant="secondary" size="sm" onClick={refresh} disabled={!!busy}>{busy === "status" ? "Controllo…" : "Aggiorna esito"}</Button>}
+        <Button variant="secondary" size="sm" onClick={previewDoc}>Anteprima</Button>
+        <Button variant="secondary" size="sm" onClick={printPdf}>Stampa PDF</Button>
+        {doc.provider_ref && <Button variant="secondary" size="sm" onClick={downloadXml} disabled={!!busy}>{busy === "xml" ? "…" : "Scarica XML"}</Button>}
         {frozen && doc.doc_kind !== "nota_di_credito" && doc.stato !== "stornata" && <button onClick={creditNote} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{busy === "nc" ? "…" : "Nota di credito"}</button>}
         <span className="ml-auto text-[11px] text-faint">Regime: {doc.regime ?? "—"} · {doc.send_sdi ? "SDI attivo" : "no SDI"}</span>
       </div>

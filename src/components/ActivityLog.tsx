@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui";
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import type { ActivityType } from "@/lib/store";
@@ -47,19 +48,19 @@ export default function ActivityLog() {
 
   return (
     <div className="relative">
-      <button ref={btnRef} onClick={toggle} title={t("Registro attività")} aria-label={t("Registro attività")} className="relative grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
+      <Button variant="secondary" size="xs" ref={btnRef} onClick={toggle} title={t("Registro attività")} aria-label={t("Registro attività")} className="relative w-8 !px-0 max-sm:w-10 max-sm:!px-0">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" />
         </svg>
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-focus px-1 text-[9px] font-bold text-on-focus">{unread > 99 ? "99+" : unread}</span>
         )}
-      </button>
+      </Button>
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={320} maxHeight={560} label={t("Registro attività")}>
         <div className="p-1">
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-dim">{t("Registro attività")}</div>
           {activities.length === 0 ? (
-            <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>
+            <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>
           ) : (
             activities.map((a) => (
               <div key={a.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-wash">

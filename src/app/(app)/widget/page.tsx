@@ -7,7 +7,7 @@ import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { nights, toISO, shiftISO, fmtDateTime } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { useLang } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -270,14 +270,14 @@ export default function WidgetPage() {
     return (
       <div>
         <PageHeader title={t("Widget sito")} subtitle={t("Crea uno o più widget di prenotazione per il tuo sito")}
-          actions={<button onClick={createWidget} disabled={!structures.length} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">+ {t("Crea un nuovo widget")}</button>} />
+          actions={<Button size="sm" onClick={createWidget} disabled={!structures.length}>+ {t("Crea un nuovo widget")}</Button>} />
         {pubState === "error" && <div className="mb-3"><Notice kind="warn">Non riesco a leggere lo stato di pubblicazione delle strutture (errore di rete o di accesso). Puoi comunque configurare i widget; lo stato Online/Non pubblicato non è verificato. <button onClick={loadPub} className="font-semibold text-focus hover:underline">Riprova</button></Notice></div>}
         {pubState === "offline" && <div className="mb-3"><Notice kind="info">Non sei connesso al server: lo stato di pubblicazione non è disponibile.</Notice></div>}
         <Card>
           {!structures.length ? (
             <EmptyState title="Nessuna struttura" sub="Crea prima una struttura (menu Strutture): il widget di prenotazione si collega a una struttura." />
           ) : shownWidgets.length === 0 ? (
-            <EmptyState title={t("Nessun widget per questa struttura.")} sub="Con «+ Crea un nuovo widget» ottieni il codice da incollare nel tuo sito: il motore di prenotazione compare nella pagina e le prenotazioni entrano nel calendario." />
+            <EmptyState title={t("Nessun widget per questa struttura")} sub="Con «+ Crea un nuovo widget» ottieni il codice da incollare nel tuo sito: il motore di prenotazione compare nella pagina e le prenotazioni entrano nel calendario." />
           ) : (
             <>
               {/* Telefono: lista a schede (tap affidabile; niente tabella larga da scorrere) */}
@@ -381,7 +381,7 @@ export default function WidgetPage() {
   return (
     <div>
       <PageHeader title={c.name || t("Widget")} subtitle={t("Configura il widget; le prenotazioni entrano dirette nel calendario")}
-        actions={<div className="flex flex-wrap items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={async () => { if (c && await ask({ title: t("Elimina widget"), message: `${t("Eliminare")} "${c.name || t("Widget")}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Salva")}</button></div>} />
+        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="secondary" size="sm" onClick={() => setEditingId(null)}>← {t("Torna alla lista")}</Button><button onClick={async () => { if (c && await ask({ title: t("Elimina widget"), message: `${t("Eliminare")} "${c.name || t("Widget")}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><Button size="sm" onClick={() => setEditingId(null)}>{t("Salva")}</Button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
@@ -456,7 +456,7 @@ export default function WidgetPage() {
             <p className="mt-1.5 text-[11px] text-faint">{snippetKind === "script" ? "Lo script adatta l'altezza da solo e resta responsivo, senza barre di scorrimento interne. Alcuni costruttori di siti (es. Wix) bloccano gli script esterni: in quel caso usa l'iframe." : "L'iframe funziona quasi ovunque ma ha altezza fissa: se il contenuto è più alto compare una barra di scorrimento interna."}</p>
             <div className="mt-2 flex items-start gap-2">
               <textarea readOnly value={shownSnippet} rows={4} onFocus={(e) => e.currentTarget.select()} className="w-full resize-none rounded-lg border border-line bg-paper p-2 font-mono text-[11px] text-txt" />
-              <button onClick={() => copy("snip", shownSnippet)} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-on-focus hover:opacity-90">{copied === "snip" ? "Copiato ✓" : t("Copia")}</button>
+              <Button size="xs" onClick={() => copy("snip", shownSnippet)} className="shrink-0">{copied === "snip" ? "Copiato ✓" : t("Copia")}</Button>
             </div>
             {copyErr && <div className="mt-2"><Notice kind="err">{copyErr}</Notice></div>}
 
@@ -481,7 +481,7 @@ export default function WidgetPage() {
 
             {/* Prova e condividi */}
             <div className="mt-4 flex flex-wrap gap-2">
-              <button onClick={openTestPage} disabled={!publishedSlug} title={publishedSlug ? "Apre una pagina vuota che incorpora lo snippet script, come farebbe il tuo sito" : "Disponibile dopo la pubblicazione della struttura"} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Apri pagina di prova ↗</button>
+              <Button variant="secondary" size="xs" onClick={openTestPage} disabled={!publishedSlug} title={publishedSlug ? "Apre una pagina vuota che incorpora lo snippet script, come farebbe il tuo sito" : "Disponibile dopo la pubblicazione della struttura"}>Apri pagina di prova ↗</Button>
               {directUrl && <a href={directUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Apri la pagina di prenotazione ↗</a>}
             </div>
             {directUrl && (
@@ -491,8 +491,8 @@ export default function WidgetPage() {
                   <div className="min-w-0 flex-1">
                     <div className="break-all font-mono text-[11px] text-txt">{directUrl}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <button onClick={() => copy("direct", directUrl)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">{copied === "direct" ? "Copiato ✓" : "Copia link"}</button>
-                      {qr && <button onClick={downloadQr} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">Scarica QR</button>}
+                      <Button variant="secondary" size="xs" onClick={() => copy("direct", directUrl)}>{copied === "direct" ? "Copiato ✓" : "Copia link"}</Button>
+                      {qr && <Button variant="secondary" size="xs" onClick={downloadQr}>Scarica QR</Button>}
                     </div>
                   </div>
                   {qr && /* eslint-disable-next-line @next/next/no-img-element */ <img src={qr} alt="QR del link di prenotazione" className="h-20 w-20 shrink-0 rounded bg-white p-1" />}
@@ -573,7 +573,7 @@ export default function WidgetPage() {
                 {([["mobile", "Telefono"], ["tablet", "Tablet"], ["desktop", "Desktop"]] as const).map(([k, lab]) => (
                   <button key={k} onClick={() => setViewport(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${viewport === k ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{lab}</button>
                 ))}
-                <button aria-label="Ricarica l'anteprima" onClick={() => setReloadTick((x) => x + 1)} title="Ricarica l'anteprima" className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-dim hover:bg-wash">↻</button>
+                <Button variant="secondary" size="xs" aria-label="Ricarica l'anteprima" onClick={() => setReloadTick((x) => x + 1)} title="Ricarica l'anteprima">↻</Button>
               </div>
             )}
           </div>

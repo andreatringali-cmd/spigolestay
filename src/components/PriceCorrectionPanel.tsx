@@ -11,6 +11,7 @@
 // (prezzo Xenora × correzione), perché Channex non permette di leggere il prezzo effettivo pubblicato
 // sull'OTA. Il netto usa la commissione impostata per canale/struttura. Le etichette lo dicono sempre.
 
+import { Button } from "@/components/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
 import { addDays, toISO, fmtDM } from "@/lib/dates";
@@ -170,7 +171,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
         <div className="mb-2 rounded-lg border border-line bg-surface p-2 text-xs" style={{ color: "var(--err)" }}>
           Non riesco a leggere la correzione attuale: {cur?.error}
           <div className="mt-1 text-dim">Per sicurezza il salvataggio è disattivato finché non la leggo (altrimenti rischierei di sovrascrivere un valore esistente).</div>
-          <button onClick={() => api.load(c.id, sid)} className="mt-1.5 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Riprova lettura</button>
+          <Button variant="secondary" size="xs" onClick={() => api.load(c.id, sid)} className="mt-1.5">Riprova lettura</Button>
         </div>
       )}
 
@@ -260,7 +261,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
             <span>Dopo l&apos;invio, reinvia a Channex tutti i prezzi (consigliato: così la nuova correzione arriva sull&apos;OTA).{lastSync ? ` Ultimo invio completo: ${relTime(lastSync)}.` : " Nessun invio completo registrato su questo dispositivo."}</span>
           </label>
           <div className="mt-3 flex justify-end gap-2">
-            <button onClick={() => setStep("edit")} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">← Modifica</button>
+            <Button variant="secondary" size="sm" onClick={() => setStep("edit")}>← Modifica</Button>
             <button onClick={() => confirmSend(target)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Conferma e invia a Channex</button>
           </div>
         </div>
@@ -270,7 +271,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
       {msg && step !== "preview" && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold" style={{ color: msg.tone === "ok" ? "var(--ok)" : msg.tone === "err" ? "var(--err)" : "var(--warn)" }}>
           <span>{msg.text}</span>
-          {failedTarget && <button onClick={() => confirmSend(failedTarget.target)} disabled={step === "saving"} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Riprova</button>}
+          {failedTarget && <Button variant="secondary" size="xs" onClick={() => confirmSend(failedTarget.target)} disabled={step === "saving"}>Riprova</Button>}
         </div>
       )}
     </div>
@@ -306,7 +307,7 @@ export function CorrectionHistory({ entries, allEntries, api, onLogged }: {
   if (entries.length === 0) return <p className="text-sm text-faint">Nessuna correzione inviata ancora. Ogni modifica inviata a Channex comparirà qui con il suo esito.</p>;
   return (
     <div>
-      {retryable.length > 1 && <div className="mb-2 flex justify-end"><button onClick={retryAll} disabled={!!busy} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Riprova tutte le fallite ({retryable.length})</button></div>}
+      {retryable.length > 1 && <div className="mb-2 flex justify-end"><Button variant="secondary" size="xs" onClick={retryAll} disabled={!!busy}>Riprova tutte le fallite ({retryable.length})</Button></div>}
       <div className="flex flex-col divide-y divide-[color:var(--line)]">
         {entries.slice(0, 25).map((e) => {
           const kindTxt = e.kind === "reset" ? "Rimossa" : e.kind === "rollback" ? "Ripristinata" : e.kind === "bulk" ? "In blocco" : e.kind === "retry" ? "Nuovo tentativo" : "Impostata";
@@ -320,8 +321,8 @@ export function CorrectionHistory({ entries, allEntries, api, onLogged }: {
               </div>
               {e.status === "error" && e.error && <div className="mt-0.5 text-xs" style={{ color: "var(--err)" }}>{e.error}</div>}
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                {canRetry(e, allEntries) && <button onClick={() => run(e, "retry")} disabled={!!busy} className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{busy === e.id ? "…" : "Riprova"}</button>}
-                {canRollback(e, allEntries) && <button onClick={() => run(e, "rollback")} disabled={!!busy} className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{busy === e.id ? "…" : `Ripristina ${correctionLabel(e.from)}`}</button>}
+                {canRetry(e, allEntries) && <Button variant="secondary" size="xs" onClick={() => run(e, "retry")} disabled={!!busy}>{busy === e.id ? "…" : "Riprova"}</Button>}
+                {canRollback(e, allEntries) && <Button variant="secondary" size="xs" onClick={() => run(e, "rollback")} disabled={!!busy}>{busy === e.id ? "…" : `Ripristina ${correctionLabel(e.from)}`}</Button>}
                 {note?.id === e.id && <span className="text-xs font-semibold" style={{ color: note.ok ? "var(--ok)" : "var(--err)" }}>{note.text}</span>}
               </div>
             </div>
@@ -386,7 +387,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
           <div className="text-sm font-semibold text-txt">Correzione in blocco</div>
           <div className="text-xs text-dim">Applica la stessa correzione a più canali di questa struttura, con anteprima e esito per ciascuno.</div>
         </div>
-        <button onClick={() => { setOpen((o) => !o); setStep("edit"); setResults({}); }} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">{open ? "Chiudi" : "Apri"}</button>
+        <Button variant="secondary" size="sm" onClick={() => { setOpen((o) => !o); setStep("edit"); setResults({}); }}>{open ? "Chiudi" : "Apri"}</Button>
       </div>
       {open && (
         <div className="mt-3">
@@ -451,7 +452,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
                 <>
                   <label className="mt-2 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={resend} onChange={(e) => setResend(e.target.checked)} className="mt-0.5" /><span>Al termine reinvia a Channex tutti i prezzi di questa struttura (consigliato).</span></label>
                   <div className="mt-3 flex justify-end gap-2">
-                    <button onClick={() => setStep("edit")} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">← Modifica</button>
+                    <Button variant="secondary" size="sm" onClick={() => setStep("edit")}>← Modifica</Button>
                     <button onClick={start} disabled={picked.some((c) => api.current[c.id]?.loading)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Conferma e invia a {picked.length} canali</button>
                   </div>
                 </>
@@ -462,8 +463,8 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
                   <span style={{ color: failed.length ? "var(--err)" : "var(--ok)" }}>
                     {picked.filter((c) => results[c.id]?.status === "ok").length} ok · {failed.length} con errore · {picked.filter((c) => ["unchanged", "skipped"].includes(results[c.id]?.status ?? "")).length} non modificati
                   </span>
-                  {failed.length > 0 && <button onClick={() => runFor(failed, "retry")} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Riprova i {failed.length} falliti</button>}
-                  <button onClick={() => { setStep("edit"); setResults({}); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Nuova correzione</button>
+                  {failed.length > 0 && <Button variant="secondary" size="xs" onClick={() => runFor(failed, "retry")}>Riprova i {failed.length} falliti</Button>}
+                  <Button variant="secondary" size="xs" onClick={() => { setStep("edit"); setResults({}); }}>Nuova correzione</Button>
                 </div>
               )}
             </>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { effectiveBase } from "@/lib/pricing";
 import { eur } from "@/lib/format";
-import { PageHeader, SectionTitle } from "@/components/ui";
+import { PageHeader, SectionTitle, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { fmtDate } from "@/lib/dates";
@@ -137,7 +137,7 @@ export default function PianiTariffariPage() {
         <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>+%</span> {t("aumento")}</span>
         <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>−%</span> {t("sconto")}</span>
         <span className="hidden sm:inline">🛏️ {t("trattamento")} · 📅 {t("intervallo")} · 💳 {t("incasso")}</span>
-        <button onClick={addPlan} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px]">＋ {t("Nuovo piano")}</button>
+        <Button size="sm" onClick={addPlan} className="ml-auto max-sm:order-3 max-sm:ml-0 max-sm:shrink-0 max-sm:text-[13px]">＋ {t("Nuovo piano")}</Button>
       </div>
 
       {view === "list" ? (
@@ -305,7 +305,7 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
           {allTypes.map((rt) => { const on = selectedRooms.includes(rt.id); return (
             <button key={rt.id} type="button" onClick={() => toggleRoom(rt.id)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-10 ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{on ? "✓ " : ""}{roomName(rt.id)}</button>
           ); })}
-          {allTypes.length === 0 && <span className="text-xs text-faint">{t("Nessuna tipologia disponibile.")}</span>}
+          {allTypes.length === 0 && <span className="text-xs text-faint">{t("Nessuna tipologia disponibile")}</span>}
         </div>
         <p className="mt-1 text-[11px] text-faint">{allSelected ? t("Si applica a tutte le tipologie.") : selectedRooms.length === 0 ? t("Scegli almeno una tipologia, oppure premi Tutte.") : `${selectedRooms.length} ${t("tipologie selezionate")}`}</p>
       </div>
@@ -318,8 +318,8 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
       <div className="mt-4 flex items-center gap-2">
         <button onClick={onDelete} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
         <label className="ml-1 flex items-center gap-2 text-sm text-dim">{t("Attivo")}<Toggle on={f.enabled !== false} onClick={() => set("enabled", f.enabled === false)} color="var(--ok)" /></label>
-        <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-        <button onClick={() => onSave(f)} disabled={!f.name.trim() || f.roomTypeIds?.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+        <Button variant="secondary" size="sm" onClick={onClose} className="ml-auto">{t("Annulla")}</Button>
+        <Button size="sm" onClick={() => onSave(f)} disabled={!f.name.trim() || f.roomTypeIds?.length === 0}>{t("Salva")}</Button>
       </div>
     </Modal>
   );

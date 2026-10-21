@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import EmptyState from "@/components/EmptyState";
 import { useData } from "@/lib/store";
@@ -116,11 +116,11 @@ export default function ConciergePanel() {
           ))}
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {faq.slice(0, 5).map((f) => (<button key={f.id} onClick={() => send(f.topic + "?")} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{f.topic}</button>))}
+          {faq.slice(0, 5).map((f) => (<Button variant="secondary" size="xs" key={f.id} onClick={() => send(f.topic + "?")}>{f.topic}</Button>))}
         </div>
         <div className="mt-2 flex gap-2">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Scrivi una domanda…" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <button onClick={() => send()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Invia</button>
+          <Button size="sm" onClick={() => send()}>Invia</Button>
         </div>
       </Card>
 
@@ -138,7 +138,7 @@ export default function ConciergePanel() {
                   <input value={f.topic} onChange={(e) => updFaq(f.id, { topic: e.target.value })} placeholder="Argomento" className="w-full rounded border border-line bg-surface px-2 py-1 text-sm font-semibold text-txt outline-none focus:border-focus" />
                   <input value={f.keywords} onChange={(e) => updFaq(f.id, { keywords: e.target.value })} placeholder="parole chiave (separate da spazio)" className="w-full rounded border border-line bg-surface px-2 py-1 text-xs text-dim outline-none focus:border-focus" />
                   <textarea value={f.answer} onChange={(e) => updFaq(f.id, { answer: e.target.value })} rows={2} placeholder="Risposta" className="w-full resize-y rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                  <div className="flex justify-end gap-2"><button onClick={() => delFaq(f.id)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus">Fatto</button></div>
+                  <div className="flex justify-end gap-2"><button onClick={() => delFaq(f.id)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><Button size="xs" onClick={() => setEditId(null)}>Fatto</Button></div>
                 </div>
               ) : (
                 <div className="flex items-start gap-2">

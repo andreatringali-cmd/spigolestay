@@ -10,7 +10,7 @@ import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import FilterSheet from "@/components/FilterSheet";
 import { forecastConsumption, estimateStock, stockState, reorderQty, type StockState } from "@/lib/forniture/forecast";
@@ -198,7 +198,7 @@ export default function ForniturePage() {
       const q = reorderQty({ estimated: r.estimated, min: r.min, dailyRate: r.dailyRate, horizonDays: horizon, packSize: r.p.pack_size, minOrderQty: r.p.min_order_qty });
       if (q > 0) { addToCart(r.p.id, q); n++; }
     }
-    setMsg(n ? `${n} prodotti aggiunti al carrello: controlla le quantità e conferma l'ordine.` : "Nessuna quantità da ordinare.");
+    setMsg(n ? `${n} prodotti aggiunti al carrello: controlla le quantità e conferma l'ordine.` : "Nessuna quantità da ordinare");
     if (n) setTab("catalogo");
   };
 
@@ -215,7 +215,7 @@ export default function ForniturePage() {
   }, [structId, rules, horizon, fcBookings, today, activeProds, stockInfo]);
 
   const createSuggested = async () => {
-    if (!reorderLines.length) { setMsg("Nessun fabbisogno previsto."); return; }
+    if (!reorderLines.length) { setMsg("Nessun fabbisogno previsto"); return; }
     setBusy(true); setMsg("");
     try {
       const items = reorderLines.map((l) => ({ productId: l.product_id, qty: l.qty }));
@@ -347,7 +347,7 @@ export default function ForniturePage() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--warn)", backgroundColor: "color-mix(in srgb, var(--warn) 10%, transparent)" }}>
           <span className="font-semibold text-txt">{lowRows.length} {lowRows.length === 1 ? "prodotto sotto" : "prodotti sotto"} la soglia minima</span>
           <span className="min-w-0 flex-1 truncate text-dim">{lowRows.slice(0, 4).map((r) => r.p.name).join(", ")}{lowRows.length > 4 ? "…" : ""}</span>
-          <button onClick={() => { setOnlyLow(true); setTab("scorte"); }} className="rounded-lg border border-line bg-surface px-3 py-1 max-sm:py-2 text-xs font-semibold text-txt hover:bg-wash">Vedi scorte</button>
+          <Button variant="secondary" size="xs" onClick={() => { setOnlyLow(true); setTab("scorte"); }}>Vedi scorte</Button>
         </div>
       )}
 
@@ -417,8 +417,8 @@ export default function ForniturePage() {
                     <div className="mt-1 flex justify-between text-sm font-bold text-txt"><span>Totale</span><span className="font-mono">{c(cartTotals.tot)}</span></div>
                   </div>
                   {!structId && <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">Per ordinare scegli la struttura in alto a destra: l&apos;ordine è per una struttura sola.</div>}
-                  <button onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 max-sm:py-3 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Paga con Stripe</button>
-                  <button onClick={() => checkout(false)} disabled={busy} className="w-full rounded-lg border border-line px-3 py-2 max-sm:py-3 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Salva come bozza</button>
+                  <Button size="md" onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full">Paga con Stripe</Button>
+                  <Button variant="secondary" size="xs" onClick={() => checkout(false)} disabled={busy} className="w-full">Salva come bozza</Button>
                 </div>
               )}
             </Card>
@@ -442,7 +442,7 @@ export default function ForniturePage() {
               <div className="mb-3 flex flex-wrap items-center gap-3 max-sm:flex-nowrap max-sm:gap-2">
                 <div className="contents max-sm:hidden">{stockFilters}</div>
                 <FilterSheet count={(onlyLow ? 1 : 0) + (horizon !== 30 ? 1 : 0)} onReset={() => { setOnlyLow(false); setHorizon(30); }}>{stockFilters}</FilterSheet>
-                <button onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:ml-0 max-sm:min-h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-1.5 max-sm:text-xs max-sm:leading-tight">Aggiungi i sotto soglia al carrello ({lowRows.length})</button>
+                <Button size="sm" onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto max-sm:ml-0 max-sm:min-w-0 max-sm:flex-1 max-sm:text-xs max-sm:leading-tight">Aggiungi i sotto soglia al carrello ({lowRows.length})</Button>
               </div>
               <Card className="mb-3 !p-0 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">
@@ -520,9 +520,9 @@ export default function ForniturePage() {
             </table>
           </Card>
 
-          <button onClick={createSuggested} disabled={busy || !reorderLines.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">
+          <Button size="sm" onClick={createSuggested} disabled={busy || !reorderLines.length}>
             Crea ordine suggerito ({reorderLines.length} prodotti)
-          </button>
+          </Button>
         </div>
       )}
 
@@ -541,7 +541,7 @@ export default function ForniturePage() {
               <option value="all">Tutti gli stati</option>
               {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
-            <button onClick={exportOrdersCsv} disabled={shownOrders.length === 0} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">Esporta CSV</button>
+            <Button variant="secondary" size="sm" onClick={exportOrdersCsv} disabled={shownOrders.length === 0} className="ml-auto">Esporta CSV</Button>
           </div>
           <Card className="!p-0 overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
@@ -576,11 +576,11 @@ export default function ForniturePage() {
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-2">
-                            <button onClick={() => orderToCart(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Riordina (riporta nel carrello)</button>
-                            {ORDER_OPEN.includes(o.status) && <button onClick={() => receiveOrder(o)} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Segna consegnato e carica a magazzino</button>}
+                            <Button variant="secondary" size="xs" onClick={() => orderToCart(o)}>Riordina (riporta nel carrello)</Button>
+                            {ORDER_OPEN.includes(o.status) && <Button size="xs" onClick={() => receiveOrder(o)} disabled={busy}>Segna consegnato e carica a magazzino</Button>}
                             {["paid", "processing", "shipped", "delivered"].includes(o.status) && (invoiced[docNumberOf(o)]
                               ? <span className="text-xs text-faint">Registrato in Fatture passive ({docNumberOf(o)})</span>
-                              : <button onClick={() => orderToInvoice(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Registra in Fatture passive</button>)}
+                              : <Button variant="secondary" size="xs" onClick={() => orderToInvoice(o)}>Registra in Fatture passive</Button>)}
                             {o.status === "draft" && <button onClick={() => deleteDraft(o)} className="rounded-lg px-3 py-1.5 max-sm:py-2.5 text-xs font-medium text-faint hover:text-[color:var(--err)]">Elimina bozza</button>}
                           </div>
                         </td>

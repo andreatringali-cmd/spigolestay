@@ -232,7 +232,7 @@ export default function ScadenzarioIncassiPage() {
                 </Fragment>
               );
             })}
-            {!loading && rows.length === 0 && <tr><td colSpan={7}><EmptyState title="Nessun incasso in sospeso" sub={bucket === "all" && !q ? "Tutti i documenti emessi risultano saldati." : "Nessun documento con questi filtri."} /></td></tr>}
+            {!loading && rows.length === 0 && <tr><td colSpan={7}><EmptyState title="Nessun incasso in sospeso" sub={bucket === "all" && !q ? "Tutti i documenti emessi risultano saldati." : "Nessun documento con questi filtri"} /></td></tr>}
           </tbody>
         </table>
       </div>
@@ -270,7 +270,7 @@ export default function ScadenzarioIncassiPage() {
             </div>
           );
         })}
-        {!loading && rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title="Nessun incasso in sospeso" sub={bucket === "all" && !q ? "Tutti i documenti emessi risultano saldati." : "Nessun documento con questi filtri."} /></div>}
+        {!loading && rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title="Nessun incasso in sospeso" sub={bucket === "all" && !q ? "Tutti i documenti emessi risultano saldati." : "Nessun documento con questi filtri"} /></div>}
       </div>
     </div>
   );

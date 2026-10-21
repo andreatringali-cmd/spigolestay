@@ -1,7 +1,8 @@
 "use client";
 
 // Piccoli pezzi condivisi dalla vista "Addetta" (mobile-first: tocchi grandi, testo piccolo, niente a capo nelle celle).
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { Modal, buttonClass } from "@/components/ui";
 import { toISO } from "@/lib/dates";
 
 export const newId = (): string => ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -15,8 +16,8 @@ export function stamp(d = new Date()) {
 export const hhmm = (iso: string | undefined): string => (iso && iso.length >= 16 ? iso.slice(11, 16) : "");
 
 export const inputCls = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus";
-export const btnPrimary = "rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40";
-export const btnGhost = "rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-dim hover:bg-wash";
+export const btnPrimary = buttonClass("primary", "md");
+export const btnGhost = buttonClass("secondary", "md");
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-xl border border-line bg-surface shadow-sm ${className}`}>{children}</div>;
@@ -24,24 +25,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 
 /** Finestra a tutta larghezza sul telefono (si apre dal basso), centrata dal tablet in su. */
 export function Sheet({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", k);
-    return () => document.removeEventListener("keydown", k);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <button aria-label="Chiudi" onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-line bg-surface shadow-2xl sm:max-w-md sm:rounded-2xl">
-        <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-          <span className="font-display text-base font-bold text-txt">{title}</span>
-          <button onClick={onClose} aria-label="Chiudi" className="grid h-9 w-9 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">{footer}</div>}
-      </div>
-    </div>
-  );
+  return <Modal open onClose={onClose} title={title} size="md" footer={footer} closeLabel="Chiudi">{children}</Modal>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

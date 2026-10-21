@@ -7,7 +7,7 @@ import { toISO, shiftISO, parseISO, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { inScope, newItemStructureId } from "@/lib/scope";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 
 const isWeekend = (iso: string) => { const d = new Date(iso.slice(0, 10) + "T00:00:00Z").getUTCDay(); return d === 5 || d === 6 || d === 0; };
@@ -94,7 +94,7 @@ export default function AssistenteRicaviPage() {
 
   return (
     <div>
-      <PageHeader title="Assistente ricavi" subtitle="Prezzi consigliati giorno per giorno in base a occupazione, weekend ed eventi locali" actions={<button onClick={applyAll} disabled={!opportunities.length} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Applica tutti i consigli ({opportunities.length})</button>} />
+      <PageHeader title="Assistente ricavi" subtitle="Prezzi consigliati giorno per giorno in base a occupazione, weekend ed eventi locali" actions={<Button size="sm" onClick={applyAll} disabled={!opportunities.length}>Applica tutti i consigli ({opportunities.length})</Button>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Tariffa base media", eur(baseRate)], ["Camere in scope", String(scopeUnits.length)], ["Opportunità", String(opportunities.length)], ["Ricavo potenziale", `+${eur(upside)}`]] as [string, string][]).map(([lab, val]) => (
@@ -122,13 +122,11 @@ export default function AssistenteRicaviPage() {
             <option value="medio">Impatto medio</option>
             <option value="alto">Impatto alto</option>
           </select>
-          <button
-            onClick={addEvent}
-            disabled={!newEvName.trim() || !newEvDate}
-            className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10"
-          >
+          <Button size="sm"
+ onClick={addEvent}
+ disabled={!newEvName.trim() || !newEvDate}>
             Aggiungi
-          </button>
+          </Button>
         </div>
         <div className="flex flex-wrap gap-2">
           {events.map((e) => (

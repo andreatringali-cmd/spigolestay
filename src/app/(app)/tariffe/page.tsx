@@ -1,5 +1,6 @@
 "use client";
 
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { Fragment, useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { addDays, isWeekend, toISO, weekdayShort } from "@/lib/dates";
@@ -8,7 +9,7 @@ import { effectiveBase, effectiveMinStay, effectiveClosed, rateForDay, parseWeek
 import { inScope } from "@/lib/scope";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Switch } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 
 const DAYS = 14;
@@ -235,7 +236,7 @@ export default function TariffePage() {
           [t("Piano tariffario"), "#B3453A"],
         ] as const).map(([h, col], i, arr) => (
           <span key={h} className="flex shrink-0 items-center gap-1.5">
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: col }}>{h}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${onSolid(col)}`} style={{ backgroundColor: solidBg(col) }}>{h}</span>
             {i < arr.length - 1 && <span className="text-faint">→</span>}
           </span>
         ))}
@@ -276,7 +277,7 @@ export default function TariffePage() {
                         {openMasters.has(m.id) && descendantsOf(m.id).map((k) => baseRow(k))}
                       </Fragment>
                     ))}
-                    {rootsForBox.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna tipologia.")}</td></tr>}
+                    {rootsForBox.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna tipologia")}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -309,9 +310,7 @@ export default function TariffePage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1"><input type="number" value={weekendPct} disabled={!weekendOn} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20 disabled:opacity-40`} /><span className="text-dim">%</span></span>
             <span className="text-xs text-faint">{weekendOn ? t("su sab/dom, se non c'è un prezzo forzato dal calendario") : t("spenta: nessuna maggiorazione applicata nel weekend")}</span>
-            <button type="button" onClick={() => setWeekendOn(!weekendOn)} role="switch" aria-checked={weekendOn} title={weekendOn ? t("Disattiva la maggiorazione weekend") : t("Attiva la maggiorazione weekend")} className="relative ml-auto h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: weekendOn ? "var(--ok)" : "var(--line)" }}>
-              <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
-            </button>
+            <Switch checked={weekendOn} onCheckedChange={setWeekendOn} label={weekendOn ? t("Disattiva la maggiorazione weekend") : t("Attiva la maggiorazione weekend")} color="var(--ok)" className="ml-auto" />
           </div>
           {!wkScope && <p className="mt-2 text-[11px] text-faint">{t("Regola predefinita: vale per le strutture che non hanno una regola propria (selezionane una in alto a destra per impostarne una diversa).")}</p>}
         </Card>
@@ -370,7 +369,7 @@ export default function TariffePage() {
                   {openMasters.has(m.id) && descendantsOf(m.id).map((k) => prevRow(k))}
                 </Fragment>
               ))}
-              {types.length === 0 && <tr><td colSpan={DAYS + 1} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna tipologia.")}</td></tr>}
+              {types.length === 0 && <tr><td colSpan={DAYS + 1} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna tipologia")}</td></tr>}
             </tbody>
           </table>
         </div>

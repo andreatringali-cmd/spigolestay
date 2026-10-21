@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -160,8 +160,8 @@ function EntryForm({ draft, setDraft, onSave, onCancel, saving, isNew, structure
       </div>
       <p className="text-[11px] text-faint">Link mappa: lascia vuoto, la mappa si genera dall&apos;indirizzo.</p>
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} disabled={saving} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash disabled:opacity-50">Annulla</button>
-        <button onClick={onSave} disabled={saving || invalid} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : isNew ? "Crea voce" : "Salva"}</button>
+        <Button variant="secondary" size="xs" onClick={onCancel} disabled={saving}>Annulla</Button>
+        <Button size="xs" onClick={onSave} disabled={saving || invalid}>{saving ? "Salvataggio…" : isNew ? "Crea voce" : "Salva"}</Button>
       </div>
     </div>
   );
@@ -398,7 +398,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
           </label>
           <div className="mt-2 flex gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="Scrivi la domanda dell'ospite…" className={`${inputCls} flex-1`} />
-            <button onClick={submit} disabled={asking || !q.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Invia</button>
+            <Button size="sm" onClick={submit} disabled={asking || !q.trim()}>Invia</Button>
           </div>
           <div className="mt-3 space-y-2 rounded-xl border border-line bg-wash p-3" style={{ minHeight: 120 }}>
             {!asking && !res && !askErr && <p className="text-xs text-faint">Nessuna prova ancora.</p>}

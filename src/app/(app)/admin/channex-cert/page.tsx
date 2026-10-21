@@ -9,7 +9,7 @@
 // risposta è 403, mostriamo l'area riservata.
 
 import { useMemo, useState } from "react";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Button } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 
 type ScenarioId = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
@@ -221,9 +221,9 @@ export default function ChannexCertPage() {
           {allTaskIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="text-xs text-faint">{allTaskIds.length} task ID raccolti finora</span>
-              <button onClick={() => copy(allTaskIds.join(", "), "all")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">
+              <Button variant="secondary" size="xs" onClick={() => copy(allTaskIds.join(", "), "all")}>
                 {copied === "all" ? "Copiati ✓" : "Copia tutti i task ID"}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -475,13 +475,11 @@ export default function ChannexCertPage() {
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <button
-                onClick={loadRevisions}
-                disabled={loadingRevs}
-                className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60"
-              >
+              <Button variant="secondary" size="sm"
+ onClick={loadRevisions}
+ disabled={loadingRevs}>
                 {loadingRevs ? "Leggo…" : "Leggi revisioni"}
-              </button>
+              </Button>
               <button
                 onClick={ackBookings}
                 disabled={acking}

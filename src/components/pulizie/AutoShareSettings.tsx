@@ -2,7 +2,7 @@
 
 import { fmtDateTime } from "@/lib/dates";
 import { useEffect, useState } from "react";
-import Icon from "@/components/Icon";
+import { Modal, Button } from "@/components/ui";
 import { MailIcon } from "@/components/BrandIcons";
 import { apiPost } from "@/lib/invoicing/client";
 import { useLang } from "@/lib/i18n";
@@ -117,16 +117,10 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color:var(--focus)]/10 text-[color:var(--focus)]"><Icon name="clock" size={16} /></span>
-          <div>
-            <div className="text-sm font-bold text-txt">{t("Invio automatico")}</div>
-            <div className="text-[11px] text-faint">{activeName}</div>
-          </div>
-        </div>
-
+    <Modal open onClose={onClose} title={t("Invio automatico")} description={activeName} size="sm" closeLabel={t("Chiudi")} footer={<>
+    <Button variant="ghost" onClick={onClose}>{t("Annulla")}</Button>
+    <Button onClick={save}>{saved ? t("Salvato ✓") : t("Salva")}</Button>
+    </>}>
         <label className="mb-3 flex items-center justify-between rounded-xl border border-line bg-paper px-3 py-2.5">
           <span className="text-sm font-medium text-txt">{t("Attivo")}</span>
           <input type="checkbox" checked={cfg.enabled} onChange={(e) => setCfg((c) => ({ ...c, enabled: e.target.checked }))} className="h-4 w-8 shrink-0 accent-[color:var(--focus)]" />
@@ -207,7 +201,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
         <div className="mt-3 rounded-xl border border-line bg-paper px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 text-[11px] leading-snug text-dim">{t("Prova adesso con queste impostazioni: invia il planning di oggi all'indirizzo email scelto.")}</div>
-            <button type="button" onClick={sendNow} disabled={nowBusy || !(cfg.email && cfg.emailTo.trim())} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:bg-wash disabled:opacity-50">{nowBusy ? t("Invio…") : t("Invia ora")}</button>
+            <Button variant="secondary" size="xs" type="button" onClick={sendNow} disabled={nowBusy || !(cfg.email && cfg.emailTo.trim())} className="shrink-0">{nowBusy ? t("Invio…") : t("Invia ora")}</Button>
           </div>
           {nowRes && (
             <ul className="mt-2 flex flex-col gap-1 text-[11px] leading-snug">
@@ -223,11 +217,6 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
         </div>
 
         {saveErr && <p className="mt-3 text-[11px] font-medium" style={{ color: "var(--err)" }}>{saveErr}</p>}
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash hover:text-txt">{t("Annulla")}</button>
-          <button onClick={save} className="rounded-lg px-4 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{saved ? t("Salvato ✓") : t("Salva")}</button>
-        </div>
-      </div>
-    </div>
+        </Modal>
   );
 }

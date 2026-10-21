@@ -2,7 +2,7 @@
 
 import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Button } from "@/components/ui";
 import { apiPost } from "@/lib/invoicing/client";
 import { CATEGORY_LABEL, type ConciergeEntry } from "@/lib/concierge-kb";
 import {
@@ -143,13 +143,11 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
         <SectionTitle>Base in 5 lingue (tedesco, francese, spagnolo)</SectionTitle>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {prog ? (
-            <button onClick={() => { cancel.current = true; }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Ferma</button>
+            <Button variant="secondary" size="xs" onClick={() => { cancel.current = true; }}>Ferma</Button>
           ) : (
-            <button
-              onClick={() => runKeys(todoKeys(TRANSLATE_LANGS), anyTranslation ? "Aggiorno le traduzioni" : "Traduco la base")}
-              disabled={loading || !masters.length || todoTotal === 0}
-              className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50"
-            >{anyTranslation ? "Aggiorna traduzioni" : "Traduci la base in tedesco, francese e spagnolo"}</button>
+            <Button size="xs"
+ onClick={() => runKeys(todoKeys(TRANSLATE_LANGS), anyTranslation ? "Aggiorno le traduzioni" : "Traduco la base")}
+ disabled={loading || !masters.length || todoTotal === 0}>{anyTranslation ? "Aggiorna traduzioni" : "Traduci la base in tedesco, francese e spagnolo"}</Button>
           )}
         </div>
       </div>
@@ -235,8 +233,8 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
                           {m.field_type === "auto" && <p className="text-[11px] text-faint">Lascia {"{{value}}"} nel testo: viene sostituito col valore preso dalla prenotazione.</p>}
                           {editErr && <p className="text-[11px] font-medium" style={{ color: "var(--err)" }}>{editErr}</p>}
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => { setEdit(null); setEditErr(""); }} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash disabled:opacity-50">Annulla</button>
-                            <button onClick={saveEdit} disabled={busy || !edit.title.trim() || !edit.body.trim()} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy ? "Salvo…" : "Salva e approva"}</button>
+                            <Button variant="secondary" size="xs" onClick={() => { setEdit(null); setEditErr(""); }} disabled={busy}>Annulla</Button>
+                            <Button size="xs" onClick={saveEdit} disabled={busy || !edit.title.trim() || !edit.body.trim()}>{busy ? "Salvataggio…" : "Salva e approva"}</Button>
                           </div>
                         </div>
                       ) : it ? (

@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { toISO, shiftISO, nights, fmtDM } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { yoyCompare } from "@/lib/revenue-yoy";
 import StructureRequired from "@/components/StructureRequired";
@@ -189,7 +189,7 @@ export default function MercatoPage() {
       ) : netErr ? (
         <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,var(--warn) 40%,var(--line))", background: "color-mix(in srgb,var(--warn) 10%,var(--surface))", color: "var(--warn)" }}>
           <span>{t(netErr)}</span>
-          <button onClick={() => void refresh()} disabled={loading} className="rounded-md border border-line bg-surface px-2.5 py-1 font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? t("Riprovo…") : t("Riprova")}</button>
+          <Button variant="secondary" size="sm" onClick={() => void refresh()} disabled={loading}>{loading ? t("Riprovo…") : t("Riprova")}</Button>
         </div>
       ) : null}
 

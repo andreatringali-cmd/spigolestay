@@ -3,10 +3,11 @@
 // Gruppo: si scelgono le strutture del gruppo, Xenora riconosce le tipologie e per ciascuna si indica il numero di camere reali.
 // Le tipologie con lo stesso nome dividono le stesse camere; la disponibilità resta sincronizzata tra le strutture (portali, calendario, sito diretto).
 // Logica in src/lib/inventory-pool.ts.
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { allLoaded, ensureLoaded, useStructLoad } from "@/lib/struct-load";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { POOL_DEF, POOL_KEY, parsePool, poolFamilies, poolListings, poolOccupancy, type PoolConfig } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
 import { addDays, toISO, parseISO, fmtDM } from "@/lib/dates";
@@ -22,7 +23,7 @@ function Dot({ name, color, logo, size = 22 }: { name: string; color?: string; l
     <img src={logo} alt="" aria-hidden className="shrink-0 rounded-full border border-line bg-white object-contain" style={{ width: size, height: size }} />
   );
   return (
-    <span className="grid shrink-0 place-items-center rounded-full font-bold text-white" style={{ width: size, height: size, fontSize: Math.round(size * 0.46), backgroundColor: color ?? "var(--focus)" }} aria-hidden>
+    <span className={`grid shrink-0 place-items-center rounded-full font-bold ${onSolid(color ?? "var(--focus)")}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.46), backgroundColor: solidBg(color ?? "var(--focus)") }} aria-hidden>
       {(name || "?")[0]?.toUpperCase()}
     </span>
   );
@@ -147,10 +148,10 @@ export default function GruppoPage() {
                   <label className="flex shrink-0 flex-col items-center gap-1">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">Camere reali</span>
                     <span className="flex items-center gap-1">
-                      <button type="button" onClick={() => setRooms(f.key, String(Math.max(0, f.real - 1)))} disabled={f.real <= 0} aria-label={`Una camera in meno per ${f.name}`} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-lg leading-none text-dim transition hover:bg-wash hover:text-txt disabled:opacity-40">−</button>
+                      <Button variant="secondary" size="xs" type="button" onClick={() => setRooms(f.key, String(Math.max(0, f.real - 1)))} disabled={f.real <= 0} aria-label={`Una camera in meno per ${f.name}`} className="text-lg leading-none w-8 !px-0 max-sm:w-10 max-sm:!px-0">−</Button>
                       <input type="number" min={0} inputMode="numeric" value={f.set ? f.real : ""} placeholder={String(f.suggested)} onChange={(e) => setRooms(f.key, e.target.value)} aria-label={`Camere reali di ${f.name}`}
                         className="h-9 w-14 rounded-lg border bg-surface text-center font-mono text-lg font-bold text-txt outline-none focus:border-focus" style={{ borderColor: f.set ? "var(--line)" : tint("var(--warn)", 55) }} />
-                      <button type="button" onClick={() => setRooms(f.key, String(f.real + 1))} aria-label={`Una camera in più per ${f.name}`} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-lg leading-none text-dim transition hover:bg-wash hover:text-txt">+</button>
+                      <Button variant="secondary" size="xs" type="button" onClick={() => setRooms(f.key, String(f.real + 1))} aria-label={`Una camera in più per ${f.name}`} className="text-lg leading-none w-8 !px-0 max-sm:w-10 max-sm:!px-0">+</Button>
                     </span>
                   </label>
                 </div>

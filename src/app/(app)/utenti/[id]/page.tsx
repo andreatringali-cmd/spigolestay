@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
   PERMISSIONS, PERM_GROUPS, PERM_TEMPLATES, USER_LANGS, AV_COLORS, initials,
@@ -26,7 +26,7 @@ import { runInvite, shareStructures, profileOf, markInvited } from "@/lib/invite
 import { friendlyError } from "@/lib/friendly-error";
 import { PASSWORD_MIN } from "@/components/PublicUi";
 
-import { onSolid } from "@/lib/on-solid";
+import { onSolid, solidBg } from "@/lib/on-solid";
 import Toggle from "@/components/Toggle";
 // --- Micro-componenti ---------------------------------------------------------
 function Info({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "warn" }) {
@@ -200,7 +200,7 @@ export default function UserSchedaPage() {
 
   const fullName = `${u.firstName} ${u.lastName}`.trim() || t("Nuovo utente");
   const avatar = (size: number) => (
-    <div className="grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-white" style={{ width: size, height: size, backgroundColor: u.avatarColor, fontSize: size * 0.36 }}>
+    <div className={`grid shrink-0 place-items-center overflow-hidden rounded-full font-bold ${onSolid(u.avatarColor)}`} style={{ width: size, height: size, backgroundColor: solidBg(u.avatarColor), fontSize: size * 0.36 }}>
       {u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}
     </div>
   );
@@ -213,8 +213,8 @@ export default function UserSchedaPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {canDelete && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
-            <button onClick={() => router.push("/utenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} title={valid ? "" : `${t("Mancano:")} ${errs.join(", ")}`} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea utente") : t("Salva")}</button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/utenti")}>{t("Annulla")}</Button>
+            <Button size="sm" onClick={save} disabled={!valid} title={valid ? "" : `${t("Mancano:")} ${errs.join(", ")}`}>{isNew ? t("Crea utente") : t("Salva")}</Button>
           </div>
         }
       />
@@ -273,7 +273,7 @@ export default function UserSchedaPage() {
             <div className="mt-3">
               <div className="text-xs font-medium text-dim">{t("Password")}</div>
               <div className="mt-1 flex flex-wrap gap-2">
-                <button onClick={() => { setPwOpen((o) => !o); resetPwFields(); }} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">🔑 {t("Cambia password")}</button>
+                <Button variant="secondary" size="xs" onClick={() => { setPwOpen((o) => !o); resetPwFields(); }}>🔑 {t("Cambia password")}</Button>
               </div>
               {pwOpen && (isSelf ? (
                 <div className="mt-2 space-y-2">
@@ -281,7 +281,7 @@ export default function UserSchedaPage() {
                   <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t(`Nuova password (min. ${PASSWORD_MIN})`)} className={inp} />
                   <input type="password" autoComplete="new-password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} placeholder={t("Ripeti nuova password")} className={inp} />
                   <div className="flex flex-wrap items-center gap-3">
-                    <button onClick={changePw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : t("Aggiorna password")}</button>
+                    <Button size="xs" onClick={changePw} disabled={pwBusy}>{pwBusy ? t("Attendi…") : t("Aggiorna password")}</Button>
                     <button type="button" onClick={forgotPw} disabled={pwBusy} className="text-xs font-medium text-focus hover:underline">{t("Password dimenticata?")}</button>
                   </div>
                   <p className="text-[11px] text-faint">{t("Se non ricordi quella attuale, usa «Password dimenticata»: ti arriva un link via email per reimpostarla.")}</p>
@@ -289,7 +289,7 @@ export default function UserSchedaPage() {
               ) : (
                 <div className="mt-2 space-y-2">
                   <p className="text-[12px] text-dim">{t("Per motivi di sicurezza non puoi impostare tu la password di un altro utente. Invia un'email di reset: l'utente sceglierà la sua nuova password.")}</p>
-                  <button onClick={forgotPw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</button>
+                  <Button size="xs" onClick={forgotPw} disabled={pwBusy}>{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</Button>
                 </div>
               ))}
               {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
@@ -307,7 +307,7 @@ export default function UserSchedaPage() {
             </div>
             <div className="mb-3 text-xs text-dim">{t("Ultimo accesso:")} {u.lastLogin ? <>{fmtDateTime(u.lastLogin.at)} {t("da")} <span className="font-mono">{u.lastLogin.ip}</span></> : <span className="text-faint">{t("mai")}</span>}</div>
             {(u.sessions ?? []).length === 0 ? (
-              <div className="text-sm text-faint">{t("Nessuna sessione attiva.")}</div>
+              <div className="text-sm text-faint">{t("Nessuna sessione attiva")}</div>
             ) : (
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {(u.sessions ?? []).map((s) => (
@@ -401,10 +401,10 @@ export default function UserSchedaPage() {
                   </div>
                   {/* Frecce */}
                   <div className="flex flex-col items-center justify-center gap-1.5">
-                    <button aria-label={t("Sposta selezionate")} onClick={moveRight} disabled={pickA.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta selezionate")}>›</button>
-                    <button aria-label={t("Sposta tutte")} onClick={moveAllRight} disabled={available.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta tutte")}>»</button>
-                    <button aria-label={t("Rimuovi selezionate")} onClick={moveLeft} disabled={pickS.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi selezionate")}>‹</button>
-                    <button aria-label={t("Rimuovi tutte")} onClick={moveAllLeft} disabled={selected.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi tutte")}>«</button>
+                    <Button variant="secondary" size="xs" aria-label={t("Sposta selezionate")} onClick={moveRight} disabled={pickA.size === 0} title={t("Sposta selezionate")} className="w-8 !px-0 max-sm:w-10 max-sm:!px-0">›</Button>
+                    <Button variant="secondary" size="xs" aria-label={t("Sposta tutte")} onClick={moveAllRight} disabled={available.length === 0} title={t("Sposta tutte")} className="w-8 !px-0 max-sm:w-10 max-sm:!px-0">»</Button>
+                    <Button variant="secondary" size="xs" aria-label={t("Rimuovi selezionate")} onClick={moveLeft} disabled={pickS.size === 0} title={t("Rimuovi selezionate")} className="w-8 !px-0 max-sm:w-10 max-sm:!px-0">‹</Button>
+                    <Button variant="secondary" size="xs" aria-label={t("Rimuovi tutte")} onClick={moveAllLeft} disabled={selected.length === 0} title={t("Rimuovi tutte")} className="w-8 !px-0 max-sm:w-10 max-sm:!px-0">«</Button>
                   </div>
                   {/* Selezionate */}
                   <div className="rounded-lg border border-line">

@@ -24,7 +24,8 @@ Non scrivere mai esadecimali o `text-white` nei componenti dell'app: usa i token
 | Bordi | `border-line` (divisori, card) · `border-line-strong` (**campi e pulsanti**, ≥ 3:1) | |
 | Accento | `bg-focus` + `text-on-focus` · `text-focus` | un solo accento: blu |
 | Stati | `text-ok/warn/err` · `bg-ok/15` (tinta) · `bg-err` + `text-on-err` (pieno) | verde = completato, ambra = attenzione, rosso = errore/scaduto (MAI una categoria), blu = informativo |
-| Testo su fondo pieno | `text-on-focus` / `on-ok` / `on-warn` / `on-err` | in scuro diventa quasi nero (il bianco su fondi chiari non passa) |
+| Testo su fondo pieno | `text-on-focus` / `on-ok` / `on-warn` / `on-err` / `on-wa` | in scuro diventa quasi nero (il bianco su fondi chiari non passa). Verde WhatsApp: `bg-wa text-on-wa` (mai `#25D366` + bianco: 2,0:1). Azzurro «Riassetto» come testo: `var(--cl-rest)` |
+| Fondo pieno con colore scelto dall'utente (#hex: avatar, tile dei canali, legende) | `className={onSolid(c)}` + `style={{ backgroundColor: solidBg(c) }}` (`@/lib/on-solid`) | sceglie bianco o quasi-nero e, sui toni medi dove nessuno dei due arriva a 4,5:1, scurisce lo sfondo. Mai `text-white` su un colore variabile |
 | Raggi | `--r-sm 6` chip · `--r-md 8` pulsanti/campi (`rounded-lg`) · `--r-lg 12` card (`rounded-xl`) · `--r-xl 16` finestre (`rounded-2xl`) | |
 | Ombre | `--shadow-1` card interattiva · `--shadow-2` popover · `--shadow-3` finestra | |
 | z-index | `--z-sticky 30` · `--z-drawer 40` · `--z-modal 200` · `--z-dropdown 1000` · `--z-toast 1100` | le conferme usano `modal + 10`; nei componenti nuovi `style={{ zIndex: "var(--z-modal)" }}` |
@@ -35,8 +36,8 @@ Tema scuro: la classe `dark` sta su `<html>`; basta usare i token.
 ## 3. Componenti
 
 ### Button
-`<Button variant="primary|secondary|ghost|danger|icon" size="sm|md" loading fullWidth>`
-- `sm` = 36 px, `md` = 40 px; **su telefono entrambe 44 px** (bersaglio di tocco).
+`<Button variant="primary|secondary|ghost|danger|icon" size="xs|sm|md" loading fullWidth>`
+- `xs` = 32 px (righe compatte di tabelle e barre strumenti, testo 12 px), `sm` = 36 px, `md` = 40 px; **su telefono 40 / 44 / 44 px** (bersaglio di tocco).
 - Una sola azione `primary` per finestra/sezione. `danger` (rosso pieno) per eliminare, **sempre** dopo `useConfirm({ danger: true })`.
 - `loading` mostra l'anello, blocca i clic e mette `aria-busy`. `disabled`: opacità 50 % + `cursor-not-allowed`.
 - Pulsante **solo icona**: `variant="icon"` con `aria-label` obbligatorio (lo impone il tipo) oppure `<IconButton label="Chiudi">`.
@@ -68,7 +69,8 @@ Altezza unica 40 px (44 su telefono), bordo `line-strong`, sfondo `surface`, seg
 `<Modal open onClose title description footer size="sm|md|lg|xl" busy layer>` — fa tutto da sola: `role="dialog"` `aria-modal`, `aria-labelledby`, Esc (solo la finestra in cima), trappola del focus, ritorno del focus all'elemento che l'ha aperta, blocco dello scorrimento, portale nel `<body>`, z-index dai token, **su telefono diventa un foglio (sheet) in basso**.
 - Footer: «Annulla» (secondario) a sinistra del primario.
 - Azione **distruttiva**: il focus iniziale va su «Annulla» → metti `data-autofocus` su «Annulla» (o usa `useConfirm({ danger: true })`, che lo fa da solo).
-- Mai più `fixed inset-0` scritti a mano.
+- Mai più `fixed inset-0` scritti a mano: `tests/ds-tokens-contrasto.test.ts` ha un «argine» (elenco ammesso con il massimo di occorrenze per file) e fallisce se ne compare uno nuovo.
+- Niente `window.confirm` e niente conferme fatte a mano: `useConfirm({ danger: true })`, oppure un `<Modal>` con «Annulla» (`data-autofocus`) + `<Button variant="danger">`.
 
 ### Tabs / TabPanel
 `<Tabs id={id} ariaLabel="Sezioni" value items onChange variant="underline|pill" />` + `<TabPanel id={id} value active>`: `role=tablist/tab/tabpanel`, frecce sinistra/destra, Home/End, solo la scheda attiva si raggiunge con Tab. Per scelte singole non-schede (es. «Griglia | Dettagliata») usa pulsanti con `aria-pressed` dentro un `role="group"`.

@@ -8,7 +8,7 @@ import { bookingTotals, TOTAL_WITH_TAX_LABEL } from "@/lib/booking-totals";
 import { eur } from "@/lib/format";
 import { NUM_TYPING_RE, formatDecimalIT, parseDecimalIT, roundDecimals } from "@/lib/num-it";
 import { exportExcel, exportPdf } from "@/lib/export";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Button } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
@@ -127,11 +127,11 @@ export default function PagamentiPage() {
                   )}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="rounded-md bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus hover:opacity-90">{t("Salda")}</button>}
+                  {balance > 0 && <Button size="xs" onClick={() => updateBooking(b.id, { paid: due })}>{t("Salda")}</Button>}
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={8}><EmptyState title={t("Nessun pagamento con questi filtri.")} /></td></tr>}
+            {rows.length === 0 && <tr><td colSpan={8}><EmptyState title={t("Nessun pagamento con questi filtri")} /></td></tr>}
           </tbody>
         </table>
       </div>
@@ -155,10 +155,10 @@ export default function PagamentiPage() {
               <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Saldo")}</div><div className={`font-mono font-semibold ${balance > 0 ? "text-[color:var(--err)]" : "text-[color:var(--ok)]"}`}>{eur(balance)}</div></div>
               <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Incassato")}</div><PaidCell key={`m-${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} className="mt-0.5 w-full" /></div>
             </div>
-            {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="mt-2 w-full rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Salda")}</button>}
+            {balance > 0 && <Button size="md" onClick={() => updateBooking(b.id, { paid: due })} className="mt-2 w-full">{t("Salda")}</Button>}
           </div>
         ))}
-        {rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessun pagamento con questi filtri.")} /></div>}
+        {rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessun pagamento con questi filtri")} /></div>}
       </div>
       <p className="mt-3 text-xs text-faint">{t("Modifica l'importo incassato direttamente in tabella o usa «Salda» per registrare il pagamento completo. Gli incassi si riflettono nella scheda prenotazione e nella Cassa.")}</p>
     </div>

@@ -8,7 +8,7 @@ import { CHANNELS, type Channel, type Booking } from "@/lib/types";
 import { toISO, parseISO, addDays, nights, fmtDM } from "@/lib/dates";
 import { playSound } from "@/lib/sound";
 import { eur } from "@/lib/format";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Modal, Button } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
 import FilterSheet from "@/components/FilterSheet";
@@ -486,7 +486,7 @@ export default function PuliziePage() {
             </div>
             <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
             {shopList.length > 0 && (shopFiltered.length === 0 ? (
-              <div className="py-3 text-center text-xs text-faint">{t("Nessun prodotto trovato.")}</div>
+              <div className="py-3 text-center text-xs text-faint">{t("Nessun prodotto trovato")}</div>
             ) : activeStructureId === "all" ? (
               <div>
                 {scopeStructures.map((s) => { const items = shopFiltered.filter((p) => p.structureId === s.id); if (!items.length) return null; const sc = structColorOf(s.id); return (
@@ -526,7 +526,7 @@ export default function PuliziePage() {
             <FilterSheet count={prodFilter !== "all" ? 1 : 0} onReset={() => setProdFilter("all")}>
               {segs("grid grid-cols-2 gap-1.5", "h-9 rounded-lg border border-line px-2 text-xs font-semibold transition")}
             </FilterSheet>
-            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:ml-0 max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
+            <Button size="sm" onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 whitespace-nowrap max-sm:ml-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</Button>
           </div>
             );
           })()}
@@ -535,7 +535,7 @@ export default function PuliziePage() {
           <div className="order-2 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-3 lg:flex lg:h-[34rem] lg:flex-col">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-txt"><Icon name="grid" size={16} /> {t("Prodotti")} <span className="text-faint">· {stockFiltered.length}/{stockScoped.length}</span></div>
             <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
-              {stockFiltered.length === 0 && <div className="py-4 text-center text-xs text-faint">{t("Nessun prodotto trovato.")}</div>}
+              {stockFiltered.length === 0 && <div className="py-4 text-center text-xs text-faint">{t("Nessun prodotto trovato")}</div>}
               {activeStructureId === "all" ? (
                 scopeStructures.map((s) => { const items = stockFiltered.filter((p) => p.structureId === s.id); if (!items.length) return null; const sc = structColorOf(s.id); return (
                   <div key={s.id} className="mb-2 overflow-hidden rounded-lg border" style={{ borderColor: `color-mix(in srgb, ${sc} 35%, var(--line))` }}>
@@ -607,7 +607,7 @@ export default function PuliziePage() {
       {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi.
           Telefono: [‹ data ›] [Filtri] [Condividi]; struttura, Oggi, vista e invio programmato stanno nella tendina «Filtri». */}
       {(() => {
-        const oggiBtn = <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>;
+        const oggiBtn = <Button variant="secondary" size="xs" onClick={() => setDate(todayISO)} className="shrink-0">{t("Oggi")}</Button>;
         const vistaCtl = (<>
           <div className="flex items-center rounded-lg border border-line p-0.5">
             <Seg v="cards" icon="grid" title={t("Vista card")} />
@@ -619,37 +619,37 @@ export default function PuliziePage() {
                 <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
               ))}
             </div>
-            <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
+            <Button variant="secondary" size="xs" onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</Button>
           </>)}
         </>);
         return (
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:p-1.5">
         <div className="flex min-w-0 items-center gap-1 max-sm:shrink-0 max-sm:gap-0.5">
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">‹</button>
+          <Button variant="secondary" size="xs" onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="shrink-0 text-base leading-none w-8 !px-0 max-sm:w-10 max-sm:!px-0">‹</Button>
           <div className="min-w-0 sm:flex-none"><DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:justify-between max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px]" /></div>
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">›</button>
+          <Button variant="secondary" size="xs" onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="shrink-0 text-base leading-none w-8 !px-0 max-sm:w-10 max-sm:!px-0">›</Button>
         </div>
         <div className="contents max-sm:hidden">{oggiBtn}{vistaCtl}</div>
         <div className="ml-auto sm:hidden">
           <FilterSheet className="max-sm:px-2">
             <div className="flex flex-wrap items-center gap-2">{oggiBtn}{vistaCtl}</div>
-            <button
-              onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
-              disabled={!autoShareStructure}
-              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-line text-sm text-dim hover:bg-wash disabled:opacity-40"
-            ><Icon name="clock" size={16} /> {t("Invio programmato")}</button>
+            <Button variant="secondary" size="sm"
+ onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
+ disabled={!autoShareStructure}
+ 
+ className="flex gap-2"><Icon name="clock" size={16} /> {t("Invio programmato")}</Button>
           </FilterSheet>
         </div>
         <div className="relative flex items-center gap-2 sm:ml-auto max-sm:shrink-0">
           {copied && <span className="text-xs font-medium text-[color:var(--ok)] max-sm:hidden">{t("Copiato ✓")}</span>}
           <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:px-2 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
-          <button
-            onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
-            disabled={!autoShareStructure}
-            aria-label={t("Invio programmato")}
-            title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-sm:hidden"
-          ><Icon name="clock" size={16} /></button>
+          <Button variant="secondary" size="xs"
+ onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
+ disabled={!autoShareStructure}
+ aria-label={t("Invio programmato")}
+ title={autoShareStructure ? t("Invio programmato: scegli orario ed email") : t("Seleziona una singola struttura per configurare l'invio automatico")}
+ 
+ className="disabled:hover:bg-transparent max-sm:hidden w-8 !px-0 max-sm:w-10 max-sm:!px-0"><Icon name="clock" size={16} /></Button>
           <Popover open={planShare} anchorRef={planShareBtnRef} onClose={() => setPlanShare(false)} align="end" width={176} label={t("Condividi")}>
             <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
             <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
@@ -704,7 +704,7 @@ export default function PuliziePage() {
                     <div className="mt-0.5 text-[11px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return fmtDM(d) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">
-                    <button aria-label={t("Riapri")} onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>
+                    <Button variant="secondary" size="sm" aria-label={t("Riapri")} onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center">↺</Button>
                     <button aria-label={t("Elimina dallo storico")} onClick={() => deleteIssue(iss.id)} title={t("Elimina dallo storico")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
                   </div>
                 </div>
@@ -765,13 +765,10 @@ export default function PuliziePage() {
 
       {/* Aggiungi / modifica prodotto */}
       {prodDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
-          <button aria-label="Chiudi" onClick={() => setProdDraft(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-display text-lg font-bold text-txt">{prodDraft.id ? t("Modifica prodotto") : t("Aggiungi prodotto")}</span>
-              <button aria-label="Chiudi" onClick={() => setProdDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setProdDraft(null)} title={prodDraft.id ? t("Modifica prodotto") : t("Aggiungi prodotto")} size="sm" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setProdDraft(null)}>{t("Annulla")}</Button>
+        <Button onClick={saveProd} disabled={!prodDraft.name.trim()}>{prodDraft.id ? t("Salva") : t("Aggiungi")}</Button>
+        </>}>
             <label className="block text-xs font-medium text-dim">{t("Nome prodotto")}
               <input autoFocus value={prodDraft.name} onChange={(e) => setProdDraft({ ...prodDraft, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveProd(); }} placeholder={t("Es. Detergente vetri")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </label>
@@ -791,38 +788,25 @@ export default function PuliziePage() {
             <label className="mt-3 block text-xs font-medium text-dim">{t("Fornitore")} <span className="font-normal text-faint">({t("facoltativo")})</span>
               <input value={prodDraft.supplier} onChange={(e) => setProdDraft({ ...prodDraft, supplier: e.target.value })} placeholder={t("Es. Metro, Amazon, cartoleria…")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </label>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={() => setProdDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveProd} disabled={!prodDraft.name.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{prodDraft.id ? t("Salva") : t("Aggiungi")}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {/* Conferma eliminazione prodotto */}
       {confirmDelProd && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
-          <button aria-label="Chiudi" onClick={() => setConfirmDelProd(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 font-display text-lg font-bold text-txt">{t("Eliminare il prodotto?")}</div>
+        <Modal open onClose={() => setConfirmDelProd(null)} title={t("Eliminare il prodotto?")} size="sm" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" data-autofocus onClick={() => setConfirmDelProd(null)}>{t("Annulla")}</Button>
+        <Button variant="danger" onClick={() => { delProd(confirmDelProd.id); setConfirmDelProd(null); }}>{t("Elimina")}</Button>
+        </>}>
             <p className="text-sm text-dim">{t("Vuoi rimuovere")} <b className="text-txt">{confirmDelProd.name}</b> {t("dalla lista prodotti?")}</p>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={() => setConfirmDelProd(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={() => { delProd(confirmDelProd.id); setConfirmDelProd(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-err hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina")}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {/* Modale: segnala un problema */}
       {issueDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
-          <button aria-label="Chiudi" onClick={() => setIssueDraft(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="font-display text-lg font-bold text-txt">{t("Segnala un problema")}</span>
-              <button aria-label="Chiudi" onClick={() => setIssueDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setIssueDraft(null)} title={t("Segnala un problema")} size="md" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setIssueDraft(null)}>{t("Annulla")}</Button>
+        <Button onClick={saveIssue} disabled={!issueDraft.note.trim()}>{t("Invia segnalazione")}</Button>
+        </>}>
             <div className="mb-3 text-xs text-dim">{issueDraft.unitName} · {issueDraft.structureName} · {fmtShort(issueDraft.date ?? date)}</div>
             <div className="mb-3 grid grid-cols-2 gap-1.5">
               {ISSUE_TYPES.map((it) => (
@@ -838,12 +822,7 @@ export default function PuliziePage() {
               {issueDraft.photo && <img src={issueDraft.photo} alt="" className="h-10 w-10 rounded-md object-cover" />}
             </div>
             {issueSaveErr && <p role="alert" className="mt-2 text-xs font-medium text-[color:var(--err)]">{issueSaveErr}</p>}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={() => setIssueDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveIssue} disabled={!issueDraft.note.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-err hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Invia segnalazione")}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {/* Contenitore fuori schermo (MAI display:none, altrimenti html2canvas non cattura): una

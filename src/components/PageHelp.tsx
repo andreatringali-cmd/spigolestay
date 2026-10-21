@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { Modal, Button } from "@/components/ui";
 
 interface Guide {
   title: string;
@@ -406,18 +407,9 @@ export default function PageHelp() {
   if (!guide) return null;
   return (
     <>
-      <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-sm font-bold max-sm:h-10 max-sm:w-10 text-dim transition hover:bg-wash hover:text-txt">?</button>
+      <Button variant="secondary" size="xs" onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="shrink-0 w-8 !px-0 max-sm:w-10 max-sm:!px-0">?</Button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[8dvh]">
-          <button aria-label="Chiudi" onClick={() => setOpen(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-on-focus">?</span>
-                <h2 className="font-display text-lg font-bold text-txt">Guida · {guide.title}</h2>
-              </div>
-              <button aria-label="Chiudi" onClick={() => setOpen(false)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setOpen(false)} title={<span className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-on-focus" aria-hidden="true">?</span>Guida · {guide.title}</span>} size="md" closeLabel="Chiudi">
             {guide.intro && <p className="mb-4 text-sm text-dim">{guide.intro}</p>}
             <div className="flex flex-col gap-4">
               {guide.sections.map((sec, i) => (
@@ -431,8 +423,7 @@ export default function PageHelp() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
     </>
   );

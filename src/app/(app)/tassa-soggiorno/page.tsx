@@ -258,7 +258,7 @@ export default function TassaSoggiornoPage() {
                     <td className="px-3 py-2 text-right font-mono font-semibold text-txt">{eur(tax)}</td>
                   </tr>
                 ))}
-                {rows.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-faint">{t("Nessun soggiorno nel periodo.")}</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-faint">{t("Nessun soggiorno nel periodo")}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -287,7 +287,7 @@ export default function TassaSoggiornoPage() {
                     <td className="px-3 py-2 text-right font-mono text-dim">{r.presenze}</td>
                   </tr>
                 ))}
-                {istat.length === 0 && <tr><td colSpan={3} className="px-3 py-6 text-center text-sm text-faint">{t("Nessun movimento nel periodo.")}</td></tr>}
+                {istat.length === 0 && <tr><td colSpan={3} className="px-3 py-6 text-center text-sm text-faint">{t("Nessun movimento nel periodo")}</td></tr>}
               </tbody>
               {istat.length > 0 && (
                 <tfoot>

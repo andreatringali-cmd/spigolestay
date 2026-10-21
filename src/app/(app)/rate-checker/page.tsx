@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
@@ -166,12 +166,12 @@ export default function RateCheckerPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:[&>button]:flex-1">
-            <button onClick={() => setShowConfig((v) => !v)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash max-sm:min-h-10">{t("Competitor")}{competitors.length ? ` · ${competitors.length}` : ""}</button>
-            <button onClick={() => void refresh()} disabled={loading} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-60 max-sm:min-h-10">{loading ? t("Aggiorno…") : t("Aggiorna")}</button>
+            <Button variant="secondary" size="xs" onClick={() => setShowConfig((v) => !v)}>{t("Competitor")}{competitors.length ? ` · ${competitors.length}` : ""}</Button>
+            <Button size="xs" onClick={() => void refresh()} disabled={loading}>{loading ? t("Aggiorno…") : t("Aggiorna")}</Button>
           </div>
         </div>
 
-        {err && <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}><span>{err}</span><button onClick={() => void refresh()} disabled={loading} className="rounded-md border border-line bg-surface px-2 py-0.5 font-semibold text-txt hover:bg-wash disabled:opacity-60">{t("Riprova")}</button></div>}
+        {err && <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}><span>{err}</span><Button variant="secondary" size="sm" onClick={() => void refresh()} disabled={loading}>{t("Riprova")}</Button></div>}
         {isConfigured && !err && updatedAt && <div className="mt-2 text-[11px] text-faint">{t("Ultimo aggiornamento")}: {new Date(updatedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</div>}
         {isConfigured && noCoords && (
           <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>
@@ -214,7 +214,7 @@ export default function RateCheckerPage() {
                 {t("ID (opz.)")}
                 <input value={draft.id} onChange={(e) => setDraft((d) => ({ ...d, id: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") addCompetitor(); }} placeholder="prop_123" className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus" />
               </label>
-              <button onClick={addCompetitor} className="rounded-lg bg-focus px-4 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Aggiungi")}</button>
+              <Button size="sm" onClick={addCompetitor}>{t("Aggiungi")}</Button>
             </div>
           </div>
         )}
@@ -232,7 +232,7 @@ export default function RateCheckerPage() {
             </div>
             <p className="text-xs text-faint">{t("Il server invia al provider intervallo date, coordinate della struttura e la lista competitor qui sopra; la risposta viene normalizzata in media/min/max di mercato. Senza queste variabili non mostriamo dati finti.")}</p>
           </div>
-          <button onClick={() => setShowConfig(true)} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash max-sm:min-h-10">{t("Configura i competitor")}</button>
+          <Button variant="secondary" size="xs" onClick={() => setShowConfig(true)} className="mt-3">{t("Configura i competitor")}</Button>
         </Card>
       )}
 

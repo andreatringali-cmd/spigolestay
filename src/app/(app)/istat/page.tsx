@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import Link from "next/link";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Button } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import IstatSettingsModal from "./SettingsModal";
@@ -137,10 +137,10 @@ export default function IstatPage() {
           Invio automatico giornaliero
         </span>
       ) : (
-        <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash" title="Attiva l'invio automatico dalle impostazioni">
+        <Button variant="secondary" size="xs" onClick={() => setSettingsOpen(true)} title="Attiva l'invio automatico dalle impostazioni">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
           Invio automatico spento · attiva
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -185,10 +185,10 @@ export default function IstatPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:p-2">
         <div className="contents max-sm:hidden">{fc}</div>
         <div className="sm:hidden"><FilterSheet count={filterDate !== todayIso ? 1 : 0} onReset={() => setFilterDate(todayIso)}><div className="flex flex-col gap-2 [&>*]:shrink-0">{fc}</div></FilterSheet></div>
-        <button onClick={() => setConfirmClose(true)} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:ml-0 max-sm:h-9 max-sm:py-0 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
-        <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
+        <Button size="sm" onClick={() => setConfirmClose(true)} disabled={!!busy || dayPending === 0} title="Chiudi e invia il movimento del giorno al portale regionale" className="ml-auto max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:ml-0">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</Button>
+        <Button variant="secondary" size="xs" type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="shrink-0 w-8 !px-0 max-sm:w-10 max-sm:!px-0">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-        </button>
+        </Button>
       </div>
       ); })()}
 
@@ -284,7 +284,7 @@ export default function IstatPage() {
               : pending > 0 ? <span className="font-medium text-[color:var(--warn)]">{pending} {pending === 1 ? "movimento" : "movimenti"} da inviare.</span>
               : <span className="text-faint">Movimento in regola.</span>}
           </span>
-          <button onClick={runAuto} disabled={!!busy || autoBusy} className="shrink-0 rounded-lg border border-line px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-dim hover:bg-wash disabled:opacity-50" title="Rigenera il movimento adesso">↻ Aggiorna</button>
+          <Button variant="secondary" size="xs" onClick={runAuto} disabled={!!busy || autoBusy} title="Rigenera il movimento adesso" className="shrink-0">↻ Aggiorna</Button>
         </div>
       </Card>
 

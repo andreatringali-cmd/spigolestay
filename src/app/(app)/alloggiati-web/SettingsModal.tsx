@@ -1,6 +1,7 @@
 "use client";
 
 import DateField from "@/components/DateField";
+import { Modal, Button } from "@/components/ui";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
@@ -65,16 +66,7 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
   const wsExpSoon = s.ws_code_expires_at && new Date(s.ws_code_expires_at) < new Date(Date.now() + 30 * 86400000);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-txt">Impostazioni Alloggiati Web</h2>
-            <p className="text-[11px] text-faint">Credenziali del Portale Alloggiati e opzioni di invio — si impostano una volta.</p>
-          </div>
-          <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
-        </div>
+    <Modal open onClose={onClose} title="Impostazioni Alloggiati Web" description="Credenziali del Portale Alloggiati e opzioni di invio — si impostano una volta." size="md" closeLabel="Chiudi">
         <div className="mt-2 space-y-2">
           <label className="block"><span className={lbl}>Username (es. SR001860)</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
           <label className="block"><span className={lbl}>Password {hasPw && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvata</span>}</span>
@@ -98,16 +90,15 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
           <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: le schedine pronte partono da sole alle 23:00 (entro 24h di legge)." : "Spento: le invii tu con «Invia le pronte»."}</span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
-          <button onClick={() => call("test", "test")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "test" ? "Test…" : "Test connessione"}</button>
-          <button onClick={() => call("tabelle", "tabelle")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica dal portale i codici ufficiali di comuni, stati e documenti">{busy === "tabelle" ? "Aggiorno…" : "Aggiorna tabelle codici"}</button>
+        <Button onClick={save} disabled={!!busy} loading={busy === "save"}>{busy === "save" ? "Salvataggio…" : "Salva"}</Button>
+        <Button variant="secondary" onClick={() => call("test", "test")} disabled={!!busy} loading={busy === "test"}>{busy === "test" ? "Test…" : "Test connessione"}</Button>
+        <Button variant="secondary" onClick={() => call("tabelle", "tabelle")} disabled={!!busy} loading={busy === "tabelle"} title="Scarica dal portale i codici ufficiali di comuni, stati e documenti">{busy === "tabelle" ? "Aggiorno…" : "Aggiorna tabelle codici"}</Button>
         </div>
         {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
         <div className="mt-3 border-t border-line pt-3 text-sm">
           <span className="text-dim">Stato connessione al portale Alloggiati: </span>
           {s.status === "attivata" ? <span className="font-semibold text-[color:var(--ok)]">✔ Attivata</span> : s.status === "errore" ? <span className="font-semibold text-[color:var(--err)]">✕ Errore</span> : <span className="text-faint">non verificata</span>}
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }

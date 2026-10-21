@@ -1,11 +1,12 @@
 "use client";
 
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Button } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { planStructureLimit, planName } from "@/lib/plan";
 import { supabase } from "@/lib/supabase";
@@ -51,7 +52,7 @@ export default function StrutturePage() {
   const shared = isStaff ? [] : others;
   const assigned = isStaff ? others : [];
   const groups = [
-    { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà.") },
+    { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà") },
     { key: "shared", title: t("Condivise con me"), desc: "", list: shared, empty: t("Nessuna struttura condivisa con te da un altro proprietario.") },
     { key: "assigned", title: t("Assegnate a te"), desc: "", list: assigned, empty: "" },
   ].filter((g) => g.list.length > 0 || (g.key === "own" && !isStaff) || (g.key === "shared" && !isStaff));
@@ -66,7 +67,7 @@ export default function StrutturePage() {
       <tr key={s.id} tabIndex={0} onClick={() => router.push(`/strutture/${s.id}`)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); router.push(`/strutture/${s.id}`); } }} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
+            <div className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold ${onSolid(color)}`} style={{ backgroundColor: solidBg(color) }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
             <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div>{s.orgId && orgInfo[s.orgId] && orgInfo[s.orgId].role !== "owner" && orgInfo[s.orgId].ownerEmail && <div className="truncate text-[11px] text-faint">{t("Proprietario")}: {orgInfo[s.orgId].ownerEmail}</div>}</div>
           </div>
         </td>
@@ -86,8 +87,8 @@ export default function StrutturePage() {
         </td>
         <td className="px-3 py-2.5 text-center max-sm:hidden">
           <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button title={t("Sposta su")} aria-label={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10">↑</button>
-            <button title={t("Sposta giù")} aria-label={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10">↓</button>
+            <Button variant="secondary" size="sm" title={t("Sposta su")} aria-label={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center max-sm:w-10">↑</Button>
+            <Button variant="secondary" size="sm" title={t("Sposta giù")} aria-label={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center max-sm:w-10">↓</Button>
           </span>
         </td>
         <td className="px-3 py-2.5 text-right text-faint">›</td>
@@ -101,8 +102,8 @@ export default function StrutturePage() {
         title={t("Strutture")}
         subtitle={t("Anagrafica completa delle tue strutture · le singole camere si gestiscono in “Camere”")}
         actions={overLimit
-          ? <button onClick={() => router.push("/abbonamento")} title={`${t("Il tuo piano")} ${planName()} ${t("include")} ${limit === 1 ? t("1 struttura") : `${limit} ${t("strutture")}`}`} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> {t("Aggiungi struttura (piano superiore)")}</button>
-          : <button onClick={() => router.push("/strutture/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">+ {t("Nuova struttura")}</button>}
+          ? <Button variant="secondary" size="sm" onClick={() => router.push("/abbonamento")} title={`${t("Il tuo piano")} ${planName()} ${t("include")} ${limit === 1 ? t("1 struttura") : `${limit} ${t("strutture")}`}`} className="flex"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> {t("Aggiungi struttura (piano superiore)")}</Button>
+          : <Button size="sm" onClick={() => router.push("/strutture/nuovo")}>+ {t("Nuova struttura")}</Button>}
       />
 
       {/* Unica tabella: i due registri (proprietà / condivise) sono separati da righe-intestazione,
