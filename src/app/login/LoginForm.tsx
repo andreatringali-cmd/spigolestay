@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import LoginWaves from "@/components/LoginWaves";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BrandLockup, Notice, PUB, PASSWORD_MIN, PASSWORD_RULE } from "@/components/PublicUi";
-import PublicTheme from "@/components/PublicTheme";
+import Image from "next/image";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import Turnstile from "@/components/Turnstile";
 
@@ -86,7 +86,7 @@ export default function LoginForm() {
       (async () => {
         await supabase!.auth.getSession();
         if (isRecovery) setRecovery(true);
-        else { try { await supabase!.auth.signOut(); } catch {} setInfo("Email confermata. Ora accedi con la tua email e password."); }
+        else { try { await supabase!.auth.signOut(); } catch {} setInfo("Email confermata ✅ Ora accedi con la tua email e password."); }
         cleanHash();
       })();
       return;
@@ -134,7 +134,7 @@ export default function LoginForm() {
         try { if (remember) localStorage.setItem("xn-remember-email", email.trim()); else localStorage.removeItem("xn-remember-email"); } catch {}
         router.push(afterLoginPath());
       } else {
-        if (pwd.length < PASSWORD_MIN) { setErr(`La password deve avere almeno ${PASSWORD_MIN} caratteri.`); return; }
+        if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
         if (inviteFlow) {
           if (!username.trim() || username.trim().length < 3) { setErr("Scegli un nome utente di almeno 3 caratteri."); return; }
           if (pwd !== pwd2) { setErr("Le due password non coincidono."); return; }
@@ -159,13 +159,13 @@ export default function LoginForm() {
     if (!supabaseEnabled || !supabase) { router.push("/"); return; }
     try {
       const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}${afterLoginPath()}` : undefined } });
-      if (error) { void provider; setErr("Accesso con Google non disponibile al momento. Usa email e password."); }
+      if (error) { void provider; setErr("Accesso con Google non ancora attivo. Va abilitato nelle impostazioni."); }
     } catch { setErr("Accesso social non disponibile al momento."); }
   };
 
   const resetPwd = async () => {
     setErr(null); setInfo(null);
-    if (!supabaseEnabled || !supabase) { setInfo("Accesso libero in questo ambiente: premi Accedi."); return; }
+    if (!supabaseEnabled || !supabase) { setInfo("Nella versione dimostrativa l'accesso è libero: premi Accedi."); return; }
     if (!email.trim()) { setErr("Scrivi prima la tua email qui sopra, poi premi «Password dimenticata»."); return; }
     if (TURNSTILE_SITE_KEY && !captchaToken) { setErr("Completa la verifica di sicurezza qui sotto."); return; }
     setBusy(true);
@@ -180,162 +180,198 @@ export default function LoginForm() {
     e.preventDefault();
     setErr(null); setInfo(null);
     if (!supabase) return;
-    if (pwd.length < PASSWORD_MIN) { setErr(`La password deve avere almeno ${PASSWORD_MIN} caratteri.`); return; }
+    if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
     setBusy(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: pwd });
       if (error) { setErr(traduci(error.message)); return; }
       try { await supabase.auth.signOut(); } catch {}
       setRecovery(false); setPwd("");
-      setInfo("Password aggiornata. Ora accedi con la nuova password.");
+      setInfo("Password aggiornata ✅ Ora accedi con la nuova password.");
     } finally { setBusy(false); }
   };
 
-  const linkCls = PUB.link;
-  const pwdProps = { show, onToggle: () => setShow((s) => !s), disabled: busy };
+  const fld = "w-full rounded-lg border border-[#d9d5cf] bg-white px-3.5 py-2.5 text-sm text-[#1f1b16] outline-none transition focus:border-[#2f6bb0] focus:ring-2 focus:ring-[#2f6bb0]/20 disabled:opacity-60";
+  const primaryBtn = "block w-full rounded-lg bg-[#2f6bb0] py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-[#285d99] disabled:opacity-60";
+  const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className={`${PUB.page} flex flex-col px-4 py-6 sm:px-6`}>
-      <PublicTheme />
-      <main className="flex w-full flex-1 items-center justify-center py-4">
-        <div className={`${PUB.card} max-w-md`}>
-          <div className="mb-6"><BrandLockup /></div>
+    <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
+      <LoginWaves />
+      <main className="relative flex w-full min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto">
+        <div className="my-auto w-full max-w-md rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
+          {/* Logo dentro il box, centrato */}
+          <div className="mb-4 flex flex-col items-center">
+            <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
+            <h1 className="sr-only">Accedi a Xenora</h1>{/* titolo per i lettori di schermo: non si vede */}
+          </div>
 
           {inviteFlow ? (
             <>
-              <h1 className={PUB.h1}>Crea le tue credenziali</h1>
-              <p className={PUB.lead}>Scegli un nome utente e una password: ci vuole un minuto, poi si parte con la configurazione della tua struttura.</p>
-              <form onSubmit={submit} className="mt-6 space-y-4">
-                <Field label="Nome utente" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="es. mario.rossi" disabled={busy} autoFocus required minLength={3} autoCapitalize="none" autoComplete="username" />
-                <Field label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy} autoComplete="email" />
-                <PasswordField label="Password" value={pwd} onChange={setPwd} hint={`Almeno ${PASSWORD_MIN} caratteri.`} minLength={PASSWORD_MIN} autoComplete="new-password" {...pwdProps} />
-                <PasswordField label="Ripeti password" value={pwd2} onChange={setPwd2} minLength={PASSWORD_MIN} autoComplete="new-password" {...pwdProps} />
+              <div className="mb-4 flex items-center justify-between text-[11px] font-medium text-[#9a9186]">
+                <span>Passo 1 di 7</span><span>Il tuo accesso</span>
+              </div>
+              <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-[#f0eee9]"><div className="h-full rounded-full bg-[#2f6bb0]" style={{ width: "14%" }} /></div>
+              <h1 className="text-2xl font-bold tracking-tight">Crea le tue credenziali</h1>
+              <p className="mt-1 text-sm text-[#6b6459]">Scegli un nome utente e una password: ci vuole un minuto, poi si parte con la configurazione della tua struttura.</p>
+              <form onSubmit={submit} className="mt-6">
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nome utente</span>
+                  <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="es. mario.rossi" className={fld} disabled={busy} autoFocus required minLength={3} />
+                </label>
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Email</span>
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={fld} disabled={busy} />
+                </label>
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
+                  <div className="relative">
+                    <input type={show ? "text" : "password"} required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-3 py-2 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16] sm:right-2 sm:px-2 sm:py-1">{show ? "Nascondi" : "Mostra"}</button>
+                  </div>
+                  <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri.</span>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Ripeti password</span>
+                  <input type={show ? "text" : "password"} required minLength={8} value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="••••••••" className={fld} disabled={busy} />
+                </label>
 
                 {TURNSTILE_SITE_KEY && <Turnstile key={captchaKey} siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />}
-                {err && <Notice kind="err">{err}</Notice>}
-                {info && <Notice kind="info">{info}</Notice>}
+                {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
+                {info && <div className="mt-4 rounded-lg border border-[#e2ded7] bg-[#f6f4f1] px-3 py-2.5 text-[13px] text-[#4a453d]">{info}</div>}
 
-                <button type="submit" disabled={busy} className={`${PUB.btnPrimary} w-full`}>{busy ? "Attendi…" : "Continua"}</button>
+                <button type="submit" disabled={busy} className={`mt-5 ${primaryBtn}`}>{busy ? "Attendi…" : "Continua →"}</button>
               </form>
             </>
           ) : recovery ? (
             <>
-              <h1 className={PUB.h1}>Imposta una nuova password</h1>
-              <p className={PUB.lead}>Scegli la nuova password per il tuo account.</p>
-              <form onSubmit={updatePwd} className="mt-6 space-y-4">
-                <PasswordField label="Nuova password" value={pwd} onChange={setPwd} hint={PASSWORD_RULE} minLength={PASSWORD_MIN} autoComplete="new-password" autoFocus {...pwdProps} />
-                {err && <Notice kind="err">{err}</Notice>}
-                <button type="submit" disabled={busy} className={`${PUB.btnPrimary} w-full`}>{busy ? "Attendi…" : "Salva password"}</button>
+              <h1 className="text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
+              <p className="mt-1 text-sm text-[#6b6459]">Scegli la nuova password per il tuo account.</p>
+              <form onSubmit={updatePwd} className="mt-6">
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nuova password</span>
+                  <div className="relative">
+                    <input type={show ? "text" : "password"} required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} autoFocus />
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-3 py-2 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16] sm:right-2 sm:px-2 sm:py-1">{show ? "Nascondi" : "Mostra"}</button>
+                  </div>
+                  <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri, meglio con lettere e numeri.</span>
+                </label>
+                {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
+                <button type="submit" disabled={busy} className={`mt-5 ${primaryBtn}`}>{busy ? "Attendi…" : "Salva password"}</button>
               </form>
             </>
           ) : (
             <>
-              <h1 className={PUB.h1}>{mode === "login" ? "Accedi a Xenora" : "Crea il tuo account"}</h1>
-              <p className={PUB.lead}>{mode === "login" ? "Entra nel tuo gestionale." : "Inserisci i tuoi dati per iniziare."}</p>
-              <form onSubmit={submit} className="mt-6 space-y-4">
+              <form onSubmit={submit} className="mt-2">
                 {mode === "signup" && (
-                  <Field label="Nome e cognome" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mario Rossi" disabled={busy} required autoComplete="name" />
+                  <label className="mb-3 block">
+                    <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nome e cognome</span>
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mario Rossi" className={fld} disabled={busy} required />
+                  </label>
                 )}
                 {mode === "signup" && (
-                  <Field label="Telefono" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+39 333 1234567" disabled={busy} required autoComplete="tel" />
+                  <label className="mb-3 block">
+                    <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Telefono</span>
+                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+39 333 1234567" className={fld} disabled={busy} required />
+                  </label>
                 )}
 
-                <Field label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete={mode === "signup" ? "off" : "email"} placeholder="tu@esempio.com" disabled={busy} />
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Email</span>
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete={mode === "signup" ? "off" : "email"} placeholder="tu@esempio.com" className={fld} disabled={busy} />
+                </label>
 
-                {/* In accesso nessun minimo lato browser: lo verifica il server (gli account esistenti restano utilizzabili). La regola dei ${PASSWORD_MIN} caratteri vale in registrazione e nel cambio password. */}
-                <PasswordField label="Password" value={pwd} onChange={setPwd} hint={mode === "signup" ? PASSWORD_RULE : undefined} minLength={mode === "signup" ? PASSWORD_MIN : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} {...pwdProps} />
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
+                  <div className="relative">
+                    <input type={show ? "text" : "password"} required minLength={mode === "signup" ? 8 : undefined} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-3 py-2 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16] sm:right-2 sm:px-2 sm:py-1">{show ? "Nascondi" : "Mostra"}</button>
+                  </div>
+                  {mode === "signup" && <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri, meglio con lettere e numeri.</span>}
+                </label>
 
-                <div className="flex items-center justify-between gap-2">
-                  <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm text-txt">
-                    <input type="checkbox" checked={remember} onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) { try { localStorage.removeItem("xn-remember-email"); } catch {} } }} className="h-4 w-4 rounded accent-focus" />
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#4a453d]">
+                    <input type="checkbox" checked={remember} onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) { try { localStorage.removeItem("xn-remember-email"); } catch {} } }} className="h-4 w-4 rounded accent-[#2f6bb0]" />
                     Ricordami
                   </label>
-                  {mode === "login" && <button type="button" onClick={resetPwd} className={`${PUB.link} min-h-9 text-sm`} disabled={busy}>Password dimenticata?</button>}
+                  {mode === "login" && <button type="button" onClick={resetPwd} className="text-[13px] font-medium text-[#2f6bb0] hover:underline" disabled={busy}>Password dimenticata?</button>}
                 </div>
 
                 {TURNSTILE_SITE_KEY && <Turnstile key={captchaKey} siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />}
 
                 {denied && (
-                  <Notice kind="warn">
-                    Il tuo account non è ancora abilitato. Xenora è ad <strong>accesso su invito</strong>:{" "}
+                  <div className="mt-4 rounded-lg border border-[#e6cfa2] bg-[#fbf3e2] px-3 py-2.5 text-[13px] text-[#8a6d1f]">
+                    Il tuo account non è ancora abilitato. Xenora è ad <strong>accesso su invito</strong>: {" "}
                     <a href="https://www.xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>richiedi una demo</a> per ottenere l&apos;accesso.
-                  </Notice>
+                  </div>
                 )}
-                {err && <Notice kind="err">{err}</Notice>}
-                {info && <Notice kind="info">{info}</Notice>}
+                {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
+                {info && <div className="mt-4 rounded-lg border border-[#e2ded7] bg-[#f6f4f1] px-3 py-2.5 text-[13px] text-[#4a453d]">{info}</div>}
 
-                <button type="submit" disabled={busy} className={`${PUB.btnPrimary} w-full`}>{busy ? "Attendi…" : mode === "login" ? "Accedi" : "Crea account"}</button>
+                <button type="submit" disabled={busy} className={`mt-5 ${primaryBtn}`}>{busy ? "Attendi…" : mode === "login" ? "Accedi" : "Crea account"}</button>
               </form>
 
-              <div className="my-5 flex items-center gap-3 text-xs font-medium text-dim" role="separator">
-                <span className="h-px flex-1 bg-line" />
+              <div className="my-5 flex items-center gap-3 text-[12px] font-medium text-[#9a9186]">
+                <span className="h-px flex-1 bg-[#e2ded7]" />
                 {mode === "login" ? "Oppure accedi con" : "Oppure registrati con"}
-                <span className="h-px flex-1 bg-line" />
+                <span className="h-px flex-1 bg-[#e2ded7]" />
               </div>
 
-              <button type="button" onClick={() => oauth("google")} className={`${PUB.btnSecondary} w-full`}>
-                <GoogleIcon /> Continua con Google
+              <button type="button" onClick={() => oauth("google")} className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#d9d5cf] bg-white py-2.5 text-sm font-semibold text-[#1f1b16] transition hover:bg-[#f6f4f1]">
+                <GoogleIcon /> Google
               </button>
 
               {mode === "login" ? (
-                <p className="mt-6 text-center text-sm text-dim">
-                  Non hai un account? <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className={linkCls}>Richiedi la demo</a>
-                </p>
+                <div className="mt-6 text-center">
+                  <div className="text-[13px] text-[#4a453d] sm:whitespace-nowrap sm:text-sm">
+                    Non hai un account? <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">Richiedi la demo</a>.
+                  </div>
+                  <div className="mt-2 text-[11px] text-[#9a9186]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
+                </div>
               ) : (
-                <p className="mt-6 text-center text-sm text-dim">
-                  Hai già un account? <button type="button" onClick={() => { setMode("login"); setErr(null); setInfo(null); }} className={linkCls}>Accedi</button>
-                </p>
+                <div className="mt-6 text-center text-sm text-[#4a453d]">
+                  Hai già un account? <button onClick={() => { setMode("login"); setErr(null); setInfo(null); }} className={linkCls}>Accedi</button>
+                </div>
               )}
 
-              {!supabaseEnabled && <p className="mt-3 text-center text-xs text-dim">Servizio di accesso non configurato in questo ambiente.</p>}
+              {!supabaseEnabled && <div className="mt-3 text-center text-xs text-[#9a9186]">Accesso non disponibile: servizio non configurato</div>}
             </>
           )}
         </div>
-      </main>
 
-      <footer className="mx-auto mt-4 flex w-full max-w-3xl flex-col gap-3 border-t border-line pt-3 text-xs text-dim sm:flex-row sm:items-center sm:justify-between">
-        <nav aria-label="Informazioni legali" className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
-          <a href="/termini" className={`${PUB.linkSubtle} py-2`}>Termini di servizio</a>
-          <a href="/privacy" className={`${PUB.linkSubtle} py-2`}>Informativa privacy</a>
-          <a href="/cookie" className={`${PUB.linkSubtle} py-2`}>Cookie</a>
-          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className={`${PUB.linkSubtle} py-2`}>xenoradigitalsolutions.com</a>
-        </nav>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:justify-end">
-          <span>© {new Date().getFullYear()} Xenora Digital Solutions</span>
+      </main>
+      <footer className="relative mt-3 border-t border-[#eceae4] px-2 pt-2 text-[11px] text-[#9a9186]">
+        {/* Mobile: sito + social sulla stessa riga */}
+        <div className="mb-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 sm:hidden">
+          <a href="/termini" className="py-1.5 hover:text-[#4a453d] hover:underline">Termini</a>
+          <a href="/privacy" className="py-1.5 hover:text-[#4a453d] hover:underline">Privacy</a>
+          <a href="/cookie" className="py-1.5 hover:text-[#4a453d] hover:underline">Cookie</a>
+        </div>
+        <div className="flex items-center justify-between gap-2 sm:hidden">
+          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="py-2 hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+          <SocialIcons />
+        </div>
+
+        {/* Desktop: tutto su una riga */}
+        <div className="hidden sm:flex sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="/privacy" className="hover:text-[#4a453d] hover:underline">Informativa privacy</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+          </div>
           <SocialIcons />
         </div>
       </footer>
-    </div>
-  );
-}
 
-// Campo di testo con etichetta associata (htmlFor/id) e suggerimento collegato con aria-describedby.
-function Field({ label, hint, ...props }: { label: string; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
-  const id = useId();
-  return (
-    <div>
-      <label htmlFor={id} className={PUB.label}>{label}</label>
-      <input id={id} aria-describedby={hint ? `${id}-hint` : undefined} {...props} className={PUB.field} />
-      {hint && <span id={`${id}-hint`} className={PUB.hint}>{hint}</span>}
-    </div>
-  );
-}
-
-// Password con interruttore mostra/nascondi (fuori dall'etichetta, con nome accessibile e stato).
-function PasswordField({ label, value, onChange, show, onToggle, disabled, hint, ...props }: {
-  label: string; value: string; onChange: (v: string) => void; show: boolean; onToggle: () => void; disabled?: boolean; hint?: string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
-  const id = useId();
-  return (
-    <div>
-      <label htmlFor={id} className={PUB.label}>{label}</label>
-      <div className="relative">
-        <input id={id} type={show ? "text" : "password"} required value={value} onChange={(e) => onChange(e.target.value)} placeholder="••••••••" disabled={disabled} aria-describedby={hint ? `${id}-hint` : undefined} {...props} className={`${PUB.field} pr-24`} />
-        <button type="button" onClick={onToggle} aria-pressed={show} aria-label={show ? "Nascondi password" : "Mostra password"} className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md px-3 py-2 text-xs font-semibold text-dim transition hover:text-txt focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
-          {show ? "Nascondi" : "Mostra"}
-        </button>
-      </div>
-      {hint && <span id={`${id}-hint`} className={PUB.hint}>{hint}</span>}
+      <style>{`
+        html,body{overscroll-behavior-y:none}
+        .login-bg{height:100vh;height:100dvh;background-color:#FCFDFF}
+      `}</style>
     </div>
   );
 }
@@ -344,13 +380,13 @@ function SocialIcons() {
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       {[
-        { k: "facebook", n: "Facebook", u: "https://www.facebook.com" },
-        { k: "linkedin", n: "LinkedIn", u: "https://www.linkedin.com" },
-        { k: "instagram", n: "Instagram", u: "https://www.instagram.com" },
-        { k: "tiktok", n: "TikTok", u: "https://www.tiktok.com" },
+        { k: "facebook", u: "https://www.facebook.com", c: "#1877F2" },
+        { k: "linkedin", u: "https://www.linkedin.com", c: "#0A66C2" },
+        { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
+        { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
       ].map((s) => (
-        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.n} className="grid h-9 w-9 place-items-center rounded-md border border-line text-dim transition hover:bg-wash hover:text-txt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d={SOCIAL_PATHS[s.k]} /></svg>
+        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-6 w-6 place-items-center rounded-md border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90 max-sm:h-9 max-sm:w-9">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
         </a>
       ))}
     </div>
@@ -373,7 +409,7 @@ function traduci(msg: string): string {
   if (m.includes("invalid login")) return "Email o password non corretti.";
   if (m.includes("email not confirmed")) return "Devi prima confermare l'email: apri il link che ti abbiamo inviato.";
   if (m.includes("already registered") || m.includes("already exists")) return "Esiste già un account con questa email. Prova ad accedere.";
-  if (m.includes("password should be at least")) return `La password è troppo corta (minimo ${PASSWORD_MIN} caratteri).`;
+  if (m.includes("password should be at least")) return "La password è troppo corta (minimo 8 caratteri).";
   if (m.includes("unable to validate email") || m.includes("invalid email")) return "L'indirizzo email non è valido.";
   if (m.includes("rate limit") || m.includes("too many")) return "Troppi tentativi. Attendi qualche minuto e riprova.";
   if (m.includes("captcha")) return "Verifica di sicurezza non riuscita. Riprova.";
