@@ -107,7 +107,7 @@ export async function recordCheckinPayment(admin: SupabaseClient, store: Booking
       data.bookings = bookings;
       out = { wrote: true, excessCents: excess, amountAppliedCents: applied, done: true };
       return true;
-    });
+    }, { tables: "scope" }); // Fase 3, passo 3a: la funzione usa solo bookings e structures di data (scrittura su public.entities solo se l'autorita' e' 'table')
     if (!out.done) return { ok: false, status: 404, error: "not_found" };
     if (out.wrote && !wrote) return { ok: false, status: 409, error: "write_conflict" };
   }
