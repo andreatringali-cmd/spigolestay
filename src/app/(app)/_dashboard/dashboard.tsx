@@ -254,7 +254,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-[1440px]">
+    <div className="w-full">
       <PageHeader
         title="Dashboard" subtitle={subtitle}
         actions={
@@ -274,7 +274,7 @@ export default function Dashboard() {
       <div className="flex flex-col gap-3">
         {showSetup && <Avvio state={setup} onHide={() => setSetupHidden(true)} />}
         <Kpis items={kpis} />
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] xl:items-start">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] xl:items-start">
           <div className="flex min-w-0 flex-col gap-3">
             <DaFare rows={todo} loading={loadingAdem} health={health} setupPending={!setup.complete} />
             <Oggi rows={day.rows} onOpen={openBooking} onNew={() => openNewBooking()} noBookings={live.length === 0} noStructures={structures.length === 0} />
