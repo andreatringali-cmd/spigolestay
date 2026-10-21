@@ -12,6 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${ORIGIN}/prezzi`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     { url: `${ORIGIN}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
     { url: `${ORIGIN}/termini`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${ORIGIN}/cookie`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
   ];
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

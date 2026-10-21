@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import Turnstile from "@/components/Turnstile";
+import { copyrightRiga } from "@/lib/azienda";
 
 // Site key pubblica di Cloudflare Turnstile: se presente, mostra il captcha e invia il token a Supabase.
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
@@ -325,7 +326,7 @@ export default function LoginForm() {
                   <div className="text-[13px] text-[#4a453d] sm:whitespace-nowrap sm:text-sm">
                     Non hai un account? <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">Richiedi la demo</a>.
                   </div>
-                  <div className="mt-2 text-[11px] text-[#6b6458]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
+                  <div className="mt-2 text-[11px] text-[#6b6458]">{copyrightRiga(new Date().getFullYear())} · Tutti i diritti riservati</div>
                 </div>
               ) : (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">

@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import LegalShell from "@/components/LegalShell";
+import { AZIENDA } from "@/lib/azienda";
 
-export const metadata: Metadata = { title: "Informativa sulla privacy · Xenora" };
+export const metadata: Metadata = { title: "Informativa sulla privacy · Xenora", description: "Come Xenora tratta i dati personali di utenti e ospiti: titolare, finalità, conservazione, fornitori e diritti dell'interessato.", alternates: { canonical: "/privacy" } };
 
 export default function PrivacyPage() {
   return (
     <LegalShell title="Informativa sulla privacy" updated="Settembre 2026">
-      <p>La presente informativa descrive come <strong>Xenora Digital Solutions</strong> (di seguito &quot;Xenora&quot;, &quot;noi&quot;) tratta i dati personali degli utenti del gestionale Xenora e del sito, ai sensi del Regolamento (UE) 2016/679 (GDPR).</p>
+      <p>La presente informativa descrive come <strong>{AZIENDA.denominazione}</strong> (di seguito &quot;Xenora&quot;, &quot;noi&quot;) tratta i dati personali degli utenti del gestionale Xenora e del sito, ai sensi del Regolamento (UE) 2016/679 (GDPR).</p>
 
       <h2>1. Titolare del trattamento</h2>
-      <p>Titolare del trattamento è Xenora Digital Solutions — [ragione sociale], [indirizzo sede], P.IVA [__]. Contatto: <a href="mailto:info@xenora.it">info@xenora.it</a>.</p>
+      <p>Titolare del trattamento è {AZIENDA.denominazione} — sede legale: {AZIENDA.sede} — P.IVA {AZIENDA.partitaIva} — C.F. {AZIENDA.codiceFiscale} — PEC: {AZIENDA.pec}. Contatto per la privacy: <a href={`mailto:${AZIENDA.emailPrivacy}`}>{AZIENDA.emailPrivacy}</a>.</p>
 
       <h2>2. Dati trattati</h2>
       <ul>
@@ -26,16 +27,16 @@ export default function PrivacyPage() {
       </ul>
 
       <h2>4. Dati degli ospiti</h2>
-      <p>L'utente (struttura ricettiva) è <strong>titolare autonomo</strong> del trattamento dei dati dei propri ospiti; Xenora agisce come <strong>responsabile del trattamento</strong> per suo conto, secondo un accordo (DPA) dedicato. I dati sono isolati per account e protetti da controlli di accesso.</p>
+      <p>L'utente (struttura ricettiva) è <strong>titolare autonomo</strong> del trattamento dei dati dei propri ospiti; Xenora agisce come <strong>responsabile del trattamento</strong> per suo conto (art. 28 GDPR). Accordo sul trattamento dei dati (DPA): {"[DA COMPLETARE: da predisporre prima di dichiararlo disponibile]"}. I dati sono isolati per account e protetti da controlli di accesso.</p>
 
       <h2>5. Conservazione</h2>
       <p>I dati sono conservati per il tempo necessario alle finalità indicate e agli obblighi di legge. Le immagini dei documenti d'identità vengono rimosse dopo l'invio della schedina alla Questura.</p>
 
       <h2>6. Fornitori</h2>
-      <p>Ci avvaliamo di fornitori che trattano dati per nostro conto (es. hosting e database, invio email, pagamenti, distribuzione sui canali), tutti vincolati contrattualmente e conformi al GDPR.</p>
+      <p>Ci avvaliamo di fornitori che trattano dati per nostro conto (es. hosting e database, invio email, pagamenti, distribuzione sui canali), scelti tra operatori che offrono garanzie adeguate e regolati dai rispettivi accordi sul trattamento dei dati.</p>
 
       <h2>7. Diritti dell'interessato</h2>
-      <p>Puoi esercitare i diritti di accesso, rettifica, cancellazione, limitazione, portabilità e opposizione scrivendo a <a href="mailto:info@xenora.it">info@xenora.it</a>. Hai inoltre diritto di reclamo al Garante per la protezione dei dati personali.</p>
+      <p>Puoi esercitare i diritti di accesso, rettifica, cancellazione, limitazione, portabilità e opposizione scrivendo a <a href={`mailto:${AZIENDA.emailPrivacy}`}>{AZIENDA.emailPrivacy}</a>. Hai inoltre diritto di reclamo al Garante per la protezione dei dati personali.</p>
     </LegalShell>
   );
 }

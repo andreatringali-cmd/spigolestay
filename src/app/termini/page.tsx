@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import LegalShell from "@/components/LegalShell";
+import { AZIENDA } from "@/lib/azienda";
 
-export const metadata: Metadata = { title: "Termini di servizio · Xenora" };
+export const metadata: Metadata = { title: "Termini di servizio · Xenora", description: "Condizioni di utilizzo del gestionale Xenora: servizio, account, abbonamento, dati, recesso e legge applicabile.", alternates: { canonical: "/termini" } };
 
 export default function TerminiPage() {
   return (
     <LegalShell title="Termini di servizio" updated="Settembre 2026">
-      <p>I presenti Termini regolano l&apos;utilizzo del gestionale Xenora, fornito da <strong>Xenora Digital Solutions</strong>. Utilizzando il servizio accetti questi Termini.</p>
+      <p>I presenti Termini regolano l&apos;utilizzo del gestionale Xenora, fornito da <strong>{AZIENDA.denominazione}</strong> (di seguito &quot;Xenora&quot;). Utilizzando il servizio accetti questi Termini.</p>
 
       <h2>1. Oggetto del servizio</h2>
       <p>Xenora è un software gestionale (PMS + Channel Manager) per strutture ricettive: gestione di prenotazioni, canali, check-in, adempimenti verso la PA, incassi e comunicazioni.</p>
@@ -30,10 +31,11 @@ export default function TerminiPage() {
       <p>L&apos;utente può cessare l&apos;utilizzo in qualsiasi momento; i dati possono essere esportati prima della chiusura dell&apos;account.</p>
 
       <h2>8. Legge applicabile</h2>
-      <p>I presenti Termini sono regolati dalla legge italiana. Per ogni controversia è competente il foro del luogo in cui ha sede il Titolare, salvo norme inderogabili a tutela del consumatore.</p>
+      <p>I presenti Termini sono regolati dalla legge italiana. Per ogni controversia è competente il foro del luogo in cui ha sede il fornitore del servizio, salvo norme inderogabili a tutela del consumatore.</p>
 
-      <h2>9. Contatti</h2>
-      <p><a href="mailto:info@xenora.it">info@xenora.it</a></p>
+      <h2>9. Chi siamo e contatti</h2>
+      <p>Fornitore del servizio: {AZIENDA.denominazione} — sede legale: {AZIENDA.sede} — P.IVA {AZIENDA.partitaIva} — C.F. {AZIENDA.codiceFiscale} — PEC: {AZIENDA.pec}.</p>
+      <p>Email: <a href={`mailto:${AZIENDA.emailContatti}`}>{AZIENDA.emailContatti}</a></p>
     </LegalShell>
   );
 }
