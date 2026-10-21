@@ -8,7 +8,7 @@ import { CHANNELS, type Channel, type Booking } from "@/lib/types";
 import { toISO, parseISO, addDays, nights, fmtDM } from "@/lib/dates";
 import { playSound } from "@/lib/sound";
 import { eur } from "@/lib/format";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Modal, Button } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
 import FilterSheet from "@/components/FilterSheet";
@@ -765,13 +765,10 @@ export default function PuliziePage() {
 
       {/* Aggiungi / modifica prodotto */}
       {prodDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
-          <button aria-label="Chiudi" onClick={() => setProdDraft(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-display text-lg font-bold text-txt">{prodDraft.id ? t("Modifica prodotto") : t("Aggiungi prodotto")}</span>
-              <button aria-label="Chiudi" onClick={() => setProdDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setProdDraft(null)} title={prodDraft.id ? t("Modifica prodotto") : t("Aggiungi prodotto")} size="sm" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setProdDraft(null)}>{t("Annulla")}</Button>
+        <Button onClick={saveProd} disabled={!prodDraft.name.trim()}>{prodDraft.id ? t("Salva") : t("Aggiungi")}</Button>
+        </>}>
             <label className="block text-xs font-medium text-dim">{t("Nome prodotto")}
               <input autoFocus value={prodDraft.name} onChange={(e) => setProdDraft({ ...prodDraft, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveProd(); }} placeholder={t("Es. Detergente vetri")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </label>
@@ -791,38 +788,25 @@ export default function PuliziePage() {
             <label className="mt-3 block text-xs font-medium text-dim">{t("Fornitore")} <span className="font-normal text-faint">({t("facoltativo")})</span>
               <input value={prodDraft.supplier} onChange={(e) => setProdDraft({ ...prodDraft, supplier: e.target.value })} placeholder={t("Es. Metro, Amazon, cartoleria…")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </label>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={() => setProdDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveProd} disabled={!prodDraft.name.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{prodDraft.id ? t("Salva") : t("Aggiungi")}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {/* Conferma eliminazione prodotto */}
       {confirmDelProd && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
-          <button aria-label="Chiudi" onClick={() => setConfirmDelProd(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 font-display text-lg font-bold text-txt">{t("Eliminare il prodotto?")}</div>
+        <Modal open onClose={() => setConfirmDelProd(null)} title={t("Eliminare il prodotto?")} size="sm" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" data-autofocus onClick={() => setConfirmDelProd(null)}>{t("Annulla")}</Button>
+        <Button variant="danger" onClick={() => { delProd(confirmDelProd.id); setConfirmDelProd(null); }}>{t("Elimina")}</Button>
+        </>}>
             <p className="text-sm text-dim">{t("Vuoi rimuovere")} <b className="text-txt">{confirmDelProd.name}</b> {t("dalla lista prodotti?")}</p>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={() => setConfirmDelProd(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={() => { delProd(confirmDelProd.id); setConfirmDelProd(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-err hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina")}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {/* Modale: segnala un problema */}
       {issueDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
-          <button aria-label="Chiudi" onClick={() => setIssueDraft(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="font-display text-lg font-bold text-txt">{t("Segnala un problema")}</span>
-              <button aria-label="Chiudi" onClick={() => setIssueDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-            </div>
+        <Modal open onClose={() => setIssueDraft(null)} title={t("Segnala un problema")} size="md" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setIssueDraft(null)}>{t("Annulla")}</Button>
+        <Button onClick={saveIssue} disabled={!issueDraft.note.trim()}>{t("Invia segnalazione")}</Button>
+        </>}>
             <div className="mb-3 text-xs text-dim">{issueDraft.unitName} · {issueDraft.structureName} · {fmtShort(issueDraft.date ?? date)}</div>
             <div className="mb-3 grid grid-cols-2 gap-1.5">
               {ISSUE_TYPES.map((it) => (
@@ -838,12 +822,7 @@ export default function PuliziePage() {
               {issueDraft.photo && <img src={issueDraft.photo} alt="" className="h-10 w-10 rounded-md object-cover" />}
             </div>
             {issueSaveErr && <p role="alert" className="mt-2 text-xs font-medium text-[color:var(--err)]">{issueSaveErr}</p>}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={() => setIssueDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveIssue} disabled={!issueDraft.note.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-err hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Invia segnalazione")}</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {/* Contenitore fuori schermo (MAI display:none, altrimenti html2canvas non cattura): una

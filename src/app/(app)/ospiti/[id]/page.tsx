@@ -13,7 +13,7 @@ import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { contactReportCached } from "@/lib/contacts-check";
 import { guestLangOf } from "@/lib/guest-lang";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promosForStructure, promoMailto, promoRecipientEmail } from "@/lib/promos";
 import { useEffect } from "react";
@@ -290,10 +290,7 @@ export default function OspiteSchedaPage() {
       </div>
 
       {pickPromo && (
-        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
-          <button aria-label={t("Chiudi")} onClick={() => setPickPromo(false)} className="fixed inset-0 bg-black/40" />
-          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Invia promo a")} {fullName}</span><button onClick={() => setPickPromo(false)} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
+        <Modal open onClose={() => setPickPromo(false)} title={<>{t("Invia promo a")} {fullName}</>} size="sm" closeLabel={t("Chiudi")}>
             <div className="mb-3 text-xs text-dim">{g.email}</div>
             {promos.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
@@ -307,8 +304,7 @@ export default function OspiteSchedaPage() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );

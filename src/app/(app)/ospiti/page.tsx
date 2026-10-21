@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
-import { PageHeader, StatCard } from "@/components/ui";
+import { PageHeader, StatCard, Modal, Button } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import FilterSheet from "@/components/FilterSheet";
 import EmptyState from "@/components/EmptyState";
@@ -422,10 +422,10 @@ export default function OspitiPage() {
       <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
 
       {mergeOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
-          <button aria-label="Chiudi" onClick={() => setMergeOpen(false)} className="fixed inset-0 bg-black/40" />
-          <div className="relative w-full max-w-2xl rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Unisci i doppioni")}</span><button onClick={() => setMergeOpen(false)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
+        <Modal open onClose={() => setMergeOpen(false)} title={t("Unisci i doppioni")} size="lg" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setMergeOpen(false)}>{t("Annulla")}</Button>
+        <Button onClick={doMerge} disabled={mergePlans.every((p) => mergeSkip.has(p.keepId))}>{t("Unisci")} ({mergePlans.filter((p) => !mergeSkip.has(p.keepId)).length})</Button>
+        </>}>
             <div className="mb-3 text-xs text-dim">{t("Per ogni gruppo resta la scheda con più prenotazioni: le prenotazioni delle altre le passano e i campi mancanti vengono completati (tag in unione, VIP e consenso marketing se presenti in una delle schede, note accodate). L'unione non si può annullare: togli la spunta ai gruppi che non sono la stessa persona.")}</div>
             <div className="flex flex-col gap-3">
               {mergePlans.map((p) => {
@@ -453,19 +453,11 @@ export default function OspitiPage() {
                 );
               })}
             </div>
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
-              <button onClick={() => setMergeOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={doMerge} disabled={mergePlans.every((p) => mergeSkip.has(p.keepId))} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Unisci")} ({mergePlans.filter((p) => !mergeSkip.has(p.keepId)).length})</button>
-            </div>
-          </div>
-        </div>
+            </Modal>
       )}
 
       {exportPick && (
-        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
-          <button aria-label="Chiudi" onClick={() => setExportPick(false)} className="fixed inset-0 bg-black/40" />
-          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Esporta ospiti in Excel")}</span><button onClick={() => setExportPick(false)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
+        <Modal open onClose={() => setExportPick(false)} title={t("Esporta ospiti in Excel")} size="sm" closeLabel={t("Chiudi")} footer={<Button onClick={doExportExcel} disabled={exportCols.size === 0}>⬇ {t("Esporta")}</Button>}>
             <div className="mb-3 text-xs text-dim">{guestSorted.length} {t("ospiti nel segmento corrente")} · {t("scegli le colonne")}</div>
             <div className="mb-4 grid grid-cols-2 gap-2">
               {EXPORT_COLUMNS.map((c) => (
@@ -480,17 +472,12 @@ export default function OspitiPage() {
                 <button onClick={() => setExportCols(new Set(EXPORT_COLUMNS.map((c) => c.key)))} className="font-semibold text-focus hover:underline">{t("Tutte")}</button>
                 <button onClick={() => setExportCols(new Set())} className="font-semibold text-dim hover:underline">{t("Nessuna")}</button>
               </div>
-              <button onClick={doExportExcel} disabled={exportCols.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">⬇ {t("Esporta")}</button>
-            </div>
-          </div>
-        </div>
+              </div>
+              </Modal>
       )}
 
       {pickPromo && (
-        <div className="fixed inset-0 z-50 flex overflow-y-auto p-4">
-          <button aria-label="Chiudi" onClick={() => setPickPromo(false)} className="fixed inset-0 bg-black/40" />
-          <div className="relative m-auto w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Scegli la promo da inviare")}</span><button onClick={() => setPickPromo(false)} aria-label="Chiudi" className="rounded px-2 py-1 text-dim max-sm:px-3 max-sm:py-2.5 hover:bg-wash">✕</button></div>
+        <Modal open onClose={() => setPickPromo(false)} title={t("Scegli la promo da inviare")} size="sm" closeLabel={t("Chiudi")}>
             <div className="mb-3 text-xs text-dim">{selEmails.length} {t("destinatari con email")}</div>
             {promos.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">{t("Nessuna promo salvata.")} <button onClick={() => router.push("/promozioni")} className="font-semibold text-focus hover:underline">{t("Creane una")}</button></div>
@@ -504,8 +491,7 @@ export default function OspitiPage() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );
