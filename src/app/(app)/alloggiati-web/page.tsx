@@ -21,7 +21,8 @@ const RUOLO: Record<string, string> = { "16": "Singolo", "17": "Capofamiglia", "
 
 export default function AlloggiatiWebPage() {
   const { structures, activeStructureId, bookings, roomTypes } = useData();
-  const [sid, setSid] = useState("");
+  // Le schedine sono per singola struttura: si sceglie solo dal selettore globale in alto a destra (con «Tutte»: stato vuoto).
+  const sid = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : activeStructureId === "all" && structures.length === 1 ? structures[0].id : "";
   const [sched, setSched] = useState<Sched[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -33,11 +34,6 @@ export default function AlloggiatiWebPage() {
   const [editBooking, setEditBooking] = useState<string | null>(null); // modale modifica/compilazione dati ospite
   const [confirmSend, setConfirmSend] = useState(false); // conferma invio definitivo alla Questura
   const [conn, setConn] = useState<{ status?: string; auto?: boolean }>({}); // stato connessione portale + invio automatico
-
-  useEffect(() => {
-    const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
-    if (target && target !== sid) setSid(target);
-  }, [structures, activeStructureId, sid]);
 
   const load = useCallback(async () => {
     if (!supabase || !sid) return;
@@ -147,10 +143,16 @@ export default function AlloggiatiWebPage() {
   const CH: Record<string, string> = { direct: "Diretta", booking: "Booking", airbnb: "Airbnb", expedia: "Expedia", hotelbeds: "HotelBeds", agoda: "Agoda", google: "Google Hotel", ical: "iCal", other: "Altro/OTA", blocked: "Bloccata" };
   const nightsBetween = (ci?: string, co?: string) => { if (!ci || !co) return 0; const a = new Date(ci + "T00:00"), b = new Date(co + "T00:00"); return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000)); };
 
+  if (!sid) return (
+    <div>
+      <PageHeader title="Alloggiati Web" subtitle="Schedine ospiti alla Questura (Portale Alloggiati)" />
+      <Card><EmptyState title="Scegli una struttura in alto a destra" sub="Le schedine e il collegamento al portale sono separati per struttura." /></Card>
+    </div>
+  );
+
   return (
     <div>
-      <PageHeader title="Alloggiati Web" subtitle={`Schedine ospiti alla Questura (Portale Alloggiati) · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
-        actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
+      <PageHeader title="Alloggiati Web" subtitle={`Schedine ospiti alla Questura (Portale Alloggiati) · Struttura:${structures.find((x) => x.id === sid)?.name ?? "—"}`} />
 
       {/* Card riepilogo in alto */}
       <div className="mb-3 grid grid-cols-2 gap-3 max-sm:gap-2 lg:grid-cols-4">

@@ -9,6 +9,7 @@ import { PageHeader, Card } from "@/components/ui";
 import { loadPromos, promosForStructure } from "@/lib/promos";
 import { getSiteConfigRaw } from "@/lib/publicdata";
 import Icon from "@/components/Icon";
+import StructureRequired from "@/components/StructureRequired";
 
 export default function BookingEngineHub() {
   const router = useRouter();
@@ -17,7 +18,9 @@ export default function BookingEngineHub() {
   const [tagline, setTagline] = useState("");
   const [guideSections, setGuideSections] = useState<number | null>(null);
 
-  const sid = activeStructureId !== "all" ? activeStructureId : structures[0]?.id;
+  // Le impostazioni sono di una struttura sola: con «Tutte» (più strutture) si sceglie in alto a destra.
+  const sid = activeStructureId !== "all" ? activeStructureId : (structures.length === 1 ? structures[0].id : undefined);
+  const needPick = !sid && structures.length > 1;
 
   useEffect(() => {
     // Offerte della struttura in vista (+ quelle valide per tutte); con "Tutte" si contano tutte.
@@ -59,9 +62,7 @@ export default function BookingEngineHub() {
   return (
     <div>
       <PageHeader title="Booking Engine" subtitle="Impostazioni del motore di prenotazione, in un unico posto" />
-      {activeStructureId === "all" && structures.length > 1 && (
-        <p className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">Con «Tutte le strutture» qui sotto vedi i dati di <b className="text-txt">{structures.find((s) => s.id === sid)?.name}</b>: seleziona una struttura in alto a destra per vedere e modificare le impostazioni di un&apos;altra.</p>
-      )}
+      {needPick ? <StructureRequired sub="Le impostazioni del motore di prenotazione sono di una struttura alla volta." /> : (<>
       {/* Ordine delle card = ordine delle voci "Booking Engine" nella sidebar (vedi nav.ts):
           Widget sito, Xenosite, Promozioni, Upselling, Guida ospiti prima; le due impostazioni
           che vivono altrove (Camere, Strutture) in coda, non essendo voci di questo gruppo. */}
@@ -75,6 +76,7 @@ export default function BookingEngineHub() {
         <Tile icon="card" tint="#8B5CF6" title="Pagamenti e acconti" desc="Acconto richiesto e metodi di pagamento." value="Stripe, % acconto" action="Apri Strutture" onClick={() => router.push("/strutture")} />
       </div>
       <p className="mt-3 text-xs text-faint">Questa pagina raccoglie le impostazioni: i dati restano nei rispettivi moduli, senza doppioni.</p>
+      </>)}
     </div>
   );
 }

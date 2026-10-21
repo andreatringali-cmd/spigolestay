@@ -72,8 +72,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 export default function PianiTariffariPage() {
   const { structures, roomTypes, activeStructureId, addActivity } = useData();
-  const [localStructure, setLocalStructure] = useState<string>("all");
-  const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
+  const effStructure = activeStructureId; // la struttura si sceglie solo in alto a destra
   const ask = useConfirm();
   const { t } = useLang();
   const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
@@ -133,14 +132,8 @@ export default function PianiTariffariPage() {
         subtitle={t("La stessa camera, più modi di venderla. Ogni piano parte dal prezzo del giorno e applica uno scarto. Lo scegli quando crei un preventivo o una prenotazione.")}
       />
 
-      {/* Barra: struttura + vista + legenda + aggiungi */}
+      {/* Barra: vista + legenda + aggiungi */}
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3 max-sm:gap-x-2.5 max-sm:gap-y-1.5 max-sm:px-2.5">
-        {activeStructureId === "all" && (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:py-1 max-sm:text-[13px]">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-          </select>
-        )}
         <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line">
           <button onClick={() => setView2("list")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "list" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}

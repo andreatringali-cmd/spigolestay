@@ -25,7 +25,7 @@ import { supabase, supabaseEnabled } from "./supabase";
 import MfaChallenge from "@/components/MfaChallenge";
 import DeltaBar from "@/components/DeltaBar";
 import { combineData } from "./org-combine";
-import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig } from "./org-cassa-config";
+import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig, extractOrgMsgState, applyOrgMsgState } from "./org-cassa-config";
 import { buildDelta, isEmptyDelta } from "./sync-delta";
 import { flatHash as flatHashOf } from "./sync-flat";
 import { deltaAllowedFor, deltaWantedFrom } from "./delta-allow";
@@ -326,7 +326,7 @@ async function syncOnce(
     ...orgIds.map((orgId) => {
       // Gli ospiti dell'org sono una proiezione (quelli citati dalle prenotazioni caricate qui): un ospite già nella base dell'org e ancora nel locale non va "cancellato" per la sola assenza (vedi retainOrgGuests).
       const localOrg = retainOrgGuests(orgs.get(orgId) ?? EMPTY_ORG_DATA(), orgRefs.current[orgId]?.last?.["spigolestay:data:v1"], fullData.guests, (fullData._deleted as { guests?: unknown } | undefined)?.guests);
-      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg), ...extractOrgCassaConfig(snap, orgSids.get(orgId) ?? new Set<string>()), ...extractOrgPoolConfig(snap, orgSids.get(orgId) ?? new Set<string>(), orgRefs.current[orgId]?.last?.["spigolestay:inventorypool"]) };
+      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg), ...extractOrgCassaConfig(snap, orgSids.get(orgId) ?? new Set<string>()), ...extractOrgPoolConfig(snap, orgSids.get(orgId) ?? new Set<string>(), orgRefs.current[orgId]?.last?.["spigolestay:inventorypool"]), ...extractOrgMsgState(snap, orgSids.get(orgId) ?? new Set<string>()) };
       return saveOne(client, "org_state", "org_id", orgId, orgSnap, orgRefs.current[orgId]);
     }),
   ]);
@@ -343,7 +343,7 @@ async function syncOnce(
   const combined = combineData(mergedPersonal, orgMergedDatas);
   const newBlob: Record<string, string> = { ...pRes.merged, "spigolestay:data:v1": JSON.stringify(combined) };
   // Conti, regole di incasso e conto principale delle strutture condivise: si adotta la versione fusa dell'org (tutti i soci vedono gli stessi).
-  for (const oc of orgCassa) { if (oc.sids.size) { Object.assign(newBlob, applyOrgCassaConfig(newBlob, oc.merged, oc.sids)); Object.assign(newBlob, applyOrgPoolConfig(newBlob, oc.merged, oc.sids)); } }
+  for (const oc of orgCassa) { if (oc.sids.size) { Object.assign(newBlob, applyOrgCassaConfig(newBlob, oc.merged, oc.sids)); Object.assign(newBlob, applyOrgPoolConfig(newBlob, oc.merged, oc.sids)); Object.assign(newBlob, applyOrgMsgState(newBlob, oc.merged, oc.sids)); } }
 
   // ANTI-RACE: la sincronizzazione fotografa il localStorage all'inizio, poi fa round-trip di
   // rete, poi restore() riscrive. Se l'utente SALVA durante il round-trip, restore lo cancellerebbe.

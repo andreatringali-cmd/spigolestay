@@ -131,7 +131,7 @@ const base = () => ({
 test("adempimenti: niente da fare = lista vuota e stato ok", () => {
   const items = buildAdempimenti({ ...base(), bookings: [bk({ checkIn: T, checkOut: "2026-10-08" }), bk({ checkIn: "2026-10-01", checkOut: "2026-10-04" })] });
   assert.deepEqual(items, []);
-  assert.deepEqual(adempimentiStato(items), { total: 0, urgent: 0, tone: "ok" });
+  assert.deepEqual(adempimentiStato(items), { total: 0, urgent: 0, today: 0, backlog: 0, tone: "ok" });
 });
 
 test("adempimenti: check-in, schedine, saldi e tassa con urgenza e ordine", () => {

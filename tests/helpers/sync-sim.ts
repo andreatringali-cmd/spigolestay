@@ -94,7 +94,7 @@ export class Dev {
     const localOrg = Canon?.retainOrgGuests
       ? Canon.retainOrgGuests(localOrg0, this.org.last[KEY], fullData.guests, (fullData._deleted as { guests?: unknown } | undefined)?.guests)
       : localOrg0;
-    const orgSnap: Row = { [KEY]: JSON.stringify(localOrg), ...OrgCfg.extractOrgCassaConfig(snap, orgSids), ...OrgCfg.extractOrgPoolConfig(snap, orgSids, this.org.last["spigolestay:inventorypool"]) };
+    const orgSnap: Row = { [KEY]: JSON.stringify(localOrg), ...OrgCfg.extractOrgCassaConfig(snap, orgSids), ...OrgCfg.extractOrgPoolConfig(snap, orgSids, this.org.last["spigolestay:inventorypool"]), ...OrgCfg.extractOrgMsgState(snap, orgSids) };
 
     const pRes = this.saveOne(srv, "app:" + this.uid, personalSnap, this.personal, this.baseHashes ?? {});
     const oRes = this.saveOne(srv, "org:" + this.orgId, orgSnap, this.org);
@@ -103,7 +103,7 @@ export class Dev {
     const orgData = JSON.parse(oRes.merged[KEY] || "{}") as Json;
     const combined = Combine.combineData(mergedPersonal, [orgData]);
     const newBlob: Row = { ...pRes.merged, [KEY]: JSON.stringify(combined) };
-    if (orgSids.size) { Object.assign(newBlob, OrgCfg.applyOrgCassaConfig(newBlob, oRes.merged, orgSids)); Object.assign(newBlob, OrgCfg.applyOrgPoolConfig(newBlob, oRes.merged, orgSids)); }
+    if (orgSids.size) { Object.assign(newBlob, OrgCfg.applyOrgCassaConfig(newBlob, oRes.merged, orgSids)); Object.assign(newBlob, OrgCfg.applyOrgPoolConfig(newBlob, oRes.merged, orgSids)); Object.assign(newBlob, OrgCfg.applyOrgMsgState(newBlob, oRes.merged, orgSids)); }
     const changedLocal = Core.contentSig(newBlob) !== Core.contentSig(snap);
     if (changedLocal) { const next: Row = {}; for (const [k, v] of Object.entries(newBlob)) if (Core.isSyncKey(k)) next[k] = v; this.local = next; }
     // base persistente per le chiavi piatte (come commitSyncBase)

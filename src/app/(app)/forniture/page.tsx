@@ -54,15 +54,14 @@ export default function ForniturePage() {
   const [invoiced, setInvoiced] = useState<Record<string, boolean>>({});
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [cart, setCart] = useState<Record<string, CartItem>>({});
-  const [localStruct, setLocalStruct] = useState("");
   const [horizon, setHorizon] = useState(30);
   const [msg, setMsg] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [catFilter, setCatFilter] = useState<string>("");
   const [catLoaded, setCatLoaded] = useState(false); // catalogo letto (anche se vuoto): serve per mostrare lo stato vuoto solo a caricamento finito
 
-  // Con "Tutte le strutture" serve sceglierne una (checkout/riordino/scorte sono per singola struttura): niente ripiego silenzioso sulla prima.
-  const structId = activeStructureId !== "all" ? activeStructureId : localStruct;
+  // Con «Tutte» (più strutture) serve sceglierne una in alto a destra (checkout/riordino/scorte sono per singola struttura): niente ripiego silenzioso sulla prima.
+  const structId = activeStructureId !== "all" ? activeStructureId : (structures.length === 1 ? structures[0].id : "");
 
   useEffect(() => {
     (async () => {
@@ -135,7 +134,7 @@ export default function ForniturePage() {
   }, [cart, prods]);
 
   const checkout = async (pay: boolean) => {
-    if (!structId) { setMsg("Seleziona una struttura."); return; }
+    if (!structId) { setMsg("Scegli una struttura in alto a destra."); return; }
     if (!cartLines.length) { setMsg("Il carrello è vuoto."); return; }
     setBusy(true); setMsg("");
     try {
@@ -357,12 +356,6 @@ export default function ForniturePage() {
             <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:py-2.5 max-sm:text-[13px] text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold text-on-warn" style={{ backgroundColor: "var(--warn)" }}>{lowRows.length}</span>}</button>
           ))}
         </div>
-        {activeStructureId === "all" && (
-          <select value={localStruct} onChange={(e) => setLocalStruct(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt max-sm:h-10 max-sm:w-full max-sm:py-0 max-sm:text-[13px]">
-            <option value="">Scegli la struttura…</option>
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        )}
       </div>
 
       {tab === "catalogo" && (
@@ -422,6 +415,7 @@ export default function ForniturePage() {
                     <div className="flex justify-between text-dim"><span>IVA 22%</span><span className="font-mono">{c(cartTotals.vat)}</span></div>
                     <div className="mt-1 flex justify-between text-sm font-bold text-txt"><span>Totale</span><span className="font-mono">{c(cartTotals.tot)}</span></div>
                   </div>
+                  {!structId && <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">Per ordinare scegli la struttura in alto a destra: l&apos;ordine è per una struttura sola.</div>}
                   <button onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 max-sm:py-3 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Paga con Stripe</button>
                   <button onClick={() => checkout(false)} disabled={busy} className="w-full rounded-lg border border-line px-3 py-2 max-sm:py-3 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Salva come bozza</button>
                 </div>
@@ -433,7 +427,7 @@ export default function ForniturePage() {
 
       {tab === "scorte" && (
         <div>
-          {!structId && <div className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">Scegli una struttura dal menu accanto alle schede: le scorte sono separate per struttura.</div>}
+          {!structId && <div className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">Scegli una struttura in alto a destra: le scorte sono separate per struttura.</div>}
           {structId && (
             <>
               <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -487,7 +481,7 @@ export default function ForniturePage() {
 
       {tab === "riordino" && (
         <div>
-          {!structId && <div className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">Scegli una struttura dal menu accanto alle schede: regole di riordino e scorte sono separate per struttura.</div>}
+          {!structId && <div className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">Scegli una struttura in alto a destra: regole di riordino e scorte sono separate per struttura.</div>}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <label className="text-sm text-dim">Orizzonte</label>
             <select value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt">

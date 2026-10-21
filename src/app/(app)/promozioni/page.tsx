@@ -121,9 +121,8 @@ export default function PromozioniPage() {
   // ── Invio (separato) ──
   const [sending, setSending] = useState<Promo | null>(null);
   const [segment, setSegment] = useState<Segment>("lapsed");
-  const [structureId, setStructureId] = useState<string>(activeStructureId);
-  // Il destinatario segue la struttura attiva (il select del modale è bloccato quando ne è selezionata una).
-  useEffect(() => { setStructureId(activeStructureId); }, [activeStructureId]);
+  // I destinatari seguono la selezione in alto a destra (nessun selettore struttura nel modale).
+  const structureId = activeStructureId;
 
   // Destinatari del segmento. Si scrive SOLO a chi ha un'email vera (non gli indirizzi di inoltro di Booking/Airbnb/Expedia) e il consenso marketing
   // (flag nella scheda o iscrizione alla newsletter); gli altri sono contati in "excluded" e non ricevono nulla.
@@ -301,7 +300,6 @@ export default function PromozioniPage() {
               <optgroup label="Segmenti">{SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
               <optgroup label="Per categoria">{TAG_SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
             </select></label>
-            <label className="mt-3 block text-xs font-medium text-dim">Struttura<select value={structureId} disabled={activeStructureId !== "all"} onChange={(e) => setStructureId(e.target.value)} className={`${inp} mt-1 disabled:opacity-60`}><option value="all">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b>{excluded > 0 && <span> · {excluded} esclusi (senza consenso marketing o con email di inoltro OTA)</span>}</div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>

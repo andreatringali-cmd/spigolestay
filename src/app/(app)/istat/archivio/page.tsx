@@ -15,17 +15,14 @@ interface Item { id: string; day: string | null; created_at: string; count: numb
 // Pagina dedicata: archivio invii ISTAT (storico delle chiusure giornaliere all'Osservatorio).
 export default function IstatArchivioPage() {
   const { structures, activeStructureId } = useData();
-  const [sid, setSid] = useState("");
+  // Archivio per singola struttura: si sceglie solo dal selettore globale in alto a destra (con «Tutte»: stato vuoto).
+  const sid = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : activeStructureId === "all" && structures.length === 1 ? structures[0].id : "";
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [msg, setMsg] = useState("");
 
-  useEffect(() => {
-    const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
-    if (target && target !== sid) setSid(target);
-  }, [structures, activeStructureId, sid]);
 
   const load = useCallback(async () => {
     if (!sid) return;
@@ -46,13 +43,20 @@ export default function IstatArchivioPage() {
   });
   const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
+  if (!sid) return (
+    <div>
+      <PageHeader title="Archivio invii ISTAT" subtitle="Storico delle chiusure giornaliere inviate all'Osservatorio Turistico"
+        actions={<Link href="/istat" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna al movimento</Link>} />
+      <Card><EmptyState title="Scegli una struttura in alto a destra" sub="L'archivio degli invii è separato per struttura." /></Card>
+    </div>
+  );
+
   return (
     <div>
       <PageHeader title="Archivio invii ISTAT" subtitle={`Storico delle chiusure giornaliere inviate all'Osservatorio Turistico · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
         actions={<Link href="/istat" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna al movimento</Link>} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {structures.length > 1 && activeStructureId === "all" && <select value={sid} onChange={(e) => setSid(e.target.value)} className={fieldCls}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
         <span className="text-[11px] font-medium text-dim">Dal</span>
         <DateField value={from} onChange={(v) => setFrom(v)} className={fieldCls} />
         <span className="text-[11px] font-medium text-dim">Al</span>

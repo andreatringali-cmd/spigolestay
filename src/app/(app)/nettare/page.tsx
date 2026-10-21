@@ -21,6 +21,7 @@ import PriceHistoryCard from "@/components/PriceHistoryCard";
 import { simulateImpact } from "@/lib/revenue-impact";
 import { buildChanges, recordBatches } from "@/lib/revenue-history";
 import { fetchCityPulse, computeMarketSignal, pulseHasDemo, type MarketPulse } from "@/lib/market";
+import StructureRequired from "@/components/StructureRequired";
 
 const WINDOW = 90;
 const FUTURE = 30;
@@ -37,9 +38,9 @@ export default function NettarePage() {
   const { structures, roomTypes, units, bookings, events, rateOverrides, activeStructureId, setDayRates } = useData();
   const { user } = useAuth();
 
-  // Con "Tutte le strutture" Nèttare lavora comunque su UNA struttura per volta: scelta esplicita (selettore locale).
-  const [localSid, setLocalSid] = useState("");
-  const effSid = activeStructureId !== "all" ? activeStructureId : localSid;
+  // Nèttare lavora su UNA struttura per volta, scelta in alto a destra: con «Tutte» (più strutture) la pagina lo chiede.
+  const effSid = activeStructureId !== "all" ? activeStructureId : (structures.length === 1 ? structures[0].id : "");
+  const needPick = activeStructureId === "all" && structures.length > 1;
   const struct = useMemo(() => {
     const active = structures.find((s) => s.id === effSid && (s.city || "").trim());
     return active || structures.find((s) => s.id === effSid) || structures.find((s) => (s.city || "").trim()) || structures[0];
@@ -220,19 +221,17 @@ export default function NettarePage() {
     {strat.periods.map((p) => <Chip key={p.id} on={scope === p.id} onClick={() => setScope(p.id)}>{p.name}<span className="ml-1.5 font-normal opacity-70">{fmtShort(p.from)}–{fmtShort(p.to)}</span></Chip>)}
   </>);
 
+  if (needPick) return (
+    <div>
+      <PageHeader title="Nèttare" subtitle={t("Prezzi dinamici")} />
+      <StructureRequired sub="La strategia di prezzo è separata per struttura." />
+    </div>
+  );
+
   return (
     <div>
       <style>{`:root{--chart-1:#2F6BB0;--chart-2:#C9751A}.dark{--chart-1:#6FA3DC;--chart-2:#D98A3A}`}</style>
       <PageHeader title="Nèttare" subtitle={`${t("Prezzi dinamici")}${city ? ` · ${city}` : ""}`} />
-      {activeStructureId === "all" && structures.length > 1 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm max-sm:gap-x-2 max-sm:gap-y-1">
-          <span className="text-xs font-semibold text-dim">{t("Struttura")}</span>
-          <select value={struct?.id ?? ""} onChange={(e) => setLocalSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <span className="text-[11px] text-faint">{t("La strategia di prezzo è separata per struttura.")}</span>
-        </div>
-      )}
 
       {/* Riepilogo Nèttare */}
       <div className="mt-4 rounded-2xl border border-line p-5 max-sm:mt-3 max-sm:p-4" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>

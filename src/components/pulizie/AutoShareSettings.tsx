@@ -23,14 +23,12 @@ export function loadAutoShareCfg(structureId: string): AutoShareCfg {
   return { ...DEFAULT_CFG, emailCc: [] };
 }
 
-export default function AutoShareSettings({ structureId, structureName, structures, onClose }: {
-  structureId: string; structureName: string;
-  /** Tutte le strutture dell'account: nella finestra si sceglie la struttura da configurare e si salvano tutte insieme (ognuna con le sue impostazioni). */
-  structures?: { id: string; name: string }[];
+export default function AutoShareSettings({ structureId, structureName, onClose }: {
+  structureId: string; structureName: string; // è la struttura scelta dal selettore globale: nessuna scelta dentro la finestra
   onClose: () => void;
 }) {
   const { t } = useLang();
-  const list = structures && structures.length > 0 ? structures : [{ id: structureId, name: structureName }];
+  const list = [{ id: structureId, name: structureName }];
   const [activeId, setActiveId] = useState(structureId);
   const [cfgs, setCfgs] = useState<Record<string, AutoShareCfg>>({});
   const [dirty, setDirty] = useState<string[]>([]);
@@ -125,24 +123,9 @@ export default function AutoShareSettings({ structureId, structureName, structur
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color:var(--focus)]/10 text-[color:var(--focus)]"><Icon name="clock" size={16} /></span>
           <div>
             <div className="text-sm font-bold text-txt">{t("Invio automatico")}</div>
-            <div className="text-[11px] text-faint">{list.length > 1 ? t("Ogni struttura invia la sua email, al suo orario") : activeName}</div>
+            <div className="text-[11px] text-faint">{activeName}</div>
           </div>
         </div>
-
-        {list.length > 1 && (
-          <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label={t("Struttura")}>
-            {list.map((s) => {
-              const c = cfgs[s.id]; const on = !!c?.enabled; const act = s.id === activeId;
-              return (
-                <button key={s.id} type="button" role="tab" aria-selected={act} onClick={() => { setActiveId(s.id); setCcInput(""); setCcErr(""); setNowRes(null); }}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${act ? "border-focus bg-[color:var(--focus)]/10 text-focus" : "border-line bg-paper text-dim hover:bg-wash"}`}>
-                  <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />
-                  {s.name}{dirty.includes(s.id) ? " •" : ""}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         <label className="mb-3 flex items-center justify-between rounded-xl border border-line bg-paper px-3 py-2.5">
           <span className="text-sm font-medium text-txt">{t("Attivo")}</span>

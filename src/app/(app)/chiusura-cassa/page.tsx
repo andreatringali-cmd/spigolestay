@@ -50,15 +50,10 @@ export default function ChiusuraCassaPage() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [msg, setMsg] = useState("");
 
-  // Ambito: le strutture selezionate in alto a destra (una, più d'una o tutte). Con più strutture si può restringere a una sola; "all" qui = tutte quelle selezionate.
+  // Ambito: SOLO le strutture selezionate in alto a destra (una, più d'una o tutte); nessun filtro struttura in pagina.
   const allIds = useMemo(() => allStructures.map((x) => x.id), [allStructures]);
   const baseScope = useMemo<CashScope>(() => cashScopeOf(selectedStructureIds, allIds), [selectedStructureIds, allIds]);
-  const singleBase = typeof baseScope === "string" && baseScope !== "all";
-  const baseKey = typeof baseScope === "string" ? baseScope : baseScope.join(",");
-  const structures = useMemo(() => { const ids = scopeIds(baseScope, allIds); return allStructures.filter((x) => ids.includes(x.id)); }, [baseScope, allStructures, allIds]); // strutture tra cui scegliere
-  const [struct, setStruct] = useState<string>("all");
-  useEffect(() => { setStruct("all"); }, [baseKey]);
-  const scope: CashScope = singleBase ? baseScope : struct !== "all" && structures.some((x) => x.id === struct) ? struct : baseScope;
+  const scope: CashScope = baseScope;
   const scopeKey = typeof scope === "string" ? scope : scope.join(",");
   const scopeName = typeof scope === "string" ? (scope === "all" ? "Tutte le strutture" : getStructure(scope)?.name ?? "—") : scope.map((id) => getStructure(id)?.name ?? "—").join(" + ");
 
@@ -163,12 +158,7 @@ export default function ChiusuraCassaPage() {
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className={lbl}>Giorno<DateField value={day} onChange={(v) => setDay(v)} className={inp} /></label>
             <label className={lbl}>Conto<select value={conto} onChange={(e) => setConto(e.target.value)} className={inp}>{conti.map((c) => <option key={c} value={c}>{contoLabel(c)}</option>)}</select></label>
-            {/* Filtro struttura solo se in alto a destra è selezionato "Tutte" */}
-            {!singleBase ? (
-              <label className={`${lbl} col-span-2`}>Struttura<select value={struct} onChange={(e) => setStruct(e.target.value)} className={inp}><option value="all">{typeof baseScope === "string" ? "Tutte le strutture" : "Tutte le selezionate"}</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-            ) : (
-              <div className="col-span-2 text-xs text-dim">Struttura: <b className="text-txt">{scopeName}</b></div>
-            )}
+            <div className="col-span-2 text-xs text-dim">Struttura: <b className="text-txt">{scopeName}</b></div>
           </div>
           <div className="mt-3 flex flex-col gap-1 rounded-lg bg-wash p-3 text-sm">
             <div className="flex justify-between"><span className="text-dim">Entrate del giorno</span><span className="font-mono text-[color:var(--ok)]">{eur(entrate)}</span></div>

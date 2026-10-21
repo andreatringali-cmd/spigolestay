@@ -3,7 +3,6 @@
 import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 
 interface Sett { region: string; partner: string; username: string; password_enc: string; auto_daily: boolean; start_from: string; status: string; status_msg: string }
@@ -12,8 +11,7 @@ const REGIONS = ["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagn
 
 // Finestra centrale con le impostazioni ISTAT / portale regionale (si impostano una volta).
 export default function IstatSettingsModal({ sid, onClose }: { sid: string; onClose: () => void }) {
-  const { structures, activeStructureId } = useData();
-  const [msid, setMsid] = useState(sid);
+  const msid = sid; // la struttura è quella scelta dal selettore globale: nessuna scelta dentro la finestra
   const [s, setS] = useState<Sett>(DEF);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -62,10 +60,6 @@ export default function IstatSettingsModal({ sid, onClose }: { sid: string; onCl
           </div>
           <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
         </div>
-
-        {structures.length > 1 && activeStructureId === "all" && (
-          <label className="block"><span className={lbl}>Struttura</span><select value={msid} onChange={(e) => setMsid(e.target.value)} className={inp}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-        )}
         <div className="mt-2 space-y-2">
           <label className="block"><span className={lbl}>Regione</span><select value={s.region} onChange={(e) => set({ region: e.target.value })} className={inp}>{REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
           <label className="block"><span className={lbl}>Portale / partner</span><input value={s.partner} onChange={(e) => set({ partner: e.target.value })} placeholder="Turist@t / Ross1000…" className={inp} /></label>

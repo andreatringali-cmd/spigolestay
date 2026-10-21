@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { buildPublishData, slugify, RESERVED_SLUGS, siteConfigKey, getSiteConfigRaw } from "@/lib/publicdata";
 import { friendlyError } from "@/lib/friendly-error";
+import StructureRequired from "@/components/StructureRequired";
 
 interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
 const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
@@ -34,13 +35,15 @@ export default function SitoPage() {
   const [c, setC] = useState<Cfg>(DEF);
   const [sid, setSid] = useState("");
   const [heroErr, setHeroErr] = useState("");
-  // Se in alto è selezionata UNA struttura, il mini-sito segue quella (menu nascosto).
-  // Se è selezionato "Tutte", resta il menu a tendina per scegliere quale configurare.
+  // Il mini-sito segue la struttura scelta in alto a destra. Con «Tutte» (più strutture) non c'è nulla da configurare:
+  // la pagina chiede di sceglierne una (nessun selettore dentro la pagina).
   useEffect(() => {
     if (activeStructureId !== "all" && structures.some((s) => s.id === activeStructureId)) {
       if (activeStructureId !== sid) setSid(activeStructureId);
-    } else if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) {
-      setSid(structures[0].id);
+    } else if (structures.length === 1) {
+      if (sid !== structures[0].id) setSid(structures[0].id);
+    } else if (sid) {
+      setSid("");
     }
   }, [structures, activeStructureId, sid]);
   // Config SCOPED per struttura: va ricaricata ogni volta che cambia `sid`,
@@ -52,7 +55,7 @@ export default function SitoPage() {
       setC(r ? { ...DEF, ...JSON.parse(r) } : DEF);
     } catch { setC(DEF); }
   }, [sid, structures]);
-  const showStructPicker = activeStructureId === "all" && structures.length > 1;
+  const needPick = activeStructureId === "all" && structures.length > 1;
   const set = (patch: Partial<Cfg>) => setC((p) => {
     const n = { ...p, ...patch };
     if (sid) { try { localStorage.setItem(siteConfigKey(sid), JSON.stringify(n)); } catch {} }
@@ -143,6 +146,13 @@ export default function SitoPage() {
   };
   const isDirtySlug = publishedSlug !== null && slugify(slug) !== publishedSlug;
 
+  if (needPick) return (
+    <div>
+      <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} />
+      <StructureRequired sub="Il mini-sito è di una struttura alla volta." />
+    </div>
+  );
+
   return (
     <div>
       <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} />
@@ -151,11 +161,6 @@ export default function SitoPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("Contenuti")}</SectionTitle>
-            {showStructPicker && (
-              <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span>
-                <select value={sid} onChange={(e) => setSid(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-              </label>
-            )}
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Nome struttura")} <span className="text-faint">({t("dalla scheda struttura")})</span></span><input value={siteName} readOnly disabled className="mt-0.5 w-full cursor-not-allowed rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim" /></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Sottotitolo")}</span><input value={c.tagline} onChange={(e) => set({ tagline: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Link recensioni Google")} <span className="text-faint">({t("opzionale")})</span></span><input value={c.googleUrl ?? ""} onChange={(e) => set({ googleUrl: e.target.value })} placeholder="https://g.page/…/review" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>

@@ -79,13 +79,8 @@ export default function ImpostazioniPage() {
       .then((j) => setGcalInfo(j))
       .catch(() => setGcalInfo({ configured: false, serviceAccountEmail: null }));
   }, []);
-  const [gcalStructId, setGcalStructId] = useState("");
-  useEffect(() => {
-    if (gcalStructId && structures.some((s) => s.id === gcalStructId)) return;
-    setGcalStructId(activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? "");
-  }, [structures, activeStructureId, gcalStructId]);
-  // Segui la struttura attiva del selettore globale (con "Tutte" resta la scelta locale).
-  useEffect(() => { if (activeStructureId !== "all") setGcalStructId(activeStructureId); }, [activeStructureId]);
+  // Il calendario Google è di una struttura: segue il selettore in alto a destra (con «Tutte» e più strutture la scheda chiede di sceglierne una).
+  const gcalStructId = activeStructureId !== "all" ? activeStructureId : (structures.length === 1 ? structures[0].id : "");
   const gcalStruct = structures.find((s) => s.id === gcalStructId);
   const [gcalIdInput, setGcalIdInput] = useState("");
   useEffect(() => { setGcalIdInput(extractCalendarId(gcalStruct?.gcalId ?? "")); }, [gcalStruct?.gcalId, gcalStructId]);
@@ -316,16 +311,10 @@ export default function ImpostazioniPage() {
                 <span className="pt-0.5">{t("Incolla qui sotto e premi \"Verifica\": ti diciamo subito se è tutto a posto, prima di \"Salva\".")}</span>
               </li>
             </ol>
-            {activeStructureId === "all" && structures.length > 1 && (
-              <label className="mb-2 block text-xs font-medium text-dim">{t("Struttura")}
-                <select value={gcalStructId} onChange={(e) => setGcalStructId(e.target.value)} className={`mt-1 ${inp}`}>
-                  {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </label>
-            )}
-            <label className="block text-xs font-medium text-dim">{t("ID calendario Google")} {activeStructureId !== "all" && gcalStruct ? `· ${gcalStruct.name}` : ""}
+            {!gcalStructId && <p className="mb-2 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">{t("Scegli una struttura in alto a destra: ogni struttura ha il proprio calendario.")}</p>}
+            <label className="block text-xs font-medium text-dim">{t("ID calendario Google")} {gcalStruct ? `· ${gcalStruct.name}` : ""}
               <div className="mt-1 flex items-center gap-2">
-                <input value={gcalIdInput} onChange={(e) => { setGcalIdInput(e.target.value); setGcalVerifyMsg(null); }} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+                <input value={gcalIdInput} disabled={!gcalStructId} onChange={(e) => { setGcalIdInput(e.target.value); setGcalVerifyMsg(null); }} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
                 <button onClick={verifyGcal} disabled={!gcalIdInput.trim() || gcalVerifying} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{gcalVerifying ? t("Verifico…") : t("Verifica")}</button>
                 <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
               </div>

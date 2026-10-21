@@ -15,7 +15,8 @@ interface Item { id: string; date: string | null; created_at: string; count: num
 // Pagina dedicata: archivio invii alla Questura (ricevute scaricabili/stampabili in qualsiasi momento).
 export default function AlloggiatiArchivioPage() {
   const { structures, activeStructureId } = useData();
-  const [sid, setSid] = useState("");
+  // Archivio per singola struttura: si sceglie solo dal selettore globale in alto a destra (con «Tutte»: stato vuoto).
+  const sid = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : activeStructureId === "all" && structures.length === 1 ? structures[0].id : "";
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -24,10 +25,6 @@ export default function AlloggiatiArchivioPage() {
   const [to, setTo] = useState("");
   const [stato, setStato] = useState("all");
 
-  useEffect(() => {
-    const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
-    if (target && target !== sid) setSid(target);
-  }, [structures, activeStructureId, sid]);
 
   const load = useCallback(async () => {
     if (!sid) return;
@@ -77,13 +74,20 @@ export default function AlloggiatiArchivioPage() {
   });
   const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
+  if (!sid) return (
+    <div>
+      <PageHeader title="Archivio ricevute · Questura" subtitle="Storico degli invii alla Questura: riscarica o stampa la ricevuta in qualsiasi momento"
+        actions={<Link href="/alloggiati-web" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna alle schedine</Link>} />
+      <Card><EmptyState title="Scegli una struttura in alto a destra" sub="L'archivio degli invii è separato per struttura." /></Card>
+    </div>
+  );
+
   return (
     <div>
       <PageHeader title="Archivio ricevute · Questura" subtitle={`Storico degli invii alla Questura: riscarica o stampa la ricevuta in qualsiasi momento · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
         actions={<Link href="/alloggiati-web" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna alle schedine</Link>} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {structures.length > 1 && activeStructureId === "all" && <select value={sid} onChange={(e) => setSid(e.target.value)} className={fieldCls}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
         <span className="text-[11px] font-medium text-dim">Dal</span>
         <DateField value={from} onChange={(v) => setFrom(v)} className={fieldCls} />
         <span className="text-[11px] font-medium text-dim">Al</span>

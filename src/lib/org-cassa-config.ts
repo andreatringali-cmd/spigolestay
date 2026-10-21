@@ -5,6 +5,8 @@ import { sortListBy } from "./sync-canon";
 export const CASSA_CONTI_KEY = "spigolestay:cassa:conti";
 export const CASSA_PAYOUTS_KEY = "spigolestay:cassa:payouts";
 export const CASSA_PREFS_KEY = "spigolestay:cassa:conti-prefs";
+// Stato condiviso dei messaggi OTA (letto / non serve rispondere): stessa tecnica, unione per conversazione (vedi msg-state.ts).
+export { extractOrgMsgState, applyOrgMsgState } from "./msg-state";
 
 type Snap = Record<string, string>;
 const parse = (raw: string | undefined): unknown => { if (!raw) return undefined; try { return JSON.parse(raw); } catch { return undefined; } };

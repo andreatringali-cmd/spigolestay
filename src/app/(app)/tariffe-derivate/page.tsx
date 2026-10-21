@@ -89,13 +89,12 @@ export default function TariffeDerivatePage() {
   const { t } = useLang();
   const { structures, roomTypes, units, bookings, activeStructureId, deleteRoomType } = useData();
   const ask = useConfirm();
-  const [localS, setLocalS] = useState("all");
   const [view, setView] = useState<"table" | "map">("map");
   const [derivModal, setDerivModal] = useState<null | { structureIds: string[]; parentId?: string; editId?: string }>(null);
   const [derivOpen, setDerivOpen] = useState<Set<string>>(new Set()); // vuoto = tutte chiuse all'apertura
   const toggleDeriv = (id: string) => setDerivOpen((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const scoped = structures.filter((s) => (activeStructureId === "all" ? localS === "all" || s.id === localS : s.id === activeStructureId));
+  const scoped = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId);
 
   return (
     <div>
@@ -104,14 +103,8 @@ export default function TariffeDerivatePage() {
         subtitle={t("Tariffe collegate a una tipologia (es. uso singola, non rimborsabile). Seguono il prezzo della madre con uno scarto e condividono le stesse camere.")}
       />
 
-      {/* Barra: struttura + vista Tabella / Mappa + legenda */}
+      {/* Barra: vista Tabella / Mappa + legenda (la struttura si sceglie in alto a destra) */}
       <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3 max-sm:gap-x-2.5 max-sm:gap-y-1.5 max-sm:px-2.5">
-        {activeStructureId === "all" && (
-          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:py-1 max-sm:text-[13px]">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        )}
         <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line">
           <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "map" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}

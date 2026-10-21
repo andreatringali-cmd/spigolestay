@@ -9,6 +9,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { yoyCompare } from "@/lib/revenue-yoy";
+import StructureRequired from "@/components/StructureRequired";
 
 const WINDOW = 90;
 const THRESHOLD = 3;
@@ -25,11 +26,12 @@ export default function MercatoPage() {
   const { structures, units, bookings, guests, activeStructureId } = useData();
   const { user } = useAuth();
 
-  // Con una struttura selezionata si usa SOLO quella (se non ha la città: messaggio "imposta la città"),
-  // mai un'altra; con "Tutte" la prima struttura con città.
+  // Con una struttura selezionata si usa SOLO quella (se non ha la città: messaggio "imposta la città"), mai un'altra.
+  // I consensi di condivisione sono per struttura: con «Tutte» (più strutture) la pagina chiede di sceglierne una in alto a destra.
+  const needPick = activeStructureId === "all" && structures.length > 1;
   const struct = useMemo(() => {
     if (activeStructureId !== "all") return structures.find((s) => s.id === activeStructureId);
-    return structures.find((s) => (s.city || "").trim()) || structures[0];
+    return structures.length === 1 ? structures[0] : undefined;
   }, [structures, activeStructureId]);
   const city = (struct?.city || "").trim();
 
@@ -161,6 +163,7 @@ export default function MercatoPage() {
   const toggle = (k: keyof Consents) => { setConsentChosen(true); setConsents((c) => ({ ...c, [k]: !c[k] })); };
   const enough = (pulse?.n_structures ?? 0) >= THRESHOLD;
 
+  if (needPick) return (<div><PageHeader title={t("Rete città")} subtitle={t("Confronta la tua struttura con il mercato locale")} /><StructureRequired sub="Il confronto con il mercato (e i consensi di condivisione) è di una struttura alla volta." /></div>);
   if (!struct) return (<div><PageHeader title={t("Rete città")} subtitle={t("Confronta la tua struttura con il mercato locale")} /><Card><p className="text-sm text-dim">{t("Aggiungi prima una struttura.")}</p></Card></div>);
   if (!city) return (<div><PageHeader title={t("Rete città")} subtitle={t("Confronta la tua struttura con il mercato locale")} /><Card><p className="text-sm text-dim">{t("Imposta la città nella scheda della struttura per attivare la rete.")}</p></Card></div>);
 

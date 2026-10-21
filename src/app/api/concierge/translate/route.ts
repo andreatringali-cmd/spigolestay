@@ -3,7 +3,8 @@ import { authTenant, isResponse } from "@/lib/invoicing/api";
 import type { ConciergeEntry } from "@/lib/concierge-kb";
 import { isTranslateLang, srcHashOf, validateTranslation, type TranslationItem } from "@/lib/concierge-i18n";
 import { approveTranslations, loadTranslations, putTranslations, removeTranslation } from "@/lib/concierge-translations";
-import { translateBlock } from "@/lib/ai/concierge-translate";
+import { translateBlock, translateTexts, type FreeLang } from "@/lib/ai/concierge-translate";
+import { rateLimited } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,9 @@ export const maxDuration = 60;
 //   { action: "save", id, lang, title, body }     -> modifica a mano (validata sull'originale), salva come rivista
 //   { action: "approve", keys: [{id, lang}] }     -> segna come riviste (riallinea l'impronta all'originale attuale)
 //   { action: "remove", id, lang }                -> elimina la traduzione (tornerà "mancante")
+//   { action: "text", to, purpose, texts }        -> traduce testi liberi delle chat con gli ospiti (OtaThreadChat), senza salvare nulla:
+//                                                    purpose "read" = messaggio dell'ospite → host; "send" = risposta dell'host → ospite (anteprima da confermare)
+//                                                    { ok, texts: string[], check: boolean[] }  (check[i] = link, numeri e codici identici all'originale)
 const MAX_IDS = 6;
 
 type Row = ConciergeEntry & { id: string };
@@ -30,6 +34,25 @@ export async function POST(req: Request) {
 
     if (action === "status") {
       return NextResponse.json({ ok: true, items: await loadTranslations(auth.admin, auth.tenantId) });
+    }
+
+    if (action === "text") {
+      const to = String(b?.to || "");
+      if (!(["it", "en", "de", "fr", "es"] as string[]).includes(to)) return NextResponse.json({ ok: false, error: "bad_lang" }, { status: 400 });
+      const texts = (Array.isArray(b?.texts) ? b.texts : []).map((x: unknown) => String(x ?? "").trim()).filter(Boolean).slice(0, 5);
+      if (!texts.length) return NextResponse.json({ ok: false, error: "missing_texts" }, { status: 400 });
+      if (texts.some((x: string) => x.length > 4000) || texts.join("").length > 8000) return NextResponse.json({ ok: false, error: "too_large", message: "Il testo è troppo lungo da tradurre." }, { status: 413 });
+      if (rateLimited("translate-text:" + auth.userId, 40, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
+      const purpose = b?.purpose === "send" ? "send" : "read";
+      const out = await translateTexts(to as FreeLang, texts, purpose);
+      if (!out.ok) {
+        const busy = out.error === "timeout" || out.error === "fetch_failed" || /^http_(429|5\d\d)$/.test(out.error);
+        const message = out.error === "ai_not_configured" ? "L'assistente intelligente non è ancora attivo: contatta l'assistenza."
+          : busy ? "Il servizio di traduzione è occupato: riprova tra qualche istante." : "Traduzione non riuscita. Riprova tra poco.";
+        return NextResponse.json({ ok: false, error: out.error, message }, { status: out.error === "ai_not_configured" ? 503 : 502 });
+      }
+      const check = out.texts.map((t, i) => validateTranslation({ title: ".", body: texts[i] }, { title: ".", body: t }).ok);
+      return NextResponse.json({ ok: true, texts: out.texts, check });
     }
 
     // Voci originali del tenant (fonte di verità per impronta e controlli).

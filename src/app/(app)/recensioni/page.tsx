@@ -17,7 +17,7 @@ import type { NormalizedReview } from "@/lib/reviews/google";
 import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChannel, type ReviewScore, type ScoreSummary } from "@/lib/channex-review-scores";
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 import { waDigits } from "@/lib/contacts-check";
-
+
 import { onSolid } from "@/lib/on-solid";
 const fmt = (iso: string) => fmtDate(iso);
 
@@ -83,8 +83,9 @@ export default function RecensioniPage() {
   const [sortBy, setSortBy] = useState<"new" | "old" | "low" | "high">("new");
   const [trendDays, setTrendDays] = useState<30 | 90 | 365>(90); // finestra del confronto "media per periodo"
 
-  // Struttura selezionata per configurazione/visualizzazione recensioni.
-  const [selStructureId, setSelStructureId] = useState<string>("");
+  // Struttura delle recensioni: SOLO quella scelta dal selettore globale in alto a destra (nessun selettore in pagina).
+  // Con «Tutte» (o un sottoinsieme) resta vuota → stato vuoto «Scegli una struttura»; se l'organizzazione ne ha una sola, è quella.
+  const selStructureId = activeStructureId !== "all" ? activeStructureId : structures.length === 1 ? structures[0].id : "";
   const [placeId, setPlaceId] = useState<string>(""); // salvato per la struttura selezionata
   const [placeIdInput, setPlaceIdInput] = useState<string>("");
 
@@ -116,18 +117,6 @@ export default function RecensioniPage() {
   const [mForm, setMForm] = useState<{ source: SourceKey; guest: string; date: string; rating: number; text: string }>({
     source: "booking", guest: "", date: toISO(new Date()), rating: 9, text: "",
   });
-
-  // Struttura effettiva: se l'utente ha scelto "tutte", usa la prima; altrimenti quella attiva.
-  useEffect(() => {
-    if (selStructureId && structures.some((s) => s.id === selStructureId)) return;
-    const fallback = activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? "";
-    setSelStructureId(fallback);
-  }, [structures, activeStructureId, selStructureId]);
-
-  // Segui il cambio di struttura attiva dal selettore globale.
-  useEffect(() => {
-    if (activeStructureId !== "all") setSelStructureId(activeStructureId);
-  }, [activeStructureId]);
 
   // Carica risposte + recensioni manuali una volta.
   useEffect(() => {
@@ -701,20 +690,19 @@ export default function RecensioniPage() {
   const phoneFilterCount = (filter !== "all" ? 1 : 0) + (ratingFilter !== "all" ? 1 : 0) + (replyFilter !== "all" ? 1 : 0) + (sortBy !== "new" ? 1 : 0);
   const resetPhoneFilters = () => { setFilter("all"); setRatingFilter("all"); setReplyFilter("all"); setSortBy("new"); };
 
+  // Le recensioni sono per singola struttura: con «Tutte» (o più strutture) si sceglie dal selettore globale in alto a destra.
+  if (!selStructureId) {
+    return (
+      <div>
+        <PageHeader title="Recensioni & reputazione" subtitle="Recensioni Google reali e OTA in un posto, con risposte suggerite dall'AI" />
+        <Card><EmptyState title="Scegli una struttura in alto a destra" sub="Le recensioni sono separate per struttura." /></Card>
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader title="Recensioni & reputazione" subtitle="Recensioni Google reali e OTA in un posto, con risposte suggerite dall'AI" />
-
-      {/* Con "Tutte le strutture" le recensioni sono per singola struttura: scelta esplicita invece di ripiegare in silenzio sulla prima */}
-      {activeStructureId === "all" && structures.length > 1 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-xs font-semibold text-dim">Recensioni di</span>
-          <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <span className="text-[11px] text-faint">Le recensioni sono separate per struttura; scegli quale vedere.</span>
-        </div>
-      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Media" value={<>{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></>} />

@@ -50,8 +50,7 @@ function Occ({ n }: { n: number }) {
 
 export default function TariffePage() {
   const { structures, roomTypes, rateOverrides, updateRoomType, activeStructureId } = useData();
-  const [localStructure, setLocalStructure] = useState<string>("all");
-  const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
+  const effStructure = activeStructureId; // la struttura si sceglie solo dal selettore in alto a destra; con «Tutte» la tabella mostra l'insieme
 
   const { t } = useLang();
   const [allPlans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
@@ -223,12 +222,6 @@ export default function TariffePage() {
       <PageHeader
         title={t("Tariffe")}
         subtitle={t("Come si forma il prezzo e come lo vendi — prezzi base, regole e piani tariffari")}
-        actions={activeStructureId === "all" ? (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:py-1 max-sm:text-[13px]">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-          </select>
-        ) : null}
       />
 
       {/* Come nasce il prezzo — catena essenziale, un colore diverso per passaggio invece di

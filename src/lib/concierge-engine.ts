@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure } from "@/lib/types";
 import { getConciergeReply } from "@/lib/ai/guest-concierge";
+import { getConciergeDraft } from "@/lib/ai/concierge-draft";
+import { fmtDMY } from "@/lib/dates";
 import type { ConciergeTone } from "@/lib/aiConcierge";
 import { isTranslateLang, toTranslationMap, type GuestLang } from "@/lib/concierge-i18n";
 import { loadTranslations } from "@/lib/concierge-translations";
@@ -66,6 +68,7 @@ export interface EngineInput {
   message: string;
   transcript?: string;
   tone?: ConciergeTone;                     // Impostazioni → Concierge AI (formale / amichevole / essenziale); assente = amichevole
+  draft?: boolean;                          // BOZZA per l'host (chat dei portali): risponde anche fuori dalle domande di routine, non parte da sola
 }
 // ms: tempi del motore in millisecondi (kb = lettura base di conoscenza, ai = chiamata AI, total = tutto il motore)
 export interface EngineResult { answered: boolean; reply?: string; topic?: string; reason?: string; hasBooking: boolean; lang: GuestLang; ms?: { total: number; kb: number; ai: number } }
@@ -132,6 +135,18 @@ async function runConcierge(inp: EngineInput, ms: { total: number; kb: number; a
 
   ms.kb = Date.now() - tKb;
   const tAi = Date.now();
+  if (inp.draft) {
+    // Bozza per l'host: stessi dati e stessa base di conoscenza, ma la rilegge una persona prima dell'invio (vedi lib/ai/concierge-draft.ts).
+    const stay = bk && bk.status !== "cancelled" ? "dal " + fmtDMY(bk.checkIn) + " al " + fmtDMY(bk.checkOut) + (((unit as { name?: string } | undefined)?.name) ? ", " + (unit as { name?: string }).name : "") : undefined;
+    const dr = await getConciergeDraft({
+      faq: selectRelevant(faq, inp.message), hasBooking, guestName: inp.guestName, lang,
+      structureName: st.name, address: st.address, checkInFrom: st.checkInFrom, checkInTo: st.checkInTo, checkOutBy: st.checkOutBy,
+      accessInfo, hasParking, transcript: inp.transcript, lastGuestMessage: inp.message, tone: inp.tone, stay,
+    });
+    ms.ai = Date.now() - tAi;
+    if (!dr.ok) return { answered: false, reason: dr.error === "ai_not_configured" ? "AI non configurata (manca ANTHROPIC_API_KEY)" : "errore AI (" + dr.error + ")", hasBooking, lang };
+    return { answered: true, reply: dr.draft, hasBooking, lang };
+  }
   const outcome = await getConciergeReply({
     faq: selectRelevant(faq, inp.message), hasBooking, guestName: inp.guestName, lang,
     structureName: st.name, address: st.address, checkInFrom: st.checkInFrom, checkInTo: st.checkInTo, checkOutBy: st.checkOutBy,

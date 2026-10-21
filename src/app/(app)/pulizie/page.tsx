@@ -80,7 +80,6 @@ export default function PuliziePage() {
   const [view, setView] = useState<"rows" | "cards">("cards");
   const pickView = (v: "rows" | "cards") => { setView(v); try { localStorage.setItem("spigolestay:pulizie:view", v); } catch {} };
   useEffect(() => { try { const v = localStorage.getItem("spigolestay:pulizie:view"); if (v === "rows" || v === "cards") setView(v); } catch {} }, []);
-  const [structFilter, setStructFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState<"tutte" | "dafare" | "riassetto" | "partenze" | "arrivi">("tutte");
   const matchAction = (action: ActionKey) => {
     if (actionFilter === "tutte") return true; // all'apertura: tutte le camere
@@ -270,14 +269,13 @@ export default function PuliziePage() {
   const keyOf = (unitId: string) => `${unitId}:${date}`;
 
   const active = bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && (activeStructureId === "all" || b.structureId === activeStructureId));
-  const scopedStructures = structures.filter((s) =>
-    activeStructureId === "all" ? structFilter === "all" || s.id === structFilter : s.id === activeStructureId
-  );
+  // La struttura si sceglie solo dal selettore globale: con «Tutte» (o un sottoinsieme) il piano le mostra tutte.
+  const scopedStructures = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId);
   // L'invio automatico è per singola struttura (destinatari/orario diversi per ciascuna):
-  // serve una struttura sola selezionata, non "tutte le strutture" senza filtro.
+  // serve una struttura sola selezionata dal selettore in alto a destra.
   const autoShareStructure = activeStructureId !== "all"
     ? structures.find((s) => s.id === activeStructureId)
-    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : structures.length === 1 ? structures[0] : undefined); // con una sola struttura nell'account non serve sceglierla
+    : structures.length === 1 ? structures[0] : undefined; // con una sola struttura nell'account non serve sceglierla
 
   // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione
   // (calcolato per struttura, come nella pagina Camere — non fa parte della logica condivisa col cron).
@@ -609,12 +607,6 @@ export default function PuliziePage() {
       {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi.
           Telefono: [‹ data ›] [Filtri] [Condividi]; struttura, Oggi, vista e invio programmato stanno nella tendina «Filtri». */}
       {(() => {
-        const structSel = activeStructureId === "all" && (
-          <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-          </select>
-        );
         const oggiBtn = <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>;
         const vistaCtl = (<>
           <div className="flex items-center rounded-lg border border-line p-0.5">
@@ -630,10 +622,8 @@ export default function PuliziePage() {
             <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
           </>)}
         </>);
-        const nFilt = structFilter !== "all" ? 1 : 0;
         return (
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:p-1.5">
-        <div className="contents max-sm:hidden">{structSel}</div>
         <div className="flex min-w-0 items-center gap-1 max-sm:shrink-0 max-sm:gap-0.5">
           <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9 max-sm:w-7">‹</button>
           <div className="min-w-0 sm:flex-none"><DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:justify-between max-sm:px-1.5 max-sm:py-0 max-sm:text-[13px]" /></div>
@@ -641,8 +631,7 @@ export default function PuliziePage() {
         </div>
         <div className="contents max-sm:hidden">{oggiBtn}{vistaCtl}</div>
         <div className="ml-auto sm:hidden">
-          <FilterSheet count={nFilt} onReset={() => setStructFilter("all")} className="max-sm:px-2">
-            {structSel}
+          <FilterSheet className="max-sm:px-2">
             <div className="flex flex-wrap items-center gap-2">{oggiBtn}{vistaCtl}</div>
             <button
               onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}

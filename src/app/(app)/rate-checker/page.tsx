@@ -10,6 +10,7 @@ import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import type { Competitor, MarketRateRow } from "@/lib/ratecheck/service";
 import { fmtDM } from "@/lib/dates";
 import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
+import StructureRequired from "@/components/StructureRequired";
 
 const addDays = addDaysYmd; // aritmetica di calendario, immune al cambio dell'ora legale
 const todayISO = () => ymdRome(new Date());
@@ -44,7 +45,7 @@ export default function RateCheckerPage() {
 
   const rts = useMemo(() => roomTypes.filter((rt) => activeStructureId === "all" || rt.structureId === activeStructureId), [roomTypes, activeStructureId]);
 
-  const activeStructure = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) : undefined;
+  const activeStructure = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) : (structures.length === 1 ? structures[0] : undefined);
 
   // Config competitor (localStorage per struttura) — NON tocca lo store globale.
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
@@ -75,6 +76,7 @@ export default function RateCheckerPage() {
   const removeCompetitor = (i: number) => persist(competitors.filter((_, idx) => idx !== i));
 
   const refresh = useCallback(async () => {
+    if (activeStructureId === "all" && structures.length > 1) return; // con «Tutte» la pagina chiede di scegliere la struttura: niente chiamata
     setLoading(true); setErr(null);
     try {
       let token: string | undefined;
@@ -101,7 +103,7 @@ export default function RateCheckerPage() {
     } catch {
       setConfigured(null); setErr(t("Errore di rete.")); setMarket([]);
     } finally { setLoading(false); }
-  }, [activeStructureId, competitors, activeStructure?.lat, activeStructure?.lng, t]);
+  }, [activeStructureId, structures.length, competitors, activeStructure?.lat, activeStructure?.lng, t]);
 
   // Verifica il connettore al caricamento e quando cambia struttura o lista competitor.
   useEffect(() => { void refresh(); }, [refresh]);
@@ -135,9 +137,17 @@ export default function RateCheckerPage() {
     }
     return { sotto, linea, sopra, n, avgGapPct: n ? Math.round((gapSum / n) * 100) : null };
   }, [rows]);
-  const noCoords = activeStructureId === "all" || typeof activeStructure?.lat !== "number" || typeof activeStructure?.lng !== "number";
+  const noCoords = typeof activeStructure?.lat !== "number" || typeof activeStructure?.lng !== "number";
 
   const isConfigured = configured === true;
+
+  // Competitor e coordinate sono di una struttura: con «Tutte» (più strutture) si sceglie in alto a destra.
+  if (activeStructureId === "all" && structures.length > 1) return (
+    <div>
+      <PageHeader title="Rate checker" subtitle={t("Confronta le tue tariffe con i competitor della zona")} />
+      <StructureRequired sub="Il confronto usa le coordinate e i competitor di una struttura." />
+    </div>
+  );
 
   return (
     <div>
@@ -165,7 +175,7 @@ export default function RateCheckerPage() {
         {isConfigured && !err && updatedAt && <div className="mt-2 text-[11px] text-faint">{t("Ultimo aggiornamento")}: {new Date(updatedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</div>}
         {isConfigured && noCoords && (
           <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>
-            {activeStructureId === "all" ? t("Seleziona una struttura in alto: il confronto usa le sue coordinate e i suoi competitor.") : t("Questa struttura non ha le coordinate (latitudine/longitudine): imposta l'indirizzo nella scheda struttura, altrimenti il provider può non trovare i competitor giusti.")}
+            {t("Questa struttura non ha le coordinate (latitudine/longitudine): imposta l'indirizzo nella scheda struttura, altrimenti il provider può non trovare i competitor giusti.")}
           </div>
         )}
         {isConfigured && competitors.length === 0 && !showConfig && (

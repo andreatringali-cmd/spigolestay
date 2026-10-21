@@ -10,6 +10,7 @@ import { toISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { DEFAULT_EXTRAS, type ExtraService } from "@/lib/types";
 import { PageHeader, StatCard } from "@/components/ui";
+import StructureRequired from "@/components/StructureRequired";
 import {
   estimateRate, isActive, isPriceUnverified, potentialOf, proposable, proposalsFor, upsellStats,
 } from "@/lib/upselling";
@@ -32,12 +33,12 @@ export default function UpsellingPage() {
   const [windowDays, setWindowDays] = useState(14);
   const [showEmpty, setShowEmpty] = useState(false);
   const [period, setPeriod] = useState("365");
-  const [localCat, setLocalCat] = useState<string>(structures[0]?.id ?? "");
   // Link diretto alla scheda catalogo (es. dalla scheda prenotazione: "Imposta prezzi e extra").
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get("tab") === "catalogo") setTab("catalogo"); } catch { /* niente query */ } }, []);
 
   // ── Catalogo extra della struttura selezionata (fonte unica, condivisa col motore prenotazioni) ──
-  const catId = activeStructureId !== "all" ? activeStructureId : (structures.some((s) => s.id === localCat) ? localCat : structures[0]?.id ?? "");
+  // Con «Tutte» (più strutture) il catalogo, che è di una struttura sola, chiede di sceglierla in alto a destra.
+  const catId = activeStructureId !== "all" ? activeStructureId : (structures.length === 1 ? structures[0].id : "");
   const catStruct = structures.find((s) => s.id === catId);
   const catExtras = catStruct?.extras ?? [];
   const saveCat = (next: ExtraService[]) => { if (catId) updateStructure(catId, { extras: next }); };
@@ -115,14 +116,8 @@ export default function UpsellingPage() {
         <StatCard label="Extra venduti" value={eur(stats.soldRevenue)} hint={stats.bookings ? `${attach}% delle prenotazioni ha un extra` : "nessuna prenotazione nel periodo"} />
       </div>
 
-      {/* Selettori: da sm in su stanno a destra delle schede; su telefono il periodo del Registro sta nel pulsante «Filtri» del Registro
-          e la struttura del Catalogo (un solo filtro) sta in una riga a tutta larghezza sotto le schede. */}
+      {/* Schede; il periodo del Registro sta a destra da sm in su e nel pulsante «Filtri» del Registro su telefono. La struttura si sceglie solo in alto a destra. */}
       {(() => {
-        const catSelect = tab === "catalogo" && activeStructureId === "all" && structures.length > 0 ? (
-          <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus max-sm:h-9 max-sm:w-full max-sm:py-1 max-sm:text-[13px]">
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        ) : null;
         return (
           <>
             <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-line max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-0">
@@ -130,11 +125,9 @@ export default function UpsellingPage() {
                 <button key={k} onClick={() => setTab(k)} className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm transition max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-center max-sm:text-[13px] ${tab === k ? "border-focus font-semibold text-focus" : "border-transparent text-dim hover:text-txt"}`}>{l}</button>
               ))}
               <div className="ml-auto flex flex-wrap items-center gap-2 pb-1 max-sm:hidden">
-                {catSelect}
                 {tab === "registro" && periodSelect}
               </div>
             </div>
-            {catSelect && <div className="mb-3 sm:hidden">{catSelect}</div>}
           </>
         );
       })()}
@@ -148,7 +141,9 @@ export default function UpsellingPage() {
       {tab === "catalogo" && (
         structures.length === 0
           ? <div className="rounded-xl border border-dashed border-line bg-surface py-10 text-center text-sm text-faint">Crea prima una struttura per gestire il catalogo extra.</div>
-          : <CatalogTab key={catId} structure={catStruct} extras={catExtras} onSave={saveCat} stats={stats.perExtra} addDisabled={!catId} />
+          : !catId
+            ? <StructureRequired sub="Il catalogo extra è di una struttura alla volta." />
+            : <CatalogTab key={catId} structure={catStruct} extras={catExtras} onSave={saveCat} stats={stats.perExtra} addDisabled={!catId} />
       )}
     </div>
   );

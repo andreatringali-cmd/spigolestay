@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
+import StructureRequired from "@/components/StructureRequired";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import Popover from "@/components/Popover";
@@ -444,11 +445,9 @@ export default function GuidaOspitiPage() {
   const { structures, units, roomTypes, activeStructureId, updateStructure, bookings, getUnit, getGuest, addActivity } = useData();
   // Registra nel "Registro attività" una voce per sessione di modifica della guida (non a ogni tasto).
   const loggedGuideSids = useRef<Set<string>>(new Set());
-  const [sid, setSid] = useState(activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""));
-  // La struttura si sceglie dal selettore globale in alto (StructureSwitcher): qui la seguiamo.
-  useEffect(() => { if (activeStructureId !== "all") setSid(activeStructureId); }, [activeStructureId]);
-  // Se le strutture arrivano dopo il primo render (sid ancora vuoto o non più valido) ripiega sulla prima.
-  useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures.length) setSid(activeStructureId !== "all" ? activeStructureId : structures[0].id); }, [structures, sid, activeStructureId]);
+  // La struttura si sceglie SOLO dal selettore globale in alto a destra: qui la seguiamo. Con «Tutte» e più strutture la pagina lo chiede.
+  const sid = activeStructureId !== "all" ? activeStructureId : (structures.length === 1 ? structures[0].id : "");
+  const needPick = activeStructureId === "all" && structures.length > 1;
   const [all, setAll] = useState<Record<string, Guide>>({});
   const [previewKey, setPreviewKey] = useState(0);
   const [savedTick, setSavedTick] = useState(false);
@@ -958,6 +957,13 @@ export default function GuidaOspitiPage() {
   })();
   const issueErr = guideIssues.filter((x) => x.level === "err").length;
 
+  if (needPick) return (
+    <div>
+      <PageHeader title="Guida ospiti" subtitle="Una guida multilingua per struttura · personalizza e genera il link da inviare" />
+      <StructureRequired sub="La guida è di una struttura alla volta." />
+    </div>
+  );
+
   return (
     <div>
       <PageHeader
@@ -981,17 +987,8 @@ export default function GuidaOspitiPage() {
       {/* Riga filtri: a sinistra la struttura che stai modificando, a destra i controlli dell'anteprima */}
       <div className="mb-4 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Con una struttura selezionata in alto la guida segue quella (niente selettore disallineato); con "Tutte" si sceglie qui. */}
-          {activeStructureId === "all" ? (
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-dim">
-              <span className="text-faint">🏠 Struttura:</span>
-              <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
-                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-dim"><span className="text-faint">🏠 Struttura:</span> <span className="text-txt">{struct?.name ?? ""}</span></span>
-          )}
+          {/* La guida segue la struttura scelta in alto a destra (nessun selettore qui). */}
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-dim"><span className="text-faint">🏠 Struttura:</span> <span className="text-txt">{struct?.name ?? ""}</span></span>
           <div className="flex flex-wrap items-center gap-2">
           {otherStructs.length > 0 && (
             <div className="relative">

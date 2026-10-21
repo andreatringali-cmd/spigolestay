@@ -63,7 +63,6 @@ export default function CamerePage() {
   const { t } = useLang();
   const { structures, roomTypes, units, activeStructureId, updateUnit, updateRoomType, addActivity } = useData();
   const ask = useConfirm();
-  const [localS, setLocalS] = useState("all");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
   const [sortKey, setSortKey] = useState<string>("name");
@@ -170,7 +169,6 @@ export default function CamerePage() {
     if (!u) return;
     const unit = units.find((x) => x.id === u);
     if (!unit) return;
-    if (activeStructureId === "all") setLocalS(unit.structureId);
     setHighlight(u);
     const t1 = window.setTimeout(() => document.getElementById(`unit-${u}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
     const t2 = window.setTimeout(() => setHighlight(null), 2800);
@@ -178,11 +176,11 @@ export default function CamerePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const scoped = structures.filter((s) => (activeStructureId === "all" ? localS === "all" || s.id === localS : s.id === activeStructureId));
+  const scoped = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId); // la struttura si sceglie solo dal selettore globale
 
   // Cambiando struttura si azzerano selezione multipla e modale aperto: le camere selezionate di un'altra
   // struttura non devono restare "invisibili" e finire nella modifica in blocco.
-  useEffect(() => { setSel(new Set()); setRoomModal(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeStructureId, localS]);
+  useEffect(() => { setSel(new Set()); setRoomModal(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeStructureId]);
 
   return (
     <div>

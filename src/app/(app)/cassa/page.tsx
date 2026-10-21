@@ -115,12 +115,11 @@ export default function CassaPage() {
   const [overrides, setOverrides] = useState<OccOverrides>(() => (typeof window === "undefined" ? {} : loadOverrides())); // righe modificate per singola scadenza
   const [occCtx, setOccCtx] = useState<{ key: string; ruleId: string; orig: { amount: number; date: string; desc: string; cat: string; conto: string } } | null>(null);
   const [openPayouts, setOpenPayouts] = useState<Set<string>>(() => new Set()); // bonifici aperti nell'elenco
-  // Le impostazioni incassi sono PER STRUTTURA: nella finestra si sceglie la struttura (di partenza la attiva, se è una sola; altrimenti la prima).
-  const [payoutStruct, setPayoutStruct] = useState("");
-  const payoutSid = scopeStructs.some((x) => x.id === payoutStruct) ? payoutStruct : (scopeStructs[0]?.id ?? structures[0]?.id ?? "");
+  // Le impostazioni incassi sono PER STRUTTURA: valgono per quella scelta in alto a destra (con più strutture la finestra chiede di sceglierne una).
+  const payoutSid = scopeStructs.length === 1 ? scopeStructs[0].id : scopeStructs.length === 0 ? (structures[0]?.id ?? "") : "";
   const payoutKey = payoutSid || DEFAULT_PAYOUTS_ID;
   const payoutsOfModal = payoutSettingsFor(payouts, payoutSid);
-  const openPayoutModal = () => { setPayoutStruct(""); setPayoutModal(true); };
+  const openPayoutModal = () => { setPayoutModal(true); };
   const commitPayouts = (next: PayoutSettingsMap) => { setPayouts(next); savePayoutSettings(next); };
   // Al primo cambio una struttura che eredita le predefinite ne crea la copia propria.
   const setPayoutRule = (ch: Channel, patch: Record<string, unknown>) => { const base = payoutSettingsFor(payouts, payoutSid); commitPayouts({ ...payouts, [payoutKey]: { ...base, [ch]: cleanRule({ ...(base[ch] ?? { mode: "arrival" }), ...patch }) } }); };
@@ -1132,11 +1131,9 @@ export default function CassaPage() {
           <div className="relative max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento.")}</p>
-            {scopeStructs.length > 1 && (
-              <div className="mb-2 flex flex-wrap gap-1">
-                {scopeStructs.map((x) => <button key={x.id} type="button" onClick={() => setPayoutStruct(x.id)} aria-pressed={payoutSid === x.id} className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${payoutSid === x.id ? "border-transparent bg-focus text-on-focus" : "border-line text-dim hover:bg-wash"}`}>{x.name}</button>)}
-              </div>
-            )}
+            {scopeStructs.length > 1 ? (
+              <p className="rounded-xl border border-line bg-wash px-3 py-6 text-center text-sm text-dim">{t("Scegli una struttura in alto a destra: le impostazioni degli incassi sono separate per struttura.")}</p>
+            ) : (
             <div className="overflow-hidden rounded-xl border border-line">
               <div className="hidden grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 border-b border-line bg-wash px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim md:grid"><span>{t("Portale")}</span><span>{t("Quando arriva il pagamento")}</span><span>{t("Commissioni")}</span></div>
               {PAYOUT_CHANNELS.map((ch) => {
@@ -1173,6 +1170,7 @@ export default function CassaPage() {
                 );
               })}
             </div>
+            )}
             <button onClick={() => setPayoutModal(false)} className="mt-3 w-full rounded-lg bg-focus py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Fatto")}</button>
           </div>
         </div>

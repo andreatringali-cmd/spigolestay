@@ -65,8 +65,7 @@ const defCfg = (k: string): MetaCfg => ({ on: k === "google", model: "cpc", valu
 export default function MetaSearchPage() {
   const { t } = useLang();
   const { roomTypes, structures, activeStructureId } = useData();
-  const [localStructure, setLocalStructure] = useState("all");
-  const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
+  const effStructure = activeStructureId; // la struttura si sceglie solo in alto a destra
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
 
   const [cfg, setCfg] = useState<Record<string, MetaCfg>>({});
@@ -133,12 +132,6 @@ export default function MetaSearchPage() {
       <PageHeader
         title="Meta Search (beta)"
         subtitle={t("Porta le tue tariffe dirette sui comparatori: l'ospite prenota da te, senza commissione OTA")}
-        actions={activeStructureId === "all" ? (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:py-1 max-sm:text-[13px]">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        ) : null}
       />
 
       {/* Differenza dai Canali, in una riga */}
@@ -224,7 +217,7 @@ export default function MetaSearchPage() {
         <div className="p-4">
           {effStructure === "all" ? (
             <div className="rounded-lg border border-line bg-wash px-3 py-3 text-sm text-dim">
-              {t("Seleziona una struttura in alto: il feed è specifico per ogni struttura.")}
+              {t("Scegli una struttura in alto a destra: il feed è specifico per ogni struttura.")}
             </div>
           ) : slugState === "loading" ? (
             <div className="rounded-lg border border-line bg-wash px-3 py-3 text-sm text-faint">{t("Controllo dello stato di pubblicazione…")}</div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import EmptyState from "@/components/EmptyState";
 import { useData } from "@/lib/store";
 import type { Structure } from "@/lib/types";
 import ConciergeKb from "./ConciergeKb";
@@ -43,9 +44,8 @@ function defaultFaq(st?: Structure): FAQ[] {
 // Concierge AI: risponde da solo agli ospiti dalla base di conoscenza (tab di /messaggi).
 export default function ConciergePanel() {
   const { structures, activeStructureId } = useData();
-  // La base di conoscenza è PER STRUTTURA. Con "Tutte" si sceglie la struttura da qui.
-  const [localSid, setLocalSid] = useState("");
-  const sid = activeStructureId !== "all" ? activeStructureId : (structures.some((s) => s.id === localSid) ? localSid : structures[0]?.id ?? "");
+  // La base di conoscenza è PER STRUTTURA: si sceglie solo dal selettore in alto a destra (con «Tutte» e più strutture: stato vuoto).
+  const sid = activeStructureId !== "all" ? activeStructureId : structures.length === 1 ? structures[0].id : "";
   const st = structures.find((s) => s.id === sid);
   const city = (st?.city || "").trim();
   const [lang, setLang] = useState("it");
@@ -92,18 +92,11 @@ export default function ConciergePanel() {
   const updFaq = (id: string, patch: Partial<FAQ>) => persist(faq.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const delFaq = (id: string) => persist(faq.filter((f) => f.id !== id));
 
+  if (!sid) return <Card><EmptyState title="Scegli una struttura in alto a destra" sub="La base di conoscenza è separata per struttura." /></Card>;
+
   return (
     <div>
-      {activeStructureId === "all" && structures.length > 1 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-xs font-semibold text-dim">Struttura</span>
-          <select value={sid} onChange={(e) => setLocalSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <span className="text-[11px] text-faint">La base di conoscenza è separata per struttura.</span>
-        </div>
-      )}
-      {sid && <ConciergeUnanswered sid={sid} onAdd={setPrefill} createdTick={createdTick} />}
+      {sid &&<ConciergeUnanswered sid={sid} onAdd={setPrefill} createdTick={createdTick} />}
       {sid && <ConciergeKb sid={sid} prefill={prefill} onCreated={() => setCreatedTick((n) => n + 1)} />}
       <SectionTitle>Prove rapide e FAQ locali</SectionTitle>
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

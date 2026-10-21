@@ -33,8 +33,7 @@ const CHANNEL_PRESET_COLORS = ["#FFC93C", "#2563EB", "#7C3AED", "#DB2777", "#E11
 export default function CanaliPage() {
   const { structures, roomTypes, units, bookings, activeStructureId, updateStructure } = useData();
   const { t } = useLang();
-  const [localStructure, setLocalStructure] = useState("all");
-  const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
+  const effStructure = activeStructureId; // la struttura si sceglie solo in alto a destra
 
 
   // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
@@ -259,14 +258,6 @@ export default function CanaliPage() {
       <PageHeader
         title="Channel Manager"
         subtitle={t("Connessioni ai portali, mappatura camere e sincronizzazione prezzi/disponibilità")}
-        actions={
-          activeStructureId === "all" ? (
-            <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-              <option value="all">{t("Tutte le strutture")}</option>
-              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          ) : null
-        }
       />
 
       {/* Andamento per canale: numeri reali dalle prenotazioni (arrivi nel periodo scelto), stesse formule dell'elenco Prenotazioni. */}

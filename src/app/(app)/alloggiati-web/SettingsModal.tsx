@@ -3,7 +3,6 @@
 import DateField from "@/components/DateField";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 
 interface Sett { username: string; password_enc: string; ws_code_enc: string; ws_code_expires_at: string; auto_daily: boolean; group_guests: boolean; group_by_room: boolean; status: string; status_msg: string }
@@ -11,8 +10,7 @@ const DEF: Sett = { username: "", password_enc: "", ws_code_enc: "", ws_code_exp
 
 // Finestra centrale (modale) con le impostazioni account Alloggiati Web.
 export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string; onClose: () => void }) {
-  const { structures, activeStructureId } = useData();
-  const [msid, setMsid] = useState(sid);
+  const msid = sid; // la struttura è quella scelta dal selettore globale: nessuna scelta dentro la finestra
   const [s, setS] = useState<Sett>(DEF);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -77,10 +75,6 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
           </div>
           <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
         </div>
-
-        {structures.length > 1 && activeStructureId === "all" && (
-          <label className="block"><span className={lbl}>Struttura</span><select value={msid} onChange={(e) => setMsid(e.target.value)} className={inp}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-        )}
         <div className="mt-2 space-y-2">
           <label className="block"><span className={lbl}>Username (es. SR001860)</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
           <label className="block"><span className={lbl}>Password {hasPw && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvata</span>}</span>

@@ -13,15 +13,14 @@ type St = { id: string; name: string; googleAdsId?: string; googleAdsLabel?: str
 
 export default function AdsSettingsCard() {
   const { structures, activeStructureId } = useData();
-  const [pick, setPick] = useState("");
   const [savedId, setSavedId] = useState(""); // struttura appena salvata: sta qui (non nel form) perché il form si rimonta (key) quando i valori salvati cambiano e perderebbe la conferma
-  // Struttura in modifica: quella del selettore globale; con "Tutte" la scelta locale (o la prima). Nessun effetto: si ricava a ogni disegno.
-  const sid = activeStructureId !== "all" ? activeStructureId : structures.some((s) => s.id === pick) ? pick : structures[0]?.id ?? "";
+  // Struttura in modifica: quella del selettore globale in alto a destra (con «Tutte» e più strutture nessuna: la scheda chiede di sceglierla). Nessun effetto: si ricava a ogni disegno.
+  const sid = activeStructureId !== "all" ? activeStructureId : structures.length === 1 ? structures[0].id : "";
   const st = structures.find((s) => s.id === sid);
-  return <AdsForm key={`${st?.id}|${st?.googleAdsId ?? ""}|${st?.googleAdsLabel ?? ""}`} st={st} showPicker={activeStructureId === "all" && structures.length > 1} structures={structures} sid={sid} onPick={setPick} saved={!!st && savedId === st.id} setSaved={(v) => setSavedId(v && st ? st.id : "")} />;
+  return <AdsForm key={`${st?.id}|${st?.googleAdsId ?? ""}|${st?.googleAdsLabel ?? ""}`} st={st} needPick={activeStructureId === "all" && structures.length > 1} saved={!!st && savedId === st.id} setSaved={(v) => setSavedId(v && st ? st.id : "")} />;
 }
 
-function AdsForm({ st, showPicker, structures, sid, onPick, saved, setSaved }: { st: St | undefined; showPicker: boolean; structures: St[]; sid: string; onPick: (id: string) => void; saved: boolean; setSaved: (v: boolean) => void }) {
+function AdsForm({ st, needPick, saved, setSaved }: { st: St | undefined; needPick: boolean; saved: boolean; setSaved: (v: boolean) => void }) {
   const { updateStructure } = useData();
   const { t } = useLang();
   const [id, setId] = useState(st?.googleAdsId ?? "");
@@ -56,20 +55,14 @@ function AdsForm({ st, showPicker, structures, sid, onPick, saved, setSaved }: {
         <li className="flex gap-2.5"><span className={num}>2</span><span className="pt-0.5">{t("Ti mostra due codici: l'ID del tag (inizia con AW-) e, nello snippet evento, l'etichetta (la parte dopo la barra in send_to).")}</span></li>
         <li className="flex gap-2.5"><span className={num}>3</span><span className="pt-0.5">{t("Incollali qui sotto (anche tutto il codice insieme: li leggiamo noi), premi Salva e poi ripubblica il sito della struttura.")}</span></li>
       </ol>
-      {showPicker && (
-        <label className="mb-2 block text-xs font-medium text-dim">{t("Struttura")}
-          <select value={sid} onChange={(e) => onPick(e.target.value)} className={`mt-1 ${inp}`}>
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </label>
-      )}
+      {needPick && <p className="mb-2 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">{t("Scegli una struttura in alto a destra: ogni struttura ha il proprio account Google Ads.")}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-medium text-dim">{t("ID del tag Google")}{st ? ` · ${st.name}` : ""}
-          <input value={id} onChange={(e) => { setId(e.target.value); setSaved(false); }} onPaste={(e) => { const tx = e.clipboardData.getData("text"); if (onPaste(tx)) { e.preventDefault(); setSaved(false); } }} placeholder="AW-1234567890" className={`mt-1 ${inp} font-mono`} />
+          <input value={id} disabled={!st} onChange={(e) => { setId(e.target.value); setSaved(false); }} onPaste={(e) => { const tx = e.clipboardData.getData("text"); if (onPaste(tx)) { e.preventDefault(); setSaved(false); } }} placeholder="AW-1234567890" className={`mt-1 ${inp} font-mono`} />
           {!idOk && <span className="mt-1 block text-[11px]" style={{ color: "var(--err)" }}>{t("Deve iniziare con AW- seguito da numeri.")}</span>}
         </label>
         <label className="block text-xs font-medium text-dim">{t("Etichetta di conversione")}
-          <input value={label} onChange={(e) => { setLabel(e.target.value); setSaved(false); }} onPaste={(e) => { const tx = e.clipboardData.getData("text"); if (onPaste(tx)) { e.preventDefault(); setSaved(false); } }} placeholder="AbCdEfGhIjKlMnOp" className={`mt-1 ${inp} font-mono`} />
+          <input value={label} disabled={!st} onChange={(e) => { setLabel(e.target.value); setSaved(false); }} onPaste={(e) => { const tx = e.clipboardData.getData("text"); if (onPaste(tx)) { e.preventDefault(); setSaved(false); } }} placeholder="AbCdEfGhIjKlMnOp" className={`mt-1 ${inp} font-mono`} />
           {!labelOk && <span className="mt-1 block text-[11px]" style={{ color: "var(--err)" }}>{t("Solo lettere, numeri, trattino e sottolineato (8-40 caratteri).")}</span>}
         </label>
       </div>
