@@ -8,6 +8,7 @@ import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { localWorkspaceKeys } from "@/lib/workspace-keys";
+import { isLocalForeign } from "@/lib/sync-owner";
 
 const PULL_MS = 20_000;
 const PUSH_MS = 3_000;
@@ -41,7 +42,10 @@ export default function WorkspaceSync() {
       return [...out];
     };
 
+    // Il locale è condiviso tra le schede: se ora è di un altro account non si scarica né si invia nulla (le impostazioni del titolare finirebbero nell'altro account o viceversa).
+    const foreign = (): boolean => { try { return isLocalForeign(localStorage, user.id); } catch { return false; } };
     const pull = async (): Promise<boolean> => {
+      if (foreign()) return false;
       const { data, error } = await sb.rpc("ws_get", { p_keys: keys() });
       if (error || !data || typeof data !== "object") return false;
       let changed = false;
@@ -63,7 +67,7 @@ export default function WorkspaceSync() {
     };
 
     const push = async () => {
-      if (!ready) return;
+      if (!ready || foreign()) return;
       for (const k of keys()) {
         let local: string | null = null;
         try { local = localStorage.getItem(k); } catch { /* niente */ }

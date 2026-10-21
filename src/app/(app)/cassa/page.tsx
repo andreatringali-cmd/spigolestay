@@ -153,7 +153,7 @@ export default function CassaPage() {
   useEffect(() => {
     if (!user || !tenantId) return; // un collaboratore aspetta di conoscere l'account di lavoro
     (async () => {
-      await migrateLocalCash(tenantId); // una-tantum: sale i vecchi dati locali sul server
+      await migrateLocalCash(tenantId, user.id); // una-tantum: sale i vecchi dati locali sul server (solo se i dati locali sono di questo account)
       const c = await loadCash();
       setManual(c.movements); setRules(c.rules); setPaid(c.paid);
     })();

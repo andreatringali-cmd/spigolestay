@@ -10,6 +10,7 @@ import { shiftISO } from "./dates";
 import { payoutDate, loadPayoutSettings, commissionRuleFor, commissionMonthOf, commissionDateFor, type PayoutSettingsMap } from "./payouts";
 import { roundCents, sumCents } from "./money";
 import { onlineIncasso, directDepositIncasso } from "./online-pay";
+import { isLocalForeign } from "./sync-owner";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; bookingStructureId?: string /* struttura della prenotazione da cui nasce (movimenti automatici): serve a non mescolare strutture nei bonifici unici */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */; variable?: boolean /* scadenza a importo variabile: l'importo è una stima */; commRefs?: string[] /* commissioni mensili tutte insieme: id delle prenotazioni incluse */ }
@@ -292,9 +293,12 @@ export async function addPaid(tenantId: string, keys: string[], orgOf: (key: str
 }
 
 // Migrazione una-tantum dei dati Cassa da localStorage → Supabase (per non perdere lo storico).
-export async function migrateLocalCash(tenantId: string): Promise<boolean> {
+// `userId` = l'account che sta usando l'app: i dati locali si salgono sul server SOLO se sono davvero di questo account (il localStorage è condiviso tra le schede:
+// con un altro account entrato altrove, quelle voci sarebbero finite nella Cassa sbagliata).
+export async function migrateLocalCash(tenantId: string, userId: string): Promise<boolean> {
   if (!supabase) return false;
   try {
+    if (isLocalForeign(localStorage, userId)) return false;
     if (localStorage.getItem("spigolestay:cassa:migrated") === "1") return false;
     const movs: Mov[] = JSON.parse(localStorage.getItem("spigolestay:cassa:v1") || "[]");
     const rules: Rule[] = JSON.parse(localStorage.getItem("spigolestay:cassa:rules") || "[]");

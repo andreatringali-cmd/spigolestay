@@ -15,6 +15,10 @@ import Icon from "@/components/Icon";
 import Popover from "@/components/Popover";
 import { copyGuideContent, guideHasText } from "@/lib/guide-copy";
 import { exampleContentFrom, loadExampleIt } from "@/lib/guide-example";
+import { GUIDES_KEY, commitGuidePatch, rememberGuideUndo, peekGuideUndo, clearGuideUndo, summarizeGuide, replaceConfirmMessage } from "@/lib/guide-protect";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useAuth } from "@/lib/authsync";
+import { isLocalForeign } from "@/lib/sync-owner";
 
 // Forma dati "guida" = window.PROPERTY del motore (public/guida). Multi-tenant: una per struttura.
 interface Guide {
@@ -462,11 +466,31 @@ export default function GuidaOspitiPage() {
   const [copyTv, setCopyTv] = useState(false);
   const [copyMsg, setCopyMsg] = useState(false);
 
-  useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} finally { setLoaded(true); } }, []);
+  const { user: authUser } = useAuth();
+  const confirmAsk = useConfirm();
+  const [, setUndoTick] = useState(0); // fa ridisegnare il pulsante «Annulla ultima sostituzione» quando cambia la copia di salvataggio
+  // Mappa delle guide LETTA ORA da localStorage (null = illeggibile). La pagina non si fida della copia in memoria: un'altra scheda o la sincronizzazione possono averla aggiornata.
+  const readStored = (): Record<string, Guide> | null => {
+    try { const p = JSON.parse(localStorage.getItem(GUIDES_KEY) || "{}"); return p && typeof p === "object" && !Array.isArray(p) ? (p as Record<string, Guide>) : null; } catch { return null; }
+  };
+  useEffect(() => { try { setAll(JSON.parse(localStorage.getItem(GUIDES_KEY) || "{}")); } catch {} finally { setLoaded(true); } }, []);
+  // Se la sincronizzazione (o un'altra scheda) aggiorna le guide mentre la pagina è aperta, la pagina le rilegge: ogni modifica è già salvata a ogni tasto, quindi non si perde nulla.
+  useEffect(() => {
+    const reload = () => { try { const p = JSON.parse(localStorage.getItem(GUIDES_KEY) || "{}"); if (p && typeof p === "object" && !Array.isArray(p)) setAll(p as Record<string, Guide>); } catch { /* illeggibile: resta la copia in memoria */ } };
+    window.addEventListener("spigolestay:datasync", reload); window.addEventListener("storage", reload);
+    return () => { window.removeEventListener("spigolestay:datasync", reload); window.removeEventListener("storage", reload); };
+  }, []);
   const persist = (next: Record<string, Guide>) => {
     setAll(next);
-    try { localStorage.setItem("spigolestay:guides", JSON.stringify(next)); setStorageFull(false); }
+    try { localStorage.setItem(GUIDES_KEY, JSON.stringify(next)); setStorageFull(false); }
     catch { setStorageFull(true); } // quota superata (di solito foto troppo pesanti): il salvataggio non è andato
+  };
+  // Salva una modifica alla guida di questa struttura sulla mappa letta ORA da localStorage (le altre strutture non si toccano). `explicit` = i campi che il titolare ha scelto di cambiare:
+  // gli altri non possono diventare vuoti se erano pieni (vedi guide-protect.ts).
+  const commit = (patch: Partial<Guide>, explicit: string[], fallback: Guide): Guide => {
+    const res = commitGuidePatch(readStored() ?? all, sid, patch as Record<string, unknown>, explicit, fallback as unknown as Record<string, unknown>);
+    persist(res.map as Record<string, Guide>);
+    return res.guide as unknown as Guide;
   };
 
   const struct = structures.find((s) => s.id === sid);
@@ -474,7 +498,7 @@ export default function GuidaOspitiPage() {
   const set = (patch: Partial<Guide>) => {
     // Prima modifica manuale di questa guida nella sessione → una voce nel registro attività.
     if (loaded && !loggedGuideSids.current.has(sid)) { loggedGuideSids.current.add(sid); addActivity("config", `Guida ospiti aggiornata${struct?.name ? " — " + struct.name : ""}`); }
-    persist({ ...all, [sid]: { ...guide, ...patch, id: sid } });
+    commit(patch, Object.keys(patch), guide);
   };
   const setSocial = (patch: Partial<Guide["social"]>) => set({ social: { ...guide.social, ...patch } });
   const tv = guide.tv ?? { enabled: false, bg: "", welcome: "", sections: [], showGuest: true };
@@ -503,7 +527,7 @@ export default function GuidaOspitiPage() {
     if (!ssid) return;
     if (guide.wifiQr && guide.wifiQrFor === wifiKey(ssid, pw)) return; // già aggiornato
     let cancelled = false;
-    makeWifiQr(ssid, pw).then((url) => { if (!cancelled) persist({ ...all, [sid]: { ...guide, wifiQr: url, wifiQrFor: wifiKey(ssid, pw), id: sid } }); }).catch(() => {});
+    makeWifiQr(ssid, pw).then((url) => { if (!cancelled) commit({ wifiQr: url, wifiQrFor: wifiKey(ssid, pw) }, ["wifiQr", "wifiQrFor"], guide); }).catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guide.wifiNetwork, guide.wifiPassword, loaded, sid]);
@@ -535,13 +559,17 @@ export default function GuidaOspitiPage() {
   // al primo render (all ancora vuoto) sovrascriverebbe la guida salvata azzerando i contenuti.
   useEffect(() => {
     if (!loaded || !sid) return; // senza struttura (arrivano dopo il primo render) non si crea un record guida con id vuoto
-    const cur = all[sid];
+    const stored = readStored() ?? all; // la guida salvata ORA (non la copia in memoria, che può essere vecchia o di un altro account)
+    const cur = stored[sid];
+    if (!cur && !struct) return; // né guida né struttura (ancora in caricamento): non si crea uno scaffold vuoto che poi la sincronizzazione porterebbe sopra una guida piena
     const base = cur ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "");
     // Lo scaffold delle sezioni è sempre presente: così le operative (contatti, WiFi, recensioni)
     // compaiono da sole appena la struttura ha i dati, senza che l'host scriva nulla.
     const merged = { ...base, ...structFields, content: base.content ?? EMPTY_CONTENT, id: sid, social: { ...base.social, ...(structFields.social ?? {}) } };
-    if (JSON.stringify(cur ?? null) !== JSON.stringify(merged)) {
-      persist({ ...all, [sid]: merged });
+    // I campi della struttura seguono le Impostazioni struttura SOLO se la struttura esiste; tutto il resto non può svuotarsi da solo (vedi protectGuideWrite).
+    const res = commitGuidePatch(stored, sid, merged as unknown as Record<string, unknown>, struct ? Object.keys(structFields) : [], base as unknown as Record<string, unknown>);
+    if (JSON.stringify(cur ?? null) !== JSON.stringify(res.guide)) {
+      persist(res.map as Record<string, Guide>);
       // Prima creazione del record guida: ricarico l'anteprima così mostra la guida (vuota) dell'host
       // e non l'ESEMPIO Siracusa (il motore ricade sull'esempio solo se manca del tutto il record).
       if (!cur) setPreviewKey((k) => k + 1);
@@ -845,7 +873,12 @@ export default function GuidaOspitiPage() {
   // L'esempio sostituisce i TESTI della guida, ma non tocca dati reali: dei dati struttura e delle credenziali
   // (WiFi, orari, telefoni, link) compila solo i campi ancora vuoti.
   const loadDemo = async () => {
-    if (hasRealContent && !confirm("Sostituire i testi della guida con l'esempio di Siracusa?\n\nI dati già inseriti (indirizzo, telefoni, WiFi, orari, link) NON vengono toccati: l'esempio compila solo i campi vuoti. Le traduzioni verranno rigenerate.")) return;
+    // Se la guida ha già dei contenuti si mostra COSA verrà sostituito (sezioni, parole, traduzioni) e si chiede conferma; subito dopo si può tornare indietro (copia di salvataggio).
+    if (hasRealContent && !(await confirmAsk({
+      title: "Sostituire i testi della guida?",
+      message: replaceConfirmMessage(struct?.name ?? guide.guideName, summarizeGuide(readStored()?.[sid] ?? guide), "esempio"),
+      confirmLabel: "Sì, sostituisci i testi", cancelLabel: "No, tieni la mia guida", danger: true,
+    }))) return;
     // I testi si copiano dall'esempio del telefono «Esempio»: la tua guida parte identica. Se l'esempio non si carica NON si applica nulla (niente testi diversi dall'esempio).
     let content: GContent;
     try { content = exampleContentFrom(await loadExampleIt(), DEMO_CONTENT as never) as unknown as GContent; } catch { alert("Non riesco a caricare l'esempio. Riprova tra un attimo."); return; }
@@ -854,23 +887,45 @@ export default function GuidaOspitiPage() {
     if (Object.keys(structPatch).length) updateStructure(sid, structPatch);
     const gRec = guide as unknown as Record<string, unknown>;
     const guidePatch = Object.fromEntries(Object.entries(DEMO_GUIDE).filter(([k]) => !String(gRec[k] ?? "").trim()));
+    rememberGuideUndo(sid, readStored()?.[sid] ?? guide, "Parti dall'esempio"); // copia di salvataggio: «Annulla ultima sostituzione»
     set({ ...guidePatch, content, i18n: {} });
+    setUndoTick((n) => n + 1);
+    refresh();
+  };
+  // Rimette la guida com'era prima dell'ultima sostituzione («Parti dall'esempio» o «Copia da un'altra struttura»). Vale finché la scheda resta aperta.
+  const undoSlot = sid ? peekGuideUndo(sid) : null;
+  const undoReplace = async () => {
+    const slot = sid ? peekGuideUndo(sid) : null; if (!slot) return;
+    const when = new Date(slot.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    if (!(await confirmAsk({ title: "Annullare l'ultima sostituzione?", message: `La guida tornerà com'era prima di «${slot.label}» (${when}). I testi che ci sono ora verranno sostituiti da quelli di prima.`, confirmLabel: "Sì, torna indietro", cancelLabel: "No, lascia com'è" }))) return;
+    const prev = slot.guide as unknown as Guide;
+    if (prev.i18n && TR_LANGS.some((l) => !!prev.i18n?.[l]) && prev.content) lastTrSig.current = JSON.stringify(prev.content); // le traduzioni di prima sono valide: niente ritraduzione automatica
+    commit(prev, Object.keys(slot.guide), guide);
+    clearGuideUndo(sid); setUndoTick((n) => n + 1);
     refresh();
   };
   const savedThis = !!all[sid];
   // Copia testi + traduzioni (e a richiesta TV / messaggio) da un'altra struttura. Dati della struttura, contatti, WiFi, orari, link e codici NON si toccano.
-  const copyFromOther = () => {
-    const srcG = all[copySrc];
+  const copyFromOther = async () => {
+    const stored = readStored() ?? all;
+    const srcG = stored[copySrc];
     const srcS = structures.find((x) => x.id === copySrc);
     if (!srcG || !guideHasText(srcG.content)) { alert("La guida di quella struttura è ancora vuota: non c'è niente da copiare."); return; }
-    if (hasRealContent && !confirm(`Sostituire i testi della guida di "${struct?.name ?? ""}" con quelli di "${srcS?.name ?? ""}"?\n\nI dati della struttura (indirizzo, telefoni, WiFi, orari, link, codici) NON vengono toccati. Le traduzioni già fatte vengono copiate insieme ai testi.`)) return;
+    if (hasRealContent && !(await confirmAsk({
+      title: "Sostituire i testi della guida?",
+      message: replaceConfirmMessage(struct?.name ?? guide.guideName, summarizeGuide(stored[sid] ?? guide), "struttura", srcS?.name ?? ""),
+      confirmLabel: "Sì, sostituisci i testi", cancelLabel: "No, tieni la mia guida", danger: true,
+    }))) return;
     const patch = copyGuideContent(srcG, guide, { tv: copyTv, inviteMsg: copyMsg }) as Partial<Guide>;
-    // Controllo quota PRIMA di toccare lo stato: se non entra, la guida attuale resta com'è.
-    try { localStorage.setItem("spigolestay:guides", JSON.stringify({ ...all, [sid]: { ...guide, ...patch, id: sid } })); }
+    // Controllo quota PRIMA di toccare lo stato: se non entra, la guida attuale resta com'è. (Si scrive la mappa letta ora, con la sola guida di questa struttura cambiata.)
+    const before = stored[sid] ?? guide;
+    try { localStorage.setItem(GUIDES_KEY, JSON.stringify(commitGuidePatch(stored, sid, patch as Record<string, unknown>, Object.keys(patch), guide as unknown as Record<string, unknown>).map)); }
     catch { alert("Memoria piena: non riesco a copiare la guida (di solito per le foto pesanti). Non è stato cambiato nulla: togli qualche foto dalla guida di origine o di destinazione e riprova."); return; }
     // Se la sorgente ha già le traduzioni, segno questo contenuto come "già tradotto": niente ri-traduzione automatica.
     if (TR_LANGS.some((l) => !!patch.i18n?.[l])) lastTrSig.current = JSON.stringify(patch.content);
+    rememberGuideUndo(sid, before, `Copia da «${srcS?.name ?? ""}»`); // copia di salvataggio: «Annulla ultima sostituzione»
     set(patch);
+    setUndoTick((n) => n + 1);
     setCopyOpen(false);
     refresh();
   };
@@ -887,6 +942,7 @@ export default function GuidaOspitiPage() {
     const g = all[sid];
     if (!g) return;
     const t = setTimeout(() => {
+      try { if (authUser?.id && isLocalForeign(localStorage, authUser.id)) return; } catch { /* storage non disponibile */ } // il locale è di un altro account: non si pubblica nulla
       supabase!.from("public_guides").upsert({ id: sid, data: stripNul(cleanGuide(g)), updated_at: new Date().toISOString() }).then(undefined, () => {});
     }, 4000);
     return () => clearTimeout(t);
@@ -1010,6 +1066,7 @@ export default function GuidaOspitiPage() {
             </div>
           )}
           <button onClick={loadDemo} title="Copia i testi della guida di esempio (Siracusa) in questa guida: i tuoi dati non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">✨ Parti dall&apos;esempio</button>
+          {undoSlot && <button onClick={undoReplace} title={`Rimette la guida com'era prima di «${undoSlot.label}»`} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↩ Annulla ultima sostituzione</button>}
           <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
           <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
             <option value="it">🇮🇹 Italiano</option>
@@ -1019,7 +1076,7 @@ export default function GuidaOspitiPage() {
             <option value="es">🇪🇸 Español</option>
           </select>
           <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
-          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid]) supabase.from("public_guides").upsert({ id: sid, data: stripNul(cleanGuide(all[sid])), updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
+          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid] && !(authUser?.id && isLocalForeign(localStorage, authUser.id))) supabase.from("public_guides").upsert({ id: sid, data: stripNul(cleanGuide(all[sid])), updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
             {savedTick
               ? <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</span>
               : <>💾 Salvataggio automatico{lastSaved ? ` · ${new Date(lastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}</>}
