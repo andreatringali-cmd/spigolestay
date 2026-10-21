@@ -1,6 +1,5 @@
 "use client";
 
-import LoginWaves from "@/components/LoginWaves";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -196,8 +195,7 @@ export default function LoginForm() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
-      <LoginWaves />
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-paper px-6 py-6 text-[#1f1b16]">
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto">
         <div className="my-auto w-full max-w-md rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
           {/* Logo dentro il box, centrato */}
@@ -341,15 +339,15 @@ export default function LoginForm() {
         </div>
 
       </main>
-      <footer className="relative mt-3 border-t border-[#eceae4] px-2 pt-2 text-[11px] text-[#9a9186]">
+      <footer className="relative mt-1 border-t border-[#eceae4] px-2 pt-1 text-[11px] leading-tight text-[#9a9186]">
         {/* Mobile: sito + social sulla stessa riga */}
-        <div className="mb-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 sm:hidden">
-          <a href="/termini" className="py-1.5 hover:text-[#4a453d] hover:underline">Termini</a>
-          <a href="/privacy" className="py-1.5 hover:text-[#4a453d] hover:underline">Privacy</a>
-          <a href="/cookie" className="py-1.5 hover:text-[#4a453d] hover:underline">Cookie</a>
+        <div className="flex flex-wrap items-center justify-center gap-x-3 sm:hidden">
+          <a href="/termini" className="py-1 hover:text-[#4a453d] hover:underline">Termini</a>
+          <a href="/privacy" className="py-1 hover:text-[#4a453d] hover:underline">Privacy</a>
+          <a href="/cookie" className="py-1 hover:text-[#4a453d] hover:underline">Cookie</a>
         </div>
         <div className="flex items-center justify-between gap-2 sm:hidden">
-          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="py-2 hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="py-1 hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
           <SocialIcons />
         </div>
 
