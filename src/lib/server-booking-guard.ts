@@ -4,6 +4,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rateForDay } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
+import { buildBlockData, diffBlockParts, diffValues, entitiesSwitch, readBookings, readRateOverrides, readRoomTypes, readStructureAcrossOwners, readUnits, type EntityOwner } from "@/lib/server-entities";
+
+// Le letture di questo file seguono l'interruttore SERVER_READ_ENTITIES (off | compare | on, vedi server-entities.ts / SERVER-ENTITIES.md):
+// con "on" strutture, tipologie, camere e prenotazioni vengono dalle tabelle (public.entities) invece che dal blocco. Le scritture dei chiamanti non cambiano.
+// Le organizzazioni di cui il proprietario e' membro si leggono sempre da memberships (invariato).
+async function orgIdsOf(admin: SupabaseClient, ownerId: string): Promise<string[]> {
+  const { data: ms, error } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
+  if (error) throw new Error("memberships: " + error.message);
+  return arr(ms).map((m) => String(m.org_id || "")).filter(Boolean);
+}
+// Proprietari in ordine di fiducia (come nel blocco): prima le organizzazioni, poi il personale.
+const ownersOf = (orgIds: string[], ownerId: string): EntityOwner[] => [...orgIds.map((id) => ({ type: "o" as const, id })), { type: "u" as const, id: ownerId }];
+const PART_KINDS = ["structures", "roomTypes", "units", "bookings"] as const;
 
 const DATA_KEY = "spigolestay:data:v1";
 type Json = Record<string, unknown>;
@@ -14,6 +27,22 @@ export interface OwnerStructureData { roomTypes: RoomType[]; units: Json[]; book
 
 /** Dati della struttura del proprietario: dal suo stato personale oppure, se è condivisa, da quello dell'organizzazione. */
 export async function loadOwnerStructureData(admin: SupabaseClient, ownerId: string, sid: string): Promise<OwnerStructureData | null> {
+  return entitiesSwitch<OwnerStructureData | null>({
+    label: "loadOwnerStructureData",
+    legacy: () => loadOwnerStructureDataFromBlock(admin, ownerId, sid),
+    tables: () => loadOwnerStructureDataFromTables(admin, ownerId, sid),
+    diff: (a, b) => (a && b ? diffBlockParts([a as unknown as Json], [b as unknown as Json], ["roomTypes", "units", "bookings"], { rates: true }) : a === b ? null : { block: a ? "dati" : null, tables: b ? "dati" : null }),
+  });
+}
+async function loadOwnerStructureDataFromTables(admin: SupabaseClient, ownerId: string, sid: string): Promise<OwnerStructureData | null> {
+  const owners = ownersOf(await orgIdsOf(admin, ownerId), ownerId);
+  const has = await readStructureAcrossOwners(admin, owners, sid);
+  const owner = owners.find((o) => has.has(o.type + ":" + o.id));
+  if (!owner) return null;
+  const [roomTypes, units, bookings, rates] = await Promise.all([readRoomTypes(admin, owner), readUnits(admin, owner), readBookings(admin, owner), readRateOverrides(admin, owner)]);
+  return { roomTypes: roomTypes as unknown as RoomType[], units, bookings, rateOverrides: rates.map };
+}
+async function loadOwnerStructureDataFromBlock(admin: SupabaseClient, ownerId: string, sid: string): Promise<OwnerStructureData | null> {
   const pick = (d: Json): OwnerStructureData | null => {
     if (!arr(d.structures).some((s) => s.id === sid)) return null;
     return { roomTypes: arr(d.roomTypes) as unknown as RoomType[], units: arr(d.units), bookings: arr(d.bookings), rateOverrides: (d.rateOverrides && typeof d.rateOverrides === "object" ? d.rateOverrides : {}) as Record<string, number> };
@@ -32,6 +61,14 @@ export async function loadOwnerStructureData(admin: SupabaseClient, ownerId: str
 
 /** Dati (spigolestay:data:v1 già letti) di tutte le organizzazioni di cui l'utente è membro: le strutture condivise stanno solo lì, non nello stato personale. */
 export async function loadOrgDataParts(admin: SupabaseClient, ownerId: string): Promise<Json[]> {
+  return entitiesSwitch<Json[]>({
+    label: "loadOrgDataParts",
+    legacy: () => loadOrgDataPartsFromBlock(admin, ownerId),
+    tables: async () => Promise.all((await orgIdsOf(admin, ownerId)).map((id) => buildBlockData(admin, { type: "o", id }, { kinds: [...PART_KINDS], rateOverrides: true }))),
+    diff: (a, b) => diffBlockParts(a, b, PART_KINDS, { rates: true }),
+  });
+}
+async function loadOrgDataPartsFromBlock(admin: SupabaseClient, ownerId: string): Promise<Json[]> {
   const out: Json[] = [];
   try {
     const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
@@ -100,6 +137,25 @@ export function isRealIsoDate(s: unknown): s is string {
  */
 export async function findOwnerStructure(admin: SupabaseClient, ownerId: string, sid: string): Promise<Json | null> {
   if (!ownerId || !sid) return null;
+  return entitiesSwitch<Json | null>({
+    label: "findOwnerStructure",
+    legacy: () => findOwnerStructureFromBlock(admin, ownerId, sid),
+    tables: async () => {
+      const orgIds = await orgIdsOf(admin, ownerId);
+      const found = await readStructureAcrossOwners(admin, ownersOf(orgIds, ownerId), sid);
+      let orgSt: Json | null = null;
+      for (const id of orgIds) {
+        const s = found.get("o:" + id);
+        if (s) { orgSt = s; if (s.stripeAccount) return s; }
+      }
+      const perSt = found.get("u:" + ownerId) ?? null;
+      if (perSt?.stripeAccount) return perSt;
+      return orgSt || perSt;
+    },
+    diff: (a, b) => diffValues(a, b),
+  });
+}
+async function findOwnerStructureFromBlock(admin: SupabaseClient, ownerId: string, sid: string): Promise<Json | null> {
   try {
     let orgSt: Json | null = null;
     const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);

@@ -1,7 +1,7 @@
 // Servizio Alloggiati Web (server-side, service role). Genera le schedine dagli
 // ospiti della prenotazione, valida il tracciato in locale, invia via provider.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
+import { loadTenantData } from "@/lib/concierge-orgdata";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { nights } from "@/lib/dates";
 import { plural } from "@/lib/plural";
@@ -125,12 +125,9 @@ export function buildRecordResolved(g: SchedinaGuest, ruolo: string, arrival: st
 type Blob = { structures?: Structure[]; bookings?: Booking[]; guests?: Guest[] };
 // Dati del tenant: personali + strutture CONDIVISE (org_state delle sue membership). Senza le org le strutture condivise risultavano vuote
 // e la pulizia degli "orfani" cancellava le schedine/righe non inviate.
+// Con SERVER_READ_ENTITIES=on legge dalle tabelle (vedi concierge-orgdata.ts / SERVER-ENTITIES.md); off = come sempre.
 async function readBlob(admin: SupabaseClient, tenantId: string): Promise<Blob> {
-  const { data } = await admin.from("app_state").select("data").eq("user_id", tenantId).maybeSingle();
-  let personal: Blob = {};
-  try { personal = JSON.parse(((data?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as Blob; } catch { personal = {}; }
-  const orgs = await loadOrgDatas(admin, tenantId);
-  return mergeOrgData(personal as Record<string, unknown>, orgs) as Blob;
+  return (await loadTenantData(admin, tenantId)) as Blob;
 }
 
 const toG = (src: Partial<Guest> & Record<string, unknown> | undefined): SchedinaGuest => ({

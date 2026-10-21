@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDaysYmd, ymdRome } from "./dates-rome";
+import { entitiesSwitch, findBookingsById, ownerState } from "./server-entities";
 
 // Helper server-side per la GESTIONE prenotazione da parte dell'OSPITE (pagina /gestisci).
 // Una prenotazione può vivere in app_state (struttura personale) oppure in org_state
@@ -104,7 +105,8 @@ export async function mutateStore(admin: SupabaseClient, store: BookingStore, mu
 // Trova la prenotazione col SOLO id (senza slug): cerca prima nelle organizzazioni
 // condivise (poche righe), poi negli stati personali. Serve ai link di check-in che
 // non portano lo slug (link interni / email vecchie). L'id prenotazione è un UUID.
-// Nota: a grande scala converrà una tabella-indice booking→store; per ora scan diretto.
+// Con SERVER_READ_ENTITIES=on il proprietario si trova con UNA ricerca per id nella tabella entities (niente scansione dei blocchi); poi si legge
+// comunque la sola riga del blocco, che serve alle scritture (mutateStore). off = scansione come sempre; compare = scansione + confronto.
 const FBS_WINDOW_MS = 60_000;
 const FBS_MAX_MISSES = 60;
 const FBS_CACHE_MS = 10 * 60_000;
@@ -113,8 +115,46 @@ const missHits: number[] = [];
 /** Solo per i test: azzera cache e contatore delle ricerche fallite. */
 export function _resetFindByIdState() { idCache.clear(); missHits.length = 0; }
 
+const rememberFound = (bookingId: string, hit: BookingStore, now: number) => {
+  if (idCache.size >= 2000) idCache.clear();
+  idCache.set(bookingId, { table: hit.table, keyCol: hit.keyCol, keyVal: hit.keyVal, exp: now + FBS_CACHE_MS });
+  return hit;
+};
+
 export async function findBookingStoreById(admin: SupabaseClient, bookingId: string): Promise<BookingStore | null> {
   if (!bookingId || bookingId.length > 100) return null;
+  return entitiesSwitch<BookingStore | null>({
+    label: "findBookingStoreById",
+    legacy: () => findBookingStoreByIdFromBlocks(admin, bookingId),
+    tables: (mode) => findBookingStoreByIdFromTables(admin, bookingId, mode === "on"),
+    project: (s) => (s ? { table: s.table, keyVal: s.keyVal, sid: s.sid } : null),
+  });
+}
+
+// Ricerca dalle tabelle. useCache=false (modalita' compare) la rende indipendente dalla cache e dal tetto, per un confronto onesto con la scansione.
+async function findBookingStoreByIdFromTables(admin: SupabaseClient, bookingId: string, useCache: boolean): Promise<BookingStore | null> {
+  const now = Date.now();
+  if (useCache) {
+    const cached = idCache.get(bookingId);
+    if (cached && cached.exp > now) {
+      const hit = await scan(admin, cached.table, cached.keyCol, cached.keyVal, bookingId);
+      if (hit) return hit;
+      idCache.delete(bookingId);
+    }
+    // Il tetto alle ricerche FALLITE resta anche qui: l'id inventato costa poco, ma una ricerca per solo id non ha indice sul proprietario.
+    while (missHits.length && now - missHits[0] > FBS_WINDOW_MS) missHits.shift();
+    if (missHits.length >= FBS_MAX_MISSES) return null;
+  }
+  for (const h of await findBookingsById(admin, bookingId)) {
+    const { table, keyCol } = ownerState(h.owner);
+    const hit = await scan(admin, table, keyCol, h.owner.id, bookingId);
+    if (hit) return useCache ? rememberFound(bookingId, hit, now) : hit;
+  }
+  if (useCache) missHits.push(now);
+  return null;
+}
+
+async function findBookingStoreByIdFromBlocks(admin: SupabaseClient, bookingId: string): Promise<BookingStore | null> {
   const now = Date.now();
   // Id già trovato di recente: si rilegge SOLO quella riga (niente scansione di tutti i tenant, niente tetto). Gli ospiti veri restano serviti.
   const cached = idCache.get(bookingId);
@@ -127,11 +167,7 @@ export async function findBookingStoreById(admin: SupabaseClient, bookingId: str
   // Tetto (per istanza) alle sole ricerche FALLITE, le uniche costose e senza esito; oltre, si risponde "non trovata".
   while (missHits.length && now - missHits[0] > FBS_WINDOW_MS) missHits.shift();
   if (missHits.length >= FBS_MAX_MISSES) return null;
-  const found = (hit: BookingStore) => {
-    if (idCache.size >= 2000) idCache.clear();
-    idCache.set(bookingId, { table: hit.table, keyCol: hit.keyCol, keyVal: hit.keyVal, exp: now + FBS_CACHE_MS });
-    return hit;
-  };
+  const found = (hit: BookingStore) => rememberFound(bookingId, hit, now);
   const { data: orgs } = await admin.from("org_state").select("org_id").limit(5000);
   for (const o of arr(orgs)) {
     const hit = await scan(admin, "org_state", "org_id", String((o as { org_id?: string }).org_id || ""), bookingId);

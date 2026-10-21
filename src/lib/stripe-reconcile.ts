@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { refundedCentsOf } from "./chat-pay-server";
 import { findBookingStoreById } from "./manage-booking";
+import { entitiesReadMode, entitiesShadow, findBookingsByPaymentIntent, logCompare, ownerState } from "./server-entities";
 import { eur } from "./format";
 
 const DATA_KEY = "spigolestay:data:v1";
@@ -134,8 +135,9 @@ export async function reconcileCharge(
   const patchIn = async (t: Target) => { const r1 = await patchOnce(t); return r1 === "conflict" ? await patchOnce(t) : r1; };
 
   let conflict = false;
+  let matched: Target | null = null; // ultimo bersaglio riconciliato (serve al confronto con le tabelle)
   const tryTargets = async (targets: Target[]): Promise<boolean> => {
-    for (const t of targets) { const r = await patchIn(t); if (r === "ok") return true; if (r === "conflict") conflict = true; }
+    for (const t of targets) { const r = await patchIn(t); if (r === "ok") { matched = t; return true; } if (r === "conflict") conflict = true; }
     return false;
   };
   const targetsForUser = async (uid: string): Promise<Target[]> => {
@@ -162,10 +164,37 @@ export async function reconcileCharge(
   if (uid) { if (await tryTargets(await targetsForUser(uid))) return "ok"; }
   if (bid || uid) return conflict ? "failed" : "none"; // il proprietario era noto: inutile scorrere tutti gli altri
 
-  // 2) Ultima risorsa: pagamenti senza metadata. Scansione di tutte le righe (limiti alti: con molti tenant un tetto basso lasciava prenotazioni non riconciliate).
+  // 2) Ultima risorsa: pagamenti senza metadata.
+  // Con SERVER_READ_ENTITIES=on i proprietari si trovano cercando il payment intent nella tabella entities (niente scansione dei blocchi);
+  // se la tabella da' errore si ripiega sulla scansione. La scrittura resta sul blocco.
+  const targetKey = (t: Target) => t.table + ":" + t.val;
+  const entityTargets = async (): Promise<Target[]> => {
+    const seen = new Set<string>();
+    const out: Target[] = [];
+    for (const h of await findBookingsByPaymentIntent(admin, pi)) {
+      const { table, keyCol } = ownerState(h.owner);
+      const t: Target = { table, col: keyCol, val: h.owner.id };
+      if (!seen.has(targetKey(t))) { seen.add(targetKey(t)); out.push(t); }
+    }
+    return out;
+  };
+  if (entitiesReadMode() === "on") {
+    try {
+      if (await tryTargets(await entityTargets())) return "ok";
+      return conflict ? "failed" : "none";
+    } catch (e) { logCompare("warn", { label: "stripe-reconcile.lastResort", result: "fallback_to_block", message: e instanceof Error ? e.message.slice(0, 300) : String(e) }); }
+  }
+  // In compare il risultato resta quello della scansione; si registra solo se le tabelle avrebbero indicato lo stesso proprietario.
+  matched = null;
+  const shadow = () => entitiesShadow<string | null>("stripe-reconcile.lastResort", matched ? targetKey(matched) : null, async () => {
+    const keys = (await entityTargets()).map(targetKey);
+    return matched && keys.includes(targetKey(matched)) ? targetKey(matched) : (keys[0] ?? null);
+  });
+  // Scansione di tutte le righe (limiti alti: con molti tenant un tetto basso lasciava prenotazioni non riconciliate).
   const { data: orgs } = await admin.from("org_state").select("org_id").limit(5000);
-  if (await tryTargets(arr(orgs).map((o) => ({ table: "org_state" as const, col: "org_id" as const, val: String(o.org_id) })))) return "ok";
+  if (await tryTargets(arr(orgs).map((o) => ({ table: "org_state" as const, col: "org_id" as const, val: String(o.org_id) })))) { await shadow(); return "ok"; }
   const { data: users } = await admin.from("app_state").select("user_id").limit(20000);
-  if (await tryTargets(arr(users).map((u) => ({ table: "app_state" as const, col: "user_id" as const, val: String(u.user_id) })))) return "ok";
+  if (await tryTargets(arr(users).map((u) => ({ table: "app_state" as const, col: "user_id" as const, val: String(u.user_id) })))) { await shadow(); return "ok"; }
+  await shadow();
   return conflict ? "failed" : "none";
 }

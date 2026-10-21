@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimited } from "@/lib/server-auth";
 import { clientIp } from "@/lib/server-booking-guard";
+import { entitiesShadow, findGuestsByContact } from "@/lib/server-entities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,11 @@ export async function POST(req: Request) {
     // Dedup: se esiste già lo stesso contatto (email o telefono), aggiorna il tag newsletter.
     const norm = (s?: string) => (s || "").trim().toLowerCase();
     const existing = guests.find((x) => (email && norm(x.email) === norm(email)) || (!email && phone && norm(x.phone) === norm(phone)));
+    // SERVER_READ_ENTITIES=compare: controlla che la tabella entities trovi lo stesso ospite del blocco (la scrittura resta sul blocco in ogni modalita').
+    await entitiesShadow<string | null>("public-lead.guestLookup", existing ? String(existing.id) : null, async () => {
+      const ids = (await findGuestsByContact(admin, { type: "u", id: ownerId }, { email, phone })).map((x) => String(x.id));
+      return existing && ids.includes(String(existing.id)) ? String(existing.id) : (ids[0] ?? null);
+    });
     if (existing) {
       const tags = Array.isArray(existing.tags) ? existing.tags : [];
       if (!tags.includes("newsletter")) existing.tags = [...tags, "newsletter"];

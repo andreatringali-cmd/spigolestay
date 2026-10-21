@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildBlockData, diffBlockParts, entitiesSwitch, MERGE_KINDS } from "./server-entities";
 
 // Dati delle STRUTTURE CONDIVISE (Structure.orgId, es. Central Perk) per il Concierge — solo server, SOLA LETTURA.
 //
@@ -8,38 +9,78 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // combineData(); qui facciamo la stessa cosa lato server (stesse regole: unione per id, le copie org vincono).
 // Le organizzazioni si trovano come in /api/public-booking e manage-booking.ts: memberships(user_id) → org_state(org_id).
 // NON si scrive mai su org_state.
+//
+// Interruttore SERVER_READ_ENTITIES (off | compare | on, vedi server-entities.ts e SERVER-ENTITIES.md): con "on" le collezioni vengono
+// dalle tabelle (public.entities) invece che dal blocco; "off" e' il comportamento di sempre.
 
 const DATA_KEY = "spigolestay:data:v1";
 const COLLECTIONS = ["structures", "roomTypes", "units", "bookings", "guests"] as const;
 type DataObj = Record<string, unknown>;
 const arr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
 
-// Dati (DATA_KEY già parsificato) di ogni organizzazione di cui il tenant è membro attivo.
+// Organizzazioni di cui il tenant e' membro attivo (come prima: massimo 20, senza doppioni). Errore di rete o tabella assente = nessuna.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadOrgDatas(admin: SupabaseClient<any>, tenantId: string): Promise<DataObj[]> {
-  const out: DataObj[] = [];
+async function activeOrgIds(admin: SupabaseClient<any>, tenantId: string): Promise<string[]> {
   try {
     const { data: ms } = await admin.from("memberships").select("org_id, active").eq("user_id", tenantId);
-    const orgIds = Array.from(new Set(arr(ms)
+    return Array.from(new Set(arr(ms)
       .filter((m) => (m as { active?: boolean }).active !== false)
       .map((m) => String((m as { org_id?: string }).org_id || "")).filter(Boolean))).slice(0, 20);
+  } catch { return []; }
+}
+
+// Dati (DATA_KEY già parsificato) di ogni organizzazione di cui il tenant è membro attivo.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadOrgDatasFromBlock(admin: SupabaseClient<any>, tenantId: string): Promise<DataObj[]> {
+  const out: DataObj[] = [];
+  try {
+    const orgIds = await activeOrgIds(admin, tenantId);
     for (const orgId of orgIds) {
-      const d = await loadOrgData(admin, orgId);
+      const d = await loadOrgDataFromBlock(admin, orgId);
       if (d) out.push(d);
     }
   } catch { /* tabelle assenti o errore di rete: resta il solo personale */ }
   return out;
 }
+// Stessi dati, ricostruiti dalle tabelle (le cinque collezioni che usa mergeOrgData). Un errore di lettura SOLLEVA: lo gestisce l'interruttore.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadOrgDatasFromTables(admin: SupabaseClient<any>, tenantId: string): Promise<DataObj[]> {
+  const orgIds = await activeOrgIds(admin, tenantId);
+  return Promise.all(orgIds.map((id) => buildBlockData(admin, { type: "o", id }, { kinds: MERGE_KINDS })));
+}
+const diffOrgDatas = (a: DataObj[], b: DataObj[]) => diffBlockParts(a, b, COLLECTIONS);
 
 // Dati (DATA_KEY già parsificato) di UNA organizzazione; null se la riga manca o il blob non è valido. Sola lettura.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadOrgData(admin: SupabaseClient<any>, orgId: string): Promise<DataObj | null> {
+async function loadOrgDataFromBlock(admin: SupabaseClient<any>, orgId: string): Promise<DataObj | null> {
   try {
     const { data: row } = await admin.from("org_state").select("data").eq("org_id", orgId).maybeSingle();
     const blob = (((row as { data?: unknown } | null)?.data ?? {}) as Record<string, string>) || {};
     const d = JSON.parse(blob[DATA_KEY] || "{}");
     return d && typeof d === "object" ? (d as DataObj) : null;
   } catch { return null; /* blob org non valido o errore di rete: lo salto */ }
+}
+
+// Dati di ogni organizzazione di cui il tenant è membro attivo (dal blocco o, con SERVER_READ_ENTITIES=on, dalle tabelle).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadOrgDatas(admin: SupabaseClient<any>, tenantId: string): Promise<DataObj[]> {
+  return entitiesSwitch<DataObj[]>({
+    label: "loadOrgDatas",
+    legacy: () => loadOrgDatasFromBlock(admin, tenantId),
+    tables: () => loadOrgDatasFromTables(admin, tenantId),
+    diff: diffOrgDatas,
+  });
+}
+
+// Dati di UNA organizzazione; null se non valida (dal blocco). Con "on" dalle tabelle (un'organizzazione senza righe da' un oggetto con liste vuote).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadOrgData(admin: SupabaseClient<any>, orgId: string): Promise<DataObj | null> {
+  return entitiesSwitch<DataObj | null>({
+    label: "loadOrgData",
+    legacy: () => loadOrgDataFromBlock(admin, orgId),
+    tables: () => buildBlockData(admin, { type: "o", id: orgId }, { kinds: MERGE_KINDS }),
+    diff: (a, b) => diffBlockParts(a ? [a] : [], b ? [b] : [], COLLECTIONS),
+  });
 }
 
 // Unione personale + org per id (le copie org, che portano orgId, sovrascrivono): stessa regola di combineData().
@@ -65,4 +106,26 @@ export function mergeOrgData<T extends DataObj>(personal: T, orgDatas: DataObj[]
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function withOrgData<T extends DataObj>(admin: SupabaseClient<any>, tenantId: string, personal: T): Promise<T> {
   return mergeOrgData(personal, await loadOrgDatas(admin, tenantId));
+}
+
+// Dati COMPLETI del tenant (personale + strutture condivise) per i lettori che servono solo strutture / tipologie / camere / prenotazioni / ospiti
+// (Alloggiati Web, ISTAT): con "off" e "compare" il blocco personale si legge come sempre; con "on" anche il personale viene dalle tabelle e il blocco non si scarica piu'.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadTenantData(admin: SupabaseClient<any>, tenantId: string): Promise<DataObj> {
+  const fromBlock = async (): Promise<DataObj> => {
+    const { data } = await admin.from("app_state").select("data").eq("user_id", tenantId).maybeSingle();
+    let personal: DataObj = {};
+    try { personal = JSON.parse(((data?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as DataObj; } catch { personal = {}; }
+    return mergeOrgData(personal, await loadOrgDatasFromBlock(admin, tenantId));
+  };
+  const fromTables = async (): Promise<DataObj> => {
+    const [personal, orgs] = await Promise.all([buildBlockData(admin, { type: "u", id: tenantId }, { kinds: MERGE_KINDS }), loadOrgDatasFromTables(admin, tenantId)]);
+    return mergeOrgData(personal, orgs);
+  };
+  return entitiesSwitch<DataObj>({
+    label: "loadTenantData",
+    legacy: fromBlock,
+    tables: fromTables,
+    diff: (a, b) => diffBlockParts([a], [b], COLLECTIONS),
+  });
 }
