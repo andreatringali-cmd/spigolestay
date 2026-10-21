@@ -15,13 +15,17 @@ const SECURITY_HEADERS = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
 
+const BASE_CSP = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'";
+
 const nextConfig: NextConfig = {
   devIndicators: false, // nasconde l'indicatore "N" di sviluppo di Next.js
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
       // X-Frame-Options SAMEORIGIN su tutto TRANNE /embed/*: il widget incorporabile deve poter stare in un iframe sul sito del gestore.
-      { source: "/((?!embed/).*)", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
+      // Stessa esclusione di /embed per il CSP: frame-ancestors 'self' equivale a SAMEORIGIN (i browser moderni usano questo), object-src 'none' e base-uri 'self'
+      // chiudono due vie classiche di iniezione (plugin/<object> e <base> che dirotta i link relativi). NON e un CSP completo (script-src/default-src richiedono prove: vedi report di sicurezza).
+      { source: "/((?!embed/).*)", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }, { key: "Content-Security-Policy", value: BASE_CSP }] },
       { source: "/embed/:path*", headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }] },
     ];
   },

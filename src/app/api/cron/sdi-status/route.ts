@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { pollTenantSdiStatus, type NotifyResult, type RejectionNotice } from "@/lib/invoicing/service";
@@ -22,11 +23,7 @@ const MAX_TENANTS = 500;
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const querySecret = url.searchParams.get("secret") || "";
-  if (bearer !== secret && querySecret !== secret) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  if (!cronAuthorized(req, secret)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;

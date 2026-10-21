@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildApprovalToken } from "@/lib/allowlist-approve";
+import { declaredTooLarge, demoRequestLimited, LIMITS } from "@/lib/public-guard";
+import { clientIp } from "@/lib/server-booking-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +36,9 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 export async function POST(req: Request) {
   const cors = corsHeaders(req.headers.get("origin"));
+  // Endpoint pubblico che manda una email al titolare a ogni richiesta: tetto alla dimensione e alla frequenza (per IP + globale).
+  if (declaredTooLarge(req, LIMITS.demoRequestBody)) return NextResponse.json({ ok: false, error: "Richiesta troppo grande." }, { status: 413, headers: cors });
+  if (demoRequestLimited(clientIp(req))) return NextResponse.json({ ok: false, error: "Troppe richieste: riprova tra qualche minuto." }, { status: 429, headers: cors });
   try {
     const b = await req.json().catch(() => ({})) as Record<string, string>;
     // Honeypot anti-spam: se compilato, fingi successo e non inviare.

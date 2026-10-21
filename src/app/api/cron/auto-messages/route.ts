@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { internalFetch, siteOrigin } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
@@ -90,10 +91,7 @@ export async function GET(req: Request) {
   if (!GUEST_AUTO_MESSAGES_ENABLED) return NextResponse.json({ ok: true, skipped: "messaggi_automatici_disattivati" });
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (bearer !== secret && (url.searchParams.get("secret") || "") !== secret) {
+  if (!cronAuthorized(req, secret)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
