@@ -195,9 +195,9 @@ export default function LoginForm() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-paper px-6 py-6 text-[#1f1b16]">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-paper px-6 pb-1 pt-6 text-[#1f1b16]">
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto">
-        <div className="my-auto w-full max-w-md rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
+        <div className="my-auto w-full max-w-sm rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
           {/* Logo dentro il box, centrato */}
           <div className="mb-4 flex flex-col items-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
@@ -339,7 +339,7 @@ export default function LoginForm() {
         </div>
 
       </main>
-      <footer className="relative mt-1 border-t border-[#eceae4] px-2 pt-1 text-[11px] leading-tight text-[#9a9186]">
+      <footer className="relative mt-6 border-t border-[#eceae4] px-2 pt-1 text-[11px] leading-tight text-[#9a9186]">
         {/* Mobile: sito + social sulla stessa riga */}
         <div className="flex flex-wrap items-center justify-center gap-x-3 sm:hidden">
           <a href="/termini" className="py-1 hover:text-[#4a453d] hover:underline">Termini</a>
