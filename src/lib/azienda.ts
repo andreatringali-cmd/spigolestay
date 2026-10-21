@@ -27,4 +27,7 @@ export const AZIENDA = {
 } as const;
 
 /** Riga unica per i footer: «© 2026 Xenora · <denominazione>». */
-export const copyrightRiga = (anno: number) => `© ${anno} ${AZIENDA.prodotto} · ${AZIENDA.denominazione}`;
+// Finché la denominazione è un segnaposto NON si mostra nulla di «da completare» nei footer pubblici: resta «© anno Xenora».
+export const copyrightRiga = (anno: number) => isSegnaposto(AZIENDA.denominazione) ? `© ${anno} ${AZIENDA.prodotto}` : `© ${anno} ${AZIENDA.prodotto} · ${AZIENDA.denominazione}`;
+/** Frammento « · P.IVA …» per i footer: vuoto finché la partita IVA è un segnaposto. */
+export const partitaIvaFooter = () => isSegnaposto(AZIENDA.partitaIva) ? "" : ` · P.IVA ${AZIENDA.partitaIva}`;

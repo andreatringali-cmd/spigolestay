@@ -5,7 +5,7 @@ import { TIERS, MODULES, ADDON_PRICE, ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF
 import { STRIPE_PLANS, annualAmount } from "@/lib/stripe-plans";
 import { CONTACT_EMAIL, FAQ, FEATURES, MODULE_BLURB, STEPS } from "./data";
 import RequestAccessForm from "./RequestAccessForm";
-import { AZIENDA, copyrightRiga } from "@/lib/azienda";
+import { AZIENDA, copyrightRiga, partitaIvaFooter } from "@/lib/azienda";
 
 // Pagina pubblica «Prezzi e iscrizione». Resta sempre chiara (come login e pagine legali) e non legge nulla dal browser:
 // piani, prezzi, moduli e limiti arrivano da src/lib/plans.ts, la stessa fonte della pagina Abbonamento.
@@ -253,7 +253,7 @@ export default function PrezziPage() {
 
       <footer className="border-t border-line bg-surface">
         <div className={`${SECTION} flex flex-col gap-4 py-6 text-xs text-dim sm:flex-row sm:items-center sm:justify-between`}>
-          <p>{copyrightRiga(new Date().getFullYear())} · P.IVA {AZIENDA.partitaIva} · <a href={AZIENDA.sitoVetrina} className={PUB.linkSubtle}>xenoradigitalsolutions.com</a> · <a href={`mailto:${CONTACT_EMAIL}`} className={PUB.linkSubtle}>{CONTACT_EMAIL}</a></p>
+          <p>{copyrightRiga(new Date().getFullYear())}{partitaIvaFooter()} · <a href={AZIENDA.sitoVetrina} className={PUB.linkSubtle}>xenoradigitalsolutions.com</a> · <a href={`mailto:${CONTACT_EMAIL}`} className={PUB.linkSubtle}>{CONTACT_EMAIL}</a></p>
           <nav aria-label="Documenti legali" className="flex flex-wrap gap-x-4">
             <Link href="/termini" className={`${PUB.linkSubtle} py-2`}>Termini</Link>
             <Link href="/privacy" className={`${PUB.linkSubtle} py-2`}>Privacy</Link>
