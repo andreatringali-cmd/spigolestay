@@ -5,6 +5,8 @@
 // buildDelta (browser): confronta ciò che il server ci ha dato (finestra), l'ultima versione sincronizzata (base) e il risultato della fusione.
 // applyDelta (server): applica le modifiche alla riga completa, con protezione contro le cancellazioni di massa.
 
+import { sameFlatContent } from "./sync-canon";
+
 type Json = Record<string, unknown>;
 
 export const DATA_KEY = "spigolestay:data:v1";
@@ -72,10 +74,9 @@ const isEmptyLike = (v: unknown): boolean => v === undefined || v === null || (A
 const same = (a: unknown, b: unknown): boolean => a === b || (isEmptyLike(a) && isEmptyLike(b)) || stableStringify(a) === stableStringify(b); // «assente» e «vuoto» sono la stessa cosa
 
 // Chiavi piatte: stesso contenuto anche se scritto in modo diverso (ordine delle chiavi, spazi) = uguale. Senza, ogni ciclo rimanderebbe valori identici.
-function sameFlat(server: string | undefined, merged: string): boolean {
-  if (server === merged) return true;
-  if (server === undefined) return false;
-  try { return stableStringify(JSON.parse(server)) === stableStringify(JSON.parse(merged)); } catch { return false; }
+// Anche l'ordine di una lista di oggetti con id (o dei conti di Cassa, per chiave) non conta: vedi sync-canon.ts.
+function sameFlat(key: string, server: string | undefined, merged: string): boolean {
+  return sameFlatContent(key, server, merged);
 }
 
 const asObj = (x: unknown): Json => (x && typeof x === "object" && !Array.isArray(x) ? (x as Json) : {});
@@ -96,6 +97,19 @@ function parseObj(raw: string | undefined): Json | null {
 export function isEmptyDelta(d: Delta): boolean {
   return !Object.values(d.colls).some((c) => c.upsert.length || c.del.length) && !Object.values(d.tombs).some((t) => t.length) && !Object.keys(d.fields).length && !Object.keys(d.flat).length
     && !(d.rates && (Object.keys(d.rates.set).length || d.rates.del.length));
+}
+
+/** Cancellazione ESPLICITA di un ospite: lapide nel fuso, oppure contatto newsletter (sito / tag) il cui email/telefono e' tra i contatti cancellati (stessa regola di mergeSnapshots). */
+function guestRemovalIsExplicit(id: string, serverGuest: unknown, mData: Json): boolean {
+  if (asArr(asObj(mData._deleted).guests).some((x) => String(x) === id)) return true;
+  const deleted = new Set(asArr(mData._deletedLeads).filter((x): x is string => typeof x === "string"));
+  if (!deleted.size) return false;
+  const g = asObj(serverGuest);
+  const lead = g.source === "sito" || (Array.isArray(g.tags) && g.tags.includes("newsletter"));
+  if (!lead) return false;
+  const email = typeof g.email === "string" ? g.email.trim().toLowerCase() : "";
+  const phone = typeof g.phone === "string" ? g.phone.replace(/[\s+()./-]/g, "") : "";
+  return (!!email && deleted.has("email:" + email)) || (phone.length >= 6 && deleted.has("tel:" + phone));
 }
 
 /**
@@ -130,7 +144,13 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
           dg[k] = (dg[k] ?? 0) + 1;
         }
       }
-      for (const id of sMap.keys()) if (!mMap.has(id)) del.push(id);
+      for (const id of sMap.keys()) {
+        if (mMap.has(id)) continue;
+        // Un OSPITE assente dal fuso non e' per forza cancellato: gli ospiti dell'organizzazione sono una proiezione (quelli citati dalle prenotazioni caricate qui) e un ospite appena
+        // creato puo' stare nella finestra senza la sua prenotazione. Si cancella dal server solo con una lapide (cancellazione dell'utente) o se e' un contatto newsletter da rimuovere.
+        if (coll === "guests" && !guestRemovalIsExplicit(id, sMap.get(id), mData)) continue;
+        del.push(id);
+      }
       if (upsert.length || del.length) delta.colls[coll] = { upsert, del };
     }
     // lapidi: solo quelle del fuso che il server non ha ancora
@@ -162,7 +182,7 @@ export function buildDelta(server: Record<string, string> | null, base: Record<s
     if (k === DATA_KEY) continue;
     const v = merged[k];
     if (typeof v !== "string") continue;
-    if (!sameFlat(server?.[k], v)) delta.flat[k] = v;
+    if (!sameFlat(k, server?.[k], v)) delta.flat[k] = v;
   }
   return delta;
 }
@@ -285,6 +305,6 @@ export function applyDelta(row: Record<string, string> | null, delta: Delta): { 
   // Nessuna modifica reale (es. entità inviate identiche a quelle già sul server): il chiamante non deve scrivere né far salire la versione.
   let changed = !same(parseObj(row?.[DATA_KEY]) ?? {}, d);
   if (out[DATA_KEY] || Object.keys(d).length) out[DATA_KEY] = JSON.stringify(d);
-  for (const [k, v] of Object.entries(delta.flat)) if (k !== DATA_KEY && typeof v === "string") { if (!sameFlat(row?.[k], v)) changed = true; out[k] = v; }
+  for (const [k, v] of Object.entries(delta.flat)) if (k !== DATA_KEY && typeof v === "string") { if (!sameFlat(k, row?.[k], v)) changed = true; out[k] = v; }
   return { row: out, stats: { upserts, deletes, tombs: tombCount, changed } };
 }

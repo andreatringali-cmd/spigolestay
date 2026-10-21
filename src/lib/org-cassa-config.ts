@@ -1,6 +1,7 @@
 // Impostazioni di Cassa delle strutture CONDIVISE tra soci (conti, regole di incasso dei portali, conto principale): viaggiano nella riga org_state dell'org,
 // così tutti i soci vedono e aggiornano gli stessi conti. Le chiavi sono "piatte" e personali (cassa:conti, cassa:payouts, cassa:conti-prefs): qui si estrae la
 // parte che appartiene alle strutture di un'org e si riporta nel locale quella fusa col server. Modulo puro (nessun accesso a storage o rete).
+import { sortListBy } from "./sync-canon";
 export const CASSA_CONTI_KEY = "spigolestay:cassa:conti";
 export const CASSA_PAYOUTS_KEY = "spigolestay:cassa:payouts";
 export const CASSA_PREFS_KEY = "spigolestay:cassa:conti-prefs";
@@ -30,7 +31,7 @@ const keyOf = (c: Conto): string | null => (typeof c?.key === "string" ? c.key :
 export function extractOrgCassaConfig(local: Snap, org: Set<string>): Snap {
   const out: Snap = {};
   const conti = parse(local[CASSA_CONTI_KEY]);
-  if (Array.isArray(conti)) { const mine = (conti as Conto[]).filter((c) => ownedBy(c, org)); if (mine.length) out[CASSA_CONTI_KEY] = JSON.stringify(mine); }
+  if (Array.isArray(conti)) { const mine = (conti as Conto[]).filter((c) => ownedBy(c, org)); if (mine.length) out[CASSA_CONTI_KEY] = JSON.stringify(sortListBy(mine, "key")); } // ordine canonico (per chiave): lo stesso per tutti i soci, qualunque sia l'ordine locale
   const pay = parse(local[CASSA_PAYOUTS_KEY]);
   if (isObj(pay)) { const mine = Object.fromEntries(Object.entries(pay).filter(([sid]) => org.has(sid))); if (Object.keys(mine).length) out[CASSA_PAYOUTS_KEY] = JSON.stringify(mine); }
   const prefs = parse(local[CASSA_PREFS_KEY]);
