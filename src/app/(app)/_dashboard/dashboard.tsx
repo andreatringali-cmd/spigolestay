@@ -279,13 +279,13 @@ export default function Dashboard() {
             <DaFare rows={todo} loading={loadingAdem} health={health} setupPending={!setup.complete} />
             <Oggi rows={day.rows} onOpen={openBooking} onNew={() => openNewBooking()} noBookings={live.length === 0} noStructures={structures.length === 0} />
           </div>
-          {/* sotto i 1280 px la colonna di destra passa su due colonne (ricavi e canali | occupazione); da xl sta accanto a Da fare e Oggi */}
+          {/* sotto i 1280 px la colonna di destra passa su due colonne (occupazione | ricavi e canali); da xl sta accanto a Da fare e Oggi */}
           <div className="grid min-w-0 items-start gap-3 lg:grid-cols-2 xl:grid-cols-1">
+            <Occupazione cells={strip} outlook={outlook} />
             <div className="flex min-w-0 flex-col gap-3">
               <Ricavi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} onNew={structures.length ? () => openNewBooking() : undefined} />
               <Canali rows={channelRows} />
             </div>
-            <Occupazione cells={strip} outlook={outlook} />
           </div>
         </div>
         <Altri list={upcomingList} guests={guestMap} today={today} />
