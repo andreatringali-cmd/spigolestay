@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandLockup, PUB } from "./PublicUi";
 import PublicTheme from "./PublicTheme";
 import PublicThemeBoot from "./PublicThemeBoot";
+import { AZIENDA, copyrightRiga } from "@/lib/azienda";
 
 // Guscio comune per le pagine legali pubbliche (privacy, cookie, termini).
 // Stessa identità di login e app (token del prodotto, chiaro/scuro). L'avviso "bozza" resta finché non c'è il testo definitivo.
@@ -25,7 +26,7 @@ export default function LegalShell({ title, updated, children }: { title: string
         {/* Avviso discreto: resta finché il testo non è definitivo (ragione sociale, P.IVA, sede da completare) */}
         <p role="note" className="mt-4 flex items-start gap-2 border-l-2 py-0.5 pl-3 text-xs text-dim" style={{ borderColor: "var(--warn)" }}>
           <span className="shrink-0 rounded-full border border-line bg-wash px-2 py-0.5 text-[11px] font-semibold text-txt">Bozza</span>
-          <span>In fase di revisione legale. Alcuni dati (ragione sociale, P.IVA, sede) sono da completare.</span>
+          <span>In fase di revisione legale. Alcuni dati (denominazione, P.IVA, sede, PEC) sono da completare.</span>
         </p>
 
         <div className="legal-body mt-8 text-sm leading-relaxed text-txt sm:text-[15px]">
@@ -33,7 +34,7 @@ export default function LegalShell({ title, updated, children }: { title: string
         </div>
 
         <footer className="mt-12 flex flex-col gap-3 border-t border-line pt-6 text-xs text-dim sm:flex-row sm:items-center sm:justify-between">
-          <span>© {new Date().getFullYear()} Xenora Digital Solutions · <a href="https://xenoradigitalsolutions.com" className={PUB.linkSubtle}>xenoradigitalsolutions.com</a></span>
+          <span>{copyrightRiga(new Date().getFullYear())} · <a href={AZIENDA.sitoVetrina} className={PUB.linkSubtle}>xenoradigitalsolutions.com</a></span>
           <nav aria-label="Documenti legali" className="flex flex-wrap gap-x-4">
             <Link href="/termini" className={`${PUB.linkSubtle} py-2`}>Termini</Link>
             <Link href="/privacy" className={`${PUB.linkSubtle} py-2`}>Privacy</Link>

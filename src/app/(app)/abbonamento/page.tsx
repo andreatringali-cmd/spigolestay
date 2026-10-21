@@ -516,7 +516,7 @@ export default function AbbonamentoPage() {
               </div>
               <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
                 <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-on-focus" style={{ backgroundColor: "var(--focus)" }}>i</span>
-                <span>{hasRealSub ? t("Hai già un abbonamento attivo: il cambio di piano non è automatico, perché l'addebito si modifica solo su Stripe. Contatta il supporto (sales@xenora.app) indicando il piano desiderato, oppure gestisci l'abbonamento dal portale pagamenti. Finché non è confermato, i moduli del tuo piano non cambiano.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
+                <span>{hasRealSub ? t("Hai già un abbonamento attivo: il cambio di piano non è automatico, perché l'addebito si modifica solo su Stripe. Contatta il supporto (info@xenora.it) indicando il piano desiderato, oppure gestisci l'abbonamento dal portale pagamenti. Finché non è confermato, i moduli del tuo piano non cambiano.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
               {!hasRealSub && <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>}
               <div className="mt-4 flex gap-2">

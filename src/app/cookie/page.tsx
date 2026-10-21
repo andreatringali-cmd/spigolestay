@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import LegalShell from "@/components/LegalShell";
+import { AZIENDA } from "@/lib/azienda";
 
-export const metadata: Metadata = { title: "Cookie Policy · Xenora" };
+export const metadata: Metadata = { title: "Cookie Policy · Xenora", description: "Quali cookie usa Xenora (tecnici, di preferenza, pubblicitari con consenso) e come gestirli.", alternates: { canonical: "/cookie" } };
 
 export default function CookiePage() {
   return (
     <LegalShell title="Cookie Policy" updated="Settembre 2026">
-      <p>Questa pagina spiega quali cookie e tecnologie simili utilizza Xenora e come gestirli.</p>
+      <p>Questa pagina spiega quali cookie e tecnologie simili utilizza Xenora e come gestirli. Titolare del sito: {AZIENDA.denominazione} — sede legale: {AZIENDA.sede} — P.IVA {AZIENDA.partitaIva}.</p>
 
       <h2>1. Cosa sono i cookie</h2>
       <p>I cookie sono piccoli file salvati sul tuo dispositivo che permettono al servizio di funzionare correttamente e di ricordare alcune preferenze.</p>
@@ -26,7 +27,7 @@ export default function CookiePage() {
       <p>Puoi gestire o eliminare i cookie dalle impostazioni del tuo browser. La disattivazione dei cookie tecnici può compromettere il funzionamento del servizio.</p>
 
       <h2>5. Contatti</h2>
-      <p>Per domande sui cookie scrivi a <a href="mailto:info@xenora.it">info@xenora.it</a>. Vedi anche l&apos;<a href="/privacy">Informativa sulla privacy</a>.</p>
+      <p>Per domande sui cookie scrivi a <a href={`mailto:${AZIENDA.emailPrivacy}`}>{AZIENDA.emailPrivacy}</a>. Vedi anche l&apos;<a href="/privacy">Informativa sulla privacy</a>.</p>
     </LegalShell>
   );
 }
