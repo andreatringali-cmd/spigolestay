@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import CalendarGrid from "@/components/CalendarGrid";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -12,13 +13,20 @@ type Vista = "grid" | "detail";
 const VIEW_KEY = "spigolestay:cal:view";
 
 export default function CalendarioPage() {
+  // useSearchParams richiede un confine Suspense: i parametri del collegamento dalla dashboard (?vista=dettaglio&col=…) si leggono qui, anche con la navigazione interna.
+  return <Suspense fallback={null}><CalendarioInner /></Suspense>;
+}
+
+function CalendarioInner() {
   const { t } = useLang();
   const { activeStructureId, getStructure } = useData();
   const st = activeStructureId !== "all" ? getStructure(activeStructureId) : undefined;
   // Vista scelta (ricordata): null finché non è letta dal browser, per non montare la griglia se si preferisce il dettaglio.
   // Collegamento dalla dashboard: /calendario?vista=dettaglio&col=arr|dep|stay apre la vista Dettagliata (senza cambiare la vista ricordata) filtrata su una colonna.
+  const sp = useSearchParams();
   const [deep] = useState<{ detail: boolean; col: "arr" | "stay" | "dep" | null }>(() => {
-    try { const q = new URLSearchParams(window.location.search); const c = q.get("col"); return { detail: q.get("vista") === "dettaglio", col: c === "arr" || c === "stay" || c === "dep" ? c : null }; } catch { return { detail: false, col: null }; }
+    const c = sp?.get("col");
+    return { detail: sp?.get("vista") === "dettaglio", col: c === "arr" || c === "stay" || c === "dep" ? c : null };
   });
   const [view, setView] = useState<Vista>(() => { if (deep.detail) return "detail"; try { return localStorage.getItem(VIEW_KEY) === "detail" ? "detail" : "grid"; } catch { return "grid"; } });
   const choose = (v: Vista) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
