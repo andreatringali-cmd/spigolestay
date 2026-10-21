@@ -325,7 +325,7 @@ export default function LoginForm() {
                   <div className="text-[13px] text-[#4a453d] sm:whitespace-nowrap sm:text-sm">
                     Non hai un account? <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">Richiedi la demo</a>.
                   </div>
-                  <div className="mt-2 text-[11px] text-[#9a9186]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
+                  <div className="mt-2 text-[11px] text-[#6b6458]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
                 </div>
               ) : (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
@@ -339,7 +339,7 @@ export default function LoginForm() {
         </div>
 
       </main>
-      <footer className="relative mt-6 border-t border-[#eceae4] px-2 pt-1 text-[11px] leading-tight text-[#9a9186]">
+      <footer className="relative mt-6 border-t border-[#eceae4] px-2 pt-1 text-[11px] leading-tight text-[#6b6458]">
         {/* Mobile: sito + social sulla stessa riga */}
         <div className="flex flex-wrap items-center justify-center gap-x-3 sm:hidden">
           <a href="/termini" className="py-1 hover:text-[#4a453d] hover:underline">Termini</a>
