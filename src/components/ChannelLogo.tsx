@@ -66,32 +66,32 @@ export default function ChannelLogo({ channel, size = 16, title, name }: { chann
 }
 
 // Logo PER INTERO del canale (marchio con il nome, non la sola icona rotonda): per Booking.com, Airbnb, Expedia, HotelBeds
-// e per le prenotazioni dirette Xenora (logo completo con la farfalla). Su fondo bianco, leggibile anche in tema scuro.
+// e per le prenotazioni dirette Xenora (logo completo con la farfalla). Senza riquadro: i colori del testo seguono il tema chiaro/scuro.
 export function ChannelWordmark({ channel, height = 20, title, name }: { channel: Channel; height?: number; title?: string; name?: string }) {
   const fs = Math.round(height * 0.78);
   const base = { fontSize: fs, lineHeight: 1, fontWeight: 800, letterSpacing: "-0.035em", whiteSpace: "nowrap" } as const;
   const chip = (t: string, children: React.ReactNode) => (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-white px-1.5" style={{ height: height + 6, boxShadow: "0 0 0 1px rgba(0,0,0,.09)" }} title={title ?? t}>{children}</span>
+    <span className="inline-flex shrink-0 items-center gap-1" style={{ height: height + 6 }} title={title ?? t}>{children}</span>
   );
   switch (channel) {
     case "booking":
-      return chip("Booking.com", <span style={{ ...base, color: "#003B95" }}>Booking<span style={{ color: "#009FE3" }}>.com</span></span>);
+      return chip("Booking.com", <span style={{ ...base, color: "var(--ota-navy, #003B95)" }}>Booking<span style={{ color: "#009FE3" }}>.com</span></span>);
     case "airbnb":
       return chip("Airbnb", <><svg width={height * 0.8} height={height * 0.8} viewBox="0 0 24 24" fill="#FF385C" aria-hidden><path d={BELO} /></svg><span style={{ ...base, color: "#FF385C", letterSpacing: "-0.045em" }}>airbnb</span></>);
     case "expedia":
-      return chip("Expedia / Vrbo", <><span aria-hidden style={{ width: height * 0.95, height: height * 0.95, borderRadius: height * 0.24, background: "#FEC84C", display: "inline-grid", placeItems: "center", flexShrink: 0 }}><svg width={height * 0.6} height={height * 0.6} viewBox="0 0 24 24" fill="none" stroke="#202843" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 18 18 6" /><path d="M8.5 6H18v9.5" /></svg></span><span style={{ ...base, color: "#202843" }}>Expedia</span></>);
+      return chip("Expedia / Vrbo", <><span aria-hidden style={{ width: height * 0.95, height: height * 0.95, borderRadius: height * 0.24, background: "#FEC84C", display: "inline-grid", placeItems: "center", flexShrink: 0 }}><svg width={height * 0.6} height={height * 0.6} viewBox="0 0 24 24" fill="none" stroke="#202843" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 18 18 6" /><path d="M8.5 6H18v9.5" /></svg></span><span style={{ ...base, color: "var(--ota-ink2, #202843)" }}>Expedia</span></>);
     case "google":
-      return chip("Google Hotel", <span style={{ ...base, color: "#4285F4" }}>G<span style={{ color: "#EA4335" }}>o</span><span style={{ color: "#FBBC05" }}>o</span>g<span style={{ color: "#34A853" }}>l</span><span style={{ color: "#EA4335" }}>e</span> <span style={{ color: "#5F6368", fontWeight: 600 }}>Hotel</span></span>);
+      return chip("Google Hotel", <span style={{ ...base, color: "#4285F4" }}>G<span style={{ color: "#EA4335" }}>o</span><span style={{ color: "#FBBC05" }}>o</span>g<span style={{ color: "#34A853" }}>l</span><span style={{ color: "#EA4335" }}>e</span> <span style={{ color: "var(--ota-gray, #5F6368)", fontWeight: 600 }}>Hotel</span></span>);
     case "agoda":
-      return chip("Agoda", <><span style={{ ...base, color: "#2B3340" }}>agoda</span><span aria-hidden style={{ display: "inline-flex", gap: 2 }}>{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} style={{ width: height * 0.16, height: height * 0.16, borderRadius: "50%", background: c, display: "block" }} />)}</span></>);
+      return chip("Agoda", <><span style={{ ...base, color: "var(--ota-ink, #2B3340)" }}>agoda</span><span aria-hidden style={{ display: "inline-flex", gap: 2 }}>{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} style={{ width: height * 0.16, height: height * 0.16, borderRadius: "50%", background: c, display: "block" }} />)}</span></>);
     case "hotelbeds":
-      return chip("HotelBeds", <span style={{ ...base, color: "#2B3340" }}>hotelbeds</span>);
+      return chip("HotelBeds", <span style={{ ...base, color: "var(--ota-ink, #2B3340)" }}>hotelbeds</span>);
     case "other":
       if (isBedAndBreakfastIt(name ?? title)) return chip("bb.it · bed-and-breakfast.it", <BbItWordmark height={height} textStyle={base} />);
-      return chip("Altro / OTA", <span style={{ ...base, fontSize: Math.round(fs * 0.85), color: "#5B5F6B" }}>OTA</span>);
+      return chip("Altro / OTA", <span style={{ ...base, fontSize: Math.round(fs * 0.85), color: "var(--ota-gray, #5B5F6B)" }}>OTA</span>);
     case "direct":
       /* eslint-disable-next-line @next/next/no-img-element */
-      return <span className="inline-flex shrink-0 items-center rounded-md bg-white px-1.5" style={{ height: height + 6, boxShadow: "0 0 0 1px rgba(0,0,0,.09)" }} title={title ?? "Diretta · Xenora"}><img src="/xenora-logo.png" alt="Xenora" style={{ height: height, width: "auto", objectFit: "contain" }} /></span>;
+      return <span className="inline-flex shrink-0 items-center gap-0.5" style={{ height: height + 6 }} title={title ?? "Diretta · Xenora"}><img src="/xenora-mark.png" alt="" aria-hidden style={{ height: height * 1.05, width: "auto", objectFit: "contain" }} /><span style={{ ...base, color: "var(--ota-ink, #2B3340)", letterSpacing: "-0.02em", fontWeight: 700 }}>enora</span></span>;
     default:
       return null;
   }

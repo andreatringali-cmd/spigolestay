@@ -71,6 +71,10 @@
 }
 
 /* ─────────── Token di design (Scuro) — blu notte, non nero ─────────── */
+/* Testo dei loghi dei canali (ChannelWordmark): scuro in tema chiaro, chiaro in tema scuro (i loghi non hanno più il riquadro bianco). */
+:root { --ota-navy: #003B95; --ota-ink: #2B3340; --ota-ink2: #202843; --ota-gray: #5B5F6B; }
+.dark { --ota-navy: #F2F4F8; --ota-ink: #E6E8EE; --ota-ink2: #ECEEF4; --ota-gray: #B6BAC3; }
+
 .dark {
   color-scheme: dark; /* barre di scorrimento e controlli nativi in scuro (prima restavano bianchi) */
   --paper: #141518;   /* carbone neutro, più morbido del nero */
