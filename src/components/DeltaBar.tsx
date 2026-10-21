@@ -1,34 +1,23 @@
 "use client";
 
-// Barra sottile mostrata SOLO con la «Modalità veloce» attiva: dice che si vedono gli ultimi 13 mesi e permette di caricare tutto lo storico (o tornare alla vista veloce).
-// Avvisa anche se una cancellazione di massa è stata bloccata per sicurezza.
+// Barra sottile (solo con la modalità veloce, che è sempre accesa): compare SOLO quando c'è qualcosa da dire — «Carico <struttura>…», un errore di caricamento o una cancellazione di
+// massa bloccata per sicurezza. Il caricamento di tutto lo storico sta in Impostazioni → Storico prenotazioni (HistoryCard).
 import { useEffect, useState } from "react";
 import { deltaIsActive } from "@/lib/authsync";
 import { useStructLoad, clearLoadError } from "@/lib/struct-load";
 
-const PAST_KEY = "xn-delta-past";
-const ACTIVE_KEY = "xn-delta-active";
-
 export default function DeltaBar() {
   const sl = useStructLoad(); // caricamento di altre strutture: «Carico …» e, se non riesce, un messaggio chiaro (la vista resta com'è)
   const [blocked, setBlocked] = useState("");
-  const [all, setAll] = useState(() => { try { return sessionStorage.getItem(PAST_KEY) === "all"; } catch { return false; } });
   useEffect(() => {
     const h = (e: Event) => setBlocked(String((e as CustomEvent).detail || "Una cancellazione di massa è stata bloccata per sicurezza."));
     window.addEventListener("xenora:delta-blocked", h);
     return () => window.removeEventListener("xenora:delta-blocked", h);
   }, []);
   if (!deltaIsActive()) return null;
-  const loadAll = () => { try { sessionStorage.setItem(PAST_KEY, "all"); } catch { /* niente */ } setAll(true); window.location.reload(); };
-  // «Torna alla vista veloce»: si toglie il segno di «finestra già preparata», così al riavvio la copia locale riparte dalla finestra.
-  const backToFast = () => { try { sessionStorage.removeItem(PAST_KEY); localStorage.removeItem(ACTIVE_KEY); } catch { /* niente */ } window.location.reload(); };
+  if (sl.loading.length === 0 && !sl.error && !blocked) return null; // niente barra fissa: compare solo quando serve
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-wash px-3 py-1.5 text-[11px] text-dim">
-      <span className="font-semibold text-txt">Modalità veloce</span>
-      <span>{all ? "stai vedendo tutto lo storico" : "stai vedendo gli ultimi 13 mesi e le prenotazioni future"}</span>
-      {all
-        ? <button onClick={backToFast} className="font-semibold text-focus hover:underline">Torna alla vista veloce</button>
-        : <button onClick={loadAll} className="font-semibold text-focus hover:underline">Carica storico</button>}
       {sl.loading.length > 0 && <span className="font-semibold text-txt" role="status">Carico {sl.loading[sl.loading.length - 1]}…</span>}
       {sl.error && <span className="font-semibold" style={{ color: "var(--err)" }} role="alert">{sl.error} <button onClick={clearLoadError} className="font-semibold text-focus hover:underline">Ok</button></span>}
       {blocked && <span className="font-semibold" style={{ color: "var(--err)" }}>{blocked}</span>}

@@ -9,6 +9,7 @@ import { playSound } from "@/lib/sound";
 import { otaLabel, isOtaVia } from "@/lib/ota-label";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
+import { directOriginOf } from "@/lib/direct-origin";
 import { bookingExtrasTotal } from "@/lib/booking";
 import BookingChannelLogo from "@/components/BookingChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
@@ -983,7 +984,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 const warn = { backgroundColor: "color-mix(in srgb, var(--warn) 15%, transparent)", color: "var(--warn)", borderColor: "transparent" } as const;
                 return (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className={chipBase} title={t("Come hanno prenotato")}><BookingChannelLogo booking={b} size={13} /> {CHANNELS[b.channel]?.label ?? b.channel}</span>
+                    <span className={chipBase} title={t("Come hanno prenotato")}><BookingChannelLogo booking={b} size={13} /> {directOriginOf(b) === "sito" ? t("Sito ufficiale") : (CHANNELS[b.channel]?.label ?? b.channel)}</span>
                     <span className={chipBase} title={t("Check-in → Check-out")}>📅 {fmtD(b.checkIn)} → {fmtD(b.checkOut)}</span>
                     <span className={chipBase} title={t("Camera")}>🛏 {room}{showStruct && st?.name ? ` · ${st.name}` : ""}</span>
                     <span className={chipBase} style={hasParking ? ok : undefined} title={t("Parcheggio")}>🅿 {hasParking ? t("Parcheggio") : t("No parcheggio")}</span>

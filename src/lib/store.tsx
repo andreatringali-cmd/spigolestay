@@ -689,8 +689,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const maxN = Math.max(codeMaxFor(year), bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0));
         const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
         // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
-        // Origine (logo): una diretta creata dal gestionale senza id esterno è "manuale"; chi chiama può passare source esplicito (es. booking engine = "sito"). Gli import (con extId) restano senza campo: li deduce directOriginOf.
-        const source = b.source ?? (b.channel === "direct" && !b.extId ? "manuale" : undefined);
+        // Origine (logo): qualunque diretta creata da QUI (nuova, preventivo, import ICS/Excel, duplicati…) è "manuale"; chi chiama può passare source esplicito (es. booking engine = "sito").
+        // Unica eccezione: un id esterno "site:…" (lo scrive solo il sito pubblico) lascia il campo vuoto, lo deduce directOriginOf.
+        const source = b.source ?? (b.channel === "direct" && !(b.extId ?? "").startsWith("site:") ? "manuale" : undefined);
         const rec: Booking = { id: uid(), bookedOn: ymdRome(new Date()), ...b, ...(source ? { source } : {}), code, updatedAt: Date.now() };
         setBookings((prev) => [...prev, rec]);
         const gName = (guests.find((g) => g.id === b.guestId) ?? freshGuests.current.get(b.guestId))?.fullName;

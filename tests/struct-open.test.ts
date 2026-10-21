@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { register } from "node:module";
 
 register("./helpers/alias-loader.mjs", import.meta.url);
@@ -472,6 +472,6 @@ test("fallimento di sessione: la lettura veloce fallita spegne la modalità solo
   const src = readFileSync(new URL("../src/lib/authsync.tsx", import.meta.url), "utf8");
   assert.ok(/sessionStorage\.setItem\(DELTA_FAILED_KEY, uid\)/.test(src));
   assert.ok(!/localStorage\.removeItem\(DELTA_FLAG_KEY\)/.test(src), "la scelta dell'utente non viene più cancellata");
-  const card = readFileSync(new URL("../src/components/FastModeCard.tsx", import.meta.url), "utf8");
-  assert.ok(/setItem\(DELTA_FLAG_KEY, next \? "1" : "0"\)/.test(card), "l'interruttore scrive 1/0");
+  // L'interruttore in Impostazioni non c'è più (la modalità veloce è sempre accesa): FastModeCard è stato sostituito da HistoryCard.
+  assert.ok(!existsSync(new URL("../src/components/FastModeCard.tsx", import.meta.url)), "nessun interruttore della modalità veloce");
 });

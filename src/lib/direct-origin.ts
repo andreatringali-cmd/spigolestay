@@ -45,3 +45,15 @@ export function directOriginOf(b: DirectOriginInput | null | undefined): DirectO
 export function directOriginLabel(origin: DirectOrigin, structureName?: string | null): string {
   return origin === "sito" ? `Sito ufficiale${structureName ? ` · ${structureName}` : ""}` : "Diretta · inserita a mano";
 }
+
+/**
+ * Prenotazione "rappresentativa" di un canale in un elenco (es. il canale principale di un ospite): serve a scegliere il logo.
+ * Per la Diretta prevale l'origine più frequente (parità: "manuale"), così il logo segue la regola sito → struttura / a mano → Xenora.
+ */
+export function topChannelBooking<T extends DirectOriginInput>(list: T[], channel: string): T | undefined {
+  const same = list.filter((b) => b.channel === channel);
+  if (channel !== "direct") return same[0];
+  const sito = same.filter((b) => directOriginOf(b) === "sito");
+  const manuale = same.filter((b) => directOriginOf(b) === "manuale");
+  return sito.length > manuale.length ? sito[0] : (manuale[0] ?? sito[0]);
+}

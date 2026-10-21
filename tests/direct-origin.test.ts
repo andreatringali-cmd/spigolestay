@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 
 register("./helpers/alias-loader.mjs", import.meta.url);
-const { directOriginOf, directOriginLabel } = await import("../src/lib/direct-origin.ts");
+const { directOriginOf, directOriginLabel, topChannelBooking } = await import("../src/lib/direct-origin.ts");
 
 test("prenotazioni nuove: il campo source decide", () => {
   assert.equal(directOriginOf({ channel: "direct", source: "sito" }), "sito");
@@ -50,4 +50,18 @@ test("etichette del tooltip", () => {
   assert.equal(directOriginLabel("sito", "Spigole House"), "Sito ufficiale · Spigole House");
   assert.equal(directOriginLabel("sito"), "Sito ufficiale");
   assert.equal(directOriginLabel("manuale", "Spigole House"), "Diretta · inserita a mano");
+});
+
+test("canale principale di un ospite: per la Diretta prevale l'origine più frequente (parità: manuale)", () => {
+  const a = { id: "a", channel: "direct", source: "sito" };
+  const b = { id: "b", channel: "direct", source: "manuale" };
+  const c = { id: "c", channel: "direct", extId: "site:x:1" };
+  const o = { id: "o", channel: "booking" };
+  assert.equal(topChannelBooking([a, b], "direct")?.id, "b"); // parità → manuale
+  assert.equal(topChannelBooking([a, c, b], "direct")?.id, "a"); // 2 sito (una dedotta dall'extId) contro 1 manuale
+  assert.equal(topChannelBooking([b, a], "direct")?.id, "b");
+  assert.equal(topChannelBooking([o, a], "booking")?.id, "o"); // altri canali: la prima di quel canale
+  assert.equal(topChannelBooking([a], "airbnb"), undefined);
+  assert.equal(topChannelBooking([], "direct"), undefined);
+  assert.equal(directOriginOf(topChannelBooking([a], "direct")), "sito");
 });

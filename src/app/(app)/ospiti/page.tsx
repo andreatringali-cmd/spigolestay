@@ -15,6 +15,8 @@ import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf } from "@/lib/booking";
 import ChannelLogo, { ChannelWordmark } from "@/components/ChannelLogo";
+import BookingChannelLogo, { BookingChannelWordmark } from "@/components/BookingChannelLogo";
+import { directOriginOf, topChannelBooking } from "@/lib/direct-origin";
 import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
 import Icon from "@/components/Icon";
 import { exportExcel } from "@/lib/export";
@@ -24,6 +26,9 @@ import { refineGroups, planMerges } from "./_merge";
 import { promoRecipientEmail } from "@/lib/promos";
 import { needsBulkGuard } from "@/lib/bulk-guard";
 import { useBulkGuard } from "@/components/useBulkGuard";
+
+// Etichetta del canale principale di un ospite: per la Diretta distingue sito ufficiale e inserita a mano ("xenora.it" come prima).
+const topChLabel = (ch: Channel, b?: Parameters<typeof directOriginOf>[0]) => (ch !== "direct" ? CHANNELS[ch].label : directOriginOf(b) === "sito" ? "Sito ufficiale" : "xenora.it");
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 const fmtD = (iso: string) => fmtDate(iso);
@@ -97,11 +102,13 @@ export default function OspitiPage() {
     const chCount: Record<string, number> = {};
     list.forEach((b) => { chCount[b.channel] = (chCount[b.channel] ?? 0) + 1; });
     const topCh = Object.entries(chCount).sort((x, y) => y[1] - x[1])[0]?.[0] as Channel | undefined;
+    // Prenotazione "rappresentativa" del canale principale: serve al logo (per la Diretta distingue sito ufficiale / inserita a mano).
+    const topB = topCh ? topChannelBooking(list, topCh) : undefined;
     // Ha prenotazioni reali in QUALSIASI struttura? Se sì è un ospite; se no è un contatto/lead (newsletter).
     const anyBookings = allB.length > 0;
     // Testo di ricerca: nome, cognome, email, paese — senza accenti né maiuscole, così l'ordine delle parole non conta.
     const hay = normName([g.fullName, g.firstName, g.lastName, g.email, g.country].filter(Boolean).join(" "));
-    return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh, anyBookings, hay };
+    return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh, topB, anyBookings, hay };
   }), [guests, bookingsByGuest, activeStructureId]);
   // Mostra: chi ha prenotazioni in questa struttura; con "Tutte" tutti; e SEMPRE i contatti senza prenotazioni
   // (es. iscritti newsletter/lead), che non sono legati a una struttura.
@@ -261,7 +268,7 @@ export default function OspitiPage() {
             {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
           </div>
           {open && <div className="flex flex-col gap-2">
-            {shown.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
+            {shown.map(({ guest, stays, nightsTot, spent, last, topCh, topB }) => (
               <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
                 <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="h-5 w-5 shrink-0" />
                 <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
@@ -274,7 +281,7 @@ export default function OspitiPage() {
                   ) : (
                     <>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
-                        {topCh && <span className="inline-flex items-center gap-1"><ChannelLogo channel={topCh} size={14} title={topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label} /><span>{topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label}</span></span>}
+                        {topCh && <span className="inline-flex items-center gap-1">{topB ? <BookingChannelLogo booking={topB} size={14} title={CHANNELS[topCh].label} /> : <ChannelLogo channel={topCh} size={14} title={CHANNELS[topCh].label} />}<span>{topChLabel(topCh, topB)}</span></span>}
                         <span>{stays} {t("pren.")} · {nightsTot} {t("notti")}</span>
                         {guest.country && <><span className="text-faint">·</span><span>{guest.country}</span></>}
                       </div>
@@ -318,7 +325,7 @@ export default function OspitiPage() {
               </tr>
             </thead>
             <tbody>
-              {shown.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh }) => (
+              {shown.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh, topB }) => (
                 <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
                   <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
                   <td className="whitespace-nowrap px-3 py-2">{nameCell(guest)}</td>
@@ -326,7 +333,7 @@ export default function OspitiPage() {
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.country ?? "—"}</td>
                   {!lead && <>
-                    <td className="whitespace-nowrap px-3 py-2">{topCh ? <ChannelWordmark channel={topCh} height={16} title={topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label} /> : "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2">{topCh ? (topB ? <BookingChannelWordmark booking={topB} height={16} title={CHANNELS[topCh].label} /> : <ChannelWordmark channel={topCh} height={16} title={CHANNELS[topCh].label} />) : "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{stays}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{nightsTot}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{avg > 0 ? eur(avg) : "—"}</td>
