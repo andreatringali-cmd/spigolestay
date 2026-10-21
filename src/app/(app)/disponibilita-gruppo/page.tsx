@@ -131,7 +131,6 @@ export default function GruppoPage() {
           <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
               <h2 className="font-display text-lg font-bold text-txt">Camere reali per tipologia</h2>
-              <p className="max-w-2xl text-xs leading-relaxed text-dim">Le tipologie con lo stesso nome in strutture diverse sono la stessa camera. Indica quante ne esistono davvero: Xenora non ne vende più di così, anche se le strutture ne mostrano di più.</p>
             </div>
             {missing > 0 && <button type="button" onClick={confirmAll} className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-wash" style={{ borderColor: tint("var(--warn)", 45), color: "var(--warn)" }}>Conferma i numeri proposti ({missing})</button>}
           </div>
