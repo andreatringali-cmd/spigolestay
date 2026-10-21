@@ -115,7 +115,7 @@ export default function Sidebar({
                       key={n.href}
                       href={n.href}
                       onClick={onCloseMobile}
-                      className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-11 ${active ? "" : "hover:bg-wash"}`}
+                      className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-10 ${active ? "" : "hover:bg-wash"}`}
                       style={active ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 } : { color: "var(--txt)" }}
                     >
                       <span style={{ color: active ? color : "var(--dim)" }}><Icon name={n.icon} size={18} /></span>
@@ -133,7 +133,7 @@ export default function Sidebar({
                 <div key={group}>
                   <button
                     onClick={() => toggleGroup(group)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash max-md:min-h-11"
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash"
                     style={{ color: isOpen ? "var(--focus)" : "var(--dim)", backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
                     <span className="flex-1 text-left">{t(group)}</span>
@@ -150,7 +150,7 @@ export default function Sidebar({
                             key={n.href}
                             href={n.href}
                             onClick={onCloseMobile}
-                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-11 ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
+                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-10 ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={
                               active
                                 ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 }
