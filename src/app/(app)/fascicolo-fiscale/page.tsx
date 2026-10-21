@@ -228,7 +228,7 @@ export default function FascicoloFiscalePage() {
             <button onClick={exportDocsCsv} disabled={loadingDocs || invoiceCount + creditNoteCount === 0} title="Elenco dei documenti emessi dell'anno (CSV per Excel; note di credito in negativo)" className="rounded-lg border border-line px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">
               {t("Esporta documenti (CSV)")}
             </button>
-            <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+            <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 max-sm:flex-1 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">
               {generating ? t("Genero…") : t("Genera fascicolo fiscale (PDF)")}
             </button>
           </div>
@@ -268,7 +268,7 @@ export default function FascicoloFiscalePage() {
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                   <th className="px-3 py-2 font-semibold">{t("Canale")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Prenot.")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Lordo")}</th>
@@ -320,11 +320,11 @@ export default function FascicoloFiscalePage() {
                   <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{eur(invoiceVat)}</div></div>
                   <div><div className="text-xs text-dim">{t("Totale")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{eur(invoiceTotal)}</div></div>
                   {creditNoteCount > 0 && (<>
-                    <div className="col-span-2 mt-1 border-t border-line pt-2 text-xs font-semibold uppercase tracking-wide text-faint sm:col-span-4">{t("Note di credito emesse")}</div>
+                    <div className="col-span-2 mt-1 border-t border-line pt-2 text-xs font-semibold uppercase tracking-wide text-dim sm:col-span-4">{t("Note di credito emesse")}</div>
                     <div><div className="text-xs text-dim">{t("N. NC")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">{creditNoteCount}</div></div>
                     <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-base sm:text-lg font-bold text-txt">−{eur(creditNoteTaxable)}</div></div>
                     <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-base sm:text-lg font-bold text-txt">−{eur(creditNoteVat)}</div></div>
-                    <div><div className="text-xs text-dim">{t("Totale al netto NC")}</div><div className="font-mono text-base sm:text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(netTotal)}</div><div className="text-[10px] text-faint">imp. {eur(netTaxable)} · IVA {eur(netVat)}</div></div>
+                    <div><div className="text-xs text-dim">{t("Totale al netto NC")}</div><div className="font-mono text-base sm:text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(netTotal)}</div><div className="text-[11px] text-faint">imp. {eur(netTaxable)} · IVA {eur(netVat)}</div></div>
                   </>)}
                   {bolloTotal > 0 && <div className="col-span-2 text-[11px] text-dim sm:col-span-4">{t("Di cui bollo virtuale")}: <b className="font-mono text-txt">{eur(bolloTotal)}</b></div>}
                   {rejectedCount > 0 && <div className="col-span-2 text-[11px] font-medium text-[color:var(--warn)] sm:col-span-4">{rejectedCount} {t("documenti scartati dallo SdI esclusi dai totali: correggili e reinviali.")}</div>}

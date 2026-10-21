@@ -89,7 +89,7 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
             </div>
             <div className="mt-4 flex items-center gap-2">
               <button onClick={() => setPicker(null)} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={() => { onExcel([...picker]); setPicker(null); }} disabled={!picker.size} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Esporta")}</button>
+              <button onClick={() => { onExcel([...picker]); setPicker(null); }} disabled={!picker.size} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Esporta")}</button>
             </div>
           </div>
         </div>

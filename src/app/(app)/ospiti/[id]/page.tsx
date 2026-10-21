@@ -34,7 +34,7 @@ function Hint({ tone, children, action }: { tone: "ok" | "warn" | "err" | "dim";
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium" style={{ color: col }}>
       <span>{children}</span>
-      {action && <button type="button" onClick={action.onClick} className="rounded-md bg-focus px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90">{action.label}</button>}
+      {action && <button type="button" onClick={action.onClick} className="rounded-md bg-focus px-2 py-0.5 text-[11px] font-semibold text-on-focus hover:opacity-90">{action.label}</button>}
     </div>
   );
 }
@@ -154,7 +154,7 @@ export default function OspiteSchedaPage() {
             {!isNew && g.email && <button onClick={() => setPickPromo(true)} disabled={!promoRecipientEmail(g)} title={promoRecipientEmail(g) ? undefined : t("Serve il consenso marketing (o l'iscrizione alla newsletter) e un'email vera, non un indirizzo di inoltro OTA")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash disabled:opacity-40 max-sm:min-h-10">✉ {t("Invia promo")}</button>}
             {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash max-sm:min-h-10">{t("Elimina")}</button>}
             <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash max-sm:min-h-10">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{isNew ? t("Crea ospite") : t("Salva")}</button>
+            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10">{isNew ? t("Crea ospite") : t("Salva")}</button>
           </div>
         }
       />
@@ -166,7 +166,7 @@ export default function OspiteSchedaPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white" style={{ backgroundColor: color }}>{initials(g.firstName, g.lastName) || "?"}</div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
             <div className="break-words text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
           </div>
           {!isNew && (
@@ -304,7 +304,7 @@ export default function OspiteSchedaPage() {
                 {promos.map((p) => (
                   <button key={p.id} onClick={() => sendPromo(p)} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-left hover:border-focus hover:bg-wash">
                     <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div></div>
-                    {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
+                    {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
                   </button>
                 ))}
               </div>

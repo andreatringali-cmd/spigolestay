@@ -29,7 +29,7 @@ function Dot({ name, color, logo, size = 22 }: { name: string; color?: string; l
 }
 
 function Pill({ children, color }: { children: React.ReactNode; color: string }) {
-  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color, backgroundColor: tint(color, 14) }}>{children}</span>;
+  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color, backgroundColor: tint(color, 14) }}>{children}</span>;
 }
 
 export default function GruppoPage() {
@@ -146,7 +146,7 @@ export default function GruppoPage() {
                   </div>
                   {/* Camere reali: contatore */}
                   <label className="flex shrink-0 flex-col items-center gap-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">Camere reali</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">Camere reali</span>
                     <span className="flex items-center gap-1">
                       <button type="button" onClick={() => setRooms(f.key, String(Math.max(0, f.real - 1)))} disabled={f.real <= 0} aria-label={`Una camera in meno per ${f.name}`} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-lg leading-none text-dim transition hover:bg-wash hover:text-txt disabled:opacity-40">−</button>
                       <input type="number" min={0} inputMode="numeric" value={f.set ? f.real : ""} placeholder={String(f.suggested)} onChange={(e) => setRooms(f.key, e.target.value)} aria-label={`Camere reali di ${f.name}`}
@@ -194,7 +194,7 @@ export default function GruppoPage() {
                       <Dot name={sName(l.structureId)} color={sColor(l.structureId)} logo={sLogo(l.structureId)} size={18} />
                       <span className="font-semibold text-txt">{sName(l.structureId)}</span>
                       <span className="text-dim">{l.name}</span>
-                      <span className="font-mono text-faint">{l.listed} in Xenora</span>
+                      <span className="font-mono text-dim">{l.listed} in Xenora</span>
                       <select value={NONE} onChange={(e) => setAssign(l.typeId, e.target.value)} className="ml-auto rounded-lg border border-line bg-surface px-1.5 py-1 text-[11px] text-dim" aria-label={`Tipologia reale di ${l.name}`}>
                         <option value={NONE}>Non condivisa</option>
                         {families.map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}
@@ -228,7 +228,7 @@ export default function GruppoPage() {
                       const dt = parseISO(d); const wk = dt.getDay() === 0 || dt.getDay() === 6; const today = d === todayIso;
                       return (
                         <th key={d} className="px-1 py-1.5 text-center font-medium" style={{ backgroundColor: today ? tint("var(--focus)", 12) : undefined, color: today ? "var(--focus)" : wk ? "var(--err)" : "var(--faint)" }}>
-                          <div className="text-[10px] uppercase">{today ? "Oggi" : dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
+                          <div className="text-[11px] uppercase">{today ? "Oggi" : dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
                           <div className="font-mono">{fmtDM(dt)}</div>
                         </th>
                       );
@@ -239,8 +239,8 @@ export default function GruppoPage() {
                   {groups.map((g) => (
                     <Fragment key={g.key}>
                       <tr key={g.key + "-h"}>
-                        <td colSpan={days.length + 1} className="sticky left-0 border-t border-line bg-wash/60 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-dim">
-                          {g.title}{g.real !== undefined && <span className="ml-2 font-mono font-semibold normal-case text-faint">{g.real} {g.real === 1 ? "camera reale" : "camere reali"}</span>}
+                        <td colSpan={days.length + 1} className="sticky left-0 border-t border-line bg-wash/60 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-dim">
+                          {g.title}{g.real !== undefined && <span className="ml-2 font-mono font-semibold normal-case text-dim">{g.real} {g.real === 1 ? "camera reale" : "camere reali"}</span>}
                         </td>
                       </tr>
                       {g.items.map((l) => (

@@ -181,9 +181,9 @@ export default function RevenueAutopilotPage() {
     <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--ok)" }} />Dati tuoi · occupazione reale dalle prenotazioni</span>
     {signal.hasZoneData
       ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--focus)" }} />Media di zona attiva{city ? ` · ${city}` : ""}</span>
-      : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">Media di zona (Rete città): in arrivo</span>}
+      : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">Media di zona (Rete città): non ancora disponibile</span>}
     {signal.hasZoneData && pulseHasDemo(pulse) && (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title="La media di zona include strutture demo dimostrative, non solo concorrenti reali.">Include dati dimostrativi</span>
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title="La media di zona include strutture demo dimostrative, non solo concorrenti reali.">Include dati dimostrativi</span>
     )}
   </>);
 
@@ -197,7 +197,7 @@ export default function RevenueAutopilotPage() {
       {/* Previsione storica per il prossimo weekend: solo se la confidenza è sufficiente (mai un numero inventato). */}
       {weekendForecast.length > 0 && (
         <Card className="mb-4 max-sm:mb-3">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Previsione basata sullo storico · non è intelligenza artificiale, è una media pesata dei tuoi dati reali</div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Previsione basata sullo storico · non è intelligenza artificiale, è una media pesata dei tuoi dati reali</div>
           <ul className="space-y-1 text-sm text-txt">
             {weekendForecast.map((f) => (
               <li key={f.iso}>
@@ -211,10 +211,10 @@ export default function RevenueAutopilotPage() {
 
       {/* Riepilogo + interruttore autopilot */}
       <div className="mb-4 grid gap-3 max-sm:mb-3 max-sm:grid-cols-3 max-sm:gap-2 lg:grid-cols-4">
-        <Card className="max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Suggerimenti</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{suggestions.length}</div></Card>
-        <Card className="max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Rialzi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{up.length}</div></Card>
-        <Card className="max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Ribassi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--warn)" }}>{down.length}</div></Card>
-        <Card className="max-sm:col-span-3 max-sm:p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Effetto se si vendono le camere libere</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: impact.net >= 0 ? "var(--ok)" : "var(--warn)" }}>{impact.net >= 0 ? "+" : "−"}{eur(Math.abs(impact.net))}</div><div className="mt-0.5 text-[10px] text-faint">su {impact.freeNightRooms} notti-camera libere · {impact.soldNightRooms} già vendute restano al loro prezzo</div></Card>
+        <Card className="max-sm:p-3"><div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Suggerimenti</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{suggestions.length}</div></Card>
+        <Card className="max-sm:p-3"><div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Rialzi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{up.length}</div></Card>
+        <Card className="max-sm:p-3"><div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Ribassi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--warn)" }}>{down.length}</div></Card>
+        <Card className="max-sm:col-span-3 max-sm:p-3"><div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Effetto se si vendono le camere libere</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: impact.net >= 0 ? "var(--ok)" : "var(--warn)" }}>{impact.net >= 0 ? "+" : "−"}{eur(Math.abs(impact.net))}</div><div className="mt-0.5 text-[11px] text-faint">su {impact.freeNightRooms} notti-camera libere · {impact.soldNightRooms} già vendute restano al loro prezzo</div></Card>
       </div>
 
       <Card className="mb-4 max-sm:mb-3">
@@ -228,7 +228,7 @@ export default function RevenueAutopilotPage() {
               <div className="text-[11px] text-faint">{cfg.on ? "Applica automaticamente entro i limiti impostati, una volta al giorno quando apri l'app (non lavora sul server a app chiusa)." : "Suggerisce soltanto: applichi tu."} {scopeSid ? `Impostazioni valide solo per ${getStructure(scopeSid)?.name ?? "questa struttura"}.` : structures.length > 1 ? "Impostazioni predefinite: valgono per le strutture che non ne hanno di proprie (selezionane una in alto a destra per personalizzarle)." : ""}</div>
             </div>
           </div>
-          <button onClick={() => setPreview(true)} disabled={!suggestions.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica tutti ({suggestions.length})</button>
+          <button onClick={() => setPreview(true)} disabled={!suggestions.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Applica tutti ({suggestions.length})</button>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -244,12 +244,12 @@ export default function RevenueAutopilotPage() {
       {(zeroPriceTypes.length > 0 || gapScan.unassigned.length > 0) && (
         <div className="mb-4 space-y-2">
           {zeroPriceTypes.length > 0 && (
-            <div className="rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,#f59e0b 35%,var(--line))", background: "color-mix(in srgb,#f59e0b 8%,var(--surface))", color: "#B45309" }}>
+            <div className="rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,var(--warn) 35%,var(--line))", background: "color-mix(in srgb,var(--warn) 8%,var(--surface))", color: "var(--warn)" }}>
               <b>Tariffa base mancante:</b> {zeroPriceTypes.map((r) => r.name).join(", ")}. Senza una tariffa base l&apos;autopilot non può proporre nulla per queste tipologie: impostala in Tariffe.
             </div>
           )}
           {gapScan.unassigned.length > 0 && (
-            <div className="rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,#f59e0b 35%,var(--line))", background: "color-mix(in srgb,#f59e0b 8%,var(--surface))", color: "#B45309" }}>
+            <div className="rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,var(--warn) 35%,var(--line))", background: "color-mix(in srgb,var(--warn) 8%,var(--surface))", color: "var(--warn)" }}>
               <b>{gapScan.unassigned.length} {gapScan.unassigned.length === 1 ? "prenotazione senza camera assegnata" : "prenotazioni senza camera assegnata"}</b> nei prossimi 60 giorni: contano comunque sulla loro tipologia per calcolare l&apos;occupazione, ma assegnale dal Calendario per avere buchi e notti orfane precisi.
             </div>
           )}
@@ -291,7 +291,7 @@ export default function RevenueAutopilotPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm max-sm:block max-sm:min-w-0">
-              <thead className="max-sm:hidden"><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-2 py-2 font-semibold">Giorno</th><th className="px-2 py-2 font-semibold">Tipologia</th><th className="px-2 py-2 text-center font-semibold">Occ.</th><th className="px-2 py-2 text-right font-semibold">Attuale</th><th className="px-2 py-2 text-right font-semibold">Suggerito</th><th className="px-2 py-2 font-semibold">Perché</th><th className="px-2 py-2"></th></tr></thead>
+              <thead className="max-sm:hidden"><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-2 py-2 font-semibold">Giorno</th><th className="px-2 py-2 font-semibold">Tipologia</th><th className="px-2 py-2 text-center font-semibold">Occ.</th><th className="px-2 py-2 text-right font-semibold">Attuale</th><th className="px-2 py-2 text-right font-semibold">Suggerito</th><th className="px-2 py-2 font-semibold">Perché</th><th className="px-2 py-2"></th></tr></thead>
               <tbody className="max-sm:block">
                 {suggestions.slice(0, 200).map((s) => (
                   <tr key={s.key} className="border-b border-line last:border-0 hover:bg-wash max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-sm:py-3">
@@ -299,8 +299,8 @@ export default function RevenueAutopilotPage() {
                     <td className="px-2 py-2 font-medium text-txt max-sm:order-2 max-sm:p-0">{s.typeName}</td>
                     <td className="px-2 py-2 text-center font-mono text-dim max-sm:order-3 max-sm:p-0 max-sm:text-xs max-sm:before:content-['occ._']">{s.occ}%</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-dim max-sm:order-4 max-sm:basis-full max-sm:p-0 max-sm:text-left max-sm:before:content-['ora_'] max-sm:after:content-['_→']">{eur(s.current)}</td>
-                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold max-sm:order-5 max-sm:p-0" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[10px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
-                    <td className="px-2 py-2 text-[11px] text-faint max-sm:order-7 max-sm:w-full max-sm:p-0">{explainSuggestionCompact(s)}{s.limitedBy && <span className="ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={`Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}. Senza limiti: ${eur(s.rawSuggested)}`}>limitato</span>}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold max-sm:order-5 max-sm:p-0" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[11px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
+                    <td className="px-2 py-2 text-[11px] text-faint max-sm:order-7 max-sm:w-full max-sm:p-0">{explainSuggestionCompact(s)}{s.limitedBy && <span className="ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[11px] font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={`Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}. Senza limiti: ${eur(s.rawSuggested)}`}>limitato</span>}</td>
                     <td className="px-2 py-2 text-right max-sm:order-6 max-sm:ml-auto max-sm:p-0"><button onClick={() => applyOne(s)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-10">Applica</button></td>
                   </tr>
                 ))}

@@ -146,7 +146,7 @@ export default function RateCheckerPage() {
       {/* Stato connettore rate shopping */}
       <Card className="mb-5 max-sm:mb-3">
         <div className="flex flex-wrap items-center gap-3 max-sm:gap-2">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: isConfigured ? "var(--ok)" : "var(--warn)" }}>{isConfigured ? "✓" : "!"}</span>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${isConfigured ? "text-on-ok" : "text-on-warn"}`} style={{ backgroundColor: isConfigured ? "var(--ok)" : "var(--warn)" }}>{isConfigured ? "✓" : "!"}</span>
           <div className="min-w-0 flex-1 max-sm:basis-0">
             <div className="text-sm font-semibold text-txt">{t("Confronto competitor")}</div>
             <div className="text-xs text-dim">
@@ -157,7 +157,7 @@ export default function RateCheckerPage() {
           </div>
           <div className="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:[&>button]:flex-1">
             <button onClick={() => setShowConfig((v) => !v)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash max-sm:min-h-10">{t("Competitor")}{competitors.length ? ` · ${competitors.length}` : ""}</button>
-            <button onClick={() => void refresh()} disabled={loading} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60 max-sm:min-h-10">{loading ? t("Aggiorno…") : t("Aggiorna")}</button>
+            <button onClick={() => void refresh()} disabled={loading} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-60 max-sm:min-h-10">{loading ? t("Aggiorno…") : t("Aggiorna")}</button>
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export default function RateCheckerPage() {
                 {t("ID (opz.)")}
                 <input value={draft.id} onChange={(e) => setDraft((d) => ({ ...d, id: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") addCompetitor(); }} placeholder="prop_123" className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus" />
               </label>
-              <button onClick={addCompetitor} className="rounded-lg bg-focus px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Aggiungi")}</button>
+              <button onClick={addCompetitor} className="rounded-lg bg-focus px-4 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Aggiungi")}</button>
             </div>
           </div>
         )}
@@ -253,7 +253,7 @@ export default function RateCheckerPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                   <th className="px-2 py-2 font-semibold">{t("Giorno")}</th>
                   <th className="px-2 py-2 font-semibold">{t("La tua tariffa")}</th>
                   <th className="px-2 py-2 font-semibold">{t("Media mercato")}</th>

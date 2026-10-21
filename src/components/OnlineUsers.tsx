@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import Popover from "./Popover";
 
+import { onSolid } from "@/lib/on-solid";
 // Utenti online REALI: presenza Supabase Realtime su un canale per ogni struttura condivisa (org)
 // di cui sei membro. Così vedi quando il tuo socio è collegato e ricevi un avviso quando entra.
 const initials = (n: string) => n.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
@@ -92,7 +93,7 @@ export default function OnlineUsers() {
       <button ref={btnRef} onClick={() => setOpen((o) => !o)} title={peers.length ? `${peers.map((p) => p.name).join(", ")} ${t("online")}` : t("Utenti online")} className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 transition hover:bg-wash">
         <div className="flex -space-x-2">
           {online.slice(0, 3).map((u, i) => (
-            <span key={u.id} className="grid h-6 w-6 place-items-center overflow-hidden rounded-full border-2 border-surface text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.name)}</span>
+            <span key={u.id} className={`grid h-6 w-6 place-items-center overflow-hidden rounded-full border-2 border-surface text-[11px] font-bold ${onSolid(AVATAR[i % AVATAR.length])}`} style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.name)}</span>
           ))}
         </div>
         <span className="hidden items-center gap-1 text-xs font-medium text-dim sm:flex">
@@ -101,15 +102,15 @@ export default function OnlineUsers() {
         </span>
       </button>
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={256} label={t("Utenti online")}>
-          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Online adesso")} · {online.length}</div>
+          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-dim">{t("Online adesso")} · {online.length}</div>
           {online.map((u, i) => (
             <div key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
-              <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>
+              <span className={`relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[11px] font-bold ${onSolid(AVATAR[i % AVATAR.length])}`} style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>
                 {u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.name)}
                 <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-[color:var(--ok)]" />
               </span>
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-txt">{u.name}{u.you && <span className="ml-1 text-[10px] text-faint">{t("(tu)")}</span>}</div>
+                <div className="truncate text-sm font-medium text-txt">{u.name}{u.you && <span className="ml-1 text-[11px] text-faint">{t("(tu)")}</span>}</div>
                 <div className="text-[11px] text-dim">{u.role}</div>
               </div>
             </div>

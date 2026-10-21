@@ -103,12 +103,12 @@ export default function XenoraBookPublicPage() {
       {/* Barra pubblica */}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <Link href="/xenorabook" className="flex items-center gap-2">
+          <Link href="/xenorabook" className="flex min-h-11 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/xenora-mark.png" alt="Xenora" width={26} height={26} style={{ width: 26, height: 26, objectFit: "contain" }} />
             <span className="font-display text-lg font-bold text-txt">XenoraBook</span>
           </Link>
-          <a href="https://xenora.it" className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">Sei una struttura? Accedi</a>
+          <a href="https://xenora.it" className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash sm:min-h-0">Sei una struttura? Accedi</a>
         </div>
       </header>
 
@@ -117,13 +117,13 @@ export default function XenoraBookPublicPage() {
       <section className="relative overflow-hidden rounded-3xl" style={{ background: "linear-gradient(135deg,#1E3A46 0%,#2E5B63 42%,#BE5D38 100%)" }}>
         <HeroDeco />
         <div className="relative px-6 py-12 sm:px-10 sm:pt-16 sm:pb-24">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur">✦ Le strutture Xenora</div>
-          <h1 className="mt-4 max-w-[16ch] font-serif text-[clamp(30px,5.4vw,52px)] font-bold leading-[1.05] text-white" style={{ textWrap: "balance" }}>Dormi dove il gestore usa Xenora.</h1>
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-white backdrop-blur">✦ Le strutture Xenora</div>
+          <h1 className="mt-4 max-w-[16ch] font-display text-[clamp(30px,5.4vw,52px)] font-bold leading-[1.05] text-white" style={{ textWrap: "balance" }}>Dormi dove il gestore usa Xenora.</h1>
           <p className="mt-3 max-w-[48ch] text-[15px] leading-relaxed text-white/85">La vetrina delle strutture — case, B&amp;B e dimore — che hanno pubblicato il proprio Xenosite in Sicilia sud-orientale. Dati reali: nomi, foto e prezzi aggiornati direttamente dal gestore.</p>
           {heroStats.length > 0 && (
             <div className="mt-6 flex flex-wrap gap-6 text-white">
               {heroStats.map(([n, l]) => (
-                <div key={l}><div className="font-serif text-2xl font-bold">{n}</div><div className="text-[12px] text-white/75">{l}</div></div>
+                <div key={l}><div className="font-display text-2xl font-bold">{n}</div><div className="text-xs text-white/90">{l}</div></div>
               ))}
             </div>
           )}
@@ -135,22 +135,22 @@ export default function XenoraBookPublicPage() {
         <div className="rounded-2xl border border-line bg-surface p-2 shadow-xl">
             <div className="grid gap-2 md:grid-cols-[1.4fr_1fr_1fr_1.1fr_auto]">
               <label className="rounded-xl px-3 py-2 hover:bg-wash">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Destinazione</div>
-                <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-txt outline-none">
+                <div className="text-xs font-bold uppercase tracking-wide text-dim">Destinazione</div>
+                <select value={city} onChange={(e) => setCity(e.target.value)} className="min-h-11 w-full md:min-h-8 bg-transparent text-base sm:text-sm font-semibold text-txt outline-none focus-visible:ring-2 focus-visible:ring-focus/40">
                   {cityOptions.map((c) => <option key={c} value={c}>{c === "Tutte" ? "Ovunque in Sicilia SE" : c}</option>)}
                 </select>
               </label>
               <div className="rounded-xl px-3 py-2 hover:bg-wash">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-in</div>
-                <DateField value={from} min={today} onChange={(v) => { setFrom(v); if (to <= v) setTo(shiftISO(v, 1)); }} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
+                <div className="text-xs font-bold uppercase tracking-wide text-dim">Check-in</div>
+                <DateField value={from} min={today} onChange={(v) => { setFrom(v); if (to <= v) setTo(shiftISO(v, 1)); }} className="min-h-11 w-full md:min-h-8 bg-transparent text-left text-base sm:text-sm font-semibold text-txt outline-none focus-visible:ring-2 focus-visible:ring-focus/40" />
               </div>
               <div className="rounded-xl px-3 py-2 hover:bg-wash">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Check-out</div>
-                <DateField value={to} min={shiftISO(from, 1)} onChange={(v) => setTo(v)} className="w-full bg-transparent text-left text-sm font-semibold text-txt outline-none" />
+                <div className="text-xs font-bold uppercase tracking-wide text-dim">Check-out</div>
+                <DateField value={to} min={shiftISO(from, 1)} onChange={(v) => setTo(v)} className="min-h-11 w-full md:min-h-8 bg-transparent text-left text-base sm:text-sm font-semibold text-txt outline-none focus-visible:ring-2 focus-visible:ring-focus/40" />
               </div>
               <div className="relative">
-                <button ref={guestsBtnRef} onClick={() => setGuestsOpen((o) => !o)} className="h-full w-full rounded-xl px-3 py-2 text-left hover:bg-wash">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Ospiti</div>
+                <button ref={guestsBtnRef} onClick={() => setGuestsOpen((o) => !o)} aria-haspopup="dialog" aria-expanded={guestsOpen} className="h-full w-full rounded-xl px-3 py-2 text-left hover:bg-wash">
+                  <div className="text-xs font-bold uppercase tracking-wide text-dim">Ospiti</div>
                   <div className="text-sm font-semibold text-txt">{adults + children} {adults + children === 1 ? "ospite" : "ospiti"} · {rooms} {rooms > 1 ? "camere" : "camera"}</div>
                 </button>
                 <Popover open={guestsOpen} anchorRef={guestsBtnRef} onClose={() => setGuestsOpen(false)} align="end" width={256} label="Ospiti">
@@ -159,16 +159,16 @@ export default function XenoraBookPublicPage() {
                       <div key={lbl} className="flex items-center justify-between py-1.5">
                         <span className="text-sm text-txt">{lbl}</span>
                         <span className="flex items-center gap-3">
-                          <button onClick={() => set(Math.max(min, val - 1))} className="grid h-7 w-7 place-items-center rounded-full border border-line text-dim hover:text-txt">−</button>
+                          <button onClick={() => set(Math.max(min, val - 1))} aria-label={`${lbl} −`} className="grid h-11 w-11 place-items-center rounded-full border border-line text-dim hover:text-txt sm:h-8 sm:w-8">−</button>
                           <span className="w-5 text-center text-sm font-semibold">{val}</span>
-                          <button onClick={() => set(val + 1)} className="grid h-7 w-7 place-items-center rounded-full border border-line text-dim hover:text-txt">+</button>
+                          <button onClick={() => set(val + 1)} aria-label={`${lbl} +`} className="grid h-11 w-11 place-items-center rounded-full border border-line text-dim hover:text-txt sm:h-8 sm:w-8">+</button>
                         </span>
                       </div>
                     ))}
                   </div>
                 </Popover>
               </div>
-              <button onClick={() => setGuestsOpen(false)} className="flex items-center justify-center gap-2 rounded-xl bg-focus px-5 py-2.5 text-sm font-bold text-white hover:opacity-90"><Icon name="search" size={16} /> Cerca</button>
+              <button onClick={() => setGuestsOpen(false)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-focus px-5 py-2.5 text-sm font-bold text-white hover:opacity-90"><Icon name="search" size={16} /> Cerca</button>
             </div>
           </div>
         </div>
@@ -177,9 +177,9 @@ export default function XenoraBookPublicPage() {
       {typeOptions.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {typeOptions.map((t) => (
-            <button key={t} onClick={() => toggleType(t)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${types.includes(t) ? "bg-focus text-white" : "border border-line bg-surface text-dim hover:text-txt"}`}>{t}</button>
+            <button key={t} onClick={() => toggleType(t)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold max-sm:min-h-11 ${types.includes(t) ? "bg-focus text-white" : "border border-line bg-surface text-dim hover:text-txt"}`}>{t}</button>
           ))}
-          <button onClick={() => setMoreOpen((o) => !o)} className="whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-txt hover:bg-wash">⚙ Filtri{activeCount ? ` · ${activeCount}` : ""}</button>
+          <button onClick={() => setMoreOpen((o) => !o)} className="whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash max-sm:min-h-11" aria-expanded={moreOpen}>⚙ Filtri{activeCount ? ` · ${activeCount}` : ""}</button>
         </div>
       )}
 
@@ -187,36 +187,36 @@ export default function XenoraBookPublicPage() {
         <Card className="mb-3">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <div className="mb-1 text-[12px] font-bold text-dim">Recensioni</div>
-              <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt">
+              <div className="mb-1 text-xs font-bold text-dim">Recensioni</div>
+              <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="min-h-11 w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-base sm:text-sm text-txt focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0">
                 <option value={0}>Qualsiasi</option><option value={4}>4+ molto bene</option><option value={4.5}>4,5+ eccellente</option>
               </select>
             </div>
             <div>
-              <div className="mb-1 text-[12px] font-bold text-dim">Posti letto (min)</div>
-              <select value={minBeds} onChange={(e) => setMinBeds(Number(e.target.value))} className="w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt">
+              <div className="mb-1 text-xs font-bold text-dim">Posti letto (min)</div>
+              <select value={minBeds} onChange={(e) => setMinBeds(Number(e.target.value))} className="min-h-11 w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-base sm:text-sm text-txt focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0">
                 <option value={0}>Qualsiasi</option>{[1, 2, 3, 4].map((b) => <option key={b} value={b}>{b}+ letti</option>)}
               </select>
             </div>
           </div>
           {amenOptions.length > 0 && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] font-bold text-dim">Servizi</div>
+              <div className="mb-1.5 text-xs font-bold text-dim">Servizi</div>
               <div className="flex flex-wrap gap-2">
                 {amenOptions.map((a) => (
-                  <button key={a} onClick={() => toggleAmen(a)} className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${amen.includes(a) ? "bg-txt text-surface" : "border border-line bg-surface text-dim hover:text-txt"}`}>{a}</button>
+                  <button key={a} onClick={() => toggleAmen(a)} className={`rounded-full px-3 py-1.5 text-xs font-semibold max-sm:min-h-11 ${amen.includes(a) ? "bg-txt text-surface" : "border border-line bg-surface text-dim hover:text-txt"}`}>{a}</button>
                 ))}
               </div>
             </div>
           )}
-          {activeCount > 0 && <button onClick={resetFilters} className="mt-4 text-[13px] font-semibold text-focus hover:underline">Azzera filtri</button>}
+          {activeCount > 0 && <button onClick={resetFilters} className="mt-4 min-h-11 text-[13px] font-semibold text-focus hover:underline sm:min-h-0">Azzera filtri</button>}
         </Card>
       )}
 
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <SectionTitle>{status === "loading" ? "Carico le strutture…" : `${results.length} strutture su Xenora`}</SectionTitle>
         {all.length > 0 && (
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] font-semibold text-dim">
+          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="min-h-11 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-base sm:text-sm font-semibold text-dim focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0">
             <option value="consigliate">Consigliate</option><option value="prezzo">Prezzo crescente</option><option value="rating">Più votate</option>
           </select>
         )}
@@ -224,12 +224,12 @@ export default function XenoraBookPublicPage() {
 
       {status === "loading" && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[0, 1, 2].map((i) => <div key={i} className="h-64 animate-pulse rounded-2xl border border-line bg-wash" />)}
+          {[0, 1, 2].map((i) => <div key={i} className="h-64 animate-pulse rounded-2xl border border-line bg-wash" aria-hidden />)}
         </div>
       )}
 
       {status === "error" && (
-        <div className="rounded-xl border border-line bg-wash px-4 py-10 text-center text-sm text-dim">Catalogo momentaneamente non disponibile. Riprova tra poco.</div>
+        <div role="alert" className="rounded-xl border border-line bg-wash px-4 py-10 text-center text-sm text-dim">Catalogo momentaneamente non disponibile. Riprova tra poco.</div>
       )}
 
       {status === "ok" && all.length === 0 && (
@@ -247,23 +247,23 @@ export default function XenoraBookPublicPage() {
                 className={`group cursor-pointer overflow-hidden rounded-2xl border bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${hovered === l.slug ? "border-focus" : "border-line"}`}>
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-wash">
                   <ListingImage src={l.images[0]} hue={l.hue} initial={l.name[0] || "X"} />
-                  <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white shadow" style={{ backgroundColor: "#3F7A5B" }}>Su Xenora</span>
+                  <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-white shadow" style={{ backgroundColor: "#3F7A5B" }}>Su Xenora</span>
                 </div>
                 <div className="flex flex-col gap-1.5 p-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="text-[17px] font-bold text-txt">{l.name}</div>
                     {l.rating != null ? (
-                      <div className="flex items-center gap-1 whitespace-nowrap text-[13px] font-bold text-txt"><span style={{ color: "#D99A2B" }}>★</span>{l.rating.toFixed(1)} <span className="font-semibold text-faint">({l.reviews})</span></div>
+                      <div className="flex items-center gap-1 whitespace-nowrap text-[13px] font-bold text-txt"><span style={{ color: "#D99A2B" }}>★</span>{l.rating.toFixed(1)} <span className="font-semibold text-dim">({l.reviews})</span></div>
                     ) : (
-                      <div className="whitespace-nowrap text-[12px] font-semibold text-faint">Nuova su Xenora</div>
+                      <div className="whitespace-nowrap text-xs font-semibold text-dim">Nuova su Xenora</div>
                     )}
                   </div>
                   <div className="text-[13px] text-dim">📍 {l.area}</div>
-                  {l.rating != null && <div className="text-[12px]" style={{ color: "#D99A2B" }}>{stars(l.rating)}</div>}
-                  {l.services.length > 0 && <div className="mt-1 flex flex-wrap gap-1.5">{l.services.slice(0, 4).map((a) => <span key={a} className="rounded-md border border-line bg-wash px-2 py-0.5 text-[11px] text-dim">{a}</span>)}</div>}
+                  {l.rating != null && <div className="text-xs" style={{ color: "#D99A2B" }} aria-hidden>{stars(l.rating)}</div>}
+                  {l.services.length > 0 && <div className="mt-1 flex flex-wrap gap-1.5">{l.services.slice(0, 4).map((a) => <span key={a} className="rounded-md border border-line bg-wash px-2 py-0.5 text-xs text-dim">{a}</span>)}</div>}
                   <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2.5">
                     <div>{l.priceFrom != null ? (<><span className="text-lg font-extrabold text-txt">€{l.priceFrom}</span> <span className="text-xs font-semibold text-dim">/ notte · €{l.priceFrom * nights} tot.</span></>) : <span className="text-xs font-semibold text-dim">Prezzo su richiesta</span>}</div>
-                    <button onClick={(e) => { e.stopPropagation(); go(l.slug); }} className="rounded-lg bg-wash px-3 py-1.5 text-[13px] font-bold text-focus hover:bg-focus hover:text-white">Vedi camere →</button>
+                    <button onClick={(e) => { e.stopPropagation(); go(l.slug); }} className="min-h-11 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-bold text-focus hover:bg-focus hover:text-white sm:min-h-0">Vedi camere →</button>
                   </div>
                 </div>
               </article>
@@ -275,20 +275,12 @@ export default function XenoraBookPublicPage() {
 
       <Card className="mt-6">
         <SectionTitle>Come selezioniamo le strutture</SectionTitle>
-        <p className="mt-1 text-sm text-dim">Oggi XenoraBook mostra le strutture che hanno pubblicato il proprio Xenosite: significa che il gestore usa Xenora per gestire camere, tariffe e prenotazioni — non ancora un controllo di qualità automatico. Questi sono i criteri che stiamo costruendo per un vero badge «Verificata»:</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[["★", "Rating ≥ 4,7", "In arrivo — media recensioni reali"], ["✓", "50+ recensioni", "In arrivo — Google e dirette"], ["🛡", "Alloggiati a norma", "In arrivo — stato check-in Questura"], ["€", "Tassa di soggiorno", "In arrivo — audit versamenti"]].map(([ic, tt, ds]) => (
-            <div key={tt} className="flex items-start gap-3">
-              <span className="grid h-9 w-9 flex-none place-items-center rounded-lg text-sm" style={{ backgroundColor: "#E3F0E7", color: "#3F7A5B" }}>{ic}</span>
-              <div><div className="text-[13px] font-bold text-txt">{tt}</div><div className="text-xs text-dim">{ds}</div></div>
-            </div>
-          ))}
-        </div>
+        <p className="mt-1 text-sm text-dim">XenoraBook mostra le strutture che hanno pubblicato il proprio Xenosite: il gestore usa Xenora per gestire camere, tariffe e prenotazioni, e nomi, foto e prezzi che vedi sono aggiornati direttamente da lui. Le recensioni mostrate sono quelle reali, da Google o raccolte dalla struttura.</p>
       </Card>
       </main>
 
       <footer className="border-t border-line bg-surface">
-        <div className="mx-auto max-w-7xl px-4 py-6 text-center text-xs text-faint">XenoraBook · Digital Solution — le strutture che usano Xenora. <a href="https://xenora.it" className="text-focus hover:underline">Gestisci la tua struttura con Xenora</a></div>
+        <div className="mx-auto max-w-7xl px-4 py-6 text-center text-xs text-dim">XenoraBook · Digital Solution — le strutture che usano Xenora. <a href="https://xenora.it" className="inline-block py-3 text-focus hover:underline">Gestisci la tua struttura con Xenora</a></div>
       </footer>
     </div>
   );

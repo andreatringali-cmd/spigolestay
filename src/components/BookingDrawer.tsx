@@ -417,7 +417,7 @@ export default function BookingDrawer() {
   // Extra della prenotazione: catalogo della struttura (+ animali, culla, letto suggeriti) con quantità; salva subito.
   const extraPanel = qa === "extra" && (
     <div className="rounded-lg border border-line bg-wash p-2">
-      <div className="mb-1.5 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Extra")}</span><button onClick={() => setQa(null)} className="text-xs text-dim hover:text-txt">{t("Chiudi")} ✕</button></div>
+      <div className="mb-1.5 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Extra")}</span><button onClick={() => setQa(null)} className="text-xs text-dim hover:text-txt">{t("Chiudi")} ✕</button></div>
       <BookingExtrasPicker entries={extrasList} onChange={(next) => updateBooking(booking.id, { extras: next })} catalog={structure?.extras} stay={booking} onConfigure={() => { closeBooking(); router.push("/upselling?tab=catalogo"); }} />
     </div>
   );
@@ -448,7 +448,7 @@ export default function BookingDrawer() {
   const contactIcons = (
     <div className="flex shrink-0 gap-1.5">
       <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white max-sm:h-10 max-sm:w-10 ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
-      <a href={safeTelHref(guest?.phone)} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white max-sm:h-10 max-sm:w-10 ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
+      <a href={safeTelHref(guest?.phone)} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-on-focus max-sm:h-10 max-sm:w-10 ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
       <a href={safeMailtoHref(guest?.email) ?? "mailto:"} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt max-sm:h-10 max-sm:w-10"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
     </div>
   );
@@ -459,11 +459,11 @@ export default function BookingDrawer() {
       {guest && (gReturning || gVip || !!guest.preferences?.trim() || (guest.tags ?? []).length > 0) && (
         <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 30%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 5%, transparent)" }}>
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Memoria ospite")}</span>
-            {gVip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
+            <span className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Memoria ospite")}</span>
+            {gVip && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
             {gReturning
-              ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>{t("Ospite di ritorno")} · {gTimes}ª {t("volta")}</span>
-              : <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold text-dim">{t("Primo soggiorno")}</span>}
+              ? <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>{t("Ospite di ritorno")} · {gTimes}ª {t("volta")}</span>
+              : <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-bold text-dim">{t("Primo soggiorno")}</span>}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-dim">
             <span>{gTimes} {gTimes === 1 ? t("soggiorno") : t("soggiorni")}</span>
@@ -471,7 +471,7 @@ export default function BookingDrawer() {
             {gLastPrior && <span>{t("Ultima volta")} {fmtDate(gLastPrior)}</span>}
           </div>
           {guest.preferences?.trim() && <div className="mt-1.5 text-sm text-txt"><span className="text-[11px] font-semibold text-dim">{t("Preferenze")}: </span>{guest.preferences}</div>}
-          {(guest.tags ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(guest.tags ?? []).map((tg) => <span key={tg} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{t(tg)}</span>)}</div>}
+          {(guest.tags ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(guest.tags ?? []).map((tg) => <span key={tg} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{t(tg)}</span>)}</div>}
           <button onClick={() => { closeBooking(); router.push(`/ospiti/${guest.id}`); }} className="mt-2 text-[11px] font-semibold text-focus hover:underline">{t("Apri scheda ospite")} →</button>
         </div>
       )}
@@ -522,7 +522,7 @@ export default function BookingDrawer() {
         <div className="mt-1.5">{payMethodRow}</div>
         {booking.nightlyRates && (
           <details className="mt-2 border-t border-line pt-2">
-            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Dettaglio notte per notte")} ({t("da")} {CHANNELS[booking.channel]?.label ?? booking.channel})</summary>
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Dettaglio notte per notte")} ({t("da")} {CHANNELS[booking.channel]?.label ?? booking.channel})</summary>
             <div className="mt-1.5 space-y-0.5">
               {Array.from({ length: nights(booking.checkIn, booking.checkOut) }, (_, i) => shiftISO(booking.checkIn, i)).map((iso) => (
                 <div key={iso} className="flex items-baseline justify-between gap-4 text-xs">
@@ -551,7 +551,7 @@ export default function BookingDrawer() {
               <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
               <button onClick={() => setIncassoAmt(dueV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(dueV)}</button>
               <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
-              <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
+              <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90">{t("Registra")}</button>
             </div>
           : <button onClick={() => setQa("incasso")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">💶 {t("Registra incasso")}</button>
       )}
@@ -567,7 +567,7 @@ export default function BookingDrawer() {
         const rwa = phoneDigits ? waSendUrl(phoneDigits, rmsg) : "";
         return (
           <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--ok) 32%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 6%, transparent)" }}>
-            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-faint">⭐ {t("Recensione Google")}</div>
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-dim">⭐ {t("Recensione Google")}</div>
             {reviewUrl ? (
               <>
                 <p className="mb-2 text-[13px] text-dim">{t("Ospite in partenza: chiedi ora una recensione, aumenta il ranking.")}</p>
@@ -614,7 +614,7 @@ export default function BookingDrawer() {
             <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
             {dueV > 0 && <button onClick={() => setIncassoAmt(dueV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(dueV)}</button>}
               <select value={incassoMethod} onChange={(e) => setIncassoMethod(isPayMethod(e.target.value) ? e.target.value : "contanti")} aria-label={t("Pagato con")} className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt">{MANUAL_PAY_METHODS.map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}</select>
-            <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
+            <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90">{t("Registra")}</button>
           </div>
         )}
         {extraPanel && <div className="mt-2">{extraPanel}</div>}
@@ -652,7 +652,7 @@ export default function BookingDrawer() {
           </div>
         ))}
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm text-dim">{t("Tassa di soggiorno")} {booking.cityTaxPaid && <span className="ml-1 rounded bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--ok)]">{t("incassata")}</span>}</span>
+          <span className="text-sm text-dim">{t("Tassa di soggiorno")} {booking.cityTaxPaid && <span className="ml-1 rounded bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--ok)]">{t("incassata")}</span>}</span>
           <span className="text-right font-mono text-sm text-txt">{eur(taxV)}</span>
         </div>
         {booking.depositPaid && <Row label={t("Caparra")} value={t("ricevuta ✓")} />}
@@ -830,7 +830,7 @@ export default function BookingDrawer() {
               <div className="mb-1 flex items-center gap-1.5 text-sm text-dim">📖 {t("Guida ospiti")}{!unitV && <span className="text-[11px]" style={{ color: "var(--warn)" }}>· {t("assegna la camera per i codici")}</span>}</div>
               <div className="flex flex-wrap gap-2">
                 {phoneDigits && <button onClick={sendGuideWa} className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia guida")}</button>}
-                <button onClick={sendGuideEmail} className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#285f92" }}>{t("Email")}</button>
+                <button onClick={sendGuideEmail} className="flex-1 rounded-lg bg-focus py-2 text-center text-xs font-semibold text-on-focus">{t("Email")}</button>
                 <button onClick={copyGuide} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
                 <a href={gLink} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-3 py-2 text-center text-xs font-semibold text-txt hover:bg-wash">↗</a>
               </div>
@@ -881,7 +881,7 @@ export default function BookingDrawer() {
       )}
 
       <Section title={t("Documenti")}>
-        <button onClick={emitDocument} disabled={emit.busy} className="flex w-full items-center justify-between rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
+        <button onClick={emitDocument} disabled={emit.busy} className="flex w-full items-center justify-between rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-60">
           <span>{emit.busy ? t("Creazione…") : t("Emetti documento")}</span>
           <span className="text-xs opacity-90">{t("fattura elettronica")} →</span>
         </button>
@@ -890,7 +890,7 @@ export default function BookingDrawer() {
       </Section>
 
       <div className="border-t border-line px-5 py-3">
-        <button onClick={sendVoucherNow} disabled={voucher.sending} className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
+        <button onClick={sendVoucherNow} disabled={voucher.sending} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus py-2 text-xs font-semibold text-on-focus transition hover:opacity-90 disabled:opacity-40">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="m4 6 8 6 8-6" /></svg>
           {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
         </button>
@@ -1097,7 +1097,7 @@ export default function BookingDrawer() {
       </Section>
 
       <Section title={t("Zona pericolo")}>
-        {groupSize > 1 && <button onClick={removeGroup} className="w-full rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina tutto il gruppo")} ({groupSize} {t("camere")})</button>}
+        {groupSize > 1 && <button onClick={removeGroup} className="w-full rounded-lg px-3 py-2 text-sm font-semibold text-on-err hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina tutto il gruppo")} ({groupSize} {t("camere")})</button>}
         <button onClick={remove} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{groupSize > 1 ? t("Elimina solo questa camera") : t("Elimina prenotazione")}</button>
       </Section>
     </>
@@ -1189,14 +1189,14 @@ export default function BookingDrawer() {
         {tab === "manage" && (mode === "edit" ? (
           <div className="flex items-center gap-3 border-t border-line bg-surface px-5 py-3 max-sm:px-3">
             <button onClick={() => { loadForm(); setMode("view"); }} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
-            <button onClick={save} className="ml-auto rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-11">{t("Salva modifiche")}</button>
+            <button onClick={save} className="ml-auto rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:min-h-11">{t("Salva modifiche")}</button>
           </div>
         ) : (
           <div className="flex items-center gap-2 border-t border-line bg-surface px-5 py-3 text-xs text-dim max-sm:px-3">
             {saved && <span className="font-medium text-[color:var(--ok)]">{t("Salvato ✓")}</span>}
             <button onClick={() => setExpanded((v) => !v)} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-focus hover:bg-wash max-sm:min-h-11">{expanded ? `← ${t("Anteprima")}` : `${t("Dettagli")} →`}</button>
             <button onClick={closeBooking} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Chiudi")}</button>
-            <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-11">{t("Modifica")}</button>
+            <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:min-h-11">{t("Modifica")}</button>
           </div>
         ))}
       </div>
@@ -1206,7 +1206,7 @@ export default function BookingDrawer() {
 
 function ContactBtn({ href, label, color, missingTitle }: { href?: string; label: string; color: string; missingTitle?: string }) {
   if (!href) return (
-    <span className="flex-1 cursor-not-allowed rounded-lg border border-line bg-paper py-2 text-center text-xs font-semibold text-faint" title={missingTitle}>{label}</span>
+    <span className="flex-1 cursor-not-allowed rounded-lg border border-line bg-paper py-2 text-center text-xs font-semibold text-dim" title={missingTitle}>{label}</span>
   );
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white transition hover:opacity-90 max-sm:py-3" style={{ backgroundColor: color }}>{label}</a>
@@ -1216,7 +1216,7 @@ function ContactBtn({ href, label, color, missingTitle }: { href?: string; label
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border-b border-line px-5 py-4">
-      <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">{title}</div>
+      <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-dim">{title}</div>
       <div className="flex flex-col gap-2.5">{children}</div>
     </div>
   );

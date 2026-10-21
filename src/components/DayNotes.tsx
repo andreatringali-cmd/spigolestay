@@ -27,12 +27,12 @@ export default function DayNotes() {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Promemoria")}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Promemoria")}</span>
         {notes.length > 0 && <span className="text-[11px] text-faint">{notes.filter((n) => !n.done).length} {t("da fare")}</span>}
       </div>
       <div className="mb-2 flex gap-1.5">
         <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("Aggiungi un promemoria…")} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button onClick={add} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">+</button>
+        <button onClick={add} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">+</button>
       </div>
       {notes.length === 0 ? (
         <div className="py-2 text-sm text-faint">{t("Nessun promemoria.")}</div>

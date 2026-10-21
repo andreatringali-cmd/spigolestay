@@ -15,6 +15,7 @@ import { loadPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import AdsConsent from "@/components/AdsConsent";
+import { GUEST_DEFAULT_ACCENT } from "@/lib/guest-brand";
 import DateField from "@/components/DateField";
 import { GuestLangPicker, useGuestLang } from "@/components/GuestLang";
 import { fmtDate, shiftISO, toISO } from "@/lib/dates";
@@ -54,7 +55,8 @@ const DEFAULT_PLANS: Plan[] = [
 ];
 
 const box = "rounded-xl border border-line bg-surface";
-const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-base text-txt outline-none focus:border-focus sm:text-sm";
+const field = "min-h-11 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:text-sm";
+const fieldErr = "border-[color:var(--err)] focus:border-[color:var(--err)] focus-visible:ring-[color:var(--err)]/30"; // campo non valido
 
 // Slug del sito pubblico (?site=<slug>) della pagina aperta.
 const siteFromUrl = (): string => { try { return (new URLSearchParams(window.location.search).get("site") || "").trim(); } catch { return ""; } };
@@ -506,16 +508,16 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const header = (
     <div className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-        <a href={homeHref} className="flex items-center gap-2 rounded-lg transition hover:opacity-80" title={t("Torna alla home")}>
-          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
-          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">← {t("Torna alla home")}</div></div>
+        <a href={homeHref} className="flex min-h-11 items-center gap-2 rounded-lg transition hover:opacity-80" title={t("Torna alla home")}>
+          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? GUEST_DEFAULT_ACCENT }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : (structure?.name ?? "XN").slice(0, 2).toUpperCase()}</div>
+          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-xs text-dim">← {t("Torna alla home")}</div></div>
         </a>
         {structures.length > 1 && step === "rooms" && (
-          <select value={structureId} onChange={(e) => { setStructureId(e.target.value); setSel(null); }} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <select value={structureId} onChange={(e) => { setStructureId(e.target.value); setSel(null); }} className="min-h-11 rounded-lg border border-line bg-paper px-2 py-1.5 text-base text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:text-sm">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
-        <div className="ml-auto flex items-center gap-2 rounded-full bg-wash px-3 py-1.5 text-sm"><span className="text-dim">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
+        <div className="ml-auto flex items-center gap-2 rounded-full bg-wash px-3 py-1.5 text-sm"><span className="text-txt">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
       </div>
     </div>
   );
@@ -525,24 +527,24 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     <footer className="mt-12 border-t border-line bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <a href={homeHref} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
-            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
+          <a href={homeHref} className="flex min-h-11 items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
+            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? GUEST_DEFAULT_ACCENT }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : (structure?.name ?? "XN").slice(0, 2).toUpperCase()}</span>
             {structure?.name ?? "Xenora"}
           </a>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
-            {structure?.email && <a href={`mailto:${structure.email}`} className="hover:text-dim">{structure.email}</a>}
-            {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dim">
+            {structure?.email && <a href={`mailto:${structure.email}`} className="inline-flex min-h-11 items-center hover:text-txt sm:min-h-0">{structure.email}</a>}
+            {structure?.phone && <a href={`tel:${structure.phone}`} className="inline-flex min-h-11 items-center hover:text-txt sm:min-h-0">{structure.phone}</a>}
             {structure?.cin && <span>CIN {structure.cin}</span>}
             <div className="flex items-center gap-2">
-              {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
-              {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
-              {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
+              {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" aria-label="WhatsApp" className="grid h-11 w-11 place-items-center rounded-full bg-wash sm:h-8 sm:w-8" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
+              {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" aria-label="Instagram" className="grid h-11 w-11 place-items-center rounded-full bg-wash sm:h-8 sm:w-8" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
+              {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" aria-label="Facebook" className="grid h-11 w-11 place-items-center rounded-full bg-wash sm:h-8 sm:w-8" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
             </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs text-dim">
           <span>{t("© {year} {name}. Tutti i diritti riservati.", { year: new Date().getFullYear(), name: structure?.name ?? "Xenora" })}</span>
-          <span>{t("Sito creato dal gruppo")} <b className="text-dim">Xenora</b> · {t("Prenotazione online sicura")}</span>
+          <span>{t("Sito creato dal gruppo")} <b className="text-txt">Xenora</b> · {t("Prenotazione online sicura")}</span>
         </div>
       </div>
     </footer>
@@ -554,22 +556,22 @@ export function Engine({ embed = false }: { embed?: boolean }) {
       <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
         <label className="block text-xs font-medium text-dim">{t("Arrivo")}<DateField lang={lang} value={checkIn} min={today} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(addDays(v, 1)); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
         <label className="block text-xs font-medium text-dim">{t("Partenza")}<DateField lang={lang} value={checkOut} min={addDays(checkIn, 1)} onChange={(v) => { setCheckOut(v); setSearched(false); }} className={`${field} mt-1 w-full text-left`} /></label>
-        <label className="block text-xs font-medium text-dim">{t("Adulti")}<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
-        <label className="block text-xs font-medium text-dim">{t("Bambini")}<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
-        <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg bg-focus px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">{t("Verifica disponibilità")}</button>
+        <label className="block text-xs font-medium text-dim">{t("Adulti")}<Stepper label={t("Adulti")} value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
+        <label className="block text-xs font-medium text-dim">{t("Bambini")}<Stepper label={t("Bambini")} value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
+        <button onClick={() => setSearched(true)} className={`min-h-11 whitespace-nowrap rounded-lg px-5 text-sm font-semibold transition ${searched ? "border border-line bg-surface text-focus hover:bg-wash" : "bg-focus text-white shadow-sm hover:opacity-90"}`}>{t("Verifica disponibilità")}</button>
       </div>
       {children > 0 && (
         <div className="mt-2">
-          <div className="mb-1 text-[11px] font-medium text-dim">{t("Età dei bambini")} <span className="text-faint">{t("(per la tassa di soggiorno e la sistemazione)")}</span></div>
+          <div className="mb-1 text-xs font-medium text-dim">{t("Età dei bambini")} <span className="font-normal">{t("(per la tassa di soggiorno e la sistemazione)")}</span></div>
           <div className="flex flex-wrap gap-2">
             {childAges.map((age, i) => (
               <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">{t("Bimbo {n}", { n: i + 1 })}
-                <input type="number" inputMode="numeric" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-base text-txt outline-none focus:border-focus sm:text-sm" />
+                <input type="number" inputMode="numeric" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="min-h-11 w-16 rounded border border-line bg-surface px-1.5 py-0.5 text-base text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:w-14 sm:text-sm" />
               </label>
             ))}
           </div>
           <label className="mt-2 flex w-fit items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-medium text-txt">
-            <input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Culla per il bimbo")} <span className="font-normal text-faint">{t("(gratuita, su richiesta)")}</span>
+            <input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-5 w-5 accent-[color:var(--focus)]" /> {t("Culla per il bimbo")} <span className="font-normal text-dim">{t("(gratuita, su richiesta)")}</span>
           </label>
         </div>
       )}
@@ -597,9 +599,9 @@ export function Engine({ embed = false }: { embed?: boolean }) {
               <p className="mt-2 text-sm text-dim">{t("Il pagamento potrebbe essere andato a buon fine, ma non abbiamo ancora potuto registrare la prenotazione. Non pagare di nuovo: riprova tra un istante oppure contatta la struttura indicando questo riferimento.")}</p>
               <p className="mt-2 font-mono text-sm font-bold text-txt">{ret.ref}</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button onClick={() => { const u = new URL(window.location.href); const sid = u.searchParams.get("session_id"); if (sid) void confirmReturn(sid, u.searchParams.get("site") || publicSlug() || ""); }} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Riprova")}</button>
-                {structure?.phone && <a href={`tel:${structure.phone}`} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt">{structure.phone}</a>}
-                {structure?.email && <a href={`mailto:${structure.email}`} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt">{structure.email}</a>}
+                <button onClick={() => { const u = new URL(window.location.href); const sid = u.searchParams.get("session_id"); if (sid) void confirmReturn(sid, u.searchParams.get("site") || publicSlug() || ""); }} className="min-h-11 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Riprova")}</button>
+                {structure?.phone && <a href={`tel:${structure.phone}`} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt">{structure.phone}</a>}
+                {structure?.email && <a href={`mailto:${structure.email}`} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt">{structure.email}</a>}
               </div>
             </div>
           )}
@@ -646,10 +648,10 @@ export function Engine({ embed = false }: { embed?: boolean }) {
             )}
             {hasDetails && (
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <button onClick={printPdf} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> {t("Scarica PDF")}</button>
+                <button onClick={printPdf} className="flex min-h-11 items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> {t("Scarica PDF")}</button>
               </div>
             )}
-            <p className="mt-4 text-xs text-faint">{hasDetails ? t("Conferma inviata via email. Puoi scaricare il PDF con tutti i dettagli della prenotazione.") : t("Per qualsiasi dubbio contatta la struttura.")}</p>
+            <p className="mt-4 text-xs text-dim">{hasDetails ? t("Conferma inviata via email. Puoi scaricare il PDF con tutti i dettagli della prenotazione.") : t("Per qualsiasi dubbio contatta la struttura.")}</p>
           </div>
         </div>
         {!embed && footer}
@@ -664,7 +666,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
         {step === "rooms" && (
           <>
             <div className="mb-3 flex justify-end"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
-            {canceledNotice && <div role="status" className="mb-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>{t("Pagamento annullato: la prenotazione non è stata registrata e non è stato addebitato nulla.")}</div>}
+            {canceledNotice && <div role="status" className="mb-3 rounded-lg border px-3 py-2 text-sm text-txt" style={{ borderColor: "var(--warn)", backgroundColor: "color-mix(in srgb, var(--warn) 10%, transparent)" }}>{t("Pagamento annullato: la prenotazione non è stata registrata e non è stato addebitato nulla.")}</div>}
             <h1 className="mb-3 font-display text-xl font-bold text-txt">{t("Verifica disponibilità")}</h1>
             {searchBar}
             {!searched && (
@@ -675,10 +677,10 @@ export function Engine({ embed = false }: { embed?: boolean }) {
             {searched && (
             <div className={`${box} mb-3 flex flex-wrap items-center gap-2 p-3`}>
               <span className="text-sm font-medium text-dim">{t("Hai un codice sconto?")}</span>
-              <input value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoErr(""); }} placeholder={t("CODICE")} className="w-40 rounded-lg border border-line bg-paper px-3 py-1.5 text-base uppercase text-txt outline-none focus:border-focus sm:text-sm" />
-              <button onClick={() => applyPromoCode()} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus hover:bg-wash">{t("Applica")}</button>
-              {appliedPromo && <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ok)" }}>✓ {appliedPromo.name || appliedPromo.code} · −{appliedPromo.pct}%<button onClick={() => { setAppliedPromo(null); setPromoInput(""); }} className="text-xs font-normal text-faint hover:text-[color:var(--err)]">{t("rimuovi")}</button></span>}
-              {promoErr && <span className="text-sm text-[color:var(--err)]">{promoErr}</span>}
+              <input value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoErr(""); }} placeholder={t("CODICE")} className="min-h-11 w-40 rounded-lg border border-line bg-paper px-3 py-1.5 text-base uppercase text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:text-sm" aria-label={t("Hai un codice sconto?")} aria-invalid={!!promoErr || undefined} />
+              <button onClick={() => applyPromoCode()} className="min-h-11 rounded-lg border border-line px-4 py-1.5 text-sm font-semibold text-focus hover:bg-wash sm:min-h-0 sm:px-3">{t("Applica")}</button>
+              {appliedPromo && <span className="flex items-center gap-2 text-sm font-semibold text-txt"><span style={{ color: "var(--ok)" }} aria-hidden>✓</span> {appliedPromo.name || appliedPromo.code} · −{appliedPromo.pct}%<button onClick={() => { setAppliedPromo(null); setPromoInput(""); }} className="px-2 py-3 text-xs font-normal text-dim underline hover:text-[color:var(--err)] sm:py-1">{t("rimuovi")}</button></span>}
+              {promoErr && <span role="alert" className="text-sm font-medium text-txt"><span style={{ color: "var(--err)" }} aria-hidden>!</span> {promoErr}</span>}
             </div>
             )}
             <div className="flex flex-col gap-3">
@@ -689,7 +691,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                       {(() => { const cover = getImages(`rt:${rt.id}`)[0]; return cover ? (
                         <MediaImg src={cover} alt={rt.name} className="h-28 w-full shrink-0 rounded-lg object-cover sm:w-40" />
                       ) : (
-                        <div className="grid h-28 w-full shrink-0 place-items-center rounded-lg sm:w-40" style={{ background: `linear-gradient(135deg, ${rt.color ?? "#4F46E5"}, color-mix(in srgb, ${rt.color ?? "#4F46E5"} 55%, #000))` }}>
+                        <div className="grid h-28 w-full shrink-0 place-items-center rounded-lg sm:w-40" style={{ background: `linear-gradient(135deg, ${rt.color ?? GUEST_DEFAULT_ACCENT}, color-mix(in srgb, ${rt.color ?? GUEST_DEFAULT_ACCENT} 55%, #000))` }}>
                           <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.6" opacity="0.9"><path d="M3 8v11" /><path d="M3 13h18v6" /><path d="M21 19v-4a3 3 0 0 0-3-3h-7v4" /><circle cx="7" cy="11.5" r="1.4" /></svg>
                         </div>
                       ); })()}
@@ -701,9 +703,9 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                             {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap items-center gap-2 text-dim">{(rt.amenities ?? []).slice(0, 8).map((a) => <span key={a} title={a} aria-label={a}>{amenityIcon(a)}</span>)}</div>}
                           </div>
                           <div className="text-right">
-                            <div className="text-[11px] text-faint">{t("da")}</div>
+                            <div className="text-xs text-dim">{t("da")}</div>
                             <div className="font-mono text-xl font-bold text-txt">{Number.isFinite(cheapest) ? eur(cheapest) : "—"}</div>
-                            <div className="text-[11px] text-faint">{nightsTxt(nights)}</div>
+                            <div className="text-xs text-dim">{nightsTxt(nights)}</div>
                           </div>
                         </div>
                         {/* Opzioni: varianti (madre + derivate) × piani */}
@@ -713,17 +715,17 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                               <div key={v.id} className="overflow-hidden rounded-lg border border-line">
                                 {hasDeriv && (
                                   <div className="flex items-center justify-between gap-2 bg-wash px-3 py-1.5">
-                                    <span className="text-xs font-semibold text-txt">{v.deriveFrom ? v.name : "Standard"} <span className="font-normal text-faint">· {t("fino a")} {v.maxOccupancy ?? v.beds} {(v.maxOccupancy ?? v.beds) === 1 ? t("ospite") : t("ospiti")}</span></span>
-                                    {v.deriveFrom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("variante")}</span>}
+                                    <span className="text-xs font-semibold text-txt">{v.deriveFrom ? v.name : "Standard"} <span className="font-normal text-dim">· {t("fino a")} {v.maxOccupancy ?? v.beds} {(v.maxOccupancy ?? v.beds) === 1 ? t("ospite") : t("ospiti")}</span></span>
+                                    {v.deriveFrom && <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("variante")}</span>}
                                   </div>
                                 )}
                                 <div className="flex flex-col divide-y divide-[color:var(--line)]">
                                   {offers.map(({ p, price }) => (
-                                    <div key={p.id} className="flex items-center justify-between px-3 py-2">
-                                      <div><span className="text-sm font-medium text-txt">{t(p.name)}</span> <span className="text-[11px] text-faint">· {t(p.board)} · {cancelLabel(p)}{planDepositPct(p) === 0 ? ` · ${t("nessun anticipo")}` : planDepositPct(p) === 100 ? ` · ${t("prepagato")}` : ` · ${t("acconto {pct}%", { pct: planDepositPct(p) })}`}</span></div>
+                                    <div key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 py-2">
+                                      <div><span className="text-sm font-medium text-txt">{t(p.name)}</span> <span className="text-xs text-dim">· {t(p.board)} · {cancelLabel(p)}{planDepositPct(p) === 0 ? ` · ${t("nessun anticipo")}` : planDepositPct(p) === 100 ? ` · ${t("prepagato")}` : ` · ${t("acconto {pct}%", { pct: planDepositPct(p) })}`}</span></div>
                                       <div className="flex items-center gap-3">
                                         <span className="font-mono text-sm font-bold text-txt">{eur(price)}</span>
-                                        <button onClick={() => { setSel({ rtId: v.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Scegli")}</button>
+                                        <button onClick={() => { setSel({ rtId: v.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="min-h-11 rounded-lg bg-focus px-5 py-1.5 text-sm font-semibold text-white hover:opacity-90 sm:min-h-9">{t("Scegli")}</button>
                                       </div>
                                     </div>
                                   ))}
@@ -739,7 +741,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                   </div>
                 );
               })}
-              {types.length === 0 && <div className={`${box} p-6 text-center text-sm text-faint`}>{t("Nessuna camera configurata per questa struttura.")}</div>}
+              {types.length === 0 && <div className={`${box} p-6 text-center text-sm text-dim`}>{t("Nessuna camera configurata per questa struttura.")}</div>}
               {allSoldOut && sibling && (
                 <div className={`${box} overflow-hidden`} style={{ borderColor: "var(--focus)", borderWidth: 2 }}>
                   <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
@@ -754,7 +756,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                       href={`/prenota?site=${encodeURIComponent(sibling.slug)}&ci=${checkIn}&co=${checkOut}&ad=${adults}${children ? `&ch=${children}&ages=${childAges.join(",")}` : ""}`}
                       target={embed ? "_top" : undefined}
                       rel={embed ? "noreferrer" : undefined}
-                      className="shrink-0 rounded-lg bg-focus px-4 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
+                      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-focus px-4 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
                     >
                       {t("Vedi disponibilità →")}
                     </a>
@@ -776,7 +778,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                               href={`/prenota?site=${encodeURIComponent(alt.slug)}&ci=${checkIn}&co=${checkOut}&ad=${adults}${children ? `&ch=${children}&ages=${childAges.join(",")}` : ""}`}
                               target={embed ? "_top" : undefined}
                               rel={embed ? "noreferrer" : undefined}
-                              className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-center text-xs font-semibold text-white hover:opacity-90"
+                              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-focus px-4 py-1.5 text-center text-sm font-semibold text-white hover:opacity-90"
                             >
                               {t("Vedi disponibilità →")}
                             </a>
@@ -793,7 +795,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
 
         {step === "checkout" && selRt && selPlan && (
           <div>
-            <button onClick={() => setStep("rooms")} className="mb-3 text-sm font-medium text-focus hover:underline">← {t("Cambia camera")}</button>
+            <button onClick={() => setStep("rooms")} className="mb-3 inline-flex min-h-11 items-center text-sm font-medium text-txt underline hover:no-underline">← {t("Cambia camera")}</button>
             <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
             <div className="flex flex-col gap-4">
 
@@ -804,8 +806,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block text-xs font-medium text-dim">{t("Nome")} *<input value={guest.firstName} maxLength={60} autoComplete="given-name" onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} className={`${field} mt-1`} /></label>
                   <label className="block text-xs font-medium text-dim">{t("Cognome")} *<input value={guest.lastName} maxLength={60} autoComplete="family-name" onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">{t("Telefono")} *<input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} className={`${field} mt-1`} placeholder="+39…" />{guest.phone.trim() && !phoneOk && <span className="mt-1 block text-[11px]" style={{ color: "var(--err)" }}>{t("Inserisci un numero di telefono valido.")}</span>}</label>
-                  <label className="block text-xs font-medium text-dim">Email *<input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" maxLength={120} value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} className={`${field} mt-1`} />{guest.email.trim() && !emailOk && <span className="mt-1 block text-[11px]" style={{ color: "var(--err)" }}>{t("Inserisci un indirizzo email valido.")}</span>}</label>
+                  <label className="block text-xs font-medium text-dim">{t("Telefono")} *<input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} aria-invalid={(!!guest.phone.trim() && !phoneOk) || undefined} className={`${field} mt-1 ${guest.phone.trim() && !phoneOk ? fieldErr : ""}`} placeholder="+39…" />{guest.phone.trim() && !phoneOk && <span role="alert" className="mt-1 block text-xs font-medium text-txt"><span style={{ color: "var(--err)" }} aria-hidden>!</span> {t("Inserisci un numero di telefono valido.")}</span>}</label>
+                  <label className="block text-xs font-medium text-dim">Email *<input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" maxLength={120} value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} aria-invalid={(!!guest.email.trim() && !emailOk) || undefined} className={`${field} mt-1 ${guest.email.trim() && !emailOk ? fieldErr : ""}`} />{guest.email.trim() && !emailOk && <span role="alert" className="mt-1 block text-xs font-medium text-txt"><span style={{ color: "var(--err)" }} aria-hidden>!</span> {t("Inserisci un indirizzo email valido.")}</span>}</label>
                   <label className="block text-xs font-medium text-dim">{t("Città")}<input value={guest.city} maxLength={60} autoComplete="address-level2" onChange={(e) => setGuest({ ...guest, city: e.target.value })} className={`${field} mt-1`} /></label>
                   <label className="block text-xs font-medium text-dim">{t("Nazione")}<input value={guest.country} maxLength={60} autoComplete="country-name" onChange={(e) => { setCountryTouched(true); setGuest({ ...guest, country: e.target.value }); }} className={`${field} mt-1`} /></label>
                 </div>
@@ -822,10 +824,10 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                     <div key={x.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-txt">{x.name}</div>
-                        {x.desc && <div className="text-[11px] text-faint">{x.desc}</div>}
+                        {x.desc && <div className="text-xs text-dim">{x.desc}</div>}
                         <div className="mt-0.5 text-xs text-dim">{eur(x.price)} {x.per === "night" ? t("a notte") : x.per === "person" ? t("a persona") : x.per === "day" ? t("a giornata") : t("a soggiorno")}</div>
                       </div>
-                      <Stepper value={extraQty[x.id] ?? 0} min={0} compact onChange={(v) => setExtraQty((q) => ({ ...q, [x.id]: v }))} />
+                      <Stepper label={x.name} value={extraQty[x.id] ?? 0} min={0} compact onChange={(v) => setExtraQty((q) => ({ ...q, [x.id]: v }))} />
                     </div>
                   ))}
                 </div>
@@ -842,13 +844,13 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                 } {t("Il pagamento è gestito in modo sicuro da Stripe.")}</p>
                 {deposit > 0 && (
                   <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim"><span>💳 {t("Carta")}</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span><span>Klarna</span></div>
-                    <div className="mt-1.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
-                      <span>🛍️</span><span>{t("Con Klarna puoi pagare in 3 rate senza interessi")}</span><span className="font-normal text-faint">{t("(dove disponibile)")}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-dim"><span>💳 {t("Carta")}</span><span aria-hidden>·</span><span>Google Pay / Apple Pay</span><span aria-hidden>·</span><span>PayPal</span><span aria-hidden>·</span><span>Klarna</span></div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
+                      <span>🛍️</span><span>{t("Con Klarna puoi pagare in 3 rate senza interessi")}</span><span className="font-normal text-dim">{t("(dove disponibile)")}</span>
                     </div>
                   </div>
                 )}
-                <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /> <span>{t("Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.")} <a href={privacyHref} target="_blank" rel="noreferrer" className="font-medium text-focus underline">{t("Leggi l'informativa privacy")}</a></span></label>
+                <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--focus)]" /> <span>{t("Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.")} <a href={privacyHref} target="_blank" rel="noreferrer" className="font-medium text-focus underline">{t("Leggi l'informativa privacy")}</a></span></label>
               </div>
             </div>
 
@@ -861,15 +863,15 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                 <Line label={`${selRt.name} · ${t(selPlan.name)}`} value={eur(accommodation)} />
                 {extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => <Line key={x.id} label={`${extraQty[x.id]}× ${x.name}`} value={eur((extraQty[x.id] ?? 0) * extraPrice(x))} sub />)}
                 {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `${t("Tassa di soggiorno")} (${structure.cityTaxPercent ?? 0}%)` : t("Tassa di soggiorno")} value={eur(cityTax)} sub />}
-                {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs" style={{ color: "var(--ok)" }}><span className="min-w-0">{t("Sconto")}{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
+                {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs font-medium text-txt"><span className="min-w-0">{t("Sconto")}{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">{t("Totale")}</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
                 {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">{deposit < payBase ? t("Acconto adesso") : t("Da pagare adesso")}</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
-                {cityTax > 0 && deposit > 0 && <div className="mt-1 text-[11px] text-dim">{t("La tassa di soggiorno ({amount}) non si paga adesso: si salda in struttura.", { amount: eur(cityTax) })}</div>}
-                <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{cancelLabel(selPlan)}</div>
-                {bookError && <div role="alert" className="mt-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>{t(bookError)}</div>}
-                <button onClick={confirm} disabled={!guestValid || processing} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{processing ? t("Invio in corso…") : t("Conferma prenotazione")}</button>
-                {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">{t("Compila nome, cognome, telefono, email e accetta la privacy.")}</div>}
+                {cityTax > 0 && deposit > 0 && <div className="mt-1 text-xs text-dim">{t("La tassa di soggiorno ({amount}) non si paga adesso: si salda in struttura.", { amount: eur(cityTax) })}</div>}
+                <div className="mt-1 text-xs font-medium text-dim"><span style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }} aria-hidden>●</span> {cancelLabel(selPlan)}</div>
+                {bookError && <div role="alert" className="mt-3 rounded-lg border px-3 py-2 text-sm font-medium text-txt" style={{ borderColor: "var(--err)", backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}>{t(bookError)}</div>}
+                <button onClick={confirm} disabled={!guestValid || processing} className="mt-3 min-h-11 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{processing ? t("Invio in corso…") : t("Conferma prenotazione")}</button>
+                {!guestValid && <div className="mt-2 text-center text-xs text-dim">{t("Compila nome, cognome, telefono, email e accetta la privacy.")}</div>}
               </div>
             </div>
           </div>
@@ -881,12 +883,12 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   );
 }
 
-function Stepper({ value, min = 0, onChange, compact }: { value: number; min?: number; onChange: (v: number) => void; compact?: boolean }) {
+function Stepper({ value, min = 0, onChange, compact, label }: { value: number; min?: number; onChange: (v: number) => void; compact?: boolean; label?: string }) {
   return (
     <div className={`mt-1 flex items-center ${compact ? "" : "w-full"} overflow-hidden rounded-lg border border-line`}>
-      <button onClick={() => onChange(Math.max(min, value - 1))} className="px-3 py-1.5 text-dim hover:bg-wash">−</button>
+      <button type="button" onClick={() => onChange(Math.max(min, value - 1))} aria-label={`${label ?? ""} −`.trim()} className="min-h-11 min-w-11 px-4 py-1.5 text-dim hover:bg-wash sm:min-h-0 sm:min-w-0 sm:px-3">−</button>
       <span className={`${compact ? "w-8" : "flex-1"} bg-paper py-1.5 text-center font-mono text-sm font-bold text-txt`}>{value}</span>
-      <button onClick={() => onChange(value + 1)} className="px-3 py-1.5 text-dim hover:bg-wash">+</button>
+      <button type="button" onClick={() => onChange(value + 1)} aria-label={`${label ?? ""} +`.trim()} className="min-h-11 min-w-11 px-4 py-1.5 text-dim hover:bg-wash sm:min-h-0 sm:min-w-0 sm:px-3">+</button>
     </div>
   );
 }

@@ -16,7 +16,7 @@ export default function StyleChooser() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Colori</div>
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">Colori</div>
         <div className="grid gap-1.5 sm:grid-cols-2">
           {PALETTES.map((p, i) => (
             <button key={p.name} onClick={() => pickPal(i)} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition max-sm:min-h-11 ${pal === i ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] text-txt" : "border-line text-dim hover:bg-wash"}`}>
@@ -31,7 +31,7 @@ export default function StyleChooser() {
       </div>
 
       <div>
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Struttura box</div>
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">Struttura box</div>
         <div className="grid gap-1.5 sm:grid-cols-2">
           {STRUCTS.map((s, i) => (
             <button key={s.name} onClick={() => pickStr(i)} className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition max-sm:min-h-11 ${str === i ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] text-txt" : "border-line text-dim hover:bg-wash"}`}>

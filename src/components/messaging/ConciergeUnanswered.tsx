@@ -96,7 +96,7 @@ export default function ConciergeUnanswered({ sid, onAdd, createdTick }: {
       <div className="space-y-3">
         {groups.map((g) => (
           <div key={g.cat} className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{topicLabel(g.cat)} <span className="font-normal">({g.rows.length})</span></div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{topicLabel(g.cat)} <span className="font-normal">({g.rows.length})</span></div>
             {g.rows.map((r) => (
               <div key={r.key} className="flex flex-wrap items-start gap-2 rounded-lg border border-line bg-paper p-2.5">
                 <div className="min-w-0 flex-1">

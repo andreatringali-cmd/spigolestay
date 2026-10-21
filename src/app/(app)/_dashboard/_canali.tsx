@@ -38,9 +38,9 @@ export default function Canali({ rows, total, monthName, delay = 0 }: { rows: Ch
           </svg>
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
             {h ? (
-              <div><div className="font-display text-xl font-bold leading-none tabular-nums text-txt">{h.share}%</div><div className="mt-0.5 font-mono text-[10px] text-faint">€ {num(h.revenue)}</div></div>
+              <div><div className="font-display text-xl font-bold leading-none tabular-nums text-txt">{h.share}%</div><div className="mt-0.5 font-mono text-[11px] text-dim">€ {num(h.revenue)}</div></div>
             ) : (
-              <div><div className="font-display text-base font-bold leading-none tabular-nums text-txt sm:text-lg">€ <CountUp value={total} format={(v) => num(v)} delay={300} /></div><div className="mt-0.5 text-[10px] text-faint">{rows.length} {rows.length === 1 ? "canale" : "canali"}</div></div>
+              <div><div className="font-display text-base font-bold leading-none tabular-nums text-txt sm:text-lg">€ <CountUp value={total} format={(v) => num(v)} delay={300} /></div><div className="mt-0.5 text-[11px] text-faint">{rows.length} {rows.length === 1 ? "canale" : "canali"}</div></div>
             )}
           </div>
         </div>

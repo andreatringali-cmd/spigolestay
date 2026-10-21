@@ -403,7 +403,7 @@ export default function FatturePassivePage() {
               <button onClick={openFic} className="h-9 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
             </div>
           </FilterSheet>
-          <button onClick={openNew} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-white hover:opacity-90 sm:hidden">+ Nuova</button>
+          <button onClick={openNew} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-on-focus hover:opacity-90 sm:hidden">+ Nuova</button>
           <div className="flex flex-wrap items-center gap-2 max-sm:hidden sm:col-span-3">
             {filterControls}
             {filtersActive ? <button onClick={resetFilters} className="text-xs font-semibold text-focus hover:underline">Azzera filtri</button> : null}
@@ -411,7 +411,7 @@ export default function FatturePassivePage() {
         <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:basis-full max-sm:flex-nowrap max-sm:justify-between sm:col-span-4">
           <div className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:shrink-0">
             {(["elenco", "riepiloghi"] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition max-sm:py-2 ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}</button>
+              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition max-sm:py-2 ${view === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{v}</button>
             ))}
           </div>
           <span className="text-xs text-faint max-sm:shrink-0 max-sm:whitespace-nowrap">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
@@ -419,7 +419,7 @@ export default function FatturePassivePage() {
             <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
             <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
             <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
-            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
+            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">+ Nuova fattura</button>
           </div>
         </div>
       </Card>
@@ -432,14 +432,14 @@ export default function FatturePassivePage() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
               {([["supplier", "Per fornitore"], ["category", "Per categoria"], ["month", "Per mese"]] as const).map(([k, l]) => (
-                <button key={k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
+                <button key={k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{l}</button>
               ))}
             </div>
             <span className="text-xs text-faint">Sui documenti che corrispondono ai filtri qui sopra; le note di credito sono sottratte.</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
                 <th className="px-3 py-2 font-semibold">{sumBy === "supplier" ? "Fornitore" : sumBy === "category" ? "Categoria" : "Mese"}</th><th className="px-3 py-2 text-right font-semibold">Doc.</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 text-right font-semibold">Da pagare</th><th className="w-40 px-3 py-2 font-semibold">Quota</th>
               </tr></thead>
               <tbody>
@@ -497,7 +497,7 @@ export default function FatturePassivePage() {
               </div>
               <div className="mt-2 flex items-center gap-1.5" onClick={(e) => { e.stopPropagation(); if (!credit) togglePaid(r); }}>
                 <span className={`${credit ? "" : "cursor-pointer"} rounded-full px-2.5 py-1 text-xs font-semibold`} style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
-                {inCassa.has(r.id) && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
+                {inCassa.has(r.id) && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
               </div>
             </div>
           );
@@ -511,7 +511,7 @@ export default function FatturePassivePage() {
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+            <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
               <th className="w-8 px-3 py-2"><input type="checkbox" aria-label="Seleziona tutte" checked={filtered.length > 0 && filtered.every((r) => sel.has(r.id))} onChange={(e) => setSel(e.target.checked ? new Set(filtered.map((r) => r.id)) : new Set())} /></th>
               <th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => sortBy("doc_date")}>Data{arrow("doc_date")}</th>{!single && <th className="px-3 py-2 font-semibold">Struttura</th>}<th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => sortBy("supplier_name")}>Fornitore{arrow("supplier_name")}</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">Categoria</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="cursor-pointer select-none px-3 py-2 text-right font-semibold hover:text-txt" onClick={() => sortBy("total_cents")}>Totale{arrow("total_cents")}</th><th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => sortBy("due_date")}>Scadenza{arrow("due_date")}</th><th className="px-3 py-2 font-semibold">Stato</th>
             </tr>
@@ -535,7 +535,7 @@ export default function FatturePassivePage() {
                   <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? fmtDate(r.due_date) : "—"}</td>
                   <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); if (!credit) togglePaid(r); }}>
                     <span className={`${credit ? "" : "cursor-pointer"} rounded-full px-2 py-0.5 text-[11px] font-semibold`} style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
-                    {inCassa.has(r.id) && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
+                    {inCassa.has(r.id) && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
                   </td>
                 </tr>
               );
@@ -556,12 +556,12 @@ export default function FatturePassivePage() {
             <div className="flex flex-wrap items-end gap-2">
               <label className={lbl}>Dal<DateField value={fic.from} max={fic.to} onChange={(v) => setFic({ ...fic, from: v, items: null })} className={inp} /></label>
               <label className={lbl}>Al<DateField value={fic.to} min={fic.from} onChange={(v) => setFic({ ...fic, to: v, items: null })} className={inp} /></label>
-              <button onClick={ficPreview} disabled={fic.busy !== "" || !fic.from || !fic.to} className="rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{fic.busy === "list" ? "Leggo…" : "Mostra anteprima"}</button>
+              <button onClick={ficPreview} disabled={fic.busy !== "" || !fic.from || !fic.to} className="rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{fic.busy === "list" ? "Leggo…" : "Mostra anteprima"}</button>
             </div>
             {fic.msg && (
               <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-txt">
                 {fic.msg}
-                {fic.reconnect && <button onClick={ficReconnect} className="mt-2 block rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Ricollega Fatture in Cloud</button>}
+                {fic.reconnect && <button onClick={ficReconnect} className="mt-2 block rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">Ricollega Fatture in Cloud</button>}
               </div>
             )}
             {fic.items && fic.items.length > 0 && (
@@ -577,7 +577,7 @@ export default function FatturePassivePage() {
                 )}
                 <div className="mt-3 max-h-[40dvh] overflow-auto rounded-lg border border-line">
                   <table className="w-full min-w-[560px] text-xs">
-                    <thead><tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-faint">
+                    <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
                       <th className="w-8 px-2 py-1.5"><input type="checkbox" aria-label="Seleziona tutte" checked={fic.items.filter((i) => i.status !== "imported").every((i) => fic.pick.has(i.ficId))} onChange={(e) => setFic({ ...fic, pick: e.target.checked ? new Set(fic.items!.filter((i) => i.status !== "imported").map((i) => i.ficId)) : new Set() })} /></th>
                       <th className="px-2 py-1.5 font-semibold">Data</th><th className="px-2 py-1.5 font-semibold">Fornitore</th><th className="px-2 py-1.5 font-semibold">Numero</th><th className="px-2 py-1.5 text-right font-semibold">Totale</th><th className="px-2 py-1.5 font-semibold">Stato</th>
                     </tr></thead>
@@ -597,7 +597,7 @@ export default function FatturePassivePage() {
                 </div>
                 <p className="mt-1 text-[11px] text-faint">Le «Forse già presente» hanno stesso fornitore, numero e anno di una fattura inserita a mano: non sono selezionate di default.</p>
                 <div className="mt-3 flex items-center gap-2">
-                  <button onClick={ficImport} disabled={fic.busy !== "" || fic.pick.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{fic.busy === "import" ? "Importo…" : `Importa ${fic.pick.size} ${fic.pick.size === 1 ? "fattura" : "fatture"}`}</button>
+                  <button onClick={ficImport} disabled={fic.busy !== "" || fic.pick.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{fic.busy === "import" ? "Importo…" : `Importa ${fic.pick.size} ${fic.pick.size === 1 ? "fattura" : "fatture"}`}</button>
                   <button onClick={() => setFic(null)} className="ml-auto rounded-lg border border-line px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
                 </div>
               </>
@@ -623,7 +623,7 @@ export default function FatturePassivePage() {
                 <span className="text-sm text-dim">{otaCommission.count} prenotazioni · stimato</span>
                 <span className="font-mono text-lg font-bold text-txt">{eur(otaCommission.sum)}</span>
               </div>
-              <button onClick={precompileCommissions} disabled={otaCommission.sum <= 0} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Precompila da commissioni</button>
+              <button onClick={precompileCommissions} disabled={otaCommission.sum <= 0} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Precompila da commissioni</button>
             </div>
 
             <div className="mt-3 rounded-lg border border-line p-3">
@@ -681,7 +681,7 @@ export default function FatturePassivePage() {
                 </div>
                 <p className="mt-1 text-[11px] text-faint">Per commissioni/servizi da fornitori esteri (OTA) va emessa l&apos;autofattura in reverse charge. L&apos;imponibile è l&apos;importo indicato sopra; IVA 22%.</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button onClick={genAutofattura} disabled={!!afBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{afBusy === "gen" ? "Genero…" : af.status ? "Rigenera autofattura" : "Genera autofattura TD17"}</button>
+                  <button onClick={genAutofattura} disabled={!!afBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{afBusy === "gen" ? "Genero…" : af.status ? "Rigenera autofattura" : "Genera autofattura TD17"}</button>
                   {af.status && <button onClick={dlAutofattura} disabled={!!afBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</button>}
                 </div>
                 {afMsg && <p className="mt-2 text-[12px] text-dim">{afMsg}</p>}
@@ -698,7 +698,7 @@ export default function FatturePassivePage() {
               </div>
             )}
             <div className="mt-3 flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
+              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
               {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 max-sm:py-2.5 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}
               <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
             </div>

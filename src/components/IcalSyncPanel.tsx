@@ -127,12 +127,12 @@ export default function IcalSyncPanel() {
   return (
     <Card className="mb-5">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <SectionTitle>{t("Sincronizzazione iCal")} <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-[color:var(--ok)]">{t("reale · sola lettura")}</span></SectionTitle>
+        <SectionTitle>{t("Sincronizzazione iCal")} <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-wide text-[color:var(--ok)]">{t("reale · sola lettura")}</span></SectionTitle>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-dim">{t("Auto ogni 15 min")}
             <button type="button" onClick={toggleAuto} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: auto ? "var(--ok)" : "var(--line)" }} aria-pressed={auto}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: auto ? "22px" : "2px" }} /></button>
           </label>
-          <button onClick={runAll} disabled={!!busy || feeds.length === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">↻ {busy === "all" ? t("Sincronizzo…") : t("Sincronizza tutti")}</button>
+          <button onClick={runAll} disabled={!!busy || feeds.length === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">↻ {busy === "all" ? t("Sincronizzo…") : t("Sincronizza tutti")}</button>
         </div>
       </div>
       <p className="mb-3 text-xs text-dim">{t("Incolla i link iCal esportati da Octorate (o dalle OTA). Xenora legge e importa le prenotazioni senza toccare la sincronizzazione live: Octorate resta il gestore, tu vedi tutto anche qui.")}</p>
@@ -143,7 +143,7 @@ export default function IcalSyncPanel() {
           {feeds.map((f) => (
             <div key={f.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-paper p-3">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-sm font-semibold text-txt"><span className="truncate">{f.name}</span><span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[10px] font-medium text-dim">{sName(f.structureId)}</span></div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-txt"><span className="truncate">{f.name}</span><span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{sName(f.structureId)}</span></div>
                 <div className="truncate text-[11px] text-faint" title={f.url}>{f.url}</div>
                 <div className="mt-0.5 text-[11px]">
                   {f.lastErr
@@ -172,7 +172,7 @@ export default function IcalSyncPanel() {
           <select value={form.structureId} disabled={activeStructureId !== "all"} onChange={(e) => setForm({ ...form, structureId: e.target.value })} className={`${inp} disabled:opacity-60`}>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <button onClick={addFeed} disabled={!/^https?:\/\//i.test(form.url.trim()) || !form.structureId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+          <button onClick={addFeed} disabled={!/^https?:\/\//i.test(form.url.trim()) || !form.structureId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
         </div>
       </div>
       {structures.length === 0 && <p className="mt-2 text-xs text-[color:var(--warn)]">{t("Prima crea una struttura.")}</p>}

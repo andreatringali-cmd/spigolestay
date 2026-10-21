@@ -29,7 +29,7 @@ export default function ConfirmDialog({ title, message, warning, confirmLabel = 
         )}
         <div className="mt-4 flex items-center justify-end gap-2">
           <button onClick={onClose} disabled={busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{cancelLabel}</button>
-          <button onClick={onConfirm} disabled={busy || disabled} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: tone }}>{busy ? "Invio…" : confirmLabel}</button>
+          <button onClick={onConfirm} disabled={busy || disabled} className={`rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50 ${tone === "var(--err)" ? "text-on-err" : tone === "var(--warn)" ? "text-on-warn" : tone === "var(--ok)" ? "text-on-ok" : "text-on-focus"}`} style={{ backgroundColor: tone }}>{busy ? "Invio…" : confirmLabel}</button>
         </div>
       </div>
     </div>

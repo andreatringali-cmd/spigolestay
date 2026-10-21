@@ -171,7 +171,7 @@ function TipologiaScheda() {
           <div className="flex items-center gap-2">
             {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={() => router.push("/camere")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea tipologia") : t("Salva")}</button>
+            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea tipologia") : t("Salva")}</button>
           </div>
         }
       />
@@ -222,7 +222,7 @@ function TipologiaScheda() {
                 <label className={lbl}>{t("Numero camere")}
                   <input type="number" min={0} value={targetRooms} onChange={(e) => setTargetRooms(e.target.value.replace(/\D/g, ""))} className={`${inp} mt-1 w-28`} />
                 </label>
-                <button type="button" onClick={applyRoomCount} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{(Number(targetRooms) || 0) !== nUnits ? `${t("Applica")} · ${nUnits} → ${Number(targetRooms) || 0}` : t("Applica")}</button>
+                <button type="button" onClick={applyRoomCount} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{(Number(targetRooms) || 0) !== nUnits ? `${t("Applica")} · ${nUnits} → ${Number(targetRooms) || 0}` : t("Applica")}</button>
                 <span className="text-xs text-faint">{t("Attualmente")}: <b className="text-dim">{nUnits}</b></span>
               </div>
               {roomMsg && <div className="mt-2 rounded-lg bg-wash px-3 py-2 text-xs text-dim">{roomMsg}</div>}
@@ -304,7 +304,7 @@ function TipologiaScheda() {
           <Card>
             <SectionTitle>{t("Descrizioni multilingua")}</SectionTitle>
             <div className="mb-3 flex flex-wrap gap-1">
-              {USER_LANGS.map((l) => <button key={l.code} onClick={() => setLang(l.code)} className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${lang === l.code ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{l.flag} {l.code.toUpperCase()}</button>)}
+              {USER_LANGS.map((l) => <button key={l.code} onClick={() => setLang(l.code)} className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${lang === l.code ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{l.flag} {l.code.toUpperCase()}</button>)}
             </div>
             <label className={lbl}>{t("Nome commerciale")} ({lang.toUpperCase()})<input value={(f.i18n ?? {})[lang]?.name ?? ""} onChange={(e) => setI18n("name", e.target.value)} className={`${inp} mt-1`} placeholder={f.name || t("Nome mostrato agli ospiti")} /></label>
             <label className={`${lbl} mt-3`}>{t("Descrizione")} ({lang.toUpperCase()})<textarea value={(f.i18n ?? {})[lang]?.desc ?? ""} onChange={(e) => setI18n("desc", e.target.value)} rows={4} className={`${inp} mt-1 resize-y`} placeholder={t("Testo mostrato sul sito e sulle OTA…")} /></label>
@@ -340,7 +340,7 @@ function TipologiaScheda() {
                     <label key={u.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-wash"} ${on && !blocked ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "border-line"}`}>
                       <input type="checkbox" disabled={blocked} checked={on && !blocked} onChange={(e) => setRemoveSel((p) => { const n = new Set(p); if (e.target.checked) n.add(u.id); else n.delete(u.id); return n; })} />
                       <span className="flex-1 text-sm text-txt">{t("Camera")} {u.name} {u.code && <span className="text-faint">· {u.code}</span>}</span>
-                      {blocked && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">{t("prenotazioni attive")}</span>}
+                      {blocked && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--warn)]">{t("prenotazioni attive")}</span>}
                     </label>
                   );
                 })}
@@ -349,7 +349,7 @@ function TipologiaScheda() {
                 <span className="text-xs text-dim">{myUnits.length - selCount === 1 ? t("Rimarrà") : t("Rimarranno")}: <b className="text-txt">{myUnits.length - selCount}</b> {myUnits.length - selCount === 1 ? t("camera") : t("camere")}</span>
                 <div className="flex gap-2">
                   <button onClick={() => setPickerOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-                  <button onClick={confirmRemove} disabled={selCount === 0} className="rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Rimuovi")} {selCount > 0 ? `(${selCount})` : ""}</button>
+                  <button onClick={confirmRemove} disabled={selCount === 0} className="rounded-lg px-3 py-2 text-sm font-semibold text-on-err disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Rimuovi")} {selCount > 0 ? `(${selCount})` : ""}</button>
                 </div>
               </div>
             </div>

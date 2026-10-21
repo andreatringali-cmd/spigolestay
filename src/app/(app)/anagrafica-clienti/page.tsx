@@ -98,13 +98,13 @@ export default function AnagraficaClientiPage() {
             <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${sel} max-sm:h-9 max-sm:min-h-0 max-sm:min-w-0 max-sm:flex-1 max-sm:py-0 max-sm:text-[13px]`}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             {ficOn && <button onClick={openSync} className="ml-auto whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:ml-0 max-sm:h-9 max-sm:min-h-0 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px] sm:order-1">Sincronizza<span className="max-sm:hidden"> con Fatture in Cloud</span></button>}
           </div>
-          <button onClick={() => { setErr(""); setEdit(emptyForm()); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:order-2 max-sm:h-9 max-sm:min-h-0 max-sm:w-[5.5rem] max-sm:py-0">+ Nuovo</button>
+          <button onClick={() => { setErr(""); setEdit(emptyForm()); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:order-2 max-sm:h-9 max-sm:min-h-0 max-sm:w-[5.5rem] max-sm:py-0">+ Nuovo</button>
         </div>
       </Card>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[720px] text-sm">
-          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-2 font-semibold">Nome</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">P.IVA / CF</th><th className="px-3 py-2 font-semibold">Città</th><th className="px-3 py-2 font-semibold">Cod. dest. / PEC</th></tr></thead>
+          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-2 font-semibold">Nome</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">P.IVA / CF</th><th className="px-3 py-2 font-semibold">Città</th><th className="px-3 py-2 font-semibold">Cod. dest. / PEC</th></tr></thead>
           <tbody>
             {filtered.map((c) => (
               <tr key={c.id} onClick={() => openEdit(c)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
@@ -148,7 +148,7 @@ export default function AnagraficaClientiPage() {
                   </div>
                 ))}
                 <div className="flex items-center gap-2">
-                  <button onClick={applySync} disabled={sync.busy || sync.prev.truncated || (sync.send.size + sync.imp.size === 0)} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica ({sync.send.size + sync.imp.size})</button>
+                  <button onClick={applySync} disabled={sync.busy || sync.prev.truncated || (sync.send.size + sync.imp.size === 0)} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Applica ({sync.send.size + sync.imp.size})</button>
                   <button onClick={() => setSync((p) => ({ ...p, open: false }))} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Chiudi</button>
                 </div>
               </>
@@ -177,7 +177,7 @@ export default function AnagraficaClientiPage() {
             </div>
             {err && <p role="alert" className="mt-2 rounded-lg bg-paper px-3 py-2 text-xs text-[color:var(--err)]">{err}</p>}
             <div className="mt-3 flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{saving ? "Salvo…" : "Salva"}</button>
+              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{saving ? "Salvo…" : "Salva"}</button>
               {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)] max-sm:min-h-11">Elimina</button>}
               <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:min-h-11">Annulla</button>
             </div>

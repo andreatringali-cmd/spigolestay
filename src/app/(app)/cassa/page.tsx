@@ -290,7 +290,7 @@ export default function CassaPage() {
   const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout));
   // cella "saldo conti" (riusata dalle voci bonifico)
   const balCell = (bal: number | null, inc: boolean) => (
-    <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2 max-md:col-start-2 max-md:row-start-2 max-md:my-0 max-md:border-l-0 max-md:pl-0"><span className="mr-1 text-[10px] text-faint md:hidden">{t("saldo")}</span>
+    <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2 max-md:col-start-2 max-md:row-start-2 max-md:my-0 max-md:border-l-0 max-md:pl-0"><span className="mr-1 text-[11px] text-faint md:hidden">{t("saldo")}</span>
       {inc
         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
         : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined}>{bal === null ? "—" : eur(bal)}</span>}
@@ -681,7 +681,7 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid grid-cols-2 gap-2 max-sm:mb-3 sm:gap-3 lg:grid-cols-4">
-        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}{saldoPerStruttura.length > 1 && <span className="mt-0.5 block space-y-px text-[10px] leading-tight">{saldoPerStruttura.map((x) => <span key={x.sid || "comuni"} className="flex items-baseline justify-between gap-2"><span className="truncate">{x.name}</span><span className="shrink-0 font-mono">{eur(x.saldo)}</span></span>)}</span>}</> : t("Imposta il saldo di partenza →")} />
+        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}{saldoPerStruttura.length > 1 && <span className="mt-0.5 block space-y-px text-[11px] leading-tight">{saldoPerStruttura.map((x) => <span key={x.sid || "comuni"} className="flex items-baseline justify-between gap-2"><span className="truncate">{x.name}</span><span className="shrink-0 font-mono">{eur(x.saldo)}</span></span>)}</span>}</> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrateCard)} color="var(--ok)" hint={`${cardRows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(usciteCard)} color="var(--err)" hint={`${cardRows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? <>{t("con saldo attuale")} · {t("al")} {fmtDMY(listHorizon)}</> : t("entrate − uscite")} />
@@ -718,7 +718,7 @@ export default function CassaPage() {
           <div className="flex" style={{ height: 160 }}>
             {/* asse Y */}
             <div className="relative mr-2 w-9 shrink-0" style={{ marginTop: 18, height: 120 }}>
-              {axisTicks.map((v) => <span key={v} className="absolute right-0 -translate-y-1/2 font-mono text-[9px] leading-none text-faint" style={{ top: `${100 - (v / axis.max) * 100}%` }}>{compactEuro(v)}</span>)}
+              {axisTicks.map((v) => <span key={v} className="absolute right-0 -translate-y-1/2 font-mono text-[10px] leading-none text-faint" style={{ top: `${100 - (v / axis.max) * 100}%` }}>{compactEuro(v)}</span>)}
             </div>
             <div className="relative min-w-0 flex-1">
               {/* linee di riferimento */}
@@ -736,7 +736,7 @@ export default function CassaPage() {
                         {tr.out > 0 && <span className="absolute bottom-full left-1/2 mb-0.5 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[8px] leading-none text-dim sm:block">{compactEuro(tr.out)}</span>}
                       </div>
                     </div>
-                    <button type="button" onClick={() => pickMonth(tr.ym, "all")} aria-label={`${t("Tutti i movimenti")} · ${monthLabel(tr.ym)}`} className="w-full rounded px-1 max-sm:py-2 text-[10px] capitalize text-faint hover:text-txt">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</button>
+                    <button type="button" onClick={() => pickMonth(tr.ym, "all")} aria-label={`${t("Tutti i movimenti")} · ${monthLabel(tr.ym)}`} className="w-full rounded px-1 max-sm:py-2 text-[11px] capitalize text-faint hover:text-txt">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</button>
                   </div>
                 ))}
               </div>
@@ -757,12 +757,12 @@ export default function CassaPage() {
             <div className="ml-auto"><ExportMenu onExcel={doExcel} onPdf={exportPdf} /></div>
           </div>
         </FilterSheet>
-        <button onClick={openNewMov} className="inline-flex h-9 w-[4.75rem] shrink-0 items-center justify-center rounded-lg bg-focus text-sm font-semibold text-white hover:opacity-90 sm:hidden">＋ {t("Nuovo")}</button>
+        <button onClick={openNewMov} className="inline-flex h-9 w-[4.75rem] shrink-0 items-center justify-center rounded-lg bg-focus text-sm font-semibold text-on-focus hover:opacity-90 sm:hidden">＋ {t("Nuovo")}</button>
         <div className="contents max-sm:hidden">{filterControls}</div>
         <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
           {chartsBtn}
           {payBtn}
-          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
+          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>
@@ -773,7 +773,7 @@ export default function CassaPage() {
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} sub={rangeInverted ? t("L'intervallo è al contrario: la data «Dal» è dopo la data «Al».") : undefined} /> : (
               <div className="-mx-1 max-h-[70dvh] overflow-auto px-1 md:max-h-[640px]">
               <div className="md:min-w-[920px]">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 max-md:hidden sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 max-md:hidden sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">
                 <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right max-md:hidden">{t("Lordo")}</span><span className="text-right max-md:hidden">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
@@ -823,11 +823,11 @@ export default function CassaPage() {
                           <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
                             <span className="truncate text-sm font-medium text-txt">{CHANNELS[ch]?.label} · {t("pagamento")} · {r.count} {r.count === 1 ? t("prenotazione") : t("prenotazioni")}</span>
-                            {r.forecast && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span>}
+                            {r.forecast && <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span>}
                             <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
                           </div>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          {r.comm === 0 && infoSum > 0 ? <span className="text-right font-mono text-[11px] italic text-faint max-md:hidden" title={t("Commissioni trattenute dal portale tutte insieme, a parte: non cambiano il saldo.")}>(− {eur(infoSum)})</span> : <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>}
+                          {r.comm === 0 && infoSum > 0 ? <span className="text-right font-mono text-[11px] italic text-faint max-md:hidden" title={t("Commissioni trattenute dal portale tutte insieme, a parte: non cambiano il saldo.")}>(− {eur(infoSum)})</span> : <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[11px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>}
                           <span className="text-right font-mono text-sm font-bold text-txt max-md:col-start-2 max-md:row-start-1">{eur(r.net)}</span>
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
@@ -869,7 +869,7 @@ export default function CassaPage() {
                           <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
                             <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
-                            <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>
+                            <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{t("auto")}</span>
                             <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
                           </div>
                           <span className="max-md:hidden" />
@@ -923,17 +923,17 @@ export default function CassaPage() {
                         {bk ? <BookingChannelLogo booking={bk} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
                         <span className="truncate text-sm font-medium text-txt">{title}</span>
                         {!isBooking && receiptOf.get(m.id) && <button type="button" onClick={(e) => { e.stopPropagation(); void openRcpt(receiptOf.get(m.id)!.path); }} aria-label={t("Apri scontrino")} title={t("Apri scontrino")} className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt"><Icon name="receipt" size={13} /></button>}
-                        {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
-                        {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
-                        {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
-                        {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
+                        {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{t("auto")}</span>)}
+                        {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
+                        {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
+                        {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
                         <span className="min-w-0 truncate text-[11px] text-faint max-sm:hidden">{[c?.label ? t(c.label) : "", contoLabel(m.conto, movSid(m) || undefined), multiScope && movSid(m) && !contoLabel(m.conto, movSid(m) || undefined).includes(" - ") ? structNameOf(movSid(m)) : ""].filter(Boolean).join(" · ")}</span>
-                        {contoUnassigned(m, conti) && <span className="shrink-0 text-[10px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a questa struttura: correggi il conto dalla modifica del movimento, oppure sposta in blocco i movimenti da «Saldo di partenza» → «Sposta movimenti tra conti».")}>⚠ {t("conto non assegnato")}</span>}
+                        {contoUnassigned(m, conti) && <span className="shrink-0 text-[11px] font-semibold text-[color:var(--warn)]" title={t("Conto non assegnato a questa struttura: correggi il conto dalla modifica del movimento, oppure sposta in blocco i movimenti da «Saldo di partenza» → «Sposta movimenti tra conti».")}>⚠ {t("conto non assegnato")}</span>}
                       </div>
                       {isBooking ? (
                         <>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[11px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>
                           <span className="text-right font-mono text-sm font-bold text-txt max-md:col-start-2 max-md:row-start-1">{eur(r.net)}</span>
                         </>
                       ) : (
@@ -943,7 +943,7 @@ export default function CassaPage() {
                           <span className="text-right font-mono text-sm font-semibold max-md:col-start-2 max-md:row-start-1" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.variable ? "~ " : ""}{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
                         </>
                       )}
-                      <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2 max-md:col-start-2 max-md:row-start-2 max-md:my-0 max-md:border-l-0 max-md:pl-0"><span className="mr-1 text-[10px] text-faint md:hidden">{t("saldo")}</span>
+                      <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2 max-md:col-start-2 max-md:row-start-2 max-md:my-0 max-md:border-l-0 max-md:pl-0"><span className="mr-1 text-[11px] text-faint md:hidden">{t("saldo")}</span>
                       {included
                         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
                         : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
@@ -958,7 +958,7 @@ export default function CassaPage() {
                 const oggiNode = (k: string) => (
                         <div key={k}>
                           <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer flex-wrap items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
-                            <span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">{t("Oggi")}</span><span>{fmtDMY(today)}</span><span className="text-faint">{oggiOpen ? "▾" : "▸"}</span>
+                            <span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[11px] uppercase tracking-wide text-on-warn">{t("Oggi")}</span><span>{fmtDMY(today)}</span><span className="text-faint">{oggiOpen ? "▾" : "▸"}</span>
                             {hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}
                           </div>
                           {oggiOpen && balParts.filter((b) => b.own || b.start !== undefined || Math.abs(b.saldo) > 0.004).map((b) => (
@@ -1000,7 +1000,7 @@ export default function CassaPage() {
             <Card className="border-[color:var(--warn)]">
               <div className="mb-3 flex items-center justify-between">
                 <SectionTitle>{t("Scadenze da registrare")}</SectionTitle>
-                {pending.some((p) => !p.rule.variable) && <button onClick={markAllPaid} className="rounded-md px-2 py-1 text-xs font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>{t("Segna tutte pagate")}</button>}
+                {pending.some((p) => !p.rule.variable) && <button onClick={markAllPaid} className="rounded-md px-2 py-1 text-xs font-semibold text-on-ok" style={{ backgroundColor: "var(--ok)" }}>{t("Segna tutte pagate")}</button>}
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {pending.map(({ rule, iso }) => {
@@ -1018,12 +1018,12 @@ export default function CassaPage() {
                       {rule.variable ? (
                         <>
                           <input inputMode="decimal" aria-label={t("Importo reale")} title={t("Importo reale (la stima è precompilata)")} value={pendAmt[`${rule.id}|${iso}`] ?? String(rule.amount).replace(".", ",")} onChange={(e) => setPendAmt((p) => ({ ...p, [`${rule.id}|${iso}`]: e.target.value }))} className="w-24 shrink-0 rounded-lg border border-line bg-paper px-2 py-1 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
-                          <button onClick={() => confirmVariable(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 max-sm:py-2 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Registra")}</button>
+                          <button onClick={() => confirmVariable(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 max-sm:py-2 text-xs font-semibold text-on-ok hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Registra")}</button>
                         </>
                       ) : (
                         <>
                           <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: rule.kind === "in" ? "var(--ok)" : "var(--err)" }}>{rule.kind === "in" ? "+" : "−"} {eur(rule.amount)}</span>
-                          <button onClick={() => markPaid(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 max-sm:py-2 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Segna pagata")}</button>
+                          <button onClick={() => markPaid(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 max-sm:py-2 text-xs font-semibold text-on-ok hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Segna pagata")}</button>
                         </>
                       )}
                     </div>
@@ -1070,7 +1070,7 @@ export default function CassaPage() {
                           <option value="">{t("Al conto…")}</option>
                           {list.filter((c) => c.key !== mv.from).map((c) => <option key={c.key} value={c.key}>{contoDisplayLabel(c, conti, (id) => getStructure(id)?.name ?? "—")}</option>)}
                         </select>
-                        <button type="button" onClick={() => void moveStored()} disabled={!mv.from || !mv.to} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Sposta")}</button>
+                        <button type="button" onClick={() => void moveStored()} disabled={!mv.from || !mv.to} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Sposta")}</button>
                       </div>
                     );
                   })()}
@@ -1117,7 +1117,7 @@ export default function CassaPage() {
               <div className="text-xs text-dim">{t("Totale")}: <b className="font-mono text-sm text-txt">{eur(openingTotal)}</b></div>
               <div className="flex gap-2">
                 <button onClick={() => setOpening(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button onClick={saveOpening} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Imposta i saldi")}</button>
+                <button onClick={saveOpening} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Imposta i saldi")}</button>
               </div>
             </div>
           </div>
@@ -1134,11 +1134,11 @@ export default function CassaPage() {
             <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento.")}</p>
             {scopeStructs.length > 1 && (
               <div className="mb-2 flex flex-wrap gap-1">
-                {scopeStructs.map((x) => <button key={x.id} type="button" onClick={() => setPayoutStruct(x.id)} aria-pressed={payoutSid === x.id} className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${payoutSid === x.id ? "border-transparent bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>{x.name}</button>)}
+                {scopeStructs.map((x) => <button key={x.id} type="button" onClick={() => setPayoutStruct(x.id)} aria-pressed={payoutSid === x.id} className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${payoutSid === x.id ? "border-transparent bg-focus text-on-focus" : "border-line text-dim hover:bg-wash"}`}>{x.name}</button>)}
               </div>
             )}
             <div className="overflow-hidden rounded-xl border border-line">
-              <div className="hidden grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint md:grid"><span>{t("Portale")}</span><span>{t("Quando arriva il pagamento")}</span><span>{t("Commissioni")}</span></div>
+              <div className="hidden grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 border-b border-line bg-wash px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim md:grid"><span>{t("Portale")}</span><span>{t("Quando arriva il pagamento")}</span><span>{t("Commissioni")}</span></div>
               {PAYOUT_CHANNELS.map((ch) => {
                 const rule = payoutsOfModal[ch] ?? { mode: "arrival" as PayoutMode };
                 const wd = rule.weekday ?? 4, md = rule.monthDay ?? 1, dd = rule.days ?? 0;
@@ -1173,7 +1173,7 @@ export default function CassaPage() {
                 );
               })}
             </div>
-            <button onClick={() => setPayoutModal(false)} className="mt-3 w-full rounded-lg bg-focus py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Fatto")}</button>
+            <button onClick={() => setPayoutModal(false)} className="mt-3 w-full rounded-lg bg-focus py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Fatto")}</button>
           </div>
         </div>
       )}
@@ -1194,7 +1194,7 @@ export default function CassaPage() {
             {editingMov === NEW_MOV && movTab === "prog" ? (
               <div>
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Pagamenti programmati")}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Pagamenti programmati")}</div>
                 <button onClick={() => { resetForm(); openNewRule(); }} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ {t("Aggiungi")}</button>
               </div>
               {rules.filter((r) => ruleVisible(r.structureId)).length === 0 ? (
@@ -1212,7 +1212,7 @@ export default function CassaPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate text-sm font-medium text-txt">{r.desc}</span>
-                              <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.variable ? t("variabile") : r.auto ? t("auto") : t("manuale")}</span>
+                              <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.variable ? t("variabile") : r.auto ? t("auto") : t("manuale")}</span>
                             </div>
                             <div className="mt-0.5 text-[11px] text-faint">{t(FREQ[r.freq])}{r.freq === "monthly" ? ` · ${t("il")} ${r.day}` : ""}{r.end ? ` · ${t("fino al")} ${fmtDate(r.end)}` : ""}{next ? ` · ${t("prossima")} ${fmtDM(next)}` : ""}</div>
                           </div>
@@ -1259,7 +1259,7 @@ export default function CassaPage() {
             </div>
             )}
             {editingMov && editingMov !== NEW_MOV && editingMov !== OCC_MOV && receiptOf.get(editingMov) && <button type="button" onClick={() => void openRcpt(receiptOf.get(editingMov)!.path)} className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="receipt" size={14} /> {t("Apri scontrino")}</button>}
-            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingMov === NEW_MOV ? (form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")) : t("Salva modifiche")}</button>
+            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90">{editingMov === NEW_MOV ? (form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")) : t("Salva modifiche")}</button>
             {editingMov === OCC_MOV && occCtx && (
               <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                 <button onClick={() => { const r = rules.find((x) => x.id === occCtx.ruleId); resetForm(); if (r) openEditRule(r); }} className="rounded-lg border border-line py-2 text-sm font-medium text-dim hover:bg-wash">{t("Modifica la regola")}</button>
@@ -1282,7 +1282,7 @@ export default function CassaPage() {
                 <button key={c.key} onClick={() => { if (catFor === "rule") setRf((f) => ({ ...f, cat: c.key })); else setForm((f) => ({ ...f, cat: c.key })); setCatPicker(false); }} className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition hover:bg-wash ${(catFor === "rule" ? rf.cat : form.cat) === c.key ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`}>
                   {iconCircle(c, 40)}
                   <span className="text-center text-[11px] font-medium leading-tight text-txt">{t(c.label)}</span>
-                  {c.custom && <span onClick={(e) => { e.stopPropagation(); deleteCat(c.key); }} title={t("Elimina categoria")} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-wash text-[10px] text-faint [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:grid hover:text-[color:var(--err)]">✕</span>}
+                  {c.custom && <span onClick={(e) => { e.stopPropagation(); deleteCat(c.key); }} title={t("Elimina categoria")} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-wash text-[11px] text-faint [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:grid hover:text-[color:var(--err)]">✕</span>}
                 </button>
               ))}
               <button onClick={openNewCat} className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line p-3 text-dim transition hover:bg-wash hover:text-focus">
@@ -1300,7 +1300,7 @@ export default function CassaPage() {
                 <div className="mb-3 grid max-h-40 grid-cols-7 gap-1.5 overflow-y-auto">
                   {ICON_KEYS.map((ic) => <button key={ic} onClick={() => setNewCat({ ...newCat, icon: ic })} className={`grid aspect-square place-items-center rounded-lg border ${newCat.icon === ic ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`} style={{ color: newCat.color }}><CatIcon name={ic} size={18} /></button>)}
                 </div>
-                <div className="flex gap-2"><button onClick={() => setNewCat(null)} className="flex-1 rounded-lg border border-line py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button><button onClick={createCat} disabled={!newCat.label.trim()} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Crea categoria")}</button></div>
+                <div className="flex gap-2"><button onClick={() => setNewCat(null)} className="flex-1 rounded-lg border border-line py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button><button onClick={createCat} disabled={!newCat.label.trim()} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Crea categoria")}</button></div>
               </div>
             )}
           </div>
@@ -1347,7 +1347,7 @@ export default function CassaPage() {
               <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: rf.auto ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: rf.auto ? "22px" : "2px" }} /></span>
             </button>
             )}
-            <button onClick={addRule} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingRule ? t("Salva modifiche") : t("Salva pagamento programmato")}</button>
+            <button onClick={addRule} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90">{editingRule ? t("Salva modifiche") : t("Salva pagamento programmato")}</button>
             {editingRule && <button onClick={async () => { const id = editingRule; closeRuleModal(); await delRule(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina pagamento")}</button>}
           </div>
         </div>

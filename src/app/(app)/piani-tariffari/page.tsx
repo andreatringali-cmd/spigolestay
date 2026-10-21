@@ -142,18 +142,18 @@ export default function PianiTariffariPage() {
           </select>
         )}
         <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line">
-          <button onClick={() => setView2("list")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "list" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+          <button onClick={() => setView2("list")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "list" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
           </button>
-          <button onClick={() => setView2("cards")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "cards" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+          <button onClick={() => setView2("cards")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "cards" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>{t("Schede")}
           </button>
         </div>
         <span className="h-4 w-px bg-line max-sm:hidden" />
-        <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>+%</span> {t("aumento")}</span>
-        <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>−%</span> {t("sconto")}</span>
+        <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>+%</span> {t("aumento")}</span>
+        <span className="flex items-center gap-1.5 max-sm:order-5 max-sm:text-[11px]"><span className="rounded-full px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>−%</span> {t("sconto")}</span>
         <span className="hidden sm:inline">🛏️ {t("trattamento")} · 📅 {t("intervallo")} · 💳 {t("incasso")}</span>
-        <button onClick={addPlan} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px]">＋ {t("Nuovo piano")}</button>
+        <button onClick={addPlan} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:shrink-0 max-sm:py-0 max-sm:text-[13px]">＋ {t("Nuovo piano")}</button>
       </div>
 
       {view === "list" ? (
@@ -161,7 +161,7 @@ export default function PianiTariffariPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[880px] text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                   <th className="px-3 py-2.5 font-semibold">{t("Etichetta")}</th>
                   <th className="px-3 py-2.5 font-semibold">{t("Trattamento")}</th>
                   <th className="px-3 py-2.5 font-semibold">{t("Variazione")}</th>
@@ -181,7 +181,7 @@ export default function PianiTariffariPage() {
                     <tr key={p.id} onClick={() => setEditId(p.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="px-3 py-2.5">
                         <div className="font-semibold text-txt">{p.name}</div>
-                        <div className="text-[10px] text-faint">{fmtRange(p, t)}{structures.length > 1 ? ` · ${structName(p.structureId)}` : ""}</div>
+                        <div className="text-[11px] text-faint">{fmtRange(p, t)}{structures.length > 1 ? ` · ${structName(p.structureId)}` : ""}</div>
                       </td>
                       <td className="px-3 py-2.5 text-dim">{t(p.board)}</td>
                       <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: p.adjPct === 0 ? "var(--wash)" : `color-mix(in srgb, ${p.adjPct > 0 ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: p.adjPct === 0 ? "var(--dim)" : p.adjPct > 0 ? "var(--ok)" : "var(--err)" }}>{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span></td>
@@ -210,7 +210,7 @@ export default function PianiTariffariPage() {
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: p.adjPct === 0 ? "var(--wash)" : `color-mix(in srgb, ${p.adjPct > 0 ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: p.adjPct === 0 ? "var(--dim)" : p.adjPct > 0 ? "var(--ok)" : "var(--err)" }}>{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span>
                 </div>
                 <div className="mt-1 font-mono text-2xl font-bold leading-none text-txt">{eur(price)}</div>
-                <div className="text-[10px] text-faint">{t("su")} {eur(refBase)} {t("base")} · {t("esempio")}</div>
+                <div className="text-[11px] text-faint">{t("su")} {eur(refBase)} {t("base")} · {t("esempio")}</div>
                 <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t(p.board)}</span>
                   <span className="rounded-full px-2 py-0.5 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span>
@@ -335,7 +335,7 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
         <button onClick={onDelete} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
         <label className="ml-1 flex items-center gap-2 text-sm text-dim">{t("Attivo")}<Toggle on={f.enabled !== false} onClick={() => set("enabled", f.enabled === false)} color="var(--ok)" /></label>
         <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-        <button onClick={() => onSave(f)} disabled={!f.name.trim() || f.roomTypeIds?.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+        <button onClick={() => onSave(f)} disabled={!f.name.trim() || f.roomTypeIds?.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
       </div>
     </Modal>
   );

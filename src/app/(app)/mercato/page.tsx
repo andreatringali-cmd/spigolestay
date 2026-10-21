@@ -173,7 +173,7 @@ export default function MercatoPage() {
       <PageHeader title={t("Rete città")} subtitle={`${city} · ${t("confronto anonimo con i B&B della tua città")}`} />
 
       {!!pulse?.n_demo_structures && (
-        <div className="mb-4 flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,#f59e0b 35%,var(--line))", background: "color-mix(in srgb,#f59e0b 8%,var(--surface))", color: "#B45309" }}>
+        <div className="mb-4 flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,var(--warn) 35%,var(--line))", background: "color-mix(in srgb,var(--warn) 8%,var(--surface))", color: "var(--warn)" }}>
           <span className="font-bold uppercase tracking-wide">{t("Include dati dimostrativi")}:</span>
           <span>{t("su")} {pulse.n_structures} {t("strutture della rete")}, {pulse.n_demo_structures} {t("sono demo dimostrative (non concorrenti reali) — usate per mostrare la funzione. Le medie qui sotto le includono.")}</span>
         </div>
@@ -200,7 +200,7 @@ export default function MercatoPage() {
                 { label: "ADR " + WINDOW + " " + t("gg"), now: yoyPast.now.adr, ly: yoyPast.lastYear.adr, d: yoyPast.deltaAdrPct, ok: yoyPast.hasHistory && yoyPast.lastYear.adr > 0, kind: "adr" as const },
                 { label: t("Occupazione prossimi 30 gg (già a libro)"), now: yoyNext.now.occ, ly: yoyNext.lastYearAtSameDate?.occ ?? yoyNext.lastYear.occ, d: yoyNext.lastYearAtSameDate ? yoyNext.deltaPaceOccPts : yoyNext.deltaOccPts, ok: yoyNext.hasHistory, kind: "occ" as const, pace: !!yoyNext.lastYearAtSameDate }].map((c, i) => (
                 <div key={i} className={`rounded-xl border border-line bg-paper p-3 ${i === 2 ? "max-sm:col-span-2" : ""}`}>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{c.label}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{c.label}</div>
                   <div className="font-mono text-xl font-bold text-txt">{c.kind === "occ" ? `${Math.round(c.now * 100)}%` : c.now ? eur(Math.round(c.now)) : "—"}</div>
                   {c.ok ? (
                     <div className="text-[11px] text-dim">{t("anno scorso")}{"pace" in c && c.pace ? " " + t("alla stessa data") : ""} {c.kind === "occ" ? `${Math.round(c.ly * 100)}%` : eur(Math.round(c.ly))}{c.d != null && <b style={{ color: c.d >= 0 ? "var(--ok)" : "var(--warn)" }}> ({c.d > 0 ? "+" : ""}{c.d}{c.kind === "occ" ? " pt" : "%"})</b>}</div>
@@ -247,7 +247,7 @@ export default function MercatoPage() {
           <span className="inline-flex items-center gap-2 text-xs text-faint">
             <span className="inline-flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${loading ? "animate-pulse" : ""}`} style={{ background: enough ? "var(--ok)" : "var(--warn)" }} />{pulse?.n_structures ?? 0} {t("nella rete")}</span>
             {!!pulse?.n_demo_structures && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("Include dati dimostrativi: strutture demo usate per mostrare la funzione, non concorrenti reali.")}>
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={t("Include dati dimostrativi: strutture demo usate per mostrare la funzione, non concorrenti reali.")}>
                 {t("Include dati dimostrativi")} ({pulse.n_demo_structures})
               </span>
             )}
@@ -259,13 +259,13 @@ export default function MercatoPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1080px] border-collapse text-sm">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-faint">
+                  <tr className="text-[11px] uppercase tracking-wider text-dim">
                     <th />
                     <th colSpan={3} className="pb-1 text-left font-semibold"><span className="border-b border-line pb-0.5">{t("Performance · 90 gg")}</span></th>
                     <th colSpan={3} className="pb-1 pl-4 text-left font-semibold"><span className="border-b border-line pb-0.5">{t("Domanda")}</span></th>
                     <th colSpan={4} className="pb-1 pl-4 text-left font-semibold"><span className="border-b border-line pb-0.5">{t("Ospiti & canali · 12 mesi")}</span></th>
                   </tr>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-faint">
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-dim">
                     <th className="pb-3 font-semibold">{t("Struttura")}</th><th className="pb-3 font-semibold">{t("Occupazione")}</th><th className="pb-3 text-right font-semibold">ADR</th><th className="pb-3 text-right font-semibold">RevPAR</th>
                     <th className="pb-3 pl-4 text-right font-semibold" title={t("Occupazione già prenotata nei prossimi 30 giorni")}>{t("Occ. 30 gg")}</th>
                     <th className="pb-3 text-right font-semibold" title={t("Punti di occupazione (prossimi 30 gg) prenotati negli ultimi 7 giorni")}>{t("Pickup 7 gg")}</th>
@@ -283,7 +283,7 @@ export default function MercatoPage() {
                         <span className="inline-flex items-center gap-2">
                           <span className="inline-grid h-6 w-6 place-items-center rounded-lg text-[11px] font-bold" style={{ background: r.is_me ? "var(--focus)" : "var(--wash)", color: r.is_me ? "#fff" : "var(--dim)" }}>{r.is_me ? "★" : r.idx}</span>
                           <span className={r.is_me ? "font-semibold text-txt" : "text-dim"}>{r.is_me ? t("La tua struttura") : `${t("Struttura")} ${r.idx}`}</span>
-                          {r.is_demo && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("Struttura demo dimostrativa: dati sintetici, non un concorrente reale.")}>{t("Demo")}</span>}
+                          {r.is_demo && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={t("Struttura demo dimostrativa: dati sintetici, non un concorrente reale.")}>{t("Demo")}</span>}
                         </span>
                       </td>
                       <td className="border-t border-line py-2.5">{r.occupancy != null ? (<span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><span className="block h-full rounded-full" style={{ width: `${Math.round(r.occupancy * 100)}%`, background: r.is_me ? "var(--focus)" : "var(--dim)" }} /></span><span className="font-mono text-xs text-txt">{Math.round(r.occupancy * 100)}%</span></span>) : <span className="text-faint">—</span>}</td>
@@ -369,7 +369,7 @@ function TrendChart({ data, cityAvg, t }: { data: { date: string; rooms_total: n
         {cityY != null && <line x1={pad} x2={W - pad} y1={cityY} y2={cityY} stroke="#f59e0b" strokeWidth="2" strokeDasharray="6 4" />}
         <circle cx={last[0]} cy={last[1]} r="4" fill="var(--focus)" stroke="var(--surface)" strokeWidth="2" />
       </svg>
-      <div className="mt-1 flex items-center justify-between text-[10px] text-faint">
+      <div className="mt-1 flex items-center justify-between text-[11px] text-faint">
         <span>{fmtDM(data[0].date)}</span>
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1"><i className="inline-block h-2 w-3 rounded" style={{ background: "var(--focus)" }} /> {t("tu")}</span>

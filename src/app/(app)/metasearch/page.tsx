@@ -153,7 +153,7 @@ export default function MetaSearchPage() {
       <SectionTitle>1. {t("Dove prenota chi arriva dai comparatori")}</SectionTitle>
       <Card className="mb-5 mt-2 max-sm:mb-4">
         <div className="flex flex-wrap items-start gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: bookingReady ? "var(--ok)" : "var(--warn)" }}>{bookingReady ? "✓" : "!"}</span>
+          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${bookingReady ? "text-on-ok" : "text-on-warn"}`} style={{ backgroundColor: bookingReady ? "var(--ok)" : "var(--warn)" }}>{bookingReady ? "✓" : "!"}</span>
           <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-2.5rem)]">
             <div className="text-sm font-semibold text-txt">{t("Due modi, scegli quello che preferisci")}</div>
             <p className="mt-1 text-xs text-dim">
@@ -184,7 +184,7 @@ export default function MetaSearchPage() {
                 </div>
                 {c.on && (
                   <div className="text-xs">
-                    <div className="mb-1 text-[10px] text-faint" title={t("Non lo decide Xenora: è quello che Google/Trivago ti applicano davvero. Scrivilo qui solo per farti calcolare una stima di spesa.")}>{t("Quanto ti costa davvero (te lo dice il comparatore)")}</div>
+                    <div className="mb-1 text-[11px] text-faint" title={t("Non lo decide Xenora: è quello che Google/Trivago ti applicano davvero. Scrivilo qui solo per farti calcolare una stima di spesa.")}>{t("Quanto ti costa davvero (te lo dice il comparatore)")}</div>
                     <div className="flex items-center gap-1.5">
                       <select value={c.model} onChange={(e) => patch(m.key, { model: e.target.value as "cpc" | "commission" })} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-dim outline-none focus:border-focus">
                         <option value="cpc">{t("Costo per clic")}</option>
@@ -194,7 +194,7 @@ export default function MetaSearchPage() {
                     </div>
                   </div>
                 )}
-                <button onClick={() => patch(m.key, { on: !c.on })} title={t("Solo la tua lista: la connessione vera si fa al passo 3, sulla piattaforma del comparatore")} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition max-sm:min-h-10 ${c.on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Attivo") : t("Attiva")}</button>
+                <button onClick={() => patch(m.key, { on: !c.on })} title={t("Solo la tua lista: la connessione vera si fa al passo 3, sulla piattaforma del comparatore")} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition max-sm:min-h-10 ${c.on ? "text-on-ok" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Attivo") : t("Attiva")}</button>
               </div>
             );
           })}
@@ -205,13 +205,13 @@ export default function MetaSearchPage() {
       <SectionTitle>3. {t("Collega il feed")}</SectionTitle>
       <Card className="mb-5 mt-2 !p-0 overflow-hidden max-sm:mb-4">
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-wash px-4 py-3">
-          <span className="grid h-8 w-8 place-items-center rounded-lg text-white" style={{ backgroundColor: "var(--ok)" }}>
+          <span className="grid h-8 w-8 place-items-center rounded-lg text-on-ok" style={{ backgroundColor: "var(--ok)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-txt">{t("Dai questo indirizzo ai siti che hai attivato al passo 2")}</h2>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--ok)" }}>{t("reale")}</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-on-ok" style={{ backgroundColor: "var(--ok)" }}>{t("reale")}</span>
             </div>
             <p className="text-xs text-dim">
               {activeMetas.length === 0
@@ -230,12 +230,12 @@ export default function MetaSearchPage() {
             <div className="rounded-lg border border-line bg-wash px-3 py-3 text-sm text-faint">{t("Controllo dello stato di pubblicazione…")}</div>
           ) : slugState !== "published" ? (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-wash px-3 py-3">
-              <span className="grid h-7 w-7 place-items-center rounded-lg text-white" style={{ backgroundColor: "var(--warn)" }}>!</span>
+              <span className="grid h-7 w-7 place-items-center rounded-lg text-on-warn" style={{ backgroundColor: "var(--warn)" }}>!</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-txt">{t("Prima completa il passo 1")}</div>
                 <div className="text-xs text-dim">{t("Il feed usa i dati pubblici del tuo sito. Pubblicalo una volta, poi torna qui: l'indirizzo del feed sarà attivo.")}</div>
               </div>
-              <Link href="/sito" className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Pubblica il sito")} →</Link>
+              <Link href="/sito" className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Pubblica il sito")} →</Link>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -245,7 +245,7 @@ export default function MetaSearchPage() {
                   <span className="text-xs font-semibold text-txt">{t("URL del feed prezzi/disponibilità")}</span>
                   <div className="flex overflow-hidden rounded-lg border border-line text-[11px] font-semibold">
                     {(["json", "xml"] as const).map((f) => (
-                      <button key={f} onClick={() => setFmt(f)} className={`px-2.5 py-1 transition ${fmt === f ? "bg-focus text-white" : "bg-paper text-dim hover:bg-wash"}`}>{f.toUpperCase()}</button>
+                      <button key={f} onClick={() => setFmt(f)} className={`px-2.5 py-1 transition ${fmt === f ? "bg-focus text-on-focus" : "bg-paper text-dim hover:bg-wash"}`}>{f.toUpperCase()}</button>
                     ))}
                   </div>
                   <span className="text-[11px] text-faint">{t("prossimi 90 giorni")}</span>
@@ -334,7 +334,7 @@ export default function MetaSearchPage() {
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
                 <th className="px-3 py-2 font-semibold">{t("Tipologia")}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t("Prezzo")}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t("Incassi via OTA")} (−{avgComm}%)</th>
@@ -361,7 +361,7 @@ export default function MetaSearchPage() {
           </table>
         </div>
       )}
-      <p className="mt-3 text-xs text-faint">{t("I metasearch mostrano il prezzo del tuo Booking Engine accanto a quello delle OTA. Se il diretto è competitivo, l'ospite prenota da te e tu trattieni la commissione. Il feed prezzi qui sopra è reale: questa tabella e la commissione media sono invece dimostrative, per stimare il guadagno.")}</p>
+      <p className="mt-3 text-xs text-faint">{t("I metasearch mostrano il prezzo del tuo Booking Engine accanto a quello delle OTA. Se il diretto è competitivo, l'ospite prenota da te e tu trattieni la commissione. Il feed prezzi qui sopra è quello reale del tuo Booking Engine; la tabella e la commissione media sono stime indicative per calcolare il guadagno.")}</p>
     </div>
   );
 }

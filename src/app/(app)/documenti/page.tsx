@@ -205,10 +205,10 @@ export default function DocumentiPage() {
               <button onClick={() => router.push("/impostazioni-fattura")} className="h-9 flex-1 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash">Impostazioni</button>
             </div>
           </FilterSheet>
-          <button onClick={createNew} disabled={creating} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 sm:hidden">{creating ? "Creo…" : "+ Nuovo"}</button>
+          <button onClick={createNew} disabled={creating} className="h-9 w-[4.75rem] shrink-0 rounded-lg bg-focus text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50 sm:hidden">{creating ? "Creo…" : "+ Nuovo"}</button>
           <div className="contents max-sm:hidden">{filterControls}</div>
           <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:hidden">
-            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
+            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
             <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
             <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
           </div>
@@ -221,7 +221,7 @@ export default function DocumentiPage() {
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[960px] text-sm">
           <thead>
-            <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+            <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
               <th className="px-3 py-2 font-semibold">Data</th>
               <th className="px-3 py-2 font-semibold">Struttura</th>
               <th className="px-3 py-2 font-semibold">Tipo</th>
@@ -254,7 +254,7 @@ export default function DocumentiPage() {
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{r.out_of_scope_cents ? `${isNc ? "−" : ""}${eur(centsEur(r.out_of_scope_cents))}` : "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{isNc ? "−" : ""}{eur(centsEur(r.total_cents))}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono" style={{ color: late ? "var(--err)" : "var(--dim)" }}>{res === null ? "—" : res === 0 ? "saldato" : eur(centsEur(res))}</td>
-                  <td className="px-3 py-2.5"><span title={st.title} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>{notSent && <div className="mt-0.5 text-[10px] text-faint">non inviata allo SdI</div>}</td>
+                  <td className="px-3 py-2.5"><span title={st.title} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>{notSent && <div className="mt-0.5 text-[11px] text-faint">non inviata allo SdI</div>}</td>
                 </tr>
               );
             })}
@@ -280,7 +280,7 @@ export default function DocumentiPage() {
                   <div className="truncate text-xs text-dim"><span className="font-mono">{r.number_label ?? "—"}</span> · {DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind} · {r.issue_date ? fmtDate(r.issue_date) : "bozza"}</div>
                   {r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}
                 </div>
-                <div className="shrink-0 text-right"><span title={st.title} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>{notSent && <div className="mt-0.5 text-[10px] text-faint">non inviata allo SdI</div>}</div>
+                <div className="shrink-0 text-right"><span title={st.title} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>{notSent && <div className="mt-0.5 text-[11px] text-faint">non inviata allo SdI</div>}</div>
               </div>
               <div className="mt-2 flex items-end justify-between gap-2 font-mono text-sm">
                 <span className="font-semibold text-txt">{isNc ? "−" : ""}{eur(centsEur(r.total_cents))}</span>

@@ -81,7 +81,7 @@ export default function AdempimentiPanel({ booking }: { booking: Booking }) {
       <Row label="Pagamenti" c={payChip} />
       {timeline.length > 0 && (
         <div className="mt-2 border-t border-line pt-2">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Attività</div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Attività</div>
           <div className="flex flex-col gap-1">
             {timeline.map((e) => (
               <div key={e.id} className="flex gap-2 text-[12px]"><span className="w-16 shrink-0 text-faint">{fmtDM(e.ts)}</span><span className="text-dim">{e.message}</span></div>

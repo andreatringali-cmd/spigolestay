@@ -153,9 +153,9 @@ export default function RevenuePage() {
     <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--ok)" }} />{t("Dati tuoi · occupazione reale dalle prenotazioni")}</span>
     {signal.hasZoneData
       ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}{city ? ` · ${city}` : ""}</span>
-      : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
+      : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">{t("Media di zona (Rete città): non ancora disponibile")}</span>}
     {signal.hasZoneData && pulseHasDemo(pulse) && (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
     )}
   </>);
 
@@ -181,22 +181,22 @@ export default function RevenuePage() {
           <>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-line bg-paper p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Occupazione già a libro</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Occupazione già a libro</div>
                 <div className="font-mono text-xl font-bold text-txt">{pctFmt(yoy.now.occ)}</div>
                 <div className="text-[11px] text-dim">anno scorso a consuntivo {pctFmt(yoy.lastYear.occ)}{yoy.deltaOccPts != null && <b style={{ color: yoy.deltaOccPts >= 0 ? "var(--ok)" : "var(--warn)" }}> ({yoy.deltaOccPts > 0 ? "+" : ""}{yoy.deltaOccPts} pt)</b>}</div>
               </div>
               <div className="rounded-xl border border-line bg-paper p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Alla stessa data dell&apos;anno scorso</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Alla stessa data dell&apos;anno scorso</div>
                 {yoy.lastYearAtSameDate ? (<>
                   <div className="font-mono text-xl font-bold text-txt">{pctFmt(yoy.lastYearAtSameDate.occ)}</div>
                   <div className="text-[11px] text-dim">ritmo di vendita: ora {pctFmt(yoy.now.occ)}{yoy.deltaPaceOccPts != null && <b style={{ color: yoy.deltaPaceOccPts >= 0 ? "var(--ok)" : "var(--warn)" }}> ({yoy.deltaPaceOccPts > 0 ? "+" : ""}{yoy.deltaPaceOccPts} pt)</b>}</div>
                 </>) : (<>
-                  <div className="font-mono text-xl font-bold text-faint">n/d</div>
+                  <div className="font-mono text-xl font-bold text-dim">n/d</div>
                   <div className="text-[11px] text-faint">serve la data di prenotazione su quasi tutte le prenotazioni dell&apos;anno scorso</div>
                 </>)}
               </div>
               <div className="rounded-xl border border-line bg-paper p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Prezzo medio a notte (ADR)</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Prezzo medio a notte (ADR)</div>
                 <div className="font-mono text-xl font-bold text-txt">{yoy.now.adr ? eur(Math.round(yoy.now.adr)) : "—"}</div>
                 <div className="text-[11px] text-dim">anno scorso {yoy.lastYear.adr ? eur(Math.round(yoy.lastYear.adr)) : "—"}{yoy.deltaAdrPct != null && <b style={{ color: yoy.deltaAdrPct >= 0 ? "var(--ok)" : "var(--warn)" }}> ({yoy.deltaAdrPct > 0 ? "+" : ""}{yoy.deltaAdrPct}%)</b>}</div>
               </div>
@@ -215,7 +215,7 @@ export default function RevenuePage() {
             const lost = Math.round(base * comm);
             return (
               <div key={ch} className="rounded-xl border border-line bg-paper p-3">
-                <div className="text-xs font-semibold text-txt">{name} <span className="font-normal text-faint">· {String(Math.round(comm * 1000) / 10).replace(".", ",")}%</span> <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={isReal ? { color: "var(--ok)", background: "color-mix(in srgb,var(--ok) 14%,transparent)" } : { color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={isReal ? `Media reale su ${n} tue prenotazioni degli ultimi 12 mesi` : "Nessuna commissione registrata sulle tue prenotazioni di questo canale: aliquota di listino indicativa"}>{isReal ? `reale · ${n}` : "stima"}</span></div>
+                <div className="text-xs font-semibold text-txt">{name} <span className="font-normal text-faint">· {String(Math.round(comm * 1000) / 10).replace(".", ",")}%</span> <span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={isReal ? { color: "var(--ok)", background: "color-mix(in srgb,var(--ok) 14%,transparent)" } : { color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={isReal ? `Media reale su ${n} tue prenotazioni degli ultimi 12 mesi` : "Nessuna commissione registrata sulle tue prenotazioni di questo canale: aliquota di listino indicativa"}>{isReal ? `reale · ${n}` : "stima"}</span></div>
                 <div className="mt-1 text-[11px] text-dim">{t("Su una notte a")} <span className="font-mono">{eur(base)}</span> {t("perdi")}</div>
                 <div className="font-mono text-lg font-bold" style={{ color: "var(--err)" }}>−{eur(lost)}</div>
                 <div className="text-[11px] text-faint">{t("che tieni con la prenotazione diretta")}</div>
@@ -229,12 +229,12 @@ export default function RevenuePage() {
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <SectionTitle>{t("Prossimi")} {days} {t("giorni")}</SectionTitle>
-          <button onClick={() => setPreview(true)} disabled={pending.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Applica tutti i suggerimenti")}{pending.length ? ` (${pending.length})` : ""}</button>
+          <button onClick={() => setPreview(true)} disabled={pending.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Applica tutti i suggerimenti")}{pending.length ? ` (${pending.length})` : ""}</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                 <th className="px-2 py-2 font-semibold">{t("Giorno")}</th>
                 <th className="px-2 py-2 font-semibold">{t("Occupazione")}</th>
                 <th className="px-2 py-2 font-semibold" title="Occupazione a consuntivo dello stesso giorno della settimana, 52 settimane prima">Anno scorso</th>
@@ -253,7 +253,7 @@ export default function RevenuePage() {
                   <tr key={r.iso} className="border-b border-line last:border-0">
                     <td className="px-2 py-2 font-medium text-txt">
                       {new Date(r.iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short" })} {fmtDM(r.iso)}
-                      {r.hasEvent && <span className="ml-1.5 rounded bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-focus">{t("evento")}</span>}
+                      {r.hasEvent && <span className="ml-1.5 rounded bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[11px] font-semibold text-focus">{t("evento")}</span>}
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-2">
@@ -263,7 +263,7 @@ export default function RevenuePage() {
                     </td>
                     <td className="px-2 py-2 font-mono text-xs text-dim">{(() => { const ly = lastYearDayOcc(bookings, units, activeStructureId, r.iso); return ly == null ? <span className="text-faint">—</span> : pctFmt(ly); })()}</td>
                     <td className="px-2 py-2 font-mono text-dim">{eur(r.base)}</td>
-                    <td className="px-2 py-2"><span title={s.reasons.join(" · ")} className="cursor-help rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${s.color} 15%, transparent)`, color: s.color }}>{t(s.label)}{s.pct !== 0 ? ` ${s.pct > 0 ? "+" : ""}${s.pct}%` : ""}</span><div className="mt-1 max-w-[260px] text-[10px] leading-snug text-faint">{s.reasons.join(" · ")}</div></td>
+                    <td className="px-2 py-2"><span title={s.reasons.join(" · ")} className="cursor-help rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${s.color} 15%, transparent)`, color: s.color }}>{t(s.label)}{s.pct !== 0 ? ` ${s.pct > 0 ? "+" : ""}${s.pct}%` : ""}</span><div className="mt-1 max-w-[260px] text-[11px] leading-snug text-faint">{s.reasons.join(" · ")}</div></td>
                     <td className="px-2 py-2 font-mono font-semibold text-txt">{eur(nuovo)}</td>
                     <td className="px-2 py-2 text-right">
                       {applied.has(`${activeStructureId}|${r.iso}`)

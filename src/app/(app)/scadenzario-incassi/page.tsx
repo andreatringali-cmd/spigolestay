@@ -153,7 +153,7 @@ export default function ScadenzarioIncassiPage() {
   // Pannello «sollecito»: usato sotto la riga della tabella (tablet/desktop) e sotto la scheda (telefono)
   const remindPanel = (r: (typeof rows)[number], c: NonNullable<ReturnType<typeof contactOf>>) => (
     <>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Testo del sollecito (modificabile)</div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-dim">Testo del sollecito (modificabile)</div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {waDigits(c.phone)
@@ -202,7 +202,7 @@ export default function ScadenzarioIncassiPage() {
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[860px] text-sm">
-          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 text-right font-semibold">Residuo</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Azioni</th></tr></thead>
+          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 text-right font-semibold">Residuo</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Azioni</th></tr></thead>
           <tbody>
             {rows.map((r) => {
               const overdue = r.days > 0;
@@ -211,11 +211,11 @@ export default function ScadenzarioIncassiPage() {
               return (
                 <Fragment key={r.id}>
                   <tr onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                    <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? dmy(r.due_date) : "senza scadenza"}{overdue && <div className="text-[10px]">{r.days} gg di ritardo</div>}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? dmy(r.due_date) : "senza scadenza"}{overdue && <div className="text-[11px]">{r.days} gg di ritardo</div>}</td>
                     <td className="px-3 py-2.5 font-mono text-txt">{r.number_label}</td>
-                    <td className="px-3 py-2.5"><div className="text-txt">{nameOf(r) || "—"}</div>{r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}{rem && <div className="text-[10px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}</td>
+                    <td className="px-3 py-2.5"><div className="text-txt">{nameOf(r) || "—"}</div>{r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}{rem && <div className="text-[11px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.total_cents))}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(r.residuo))}{r.credited > 0 && <div className="text-[10px] font-normal text-faint">dopo NC −{eur(cents(r.credited))}</div>}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(r.residuo))}{r.credited > 0 && <div className="text-[11px] font-normal text-faint">dopo NC −{eur(cents(r.credited))}</div>}</td>
                     <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: overdue ? "var(--err)" : "var(--warn)" }}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</span></td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => openRemind(r)} className="mr-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Sollecita</button>
@@ -251,11 +251,11 @@ export default function ScadenzarioIncassiPage() {
                   <div className="min-w-0">
                     <div className="truncate font-medium text-txt">{nameOf(r) || "—"}</div>
                     <div className="truncate text-xs text-dim"><span className="font-mono">{r.number_label}</span>{r.booking_code ? <> · {r.booking_code}</> : null}</div>
-                    {rem && <div className="text-[10px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}
+                    {rem && <div className="text-[11px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-mono text-sm font-semibold text-txt">{eur(cents(r.residuo))}</div>
-                    <div className="text-[10px] text-faint">{r.credited > 0 ? `dopo NC −${eur(cents(r.credited))}` : `su ${eur(cents(r.total_cents))}`}</div>
+                    <div className="text-[11px] text-faint">{r.credited > 0 ? `dopo NC −${eur(cents(r.credited))}` : `su ${eur(cents(r.total_cents))}`}</div>
                   </div>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">

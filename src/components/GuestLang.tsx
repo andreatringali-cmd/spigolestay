@@ -27,13 +27,13 @@ export function useGuestLang(detected?: string | null) {
 export function GuestLangPicker({ lang, setLang, label }: { lang: GuestLang; setLang: (l: GuestLang) => void; label: string }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1" role="group" aria-label={label}>
-      <span className="text-[11px] font-medium text-dim">🌐 {label}</span>
+      <span className="text-xs font-medium text-dim">🌐 {label}</span>
       <div className="flex flex-wrap gap-1">
         {GUEST_LANGS.map((l) => {
           const on = l.code === lang;
           return (
             <button key={l.code} type="button" onClick={() => setLang(l.code)} aria-pressed={on} title={l.label}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 max-sm:px-3 ${on ? "border-transparent text-white" : "border-line bg-surface text-txt hover:border-focus"}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-11 max-sm:min-w-11 max-sm:px-3 ${on ? "border-transparent text-on-focus" : "border-line bg-surface text-txt hover:border-focus"}`}
               style={on ? { backgroundColor: "var(--focus)" } : undefined}>
               <span aria-hidden>{l.flag}</span>{l.short}
             </button>

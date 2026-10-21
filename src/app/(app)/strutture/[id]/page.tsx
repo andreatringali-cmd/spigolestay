@@ -26,7 +26,7 @@ import { pushStructureContent } from "@/lib/google-content-client";
 function Info({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-1 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
-      <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
+      <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-on-focus" style={{ backgroundColor: "var(--focus)" }}>i</span>
       <span>{children}</span>
     </div>
   );
@@ -373,7 +373,7 @@ export default function StrutturaSchedaPage() {
             {!isNew && <Link href="/camere" className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Camere")} ({nCamere})</Link>}
             {!isNew && autoSavedAt && <span className="flex items-center gap-1 text-xs font-medium text-[color:var(--ok)]" title={t("Le modifiche vengono salvate da sole")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>{t("Salvato in automatico")}</span>}
             <button onClick={() => router.push("/strutture")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea struttura") : t("Salva")}</button>
+            <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea struttura") : t("Salva")}</button>
           </div>
         }
       />
@@ -401,7 +401,7 @@ export default function StrutturaSchedaPage() {
                 {f.logo
                   ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={f.logo} alt="Logo" className="h-full w-full object-contain p-1.5" />)
                   : <span className="text-xl font-bold text-white">{(f.name || "?").slice(0, 2).toUpperCase()}</span>}
-                <span className="absolute inset-0 hidden place-items-center bg-black/45 text-[10px] font-semibold uppercase tracking-wide text-white group-hover:grid">{f.logo ? t("Cambia") : t("＋ Logo")}</span>
+                <span className="absolute inset-0 hidden place-items-center bg-black/45 text-[11px] font-semibold uppercase tracking-wide text-white group-hover:grid">{f.logo ? t("Cambia") : t("＋ Logo")}</span>
               </button>
               <div className="min-w-0">
                 <div className="text-xs font-medium text-txt">{t("Logo della struttura")}</div>
@@ -439,7 +439,7 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Sito web")}<input value={f.website ?? ""} onChange={(e) => set("website", e.target.value)} className={`${inp} mt-1`} placeholder="www.…" /></label>
               <label className={lbl}>{t("Referente")}<input value={f.contactName ?? ""} onChange={(e) => set("contactName", e.target.value)} className={`${inp} mt-1`} placeholder={t("Nome e cognome")} /></label>
             </div>
-            <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Social")} <span className="font-normal normal-case text-faint">{t("(compaiono sul piè di pagina del preventivo)")}</span></div>
+            <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Social")} <span className="font-normal normal-case text-faint">{t("(compaiono sul piè di pagina del preventivo)")}</span></div>
             <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className={lbl}>Facebook<input value={f.facebook ?? ""} onChange={(e) => set("facebook", e.target.value)} className={`${inp} mt-1`} placeholder="facebook.com/…" /></label>
               <label className={lbl}>Instagram<input value={f.instagram ?? ""} onChange={(e) => set("instagram", e.target.value)} className={`${inp} mt-1`} placeholder="instagram.com/…" /></label>
@@ -490,7 +490,7 @@ export default function StrutturaSchedaPage() {
             </div>
             <div className="mt-3 flex gap-2">
               <input value={newSvc} onChange={(e) => setNewSvc(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSvc(); } }} placeholder={t("Aggiungi un servizio…")} className={inp} />
-              <button type="button" onClick={addSvc} disabled={!newSvc.trim()} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+              <button type="button" onClick={addSvc} disabled={!newSvc.trim()} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
             </div>
           </Card>
 
@@ -546,16 +546,16 @@ export default function StrutturaSchedaPage() {
                   <div className="text-sm font-semibold text-txt">{t("Guida ospiti personalizzata")}</div>
                   <div className="text-[11px] text-dim">{t("Pagina web con Wi-Fi, codici, istruzioni e consigli, pronta da inviare all'ospite.")}</div>
                 </div>
-                <button type="button" onClick={openGuide} disabled={!existing} title={!existing ? t("Salva prima la struttura") : undefined} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Apri la guida")} →</button>
+                <button type="button" onClick={openGuide} disabled={!existing} title={!existing ? t("Salva prima la struttura") : undefined} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Apri la guida")} →</button>
               </div>
             ) : (
               <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
                 <div className="flex items-center gap-2 text-sm font-semibold text-txt">
-                  <span className="grid h-5 w-5 place-items-center rounded-full bg-focus text-white"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg></span>
+                  <span className="grid h-5 w-5 place-items-center rounded-full bg-focus text-on-focus"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg></span>
                   {t("Guida ospiti personalizzata")}
                 </div>
                 <p className="mt-1.5 text-[11px] leading-snug text-dim">{t("Crea una pagina web elegante con Wi-Fi, codici di accesso, istruzioni e consigli, da inviare a ogni ospite. È un servizio incluso nei piani Pro e Ultimate, oppure aggiungibile al tuo piano.")}</p>
-                <button type="button" onClick={() => router.push("/abbonamento")} className="mt-2.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Aggiungi il servizio")} →</button>
+                <button type="button" onClick={() => router.push("/abbonamento")} className="mt-2.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Aggiungi il servizio")} →</button>
               </div>
             )}
           </Card>
@@ -568,8 +568,8 @@ export default function StrutturaSchedaPage() {
               return (
                 <>
                   <div className="mb-3 inline-flex rounded-lg border border-line bg-paper p-0.5 text-xs font-semibold">
-                    <button type="button" onClick={() => set("cityTaxMode", "fixed")} className={`rounded-md px-3 py-1.5 transition ${mode === "fixed" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Fisso (€ persona/notte)")}</button>
-                    <button type="button" onClick={() => set("cityTaxMode", "percent")} className={`rounded-md px-3 py-1.5 transition ${mode === "percent" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("% del pernottamento")}</button>
+                    <button type="button" onClick={() => set("cityTaxMode", "fixed")} className={`rounded-md px-3 py-1.5 transition ${mode === "fixed" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t("Fisso (€ persona/notte)")}</button>
+                    <button type="button" onClick={() => set("cityTaxMode", "percent")} className={`rounded-md px-3 py-1.5 transition ${mode === "percent" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t("% del pernottamento")}</button>
                   </div>
                   {mode === "percent" ? (
                     <>
@@ -675,7 +675,7 @@ export default function StrutturaSchedaPage() {
                   {f.stripeAccount && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: stripeSt.enabled ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--warn) 15%, transparent)", color: stripeSt.enabled ? "var(--ok)" : "var(--warn)" }}>{stripeSt.enabled ? t("Collegato ✓") : t("Da completare")}</span>}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button onClick={connectStripe} disabled={stripeSt.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</button>
+                  <button onClick={connectStripe} disabled={stripeSt.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</button>
                   {f.stripeAccount && <button onClick={disconnectStripe} disabled={stripeSt.loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{t("Scollega / cambia account")}</button>}
                 </div>
                 {f.stripeAccount && <p className="mt-1.5 text-[11px] text-faint">{t("Account collegato")}: <span className="font-mono">{f.stripeAccount}</span></p>}
@@ -693,7 +693,7 @@ export default function StrutturaSchedaPage() {
                   <p className="mb-3 text-xs text-dim">{t("Invita un altro proprietario a co-gestire questa struttura. Decidi tu cosa può vedere e modificare; solo tu potrai revocare.")}</p>
                   <div className="flex flex-wrap items-end gap-2">
                     <label className={`${lbl} flex-1`}>{t("Email del socio")}<input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder="socio@esempio.it" className={`${inp} mt-1`} type="email" /></label>
-                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita un socio")}</button>
+                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita un socio")}</button>
                   </div>
                 </>
               ) : myShare?.role === "member" ? (
@@ -712,11 +712,11 @@ export default function StrutturaSchedaPage() {
                   <p className="mb-3 text-xs text-dim">{t("Struttura condivisa. Gestisci i co-gestori: cosa vedono, cosa modificano, sospendi o rimuovi. Solo tu (proprietario) puoi farlo.")}</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder={t("email di un altro proprietario")} className={`${inp} flex-1`} type="email" />
-                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita")}</button>
+                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita")}</button>
                   </div>
                   {members.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Co-gestori")}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Co-gestori")}</div>
                       {members.map((m) => (
                         <div key={m.userId} className="rounded-lg border border-line bg-paper p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -744,7 +744,7 @@ export default function StrutturaSchedaPage() {
               {socio.msg && <p className="mt-2 text-[11px]" style={{ color: socio.ok ? "var(--ok)" : "var(--err)" }}>{socio.msg}</p>}
               {invites.length > 0 && (
                 <div className="mt-3 border-t border-line pt-3">
-                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Inviti")}</div>
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Inviti")}</div>
                   <div className="flex flex-col gap-1.5">
                     {invites.map((iv) => {
                       const days = Math.floor((Date.now() - new Date(iv.created_at).getTime()) / 86400000);

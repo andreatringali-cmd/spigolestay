@@ -557,7 +557,7 @@ export default function ImportaPage() {
             {err && <p className="mt-2 text-sm text-[color:var(--warn)]">{err}</p>}
             {report && <RiepilogoImport report={report} bookings={bookings} guests={guests} structureNames={structureNames} />}
             <div className="mt-5 flex justify-center gap-2">
-              <button onClick={() => router.push("/calendario")} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Vai al calendario")}</button>
+              <button onClick={() => router.push("/calendario")} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Vai al calendario")}</button>
               <button onClick={() => { setRows([]); setMap({}); setDone(null); setReport(null); setErr(""); setFileName(""); }} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Importa un altro file")}</button>
             </div>
           </div>
@@ -585,12 +585,12 @@ export default function ImportaPage() {
                   </label>
                 )}
                 <label className={activeStructureId === "all" ? "" : "sm:col-span-2"}><span className="mb-1 block text-xs font-medium text-dim">{t("File Excel, CSV o ICS")}</span>
-                  <input type="file" accept=".csv,.ics,.xls,.xlsx,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
+                  <input type="file" accept=".csv,.ics,.xls,.xlsx,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-on-focus hover:file:opacity-90" />
                 </label>
                 <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("…oppure incolla un URL iCal (.ics)")}</span>
                   <div className="flex gap-2">
                     <input value={icsUrl} onChange={(e) => setIcsUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); fetchIcalUrl(); } }} placeholder="https://…/calendar.ics" className={sel} />
-                    <button type="button" onClick={fetchIcalUrl} disabled={fetching || !/^https?:\/\//i.test(icsUrl.trim())} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{fetching ? t("Scarico…") : t("Carica")}</button>
+                    <button type="button" onClick={fetchIcalUrl} disabled={fetching || !/^https?:\/\//i.test(icsUrl.trim())} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{fetching ? t("Scarico…") : t("Carica")}</button>
                   </div>
                   <span className="mt-1 block text-[11px] text-faint">{t("Utile per importare lo storico da un altro gestionale o da una OTA che espone un calendario iCal.")}</span>
                 </label>
@@ -630,7 +630,7 @@ export default function ImportaPage() {
               <p className="mb-3 text-xs text-dim">{t("Dall'ICS importiamo date e occupazione. Nome ospite e importo solo se presenti nell'export di Octorate; la camera va alla prima tipologia della struttura.")}</p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[560px] text-sm">
-                  <thead><tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                  <thead><tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                     <th className="px-2 py-2">{t("Ospite / stato")}</th><th className="px-2 py-2">Check-in</th><th className="px-2 py-2">Check-out</th><th className="px-2 py-2">{t("Canale")}</th>
                   </tr></thead>
                   <tbody>
@@ -647,7 +647,7 @@ export default function ImportaPage() {
               </div>
               {icsRooms.length > 0 && !targetUnit && (
                 <div className="mt-4 rounded-lg border border-line bg-wash/50 p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Tipologie trovate nel file → le tue")}</div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-dim">{t("Tipologie trovate nel file → le tue")}</div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {icsRooms.map((r) => (
                       <div key={r} className="flex items-center gap-2 text-sm">
@@ -670,7 +670,7 @@ export default function ImportaPage() {
                   <p className="mt-3 text-xs text-faint">{t("Trovati")} {events.length} {t("eventi")}: <b className="text-dim">{resv}</b> {t("prenotazioni")}, <b className="text-dim">{blk}</b> {t("blocchi (fuori servizio)")}.</p>
                   <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={replacePrev} onChange={(e) => setReplacePrev(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Sostituisci le prenotazioni importate in precedenza (evita duplicati)")}</label>
                   <label className="mt-2 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={includeBlocked} onChange={(e) => setIncludeBlocked(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Importa anche i periodi bloccati (fuori servizio)")}</label>
-                  <button onClick={runImportICS} disabled={!structureId || imp === 0} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-40">{t("Importa")} {imp} {t("prenotazioni")}</button>
+                  <button onClick={runImportICS} disabled={!structureId || imp === 0} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm hover:opacity-90 disabled:opacity-40">{t("Importa")} {imp} {t("prenotazioni")}</button>
                 </>);
               })()}
             </Card>
@@ -728,7 +728,7 @@ export default function ImportaPage() {
               <SectionTitle>{t("3. Anteprima")}</SectionTitle>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-sm">
-                  <thead><tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                  <thead><tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                     <th className="px-2 py-2">{t("Ospite")}</th><th className="px-2 py-2">Check-in</th><th className="px-2 py-2">Check-out</th><th className="px-2 py-2">{t("Camera nel file")}</th><th className="px-2 py-2">{t("→ Camera Xenora")}</th><th className="px-2 py-2">{t("Canale")}</th><th className="px-2 py-2">{t("Importo")}</th>
                   </tr></thead>
                   <tbody>
@@ -763,7 +763,7 @@ export default function ImportaPage() {
                 {preStats.already > 0 && <> · <span style={{ color: "var(--ok)" }}>{preStats.already} {t("sono già in Xenora e non verranno duplicate")}</span></>}
                 <div className="mt-1 text-faint">{t("A fine importazione vedrai un riepilogo che confronta il file con Xenora, riga per riga.")}</div>
               </div>
-              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {Math.max(0, dataRows.length - dateIssues - orderIssues)} {t("prenotazioni")}</button>
+              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm hover:opacity-90">{t("Importa")} {Math.max(0, dataRows.length - dateIssues - orderIssues)} {t("prenotazioni")}</button>
             </Card>
           )}
         </div>

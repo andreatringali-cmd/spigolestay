@@ -96,7 +96,7 @@ export default function ConciergePanel() {
     <div>
       {activeStructureId === "all" && structures.length > 1 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-xs font-semibold text-faint">Struttura</span>
+          <span className="text-xs font-semibold text-dim">Struttura</span>
           <select value={sid} onChange={(e) => setLocalSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -118,7 +118,7 @@ export default function ConciergePanel() {
         <div ref={scroller} className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-line bg-wash p-3" style={{ minHeight: 300, maxHeight: 420 }}>
           {msgs.map((m, i) => (
             <div key={i} className={`flex ${m.role === "guest" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.role === "guest" ? "bg-focus text-white" : "border border-line bg-surface text-txt"}`}>{m.text}</div>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.role === "guest" ? "bg-focus text-on-focus" : "border border-line bg-surface text-txt"}`}>{m.text}</div>
             </div>
           ))}
         </div>
@@ -127,7 +127,7 @@ export default function ConciergePanel() {
         </div>
         <div className="mt-2 flex gap-2">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Scrivi una domanda…" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <button onClick={() => send()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Invia</button>
+          <button onClick={() => send()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Invia</button>
         </div>
       </Card>
 
@@ -145,7 +145,7 @@ export default function ConciergePanel() {
                   <input value={f.topic} onChange={(e) => updFaq(f.id, { topic: e.target.value })} placeholder="Argomento" className="w-full rounded border border-line bg-surface px-2 py-1 text-sm font-semibold text-txt outline-none focus:border-focus" />
                   <input value={f.keywords} onChange={(e) => updFaq(f.id, { keywords: e.target.value })} placeholder="parole chiave (separate da spazio)" className="w-full rounded border border-line bg-surface px-2 py-1 text-xs text-dim outline-none focus:border-focus" />
                   <textarea value={f.answer} onChange={(e) => updFaq(f.id, { answer: e.target.value })} rows={2} placeholder="Risposta" className="w-full resize-y rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                  <div className="flex justify-end gap-2"><button onClick={() => delFaq(f.id)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-white">Fatto</button></div>
+                  <div className="flex justify-end gap-2"><button onClick={() => delFaq(f.id)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus">Fatto</button></div>
                 </div>
               ) : (
                 <div className="flex items-start gap-2">

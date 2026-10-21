@@ -164,7 +164,7 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           {actions}
           {closed
-            ? <span className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-faint">{t("Conversazione chiusa")}</span>
+            ? <span className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-dim">{t("Conversazione chiusa")}</span>
             : compact ? null /* nella scheda prenotazione non c'è il pulsante: si chiude da Messaggi OTA */ : <button type="button" onClick={() => void closeThread()} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Chiudi conversazione")}</button>}
         </div>
       </div>
@@ -180,11 +180,11 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
             <div key={m.id} className={`flex items-end gap-2 ${m.sender === "property" ? "flex-row-reverse" : ""}`}>
               {m.sender === "guest" && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: `hsl(${hue(name)} 55% 42%)` }}>{initials(name)}</span>}
               <div className={`flex max-w-[78%] flex-col ${m.sender === "property" ? "items-end" : "items-start"}`}>
-                <div className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm ${m.sender === "property" ? "text-white" : "bg-surface text-txt"}`} style={m.sender === "property" ? { backgroundColor: "var(--focus)" } : { border: "1px solid var(--line)" }}>
+                <div className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm ${m.sender === "property" ? "text-on-focus" : "bg-surface text-txt"}`} style={m.sender === "property" ? { backgroundColor: "var(--focus)" } : { border: "1px solid var(--line)" }}>
                   {m.text}
                   {m.att.length > 0 && <div className="mt-1.5 flex flex-col gap-1">{m.att.map((a, i) => <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="underline">📎 {a.name || t("Allegato")}</a>)}</div>}
                 </div>
-                <span className="mt-0.5 text-[10px] text-faint" title={m.ts ? fmtDateTime(m.ts) : undefined}>{ago(m.ts)}</span>
+                <span className="mt-0.5 text-[11px] text-faint" title={m.ts ? fmtDateTime(m.ts) : undefined}>{ago(m.ts)}</span>
               </div>
             </div>
           ))}
@@ -205,7 +205,7 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" disabled={sending || !thread.bookingId} onChange={(e) => { void attach(e.target.files?.[0]); e.target.value = ""; }} />
               </label>
               <span className="hidden text-[11px] text-faint sm:inline">{t("Premi Ctrl+Invio per inviare il messaggio")}</span>
-              <button type="button" onClick={() => void send()} disabled={sending || !draft.trim()} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10 max-sm:px-5">{sending ? t("Invio…") : t("Invia")}</button>
+              <button type="button" onClick={() => void send()} disabled={sending || !draft.trim()} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10 max-sm:px-5">{sending ? t("Invio…") : t("Invia")}</button>
             </div>
           </div>
         )}

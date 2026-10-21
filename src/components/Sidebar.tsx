@@ -191,7 +191,7 @@ function NavBadge({ n, small }: { n: number; small?: boolean }) {
   return (
     <span
       aria-label={`${n} da vedere`}
-      className={`inline-grid place-items-center rounded-full font-bold leading-none text-white tabular-nums ${small ? "h-[15px] min-w-[15px] px-1 text-[9px]" : "h-[18px] min-w-[18px] px-1.5 text-[10px]"}`}
+      className={`inline-grid place-items-center rounded-full font-bold leading-none text-on-err tabular-nums ${small ? "h-[15px] min-w-[15px] px-1 text-[9px]" : "h-[18px] min-w-[18px] px-1.5 text-[10px]"}`}
       style={{ background: "var(--err)" }}
     >{n > 99 ? "99+" : n}</span>
   );

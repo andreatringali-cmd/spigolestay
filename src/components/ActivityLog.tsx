@@ -52,12 +52,12 @@ export default function ActivityLog() {
           <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-focus px-1 text-[9px] font-bold text-white">{unread > 99 ? "99+" : unread}</span>
+          <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-focus px-1 text-[9px] font-bold text-on-focus">{unread > 99 ? "99+" : unread}</span>
         )}
       </button>
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={320} maxHeight={560} label={t("Registro attività")}>
         <div className="p-1">
-          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Registro attività")}</div>
+          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-dim">{t("Registro attività")}</div>
           {activities.length === 0 ? (
             <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>
           ) : (

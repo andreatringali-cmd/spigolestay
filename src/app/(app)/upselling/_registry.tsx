@@ -73,7 +73,7 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
           ["Ricavo da offerte", eur(stats.acceptedRevenue), stats.pendingValue ? `+${eur(stats.pendingValue)} ancora in attesa` : "extra accettati ancora in prenotazione"],
         ] as [string, string, string][]).map(([l, v, h]) => (
           <div key={l} className="flex min-h-[92px] flex-col justify-center rounded-xl border border-line bg-surface p-4 shadow-sm max-sm:min-h-[72px] max-sm:min-w-0 max-sm:p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{l}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{l}</div>
             <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-txt max-sm:text-[clamp(0.95rem,4.6vw,1.25rem)]">{v}</div>
             <div className="mt-0.5 text-[11px] text-faint">{h}</div>
           </div>
@@ -89,7 +89,7 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
 
       <div className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="mr-auto text-xs font-semibold uppercase tracking-wide text-faint">Registro offerte ({rows.length})</div>
+          <div className="mr-auto text-xs font-semibold uppercase tracking-wide text-dim">Registro offerte ({rows.length})</div>
           {(() => {
             const statusChips = ([["all", "Tutte"], ["pending", "In attesa"], ["accepted", "Accettate"], ["declined", "Rifiutate"], ["expired", "Scadute"]] as [Filter, string][]).map(([k, l]) => (
               <button key={k} onClick={() => setFilter(k)} className={`rounded-full border px-2.5 py-1 text-xs transition max-sm:min-h-9 ${filter === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-wash"}`}>{l}{counts[k] ? ` (${counts[k]})` : ""}</button>
@@ -98,9 +98,9 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
               <>
                 <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:hidden">{statusChips}</div>
                 <FilterSheet count={(filter !== "all" ? 1 : 0) + (periodActive ? 1 : 0)} onReset={() => { setFilter("all"); onResetPeriod?.(); }}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Stato</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Stato</div>
                   <div className="flex flex-wrap gap-2">{statusChips}</div>
-                  {periodControl && <><div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Periodo</div>{periodControl}</>}
+                  {periodControl && <><div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Periodo</div>{periodControl}</>}
                 </FilterSheet>
               </>
             );
@@ -121,8 +121,8 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <button onClick={() => openBooking(r.booking.id)} className="truncate text-sm font-semibold text-txt hover:underline">{guestName(r.booking)}</button>
-                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${out.color} 16%, transparent)`, color: out.color }}>{out.label}{viaLink ? " · dal link di check-in" : ""}</span>
-                        {cancelled && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">prenotazione annullata</span>}
+                        <span className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${out.color} 16%, transparent)`, color: out.color }}>{out.label}{viaLink ? " · dal link di check-in" : ""}</span>
+                        {cancelled && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">prenotazione annullata</span>}
                       </div>
                       <div className="mt-0.5 text-[11px] text-faint">{fdt(o.at)} · {VIA[o.via]}{multiStructure && r.structure ? ` · ${r.structure.name}` : ""} · soggiorno {fmtDM(r.booking.checkIn)}</div>
                       <div className="mt-0.5 text-xs text-dim">{o.items.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ""}`).join(", ")}</div>
@@ -132,7 +132,7 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {r.outcome === "pending" && !cancelled && <>
-                        <button onClick={() => accept(r)} className="rounded bg-[color:var(--ok)] px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90">Accettata: aggiungi alla prenotazione</button>
+                        <button onClick={() => accept(r)} className="rounded bg-[color:var(--ok)] px-2 py-1 text-[11px] font-semibold text-on-ok hover:opacity-90">Accettata: aggiungi alla prenotazione</button>
                         <button onClick={() => decline(r)} className="rounded border border-line px-2 py-1 text-[11px] font-medium text-dim hover:bg-wash">Rifiutata</button>
                       </>}
                       {(r.outcome === "declined" || r.outcome === "expired") && o.status !== "sent" && <button onClick={() => reopen(r)} className="rounded border border-line px-2 py-1 text-[11px] font-medium text-dim hover:bg-wash">Riapri</button>}
@@ -149,10 +149,10 @@ export default function RegistryTab({ bookings, stats, today, structures, multiS
 
       {stats.perExtra.length > 0 && (
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:p-5">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">Rendimento per extra</div>
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-dim">Rendimento per extra</div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead><tr className="text-[10px] uppercase tracking-wide text-faint"><th className="py-1 pr-3 font-semibold">Extra</th><th className="px-2 text-right font-semibold">Proposto</th><th className="px-2 text-right font-semibold">Accettato</th><th className="px-2 text-right font-semibold">Conversione</th><th className="px-2 text-right font-semibold">Venduti</th><th className="pl-2 text-right font-semibold">Ricavo</th></tr></thead>
+              <thead><tr className="text-[11px] uppercase tracking-wide text-dim"><th className="py-1 pr-3 font-semibold">Extra</th><th className="px-2 text-right font-semibold">Proposto</th><th className="px-2 text-right font-semibold">Accettato</th><th className="px-2 text-right font-semibold">Conversione</th><th className="px-2 text-right font-semibold">Venduti</th><th className="pl-2 text-right font-semibold">Ricavo</th></tr></thead>
               <tbody>
                 {stats.perExtra.map((x) => {
                   const dec = x.accepted + x.declined;

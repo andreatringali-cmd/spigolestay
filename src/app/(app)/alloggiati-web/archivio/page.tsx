@@ -106,7 +106,7 @@ export default function AlloggiatiArchivioPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-dim">
                   <th className="py-2 pr-3">Data e ora invio</th>
                   <th className="py-2 pr-3">Schedine</th>
                   <th className="py-2 pr-3">Stato</th>
@@ -119,7 +119,7 @@ export default function AlloggiatiArchivioPage() {
                   <tr key={it.id} className="border-b border-line last:border-0">
                     <td className="py-2.5 pr-3 font-medium text-txt">{fmt(it.created_at)}</td>
                     <td className="py-2.5 pr-3 text-dim">{it.count}</td>
-                    <td className="py-2.5 pr-3"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${okStato(it.stato) ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: okStato(it.stato) ? "var(--ok)" : "var(--err)" }}>{okStato(it.stato) ? "Inviato" : "Errore"}</span></td>
+                    <td className="py-2.5 pr-3"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${okStato(it.stato) ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: okStato(it.stato) ? "var(--ok)" : "var(--err)" }}>{okStato(it.stato) ? "Inviato" : "Errore"}</span></td>
                     <td className="py-2.5 pr-3 text-[12px] text-faint">{it.esito || "—"}{it.hasPdf ? " · ricevuta salvata" : ""}</td>
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center justify-end gap-1.5">

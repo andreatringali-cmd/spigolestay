@@ -19,7 +19,7 @@ interface Props {
 }
 
 const box = "rounded-lg border border-line bg-paper p-3";
-const h = "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint";
+const h = "mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim";
 const th = "whitespace-nowrap px-2 py-1.5 font-semibold";
 const td = "whitespace-nowrap px-2 py-1.5";
 const btn = "whitespace-nowrap rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50";
@@ -70,7 +70,7 @@ export default function AccountantPackPanel({ docs, payments, trialIds, purchase
           <div className={h}>Fatture emesse nel periodo ({inv.nFatture} fatture{inv.nNoteCredito ? `, ${inv.nNoteCredito} note di credito` : ""})</div>
           <div className="max-h-64 overflow-auto rounded-lg border border-line">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-wash"><tr className="text-left uppercase tracking-wide text-faint">
+              <thead className="sticky top-0 bg-wash"><tr className="text-left uppercase tracking-wide text-dim">
                 <th className={th}>Data</th><th className={th}>N.</th><th className={th}>Cliente</th>
                 <th className={`${th} text-right`}>Imponibile</th><th className={`${th} text-right`}>Fuori campo IVA</th><th className={`${th} text-right`}>Bollo</th><th className={`${th} text-right`}>Totale</th><th className={th}>Stato</th>
               </tr></thead>
@@ -116,7 +116,7 @@ export default function AccountantPackPanel({ docs, payments, trialIds, purchase
                 <li key={q.q} className="whitespace-nowrap">{q.q}º trim.: {fmtEurCents(q.cents)} · F24 entro <b className="font-mono text-txt">{dmy(q.dueDate)}</b> (tributo {q.tributo}){q.postponable ? " · rinviabile" : ""}</li>
               ))}
             </ul>
-            <p className="mt-1 text-[10px] text-faint">Scadenze indicative, da confermare con il commercialista.</p>
+            <p className="mt-1 text-[11px] text-faint">Scadenze indicative, da confermare con il commercialista.</p>
           </div>
 
           {/* Imposta di soggiorno */}
@@ -124,9 +124,9 @@ export default function AccountantPackPanel({ docs, payments, trialIds, purchase
             <div className={h}>Imposta di soggiorno (arrivi del periodo)</div>
             {pack.cityTax.enabled ? (
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <div><div className="text-[10px] text-dim">Dovuta (da versare al Comune)</div><div className="font-mono font-bold text-txt">{eurE(pack.cityTax.dovuta)}</div></div>
-                <div><div className="text-[10px] text-dim">Incassata</div><div className="font-mono font-bold" style={{ color: "var(--ok)" }}>{eurE(pack.cityTax.incassata)}</div></div>
-                <div><div className="text-[10px] text-dim">Da incassare</div><div className="font-mono font-bold" style={{ color: "var(--warn)" }}>{eurE(pack.cityTax.daIncassare)}</div></div>
+                <div><div className="text-[11px] text-dim">Dovuta (da versare al Comune)</div><div className="font-mono font-bold text-txt">{eurE(pack.cityTax.dovuta)}</div></div>
+                <div><div className="text-[11px] text-dim">Incassata</div><div className="font-mono font-bold" style={{ color: "var(--ok)" }}>{eurE(pack.cityTax.incassata)}</div></div>
+                <div><div className="text-[11px] text-dim">Da incassare</div><div className="font-mono font-bold" style={{ color: "var(--warn)" }}>{eurE(pack.cityTax.daIncassare)}</div></div>
               </div>
             ) : <p className="text-xs text-faint">Non configurata per la struttura.</p>}
           </div>
@@ -140,7 +140,7 @@ export default function AccountantPackPanel({ docs, payments, trialIds, purchase
                 <li className="flex justify-between gap-2 whitespace-nowrap border-t border-line pt-0.5 font-semibold"><span className="text-txt">Totale</span><span className="font-mono text-txt">{fmtEurCents(pack.incassi.cents)}</span></li>
               </ul>
             )}
-            <p className="mt-1 text-[10px] text-faint">Solo i pagamenti registrati sui documenti fiscali.</p>
+            <p className="mt-1 text-[11px] text-faint">Solo i pagamenti registrati sui documenti fiscali.</p>
           </div>
 
           {/* Non incassate */}
@@ -158,9 +158,9 @@ export default function AccountantPackPanel({ docs, payments, trialIds, purchase
           <div className={box}>
             <div className={h}>Fatture passive del periodo</div>
             <div className="grid grid-cols-3 gap-2 text-xs">
-              <div><div className="text-[10px] text-dim">Documenti</div><div className="font-mono font-bold text-txt">{pack.purchases.count}</div></div>
-              <div><div className="text-[10px] text-dim">Totale</div><div className="font-mono font-bold text-txt">{fmtEurCents(pack.purchases.total)}</div></div>
-              <div><div className="text-[10px] text-dim">IVA</div><div className="font-mono font-bold text-txt">{fmtEurCents(pack.purchases.vat)}</div></div>
+              <div><div className="text-[11px] text-dim">Documenti</div><div className="font-mono font-bold text-txt">{pack.purchases.count}</div></div>
+              <div><div className="text-[11px] text-dim">Totale</div><div className="font-mono font-bold text-txt">{fmtEurCents(pack.purchases.total)}</div></div>
+              <div><div className="text-[11px] text-dim">IVA</div><div className="font-mono font-bold text-txt">{fmtEurCents(pack.purchases.vat)}</div></div>
             </div>
             <p className="mt-1 text-[11px] text-dim">{pack.purchases.unpaidCount} non ancora pagate ({fmtEurCents(pack.purchases.unpaidCents)})</p>
           </div>
@@ -185,7 +185,7 @@ export default function AccountantPackPanel({ docs, payments, trialIds, purchase
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[10px] text-faint">Sono solo promemoria di domande: Xenora non fornisce risposte fiscali.</p>
+          <p className="mt-2 text-[11px] text-faint">Sono solo promemoria di domande: Xenora non fornisce risposte fiscali.</p>
         </div>
 
         {/* Condivisione con il commercialista su Fatture in Cloud */}

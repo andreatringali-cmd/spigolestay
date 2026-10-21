@@ -27,7 +27,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{children}</div>;
+  return <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-dim">{children}</div>;
 }
 
 // Card riepilogo condivisa (etichetta piccola + numero grande). Unica fonte per tutte le pagine,
@@ -35,7 +35,7 @@ export function SectionTitle({ children }: { children: ReactNode }) {
 export function StatCard({ label, value, color, hint, onClick, active }: { label: ReactNode; value: ReactNode; color?: string; hint?: ReactNode; onClick?: () => void; active?: boolean }) {
   const cls = `flex min-h-[92px] flex-col justify-center rounded-xl border bg-surface p-4 shadow-sm max-sm:min-h-[72px] max-sm:p-3 ${active ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line"} ${onClick ? "cursor-pointer text-left transition hover:-translate-y-0.5 hover:shadow-md" : ""}`;
   const inner = (<>
-    <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{label}</div>
+    <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{label}</div>
     <div className="mt-1 font-mono text-2xl font-bold tabular-nums max-sm:text-[clamp(0.95rem,4.6vw,1.25rem)]" style={color ? { color } : undefined}>{value}</div>
     {hint ? <div className="mt-0.5 text-[11px] text-faint">{hint}</div> : null}
   </>);

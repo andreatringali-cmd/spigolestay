@@ -17,16 +17,17 @@ import type { NormalizedReview } from "@/lib/reviews/google";
 import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChannel, type ReviewScore, type ScoreSummary } from "@/lib/channex-review-scores";
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 import { waDigits } from "@/lib/contacts-check";
-
+
+import { onSolid } from "@/lib/on-solid";
 const fmt = (iso: string) => fmtDate(iso);
 
 // Fonti recensioni: Google (reale via API) + OTA (collegamento partner in arrivo, per ora inserimento manuale).
 const SOURCES = [
   { k: "google", label: "Google", color: "#4285F4", note: "Recensioni reali via Google Places API." },
-  { k: "booking", label: "Booking.com", color: "#003580", note: "Collegamento partner in arrivo · inserimento manuale." },
-  { k: "airbnb", label: "Airbnb", color: "#FF5A5F", note: "Collegamento partner in arrivo · inserimento manuale." },
-  { k: "expedia", label: "Expedia", color: "#FFC72C", note: "Collegamento partner in arrivo · inserimento manuale." },
-  { k: "tripadvisor", label: "Tripadvisor", color: "#00AA6C", note: "Collegamento partner in arrivo · inserimento manuale." },
+  { k: "booking", label: "Booking.com", color: "#003580", note: "Inserimento manuale: il portale non offre un accesso pubblico alle recensioni." },
+  { k: "airbnb", label: "Airbnb", color: "#FF5A5F", note: "Inserimento manuale: il portale non offre un accesso pubblico alle recensioni." },
+  { k: "expedia", label: "Expedia", color: "#FFC72C", note: "Inserimento manuale: il portale non offre un accesso pubblico alle recensioni." },
+  { k: "tripadvisor", label: "Tripadvisor", color: "#00AA6C", note: "Inserimento manuale: il portale non offre un accesso pubblico alle recensioni." },
   { k: "direct", label: "Diretta", color: "#7A8450", note: "Recensioni lasciate dagli ospiti sul tuo mini-sito · rispondi e pubblica." },
 ] as const;
 type SourceKey = typeof SOURCES[number]["k"];
@@ -667,7 +668,7 @@ export default function RecensioniPage() {
   const color = (b: string) => (b === "pos" ? "var(--ok)" : b === "neu" ? "var(--warn)" : "var(--err)");
   // Ordina + conteggio + azzera + CSV: da sm in poi stanno sulla riga della ricerca; su telefono l'ordinamento e il CSV stanno nella tendina «Filtri»
   const sortSelect = (
-    <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-faint">Ordina
+    <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-dim">Ordina
       <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-semibold text-txt outline-none focus:border-focus max-sm:h-9 max-sm:flex-1 max-sm:py-0 max-sm:text-[13px]">
         <option value="new">Più recenti</option><option value="old">Più vecchie</option><option value="low">Voto più basso</option><option value="high">Voto più alto</option>
       </select>
@@ -681,19 +682,19 @@ export default function RecensioniPage() {
   </>);
   // Chip dei filtri: scritti una volta, mostrati nella barra (da sm in poi) e nella tendina «Filtri» (telefono)
   const fonteChips = (<>
-    <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
+    <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === "all" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>Tutte</button>
     {connectedSources.map((c) => (
       <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
     ))}
   </>);
   const votoChips = (<>
     {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
-      <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
+      <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${ratingFilter === k ? onSolid(col) : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
     ))}
   </>);
   const rispChips = (<>
     {([["all", "Tutte"], ["todo", `Da rispondere (${unanswered})`], ["done", "Risposte"]] as const).map(([k, label]) => (
-      <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${replyFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
+      <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-9 ${replyFilter === k ? (k === "todo" ? "text-on-warn" : "text-on-focus") : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
     ))}
   </>);
   // Telefono: filtri attivi = fonte, voto, risposta, ordinamento diversi dal valore di partenza (la ricerca resta visibile in riga)
@@ -707,7 +708,7 @@ export default function RecensioniPage() {
       {/* Con "Tutte le strutture" le recensioni sono per singola struttura: scelta esplicita invece di ripiegare in silenzio sulla prima */}
       {activeStructureId === "all" && structures.length > 1 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-xs font-semibold text-faint">Recensioni di</span>
+          <span className="text-xs font-semibold text-dim">Recensioni di</span>
           <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -726,7 +727,7 @@ export default function RecensioniPage() {
       {negUnanswered > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm" style={{ borderColor: "var(--err)", background: "color-mix(in srgb, var(--err) 8%, transparent)" }}>
           <span className="text-txt"><b>{negUnanswered}</b> {negUnanswered === 1 ? "recensione negativa senza risposta" : "recensioni negative senza risposta"}: rispondere in fretta limita il danno di reputazione.</span>
-          <button onClick={() => { setRatingFilter("neg"); setReplyFilter("todo"); setFilter("all"); }} className="rounded-lg bg-[color:var(--err)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Mostrale</button>
+          <button onClick={() => { setRatingFilter("neg"); setReplyFilter("todo"); setFilter("all"); }} className="rounded-lg bg-[color:var(--err)] px-3 py-1.5 text-xs font-semibold text-on-err hover:opacity-90">Mostrale</button>
         </div>
       )}
 
@@ -736,7 +737,7 @@ export default function RecensioniPage() {
           <SectionTitle>Andamento della media</SectionTitle>
           <div className="mb-3 flex items-center gap-1">
             {([[30, "30 giorni"], [90, "90 giorni"], [365, "12 mesi"]] as const).map(([d, lab]) => (
-              <button key={d} onClick={() => setTrendDays(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition max-sm:min-h-10 ${trendDays === d ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{lab}</button>
+              <button key={d} onClick={() => setTrendDays(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition max-sm:min-h-10 ${trendDays === d ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>{lab}</button>
             ))}
           </div>
         </div>
@@ -782,7 +783,7 @@ export default function RecensioniPage() {
               ) : !gbp.connected ? (
                 <>
                   <p className="mt-1 text-[12px] text-dim">Collega l&apos;account Google che gestisce il profilo: vedrai tutte le recensioni (non solo le ~5 più recenti) e pubblicherai le risposte senza uscire da Xenora.</p>
-                  <button onClick={connectGbp} className="mt-2 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90">Collega account Google</button>
+                  <button onClick={connectGbp} className="mt-2 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Collega account Google</button>
                 </>
               ) : (
                 <>
@@ -809,10 +810,10 @@ export default function RecensioniPage() {
 
             {/* Ricerca automatica */}
             <div className="mt-3">
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Trova la tua struttura</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-dim">Trova la tua struttura</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 <input value={findQ} onChange={(e) => setFindQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") runFind(); }} placeholder="es. Spigolehouse Siracusa" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-                <button onClick={runFind} disabled={finding} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{finding ? "Cerco…" : "Cerca"}</button>
+                <button onClick={runFind} disabled={finding} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{finding ? "Cerco…" : "Cerca"}</button>
               </div>
               {candidates && (
                 <div className="mt-2 space-y-1.5">
@@ -829,10 +830,10 @@ export default function RecensioniPage() {
 
             {/* Place ID manuale */}
             <div className="mt-4 border-t border-line pt-3">
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Oppure incolla il Google Place ID</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-dim">Oppure incolla il Google Place ID</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 <input value={placeIdInput} onChange={(e) => setPlaceIdInput(e.target.value)} placeholder="es. ChIJ...." className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-txt outline-none focus:border-focus" />
-                <button onClick={() => { savePlaceId(); setCfgOpen(false); }} disabled={!selStructureId || placeIdInput.trim() === placeId} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Salva</button>
+                <button onClick={() => { savePlaceId(); setCfgOpen(false); }} disabled={!selStructureId || placeIdInput.trim() === placeId} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Salva</button>
                 {placeId ? <button onClick={clearPlaceId} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">Rimuovi</button> : null}
               </div>
               <p className="mt-1.5 text-[11px] text-faint">Google Places espone solo le <strong>~5 recensioni più recenti</strong>: media e totale restano completi, l&apos;elenco è parziale.</p>
@@ -842,7 +843,7 @@ export default function RecensioniPage() {
       )}
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
-        <Card><SectionTitle>Media per fonte</SectionTitle><div className="space-y-2">{bySource.length === 0 ? <p className="text-sm text-faint">Nessuna recensione ancora.</p> : bySource.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{SRC[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: SRC[x.c].color }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
+        <Card><SectionTitle>Media per fonte</SectionTitle><div className="space-y-2">{bySource.length === 0 ? <p className="text-sm text-faint">Nessuna recensione ancora.</p> : bySource.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{SRC[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: SRC[x.c].color }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[11px] text-faint">({x.n})</span></span></div>))}</div></Card>
         <Card><SectionTitle>Distribuzione voti</SectionTitle><div className="space-y-1.5">{dist.map((d) => (<div key={d.v} className="flex items-center gap-2"><span className="w-6 text-right font-mono text-sm text-dim">{d.v}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${reviews.length ? (d.n / reviews.length) * 100 : 0}%` }} /></div><span className="w-8 text-right font-mono text-sm text-dim">{d.n}</span></div>))}</div></Card>
       </div>
 
@@ -856,8 +857,8 @@ export default function RecensioniPage() {
               return (
                 <div key={ch} className="rounded-lg border border-line bg-paper px-2.5 py-2" title={v.overallDerived ? "Media calcolata sulle recensioni scaricate (Channex non fornisce il riepilogo ufficiale)" : "Punteggio ufficiale Channex"}>
                   <div className="flex items-center gap-1.5"><ChannelLogo channel={ch} size={16} /><span className="truncate text-[11px] font-semibold text-dim">{CHANNEL_LABEL[ch]}</span></div>
-                  <div className="mt-1 font-mono text-lg font-bold tabular-nums text-txt">{fmtScore(v.overall)}{v.overall != null && <span className="text-[10px] font-normal text-faint">/10</span>}</div>
-                  <div className="text-[10px] text-faint">{v.overall == null ? "nessun dato da Channex" : `${v.count} recens.${v.overallDerived ? " · calcolata" : ""}`}</div>
+                  <div className="mt-1 font-mono text-lg font-bold tabular-nums text-txt">{fmtScore(v.overall)}{v.overall != null && <span className="text-[11px] font-normal text-faint">/10</span>}</div>
+                  <div className="text-[11px] text-faint">{v.overall == null ? "nessun dato da Channex" : `${v.count} recens.${v.overallDerived ? " · calcolata" : ""}`}</div>
                 </div>
               );
             })}
@@ -866,7 +867,7 @@ export default function RecensioniPage() {
             <p className="text-sm text-faint">Channex non ha ancora fornito punteggi per categoria per questa struttura (n/d).</p>
           ) : (
             <div>
-              <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-faint">
+              <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
                 <span className="w-32 shrink-0">Categoria</span><span className="flex-1">Media</span><span className="w-9 shrink-0" />
                 {REVIEW_CHANNELS.map((ch) => <span key={ch} className="flex w-9 shrink-0 justify-center"><ChannelLogo channel={ch} size={14} /></span>)}
               </div>
@@ -892,7 +893,7 @@ export default function RecensioniPage() {
       {/* Fonti recensioni */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <SectionTitle>Fonti recensioni</SectionTitle>
-        <span className="text-[11px] font-semibold text-faint">{connectedSources.length}/{SOURCES.length} attive</span>
+        <span className="text-[11px] font-semibold text-dim">{connectedSources.length}/{SOURCES.length} attive</span>
       </div>
       <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {SOURCES.map((s) => {
@@ -907,11 +908,11 @@ export default function RecensioniPage() {
                 <div className="truncate text-[11px] text-faint">{noteFor(s)}</div>
               </div>
               {showConnectedBadge ? (
-                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition max-sm:min-h-10 group-hover:opacity-0" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition max-sm:min-h-10 group-hover:opacity-0 ${on ? "text-on-ok" : ""}`} style={on ? { backgroundColor: "var(--ok)" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
               ) : (
-                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint transition group-hover:opacity-0">Impostazioni</span>
+                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-dim transition group-hover:opacity-0">Impostazioni</span>
               )}
-              <span className="pointer-events-none absolute right-3 shrink-0 rounded-full bg-focus px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 transition group-hover:opacity-100">Apri →</span>
+              <span className="pointer-events-none absolute right-3 shrink-0 rounded-full bg-focus px-2.5 py-1 text-[11px] font-semibold text-on-focus opacity-0 transition group-hover:opacity-100">Apri →</span>
             </button>
           );
         })}
@@ -939,14 +940,14 @@ export default function RecensioniPage() {
                 ? `Channex è collegato, ma l'app "Messages & Reviews" non è ancora installata su Channex per questa struttura (dashboard Channex → Applications). Una volta installata, le recensioni ${SRC[srcCfg].label} arriveranno qui in automatico. Nel frattempo puoi inserirle a mano.`
                 : chxSourceInfo(srcCfg)?.mapped
                 ? `${SRC[srcCfg].label} è collegato automaticamente via Channex: le recensioni reali vengono importate qui sotto, e puoi rispondere direttamente da qui (la risposta viene inviata davvero su ${SRC[srcCfg].label}). Puoi comunque aggiungerne una a mano per i casi non coperti dall'importazione.`
-                : `${SRC[srcCfg].label} non espone un'API pubblica self-service per le recensioni: il collegamento avverrà tramite connettore partner (in arrivo, oppure configurando Channex). Nel frattempo puoi inserire le recensioni a mano — restano salvate e rientrano in media, distribuzione e risposte AI.`}
+                : `${SRC[srcCfg].label} non espone un'API pubblica per le recensioni, quindi non si importano in automatico. Puoi inserirle a mano — restano salvate e rientrano in media, distribuzione e risposte AI.`}
             </div>
 
             {srcCfg === "direct" ? (
               <p className="mt-3 text-center text-[11px] text-faint">Le recensioni dirette arrivano dal mini-sito (Xenosite) e compaiono qui automaticamente.</p>
             ) : (
               <>
-                <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
+                <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
                 {!chxSourceInfo(srcCfg)?.mapped && <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriva collegando Channex (pagina Canali), oppure con le integrazioni partner.</p>}
               </>
             )}
@@ -957,13 +958,13 @@ export default function RecensioniPage() {
       {/* Filtro per fonte + aggiunta manuale */}
       {/* Telefono: UNA riga [ricerca][Filtri][+ Aggiungi]; fonte, voto, risposta, ordina ed Esporta CSV stanno nella tendina «Filtri» */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm max-sm:hidden">
-        <span className="mr-1 text-xs font-semibold text-faint">Fonte:</span>
+        <span className="mr-1 text-xs font-semibold text-dim">Fonte:</span>
         {fonteChips}
         <span className="mx-1 h-4 w-px bg-line" />
-        <span className="mr-1 text-xs font-semibold text-faint">Voto:</span>
+        <span className="mr-1 text-xs font-semibold text-dim">Voto:</span>
         {votoChips}
         <span className="mx-1 h-4 w-px bg-line" />
-        <span className="mr-1 text-xs font-semibold text-faint">Risposta:</span>
+        <span className="mr-1 text-xs font-semibold text-dim">Risposta:</span>
         {rispChips}
         <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
       </div>
@@ -971,9 +972,9 @@ export default function RecensioniPage() {
         <SearchInput value={search} onChange={setSearch} placeholder="Cerca ospite o testo…" className="w-full sm:w-72 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1" />
         <FilterSheet count={phoneFilterCount} onReset={resetPhoneFilters}>
           {(close) => (<>
-            <div><div className="mb-1 text-xs font-semibold text-faint">Fonte</div><div className="flex flex-wrap gap-1">{fonteChips}</div></div>
-            <div><div className="mb-1 text-xs font-semibold text-faint">Voto</div><div className="flex flex-wrap gap-1">{votoChips}</div></div>
-            <div><div className="mb-1 text-xs font-semibold text-faint">Risposta</div><div className="flex flex-wrap gap-1">{rispChips}</div></div>
+            <div><div className="mb-1 text-xs font-semibold text-dim">Fonte</div><div className="flex flex-wrap gap-1">{fonteChips}</div></div>
+            <div><div className="mb-1 text-xs font-semibold text-dim">Voto</div><div className="flex flex-wrap gap-1">{votoChips}</div></div>
+            <div><div className="mb-1 text-xs font-semibold text-dim">Risposta</div><div className="flex flex-wrap gap-1">{rispChips}</div></div>
             {sortSelect}
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] text-faint">{shown.length} di {reviews.length}</span>
@@ -991,30 +992,30 @@ export default function RecensioniPage() {
           <SectionTitle>Nuova recensione manuale</SectionTitle>
           <div className="grid gap-2.5 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Fonte</span>
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-dim">Fonte</span>
               <select value={mForm.source} onChange={(e) => setMForm((f) => ({ ...f, source: e.target.value as SourceKey }))} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
                 {MANUAL_SOURCES.map((s) => (<option key={s.k} value={s.k}>{s.label}</option>))}
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Ospite</span>
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-dim">Ospite</span>
               <input value={mForm.guest} onChange={(e) => setMForm((f) => ({ ...f, guest: e.target.value }))} placeholder="Nome ospite" className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Data</span>
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-dim">Data</span>
               <DateField value={mForm.date} onChange={(v) => setMForm((f) => ({ ...f, date: v }))} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-left text-sm text-txt outline-none focus:border-focus" />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Voto (0–10): {mForm.rating}</span>
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-dim">Voto (0–10): {mForm.rating}</span>
               <input type="range" min={0} max={10} step={1} value={mForm.rating} onChange={(e) => setMForm((f) => ({ ...f, rating: Number(e.target.value) }))} className="w-full accent-[color:var(--focus)]" />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Testo</span>
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-dim">Testo</span>
               <textarea value={mForm.text} onChange={(e) => setMForm((f) => ({ ...f, text: e.target.value }))} rows={3} placeholder="Testo della recensione…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
             </label>
           </div>
           <div className="mt-2.5 flex gap-2">
-            <button onClick={addManual} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90">Salva recensione</button>
+            <button onClick={addManual} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">Salva recensione</button>
             <button onClick={() => setShowManual(false)} className="rounded-lg border border-line px-3.5 py-1.5 text-sm font-semibold text-dim hover:bg-wash">Annulla</button>
           </div>
         </Card>
@@ -1026,12 +1027,12 @@ export default function RecensioniPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
               <span className="font-semibold text-txt">{r.guest}</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: SRC[r.source as SourceKey]?.color ?? "var(--dim)" }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: SRC[r.source as SourceKey]?.color ?? "var(--dim)" }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
               <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
-              {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">manuale</span>}
-              {isChx(r) && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint" title="Importata automaticamente da Channex">via Channex</span>}
-              {!replies[r.id] && <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.bucket === "neg" ? "var(--err)" : "var(--warn)"} 14%, transparent)`, color: r.bucket === "neg" ? "var(--err)" : "var(--warn)" }}>Da rispondere{ageDays(r.date) > 0 ? ` · da ${ageDays(r.date)} g` : ""}</span>}
+              {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-dim">manuale</span>}
+              {isChx(r) && <span className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-dim" title="Importata automaticamente da Channex">via Channex</span>}
+              {!replies[r.id] && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.bucket === "neg" ? "var(--err)" : "var(--warn)"} 14%, transparent)`, color: r.bucket === "neg" ? "var(--err)" : "var(--warn)" }}>Da rispondere{ageDays(r.date) > 0 ? ` · da ${ageDays(r.date)} g` : ""}</span>}
               <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
               {r.id.startsWith("manual-") && <button onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
             </div>
@@ -1051,12 +1052,12 @@ export default function RecensioniPage() {
               );
             })()}
             {replies[r.id] ? (
-              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div>
+              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[11px] font-semibold uppercase tracking-wide text-dim">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  {isGbp(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata su Google">✓ Pubblicata su Google</span>}
+                  {isGbp(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata su Google">✓ Pubblicata su Google</span>}
                   {r.source === "google" && !isGbp(r) && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
-                  {r.source === "direct" && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata sul tuo mini-sito">✓ Pubblicata sul mini-sito</span>}
-                  {isChx(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={`La risposta è stata inviata su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>✓ Pubblicata su {SRC[r.source as SourceKey]?.label}</span>}
+                  {r.source === "direct" && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata sul tuo mini-sito">✓ Pubblicata sul mini-sito</span>}
+                  {isChx(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={`La risposta è stata inviata su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>✓ Pubblicata su {SRC[r.source as SourceKey]?.label}</span>}
                   {r.source !== "direct" && !isChx(r) && <button onClick={() => { setDraft((d) => ({ ...d, [r.id]: replies[r.id] ?? "" })); const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="text-[11px] font-semibold text-focus hover:underline">Modifica</button>}
                   <button onClick={() => removeReply(r)} className="text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button>
                 </div>
@@ -1067,15 +1068,15 @@ export default function RecensioniPage() {
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash max-sm:min-h-10 disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
                   {isChx(r) ? (
-                    <button onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</button>
+                    <button onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</button>
                   ) : isGbp(r) ? (
-                    <button onClick={() => publishGbpReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!gbpReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta su Google">{gbpReplyBusy[r.id] ? "Invio…" : "Pubblica su Google"}</button>
+                    <button onClick={() => publishGbpReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!gbpReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta su Google">{gbpReplyBusy[r.id] ? "Invio…" : "Pubblica su Google"}</button>
                   ) : r.source === "google" ? (
-                    <button onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="inline-flex items-center gap-1 rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)">📋 Copia e rispondi su Google →</button>
+                    <button onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="inline-flex items-center gap-1 rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)">📋 Copia e rispondi su Google →</button>
                   ) : r.source === "direct" ? (
-                    <button onClick={() => publishDirect(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta sul tuo mini-sito">Pubblica risposta</button>
+                    <button onClick={() => publishDirect(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta sul tuo mini-sito">Pubblica risposta</button>
                   ) : (
-                    <button onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</button>
+                    <button onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40" title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</button>
                   )}
                   {isChx(r) && chxReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{chxReplyErr[r.id]}</span>}
                   {isGbp(r) && gbpReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{gbpReplyErr[r.id]}</span>}

@@ -61,9 +61,9 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
               className={`flex min-w-0 flex-col items-stretch gap-1 rounded-xl border px-1 py-1.5 text-center transition sm:px-2 sm:py-2 ${isSel ? "border-focus shadow-md ring-1 ring-[color:var(--focus)]" : "border-line shadow-sm hover:border-focus"}`}
               style={isSel ? { background: "color-mix(in srgb, var(--focus) 14%, var(--surface))" } : { background: d.getDay() === 0 || d.getDay() === 6 ? "color-mix(in srgb, var(--wash) 45%, var(--surface))" : "var(--surface)" }}
             >
-              <span className="block truncate text-[10px] font-semibold uppercase tracking-wide" style={{ color: d.getDay() === 0 ? "var(--err)" : d.getDay() === 6 ? "var(--warn)" : "var(--faint)" }}>{wk}</span>
-              <span className="mx-auto grid h-7 min-w-7 place-items-center rounded-full px-1 font-mono text-sm font-bold tabular-nums sm:h-8 sm:min-w-8 sm:text-base" style={isToday ? { background: "var(--focus)", color: "#fff" } : { color: "var(--txt)" }}>{d.getDate()}</span>
-              <span className="block truncate text-[10px] text-faint">{d.getDate() === 1 || iso === days[0].iso ? mon : " "}</span>
+              <span className="block truncate text-[11px] font-semibold uppercase tracking-wide" style={{ color: d.getDay() === 0 ? "var(--err)" : d.getDay() === 6 ? "var(--warn)" : "var(--faint)" }}>{wk}</span>
+              <span className={`mx-auto grid h-7 min-w-7 place-items-center rounded-full px-1 font-mono text-sm font-bold tabular-nums sm:h-8 sm:min-w-8 sm:text-base ${isToday ? "text-on-focus" : ""}`} style={isToday ? { background: "var(--focus)" } : { color: "var(--txt)" }}>{d.getDate()}</span>
+              <span className="block truncate text-[11px] text-faint">{d.getDate() === 1 || iso === days[0].iso ? mon : " "}</span>
               <DayBody stats={stats} />
             </button>
           );
@@ -93,7 +93,7 @@ function DayBody({ stats }: { stats: DayStats }) {
     <span className="mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[12px] font-semibold tabular-nums" style={{ color: C.stay, background: tint(C.stay) }}><KindIcon k="stay" />{stats.stay}<span className="max-xl:hidden"> in casa</span></span>
     {stats.closed > 0 && <span className="mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[11px] font-semibold text-dim" style={{ background: tint("var(--faint)", 22) }} title={`${stats.closed} ${stats.closed === 1 ? "camera chiusa o fuori servizio" : "camere chiuse o fuori servizio"}`}>{stats.closed}<span className="xl:hidden">ch.</span><span className="max-xl:hidden"> {stats.closed === 1 ? "chiusa" : "chiuse"}</span></span>}
     <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-wash" title={`Camere occupate nella notte: ${total - free} su ${total} (${occ}%)`}><span className="block h-full rounded-full" style={{ width: `${occ}%`, background: barCol }} /></span>
-    <span className="mt-1.5 flex items-center justify-between text-[11px] text-faint max-xl:flex-col max-xl:gap-0.5 max-xl:text-[10px]">
+    <span className="mt-1.5 flex items-center justify-between text-[11px] text-faint max-xl:flex-col max-xl:gap-0.5 max-xl:text-[11px]">
       <span className="whitespace-nowrap" style={free === 0 ? { color: "var(--err)", fontWeight: 600 } : undefined}>{free === 0 ? "0 libere" : `${free} ${free === 1 ? "libera" : "libere"}`}</span>
       <span className="inline-flex items-center gap-0.5" title={`Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}><KindIcon k="clean" /><b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b></span>
     </span>
@@ -117,7 +117,7 @@ function GiornoTelefono({ days, sel, today, label, onStep, onToday }: { days: { 
     <div className="rounded-2xl border border-line p-3 shadow-sm" style={{ background: "color-mix(in srgb, var(--wash) 70%, var(--surface))" }}>
       <div className="mb-3 flex items-center gap-2">
         <button onClick={() => onStep(-1)} className={nav} aria-label="Giorno prima">‹</button>
-        <button onClick={onToday} disabled={sel === today} className="min-w-0 flex-1 truncate rounded-lg px-1 text-center font-display text-base font-bold capitalize text-txt disabled:opacity-100" aria-label="Torna a oggi">{label}{sel === today ? <span className="ml-1.5 rounded-full bg-focus px-2 py-0.5 align-middle text-[10px] font-bold uppercase text-white">Oggi</span> : <span className="ml-1.5 align-middle text-[11px] font-semibold text-focus">→ Oggi</span>}</button>
+        <button onClick={onToday} disabled={sel === today} className="min-w-0 flex-1 truncate rounded-lg px-1 text-center font-display text-base font-bold capitalize text-txt disabled:opacity-100" aria-label="Torna a oggi">{label}{sel === today ? <span className="ml-1.5 rounded-full bg-focus px-2 py-0.5 align-middle text-[11px] font-bold uppercase text-on-focus">Oggi</span> : <span className="ml-1.5 align-middle text-[11px] font-semibold text-focus">→ Oggi</span>}</button>
         <button onClick={() => onStep(1)} className={nav} aria-label="Giorno dopo">›</button>
       </div>
       <div className="grid grid-cols-3 gap-2">

@@ -311,7 +311,7 @@ export default function StepActions(p: StepActionsProps) {
       <button aria-label="Chiudi" onClick={p.onClose} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
       <div role="dialog" aria-label={nameOfStep(step.key, step.label, b.structureId)} className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
         <div className="border-b border-line px-5 py-3.5">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{nameOfStep(step.key, step.label, b.structureId)}</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-dim">{nameOfStep(step.key, step.label, b.structureId)}</div>
           <div className="text-base font-bold text-txt">{guestLabel}</div>
           <div className="text-xs" style={{ color: step.state === "late" ? (step.sent ? "var(--warn)" : "var(--err)") : "var(--dim)" }}>{step.detail}</div>
         </div>

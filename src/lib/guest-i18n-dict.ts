@@ -178,7 +178,6 @@ export const GUEST_DICT: GuestDict = {
   "Informazioni utili": ["Useful information", "Informations utiles", "Nützliche Informationen", "Información útil"],
   "Check-out entro le {time}": ["Check-out by {time}", "Check-out avant {time}", "Check-out bis {time} Uhr", "Check-out antes de las {time}"],
   "Mappa per arrivare": ["Map to get here", "Plan pour venir", "Karte zur Anreise", "Mapa para llegar"],
-  "Aggiungi a Google Wallet: disponibile a breve.": ["Add to Google Wallet: coming soon.", "Ajouter à Google Wallet : bientôt disponible.", "Zu Google Wallet hinzufügen: demnächst verfügbar.", "Añadir a Google Wallet: disponible próximamente."],
   "Preparo il pass…": ["Preparing the pass…", "Préparation du pass…", "Pass wird vorbereitet…", "Preparando el pase…"],
   "🔖 Aggiungi a Google Wallet": ["🔖 Add to Google Wallet", "🔖 Ajouter à Google Wallet", "🔖 Zu Google Wallet hinzufügen", "🔖 Añadir a Google Wallet"],
 

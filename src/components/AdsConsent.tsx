@@ -24,7 +24,7 @@ export default function AdsConsent({ config }: { config: AdsConfig | null }) {
       </p>
       <div className="flex shrink-0 gap-2">
         <button onClick={() => pick("denied")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Rifiuta</button>
-        <button onClick={() => pick("granted")} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Accetta</button>
+        <button onClick={() => pick("granted")} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">Accetta</button>
       </div>
     </div>
   );

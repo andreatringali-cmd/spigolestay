@@ -148,7 +148,7 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
             <button
               onClick={() => runKeys(todoKeys(TRANSLATE_LANGS), anyTranslation ? "Aggiorno le traduzioni" : "Traduco la base")}
               disabled={loading || !masters.length || todoTotal === 0}
-              className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50"
             >{anyTranslation ? "Aggiorna traduzioni" : "Traduci la base in tedesco, francese e spagnolo"}</button>
           )}
         </div>
@@ -215,19 +215,19 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
               return (
                 <div key={m.id} className="rounded-lg border border-line bg-paper p-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{catLabel(m.category)}</span>
-                    {m.field_type === "auto" && <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>Automatico</span>}
-                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${STATE_COLOR[st]} 14%, transparent)`, color: STATE_COLOR[st] }}>{STATE_LABEL[st]}</span>
-                    {it && <span className="text-[10px] text-faint">tradotta il {fmtDate(it.ts)}</span>}
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">{catLabel(m.category)}</span>
+                    {m.field_type === "auto" && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>Automatico</span>}
+                    <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${STATE_COLOR[st]} 14%, transparent)`, color: STATE_COLOR[st] }}>{STATE_LABEL[st]}</span>
+                    {it && <span className="text-[11px] text-faint">tradotta il {fmtDate(it.ts)}</span>}
                   </div>
                   <div className="mt-1.5 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Originale ({m.lang.toUpperCase()})</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Originale ({m.lang.toUpperCase()})</div>
                       <div className="text-sm font-semibold text-txt">{m.title}</div>
                       <div className="whitespace-pre-line text-xs text-dim">{m.body}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Traduzione ({tab.toUpperCase()})</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Traduzione ({tab.toUpperCase()})</div>
                       {editing && edit ? (
                         <div className="space-y-1.5">
                           <input value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} className={`${inputCls} font-semibold`} />
@@ -236,7 +236,7 @@ export default function ConciergeTranslations({ sid, rows }: { sid: string; rows
                           {editErr && <p className="text-[11px] font-medium" style={{ color: "var(--err)" }}>{editErr}</p>}
                           <div className="flex justify-end gap-2">
                             <button onClick={() => { setEdit(null); setEditErr(""); }} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash disabled:opacity-50">Annulla</button>
-                            <button onClick={saveEdit} disabled={busy || !edit.title.trim() || !edit.body.trim()} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy ? "Salvo…" : "Salva e approva"}</button>
+                            <button onClick={saveEdit} disabled={busy || !edit.title.trim() || !edit.body.trim()} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy ? "Salvo…" : "Salva e approva"}</button>
                           </div>
                         </div>
                       ) : it ? (

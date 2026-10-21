@@ -1,14 +1,33 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════ Xenora DS 1 — token (leggi qui prima di toccare i colori) ═══════════════════════════
+   CONTRASTI (WCAG 2.1, testo normale >= 4,5:1, componenti UI >= 3:1; calcolati su surface/paper/wash):
+   - CHIARO:  txt 12-14,7 · dim >= 6,0 · faint >= 4,5 (resta più tenue di dim) · focus 4,2-5,2 (4,2 solo su wash).
+   - SCURO:   txt 12-15 · dim >= 6,4 · faint >= 4,6 · focus/ok/warn/err 4,7-8,4.
+   SCELTA SUI COLORI DI STATO (--ok/--warn/--err): in CHIARO sono stati SCURITI (stesso tono) fino a >= 4,5:1 come TESTO
+   su surface/paper/wash e anche sulla propria tinta color-mix(... 14%, transparent). Così i ~1.500 usi esistenti
+   (text-[color:var(--ok)], color-mix(), pallini, barre) diventano leggibili senza riscrivere nulla e NON servono varianti
+   "-text". Come SFONDO PIENO col testo bianco passano comunque (5,4-6,0:1). In SCURO restano chiari (contrasto alto come testo).
+   TESTO SU SFONDO PIENO: usare SEMPRE la coppia  bg-focus|bg-ok|bg-warn|bg-err  +  text-on-focus|on-ok|on-warn|on-err
+   (--on-*): in chiaro è bianco, in scuro è un quasi-nero perché i pieni sono chiari (il bianco su #6FA3DC dava 2,6:1).
+   BORDI: --line = divisori sottili e card (1,3:1, decorativo); --line-strong = confine dei CAMPI e dei controlli (>= 3:1).
+   Le classi `border-line` su input/select/textarea ricevono --line-strong in automatico (vedi regola «campi» più sotto).
+   Z-INDEX: scala --z-* qui sotto (usare z-(--z-modal) ecc. nei componenti nuovi; i vecchi z-[NN] si migreranno poi).
+   TEMA: la classe `dark` sta su <html> (script anti-flash nel (app)/layout + ThemeProvider) e, per compatibilità, anche sul
+   <div> del ThemeProvider (colori canale personalizzati, Popover). I valori scuri sono nel blocco `.dark`. */
+
 /* ─────────── Token di design (Chiaro) — neutro freddo + indaco ─────────── */
 :root {
+  color-scheme: light;
+  accent-color: var(--focus); /* checkbox, radio, range seguono l'accento invece del blu di sistema */
   --paper: #EEECE8;   /* sfondo app (greige — grigio-tortora caldo) */
   --surface: #FAF9F7; /* superfici (card) */
   --wash: #E6E2DB;    /* intestazioni, zone secondarie */
-  --line: #E1DDD6;    /* bordi */
+  --line: #E1DDD6;    /* bordi sottili: divisori, card (decorativi) */
+  --line-strong: #857F74; /* bordo dei controlli (campi, select): 3,8:1 su surface, 3,1:1 su wash */
   --txt: #26241F;     /* testo primario (bruno neutro) */
-  --dim: #726D64;     /* testo secondario */
-  --faint: #A69E90;   /* testo terziario */
+  --dim: #57524A;     /* testo secondario (6,0:1 anche su wash) */
+  --faint: #6A6459;   /* testo terziario/disattivato: 4,5:1 su wash, 5,6:1 su surface; più tenue di dim */
   --focus: #2F6BB0;   /* accento blu (solo accento) */
 
   /* Canali OTA — tinte vicine ai brand nativi */
@@ -22,10 +41,33 @@
   --ch-direct: #2F9E6F;   /* diretta (verde) */
   --ch-blocked: #8A93A6;
 
-  /* Stati */
-  --ok: #2F9E6F;
-  --warn: #D98324;
-  --err: #D64545;
+  /* Stati — in chiaro già scuriti: leggibili come testo (>= 4,5:1 su surface/paper/wash) E come fondo pieno con testo bianco */
+  --ok: #1A7350;
+  --warn: #955208;
+  --err: #B83232;
+
+  /* Testo SU sfondo pieno (bg-focus/ok/warn/err): >= 4,5:1 (bianco: 5,4 · 5,8 · 6,0 · 5,9) */
+  --on-focus: #FFFFFF;
+  --on-ok: #FFFFFF;
+  --on-warn: #FFFFFF;
+  --on-err: #FFFFFF;
+
+  /* Scala z-index (valori allineati all'esistente: header sticky z-30, modali 50-200 sparsi, Toast 100, Popover 1000).
+     Da adottare nei componenti nuovi e nelle migrazioni; NON ancora riscritti i punti d'uso. */
+  --z-sticky: 30;     /* barra superiore, intestazioni fisse */
+  --z-drawer: 40;     /* menu a cassetto, pannello laterale prenotazione */
+  --z-modal: 200;     /* finestre modali e sheet (oggi 50/60/70/100/200: unificare qui) */
+  --z-dropdown: 1000; /* Popover/menu/tendine in portale: sopra le modali */
+  --z-toast: 1100;    /* notifiche: sopra a tutto (oggi 100) */
+
+  /* Raggi e ombre (scala unica, documentata; le classi rounded e shadow esistenti restano com'erano) */
+  --r-sm: 6px;   /* chip, tag */
+  --r-md: 8px;   /* pulsanti, campi */
+  --r-lg: 12px;  /* card, popover */
+  --r-xl: 16px;  /* modali, sheet */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.06);               /* card interattiva */
+  --shadow-2: 0 8px 24px -12px rgb(0 0 0 / 0.25);        /* popover, tendine */
+  --shadow-3: 0 24px 60px -24px rgb(0 0 0 / 0.4);        /* modale */
 }
 
 /* ─────────── Token di design (Scuro) — blu notte, non nero ─────────── */
@@ -35,9 +77,10 @@
   --surface: #1D1E22;
   --wash: #26272C;
   --line: #2F3036;
+  --line-strong: #70717A; /* bordo dei controlli: 3,4:1 su surface, 3,1:1 su wash */
   --txt: #EAEAEC;
-  --dim: #9C9DA3;
-  --faint: #6B6C73;
+  --dim: #A9AAB0;     /* 6,4:1 su wash */
+  --faint: #8E8F96;   /* 4,6:1 su wash, 5,2:1 su surface; più tenue di dim */
   --focus: #6FA3DC;   /* blu più chiaro per lo scuro (solo accento) */
 
   --ch-booking: #2E6FD6;  /* blu Booking più chiaro per lo scuro */
@@ -53,6 +96,17 @@
   --ok: #3FBD86;
   --warn: #E6A24B;
   --err: #F0716A;
+
+  /* Testo SU sfondo pieno: i pieni sono chiari, quindi testo scuro (7,2 · 8,0 · 8,7 · 6,6:1; il bianco dava 2,2-2,9:1) */
+  --on-focus: #0F1115;
+  --on-ok: #0F1115;
+  --on-warn: #0F1115;
+  --on-err: #0F1115;
+
+  /* ombre più marcate (su fondo scuro quelle chiare quasi non si vedono) */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 8px 24px -12px rgb(0 0 0 / 0.7);
+  --shadow-3: 0 24px 60px -24px rgb(0 0 0 / 0.8);
 }
 
 /* Espone i token come utility Tailwind (bg-paper, text-txt, border-line, …).
@@ -62,10 +116,19 @@
   --color-surface: var(--surface);
   --color-wash: var(--wash);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-txt: var(--txt);
   --color-dim: var(--dim);
   --color-faint: var(--faint);
   --color-focus: var(--focus);
+  /* stati: text-ok / bg-ok / border-ok (+ /NN per le tinte), e il testo su fondo pieno: text-on-ok ecc. */
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-err: var(--err);
+  --color-on-focus: var(--on-focus);
+  --color-on-ok: var(--on-ok);
+  --color-on-warn: var(--on-warn);
+  --color-on-err: var(--on-err);
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-archivo);
@@ -76,6 +139,18 @@ body {
   background: var(--paper);
   color: var(--txt);
 }
+
+/* Focus da tastiera: anello coerente in --focus. Sta nel layer base (priorità BASSA): i componenti che già gestiscono il focus
+   (outline-none + bordo/ring locale) lo vincono come prima; lo ricevono solo gli elementi che oggi mostrano l'anello nativo o nulla. */
+@layer base {
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+}
+
+/* Campi: il bordo `border-line` (1,3:1, quasi invisibile) diventa --line-strong (>= 3:1) su input/select/textarea, senza riscrivere i
+   ~800 campi. Non tocca stato focus (resta focus:border-focus), errori (bordo --err) né i campi senza `border-line`. */
+input.border-line:not(:focus):not(:focus-visible),
+select.border-line:not(:focus):not(:focus-visible),
+textarea.border-line:not(:focus):not(:focus-visible) { border-color: var(--line-strong); }
 
 /* Stampa / Salva come PDF: mostra solo il contenuto. */
 @media print {
@@ -167,6 +242,10 @@ body {
 @media (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea { font-size: 16px; }
   button, a, [role="button"], summary, label { touch-action: manipulation; } /* niente zoom a doppio tap, niente ritardo */
+}
+/* Telefono stretto (< 640px, anche una finestra desktop ristretta): campi a 16px, altrimenti iOS zooma la pagina al tocco. Esclusi i controlli non testuali. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]), select, textarea { font-size: 16px; }
 }
 html, body { overflow-x: clip; } /* un popover che sporge non fa più "ballare" la pagina di lato */
 

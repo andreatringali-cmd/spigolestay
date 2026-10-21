@@ -57,10 +57,10 @@ export default function EmbedPage() {
         </div>
       )}
       {state === "notfound" && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "40px 20px", textAlign: "center", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", color: "#1c1917" }}>
-          <h1 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>Motore di prenotazione non disponibile</h1>
-          <p style={{ fontSize: 13, color: "#78716c", margin: 0, maxWidth: 360 }}>
-            Nessuna struttura pubblicata all&apos;indirizzo <b style={{ color: "#1c1917" }}>/{slug}</b>.
+        <div role="alert" className="flex flex-col items-center justify-center gap-2 px-5 py-10 text-center text-txt">
+          <h1 className="font-display text-lg font-bold">Motore di prenotazione non disponibile</h1>
+          <p className="max-w-sm text-sm text-dim">
+            Nessuna struttura pubblicata all&apos;indirizzo <b className="text-txt">/{slug}</b>.
           </p>
         </div>
       )}

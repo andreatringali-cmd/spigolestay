@@ -272,7 +272,7 @@ export default function CanaliPage() {
       {/* Andamento per canale: numeri reali dalle prenotazioni (arrivi nel periodo scelto), stesse formule dell'elenco Prenotazioni. */}
       <section className="mb-5 max-sm:mb-3">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t(scope.totals.cancelled === 1 ? "annullata" : "annullate")}` : ""}`} />
@@ -283,23 +283,23 @@ export default function CanaliPage() {
         {chartsOn && <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <Card className="flex h-full flex-col">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Prenotazioni e ricavi per canale")}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Prenotazioni e ricavi per canale")}</div>
               <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-[11px] font-semibold max-sm:flex max-sm:w-full">
                 {(Object.keys(PERIOD_LABEL) as StatsPeriod[]).map((p) => (
-                  <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-2.5 py-1 transition max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-nowrap max-sm:px-1 max-sm:py-2 ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
+                  <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-2.5 py-1 transition max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-nowrap max-sm:px-1 max-sm:py-2 ${period === p ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
                 ))}
               </div>
             </div>
             <div className="flex flex-1 flex-col">
               <ChannelBars rows={scope.rows.map((r) => ({ label: r.mixed ? "Altre OTA" : (CHANNELS[r.channel]?.label ?? r.channel), color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel, name: r.name }))} fmtEur={eur} />
-              {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[10px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
+              {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[11px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
             </div>
           </Card>
           <Card className="flex h-full flex-col">
             <SectionTitle>{t("Ricavi lordi per mese")}</SectionTitle>
             <div className="flex flex-1 flex-col">
               <LineChart points={monthly.map(({ m, res }) => ({ label: m.label.charAt(0).toUpperCase() + m.label.slice(1), value: Math.round(res.totals.gross) }))} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} />
-              <div className="mt-auto pt-1 text-[10px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
+              <div className="mt-auto pt-1 text-[11px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
             </div>
           </Card>
         </div>}
@@ -310,9 +310,9 @@ export default function CanaliPage() {
       <Card className="mb-5 max-sm:mb-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${chxMap[effStructure] ? "text-on-ok" : "text-on-focus"}`} style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{t("Distribuzione sui canali")}{chxMap[effStructure] && <span className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--ok)]">● {t("Attiva")}</span>}{effStructure !== "all" && chxMap[effStructure] && (<>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{t("Distribuzione sui canali")}{chxMap[effStructure] && <span className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--ok)]">● {t("Attiva")}</span>}{effStructure !== "all" && chxMap[effStructure] && (<>
                 <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{activeChannels} {t("canali attivi")}</span>
                 {lastFull && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-normal text-dim">{t("Ultimo invio completo")}: {agoText(lastFull)}</span>}
               </>)}</div>
@@ -331,13 +331,13 @@ export default function CanaliPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2 max-sm:flex-nowrap lg:w-auto lg:shrink-0">
             <button onClick={() => setChartsOn((v) => !v)} aria-pressed={chartsOn} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} aria-label={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line transition ${chartsOn ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-            {!otaOff && <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:min-h-10 max-sm:flex-1">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>}
+            {!otaOff && <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:min-h-10 max-sm:flex-1">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>}
             {chxMap[effStructure] ? (
               <button onClick={() => { importOta(); doFullSync(); void loadOtaStatus(); }} disabled={impSync.running || fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:shrink-0 max-sm:place-items-center max-sm:p-0 lg:w-auto" aria-label={t("Sincronizza ora")} title={t("Controlla le nuove prenotazioni dalle OTA e rimanda a Channex l'intera finestra di disponibilità/prezzi, in un colpo solo. Normalmente entrambe avvengono già da sole.")}>{impSync.running || fullSync.running ? <><span className="sm:hidden" aria-hidden>…</span><span className="max-sm:hidden">{t("Sincronizzo…")}</span></> : <><span aria-hidden>⟳</span><span className="max-sm:hidden"> {t("Sincronizza ora")}</span></>}</button>
             ) : (
               <>
                 <button onClick={() => doRelink(true)} disabled={relink.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 max-sm:w-auto lg:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
-                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:w-auto max-sm:flex-1 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
+                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:w-auto max-sm:flex-1 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
               </>
             )}
           </div>
@@ -376,7 +376,7 @@ export default function CanaliPage() {
                         {[17, 9, 9, 12, 12, 12, 9, 15, 5].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
                       </colgroup>
                       <thead>
-                        <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
+                        <tr className="border-b border-line bg-wash text-left text-[11px] font-bold uppercase tracking-wide text-dim">
                           <th className={th}>{t("Canale")}</th>
                           <th className={th}>{t("Stato")}</th>
                           <th className={th}>{t("Correzione")}</th>
@@ -415,7 +415,7 @@ export default function CanaliPage() {
                                 </span>
                               </td>
                               <td className={td}>
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                               </td>
                               <td className={`${td} text-xs text-dim`}>{corr}</td>
                               <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.gross > 0 ? eur(st.gross) : dash}</td>
@@ -477,7 +477,7 @@ export default function CanaliPage() {
                         : (s.mark ?? s.name)}
                     </span>
                   )}
-                  <span className="ml-auto rounded-full bg-wash px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-faint">{t("Non collegato")}</span>
+                  <span className="ml-auto rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim">{t("Non collegato")}</span>
                 </div>
                 <p className="mt-2 flex-1 text-[13px] leading-snug text-dim">{s.why}</p>
                 <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="mt-3 self-start rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash max-sm:min-h-10 disabled:opacity-40">{t("Collega")} ↗</button>
@@ -517,7 +517,7 @@ export default function CanaliPage() {
                         {[...(CHANNEL_BRAND_COLORS[chKey] ? [CHANNEL_BRAND_COLORS[chKey] as string] : []), ...CHANNEL_PRESET_COLORS].map((hex) => (
                           <button key={hex} onClick={() => { saveChannelColor(chKey, hex); setColorTick((n) => n + 1); }} title={hex} aria-pressed={pickerColor.toLowerCase() === hex.toLowerCase()} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold leading-none text-white" style={{ backgroundColor: hex, textShadow: "0 0 2px rgba(0,0,0,.6)", boxShadow: pickerColor.toLowerCase() === hex.toLowerCase() ? "0 0 0 2px var(--surface), 0 0 0 4px var(--txt)" : "0 0 0 1px rgba(0,0,0,.12)" }}>{pickerColor.toLowerCase() === hex.toLowerCase() ? "✓" : ""}</button>
                         ))}
-                        <label className="relative grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line text-[10px] text-faint" title={t("Colore personalizzato")}>
+                        <label className="relative grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line text-[11px] text-faint" title={t("Colore personalizzato")}>
                           +
                           <input type="color" value={pickerColor} onChange={(e) => { saveChannelColor(chKey, e.target.value); setColorTick((n) => n + 1); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                         </label>

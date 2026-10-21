@@ -40,12 +40,12 @@ export default function FilterSheet({ count = 0, onReset, children, label = "Fil
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
         {label}
-        {count > 0 && <span className="grid h-4 min-w-4 place-items-center rounded-full bg-focus px-1 text-[10px] font-bold leading-none text-white">{count}</span>}
+        {count > 0 && <span className="grid h-4 min-w-4 place-items-center rounded-full bg-focus px-1 text-[10px] font-bold leading-none text-on-focus">{count}</span>}
       </button>
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align="end" width={340} label={label}>
        <div onClick={onPanelClick}>
         <div className="flex items-center justify-between px-2 pb-1 pt-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wide text-faint">{label}</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-dim">{label}</span>
           {onReset && count > 0 && <button type="button" onClick={onReset} className="text-xs font-semibold text-focus">Azzera</button>}
         </div>
         {/* I controlli si dispongono uno sotto l'altro a tutta larghezza (select, campi data, interruttori) */}

@@ -103,7 +103,7 @@ export default function BookingTimelineTab({ booking }: { booking: Booking }) {
   return (
     <div className="flex flex-col gap-3 px-5 pb-4 pt-5">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-faint">
+        <div className="text-xs font-semibold uppercase tracking-wide text-dim">
           {t("Cronologia")}{events.length > 0 && <span className="ml-1.5 font-normal normal-case tracking-normal">· {events.length}</span>}
         </div>
       </div>
@@ -154,7 +154,7 @@ function Row({ e, last, t }: { e: TimelineEvent; last: boolean; t: (s: string) =
       <div className="min-w-0 flex-1 pb-3.5">
         <div className="break-words text-[13px] font-medium leading-snug text-txt">{t(e.title)}</div>
         {e.detail && <div className="mt-0.5 whitespace-pre-line break-words text-[12px] leading-snug text-dim">{e.detail}</div>}
-        <div className="mt-0.5 text-[10px] uppercase tracking-wide text-faint">{t(e.source)}</div>
+        <div className="mt-0.5 text-[11px] uppercase tracking-wide text-dim">{t(e.source)}</div>
       </div>
     </li>
   );

@@ -52,7 +52,7 @@ export default function RiepilogoImport({ report, bookings, guests, structureNam
 
   return (
     <div className="mx-auto mt-6 max-w-3xl text-left">
-      <div className="mb-3 text-xs font-bold uppercase tracking-wide text-faint">Riconciliazione con il file{report.fileName ? ` · ${report.fileName}` : ""}</div>
+      <div className="mb-3 text-xs font-bold uppercase tracking-wide text-dim">Riconciliazione con il file{report.fileName ? ` · ${report.fileName}` : ""}</div>
 
       {!v ? (
         <div className="rounded-xl border border-line bg-wash px-4 py-3 text-sm text-dim">Controllo in corso…</div>

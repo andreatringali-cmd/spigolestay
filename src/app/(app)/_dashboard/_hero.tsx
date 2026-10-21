@@ -95,7 +95,7 @@ export default function Hero(p: HeroProps) {
         <div className="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-center gap-2 max-[359px]:grid-cols-3 md:gap-3">
           {figures.map((f, i) => (
             <div key={f.label} className="d2-fade min-w-0 rounded-2xl px-1.5 pb-1.5 pt-2 sm:px-2.5 lg:w-[108px] lg:px-3" style={glass({ animationDelay: `${160 + i * 70}ms` })}>
-              <div className="flex items-center gap-1 truncate text-[10px] font-semibold uppercase leading-none tracking-wide max-sm:text-[9px] max-lg:tracking-normal sm:text-[11px]" style={{ color: f.color }}>
+              <div className="flex items-center gap-1 truncate text-[11px] font-semibold uppercase leading-none tracking-wide max-sm:text-[10px] max-lg:tracking-normal sm:text-[11px]" style={{ color: f.color }}>
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: f.color, boxShadow: `0 0 8px ${f.color}` }} /><span className="truncate">{f.label}</span>
               </div>
               <div className="mt-1.5 font-display text-[1.9rem] font-bold leading-none tabular-nums sm:text-4xl" style={{ color: "#fff" }}><CountUp value={f.value} delay={200 + i * 80} /></div>
@@ -111,7 +111,7 @@ export default function Hero(p: HeroProps) {
                 <div className="font-display text-[1.35rem] font-bold leading-none tabular-nums sm:text-[2rem]" style={{ color: "#fff" }}><CountUp value={p.pct} delay={250} duration={1100} />
                   <span className="text-xs font-semibold sm:text-base" style={{ color: "rgba(235,241,255,.7)" }}>%</span>
                 </div>
-                <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide sm:text-[10px]" style={{ color: "rgba(235,241,255,.72)" }}>{p.totalRooms ? `${p.occupied}/${p.totalRooms} camere` : "stanotte"}</div>
+                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide sm:text-[11px]" style={{ color: "rgba(235,241,255,.72)" }}>{p.totalRooms ? `${p.occupied}/${p.totalRooms} camere` : "stanotte"}</div>
               </div>
             </Ring>
           </div>

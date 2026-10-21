@@ -85,7 +85,7 @@ export default function PagamentiPage() {
         <div className="col-span-2 flex flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-nowrap lg:col-span-3">
           <div className="flex shrink-0 items-center rounded-lg border border-line p-0.5">
             {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 max-sm:px-2.5 max-sm:py-2.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
+              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 max-sm:px-2.5 max-sm:py-2.5 text-xs font-medium ${filter === k ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t(l)}</button>
             ))}
           </div>
           <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-faint">{rows.length} {t("prenotazioni")}</span>
@@ -95,7 +95,7 @@ export default function PagamentiPage() {
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[860px] text-sm">
           <thead>
-            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
               <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
               <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
               <th className="px-3 py-2 font-semibold">{t("Check-in")}</th>
@@ -125,7 +125,7 @@ export default function PagamentiPage() {
                   )}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="rounded-md bg-focus px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Salda")}</button>}
+                  {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="rounded-md bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus hover:opacity-90">{t("Salda")}</button>}
                 </td>
               </tr>
             ))}
@@ -149,11 +149,11 @@ export default function PagamentiPage() {
               )}
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-              <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Totale")}</div><div className="font-mono text-dim">{eur(due)}</div></div>
-              <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Saldo")}</div><div className={`font-mono font-semibold ${balance > 0 ? "text-[color:var(--err)]" : "text-[color:var(--ok)]"}`}>{eur(balance)}</div></div>
-              <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Incassato")}</div><PaidCell key={`m-${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} className="mt-0.5 w-full" /></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Totale")}</div><div className="font-mono text-dim">{eur(due)}</div></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Saldo")}</div><div className={`font-mono font-semibold ${balance > 0 ? "text-[color:var(--err)]" : "text-[color:var(--ok)]"}`}>{eur(balance)}</div></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Incassato")}</div><PaidCell key={`m-${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} className="mt-0.5 w-full" /></div>
             </div>
-            {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="mt-2 w-full rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Salda")}</button>}
+            {balance > 0 && <button onClick={() => updateBooking(b.id, { paid: due })} className="mt-2 w-full rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Salda")}</button>}
           </div>
         ))}
         {rows.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessun pagamento con questi filtri.")} /></div>}

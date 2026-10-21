@@ -36,7 +36,7 @@ export default function Adempimenti({ items, total, urgent, loading, health, del
         <div className="grid gap-x-5 gap-y-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:items-center">
           <div className="flex flex-col items-center gap-1.5">
             <HalfGauge pct={health.pct} color={gaugeColor} width={148} label={`Passaggi completati: ${health.pct}% (${health.done} su ${health.total})`}>
-              <span className="font-display text-3xl font-bold leading-none tabular-nums text-txt"><CountUp value={health.pct} duration={1000} /><span className="text-base font-semibold text-faint">%</span></span>
+              <span className="font-display text-3xl font-bold leading-none tabular-nums text-txt"><CountUp value={health.pct} duration={1000} /><span className="text-base font-semibold text-dim">%</span></span>
             </HalfGauge>
             <span className="text-[11px] text-faint" title="Check-in, pagamenti e schedine di chi è in struttura, arriva o parte oggi">{health.total ? `${health.done}/${health.total} fatti` : "nessun passaggio"}</span>
           </div>

@@ -33,7 +33,7 @@ export default function LinkPreview({ text }: { text: string }) {
       <div className="px-3 py-2">
         {data.title && <div className="truncate text-xs font-semibold">{data.title}</div>}
         {data.description && <div className="mt-0.5 line-clamp-2 text-[11px] text-dim">{data.description}</div>}
-        <div className="mt-0.5 text-[10px] text-faint">{data.host}</div>
+        <div className="mt-0.5 text-[11px] text-faint">{data.host}</div>
       </div>
     </a>
   );

@@ -55,12 +55,12 @@ function StepCard({ n, tone, label, count, badge, action, onAction, children }: 
         <div className="flex items-start gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl font-mono font-bold ${badge ? "text-[15px]" : "text-xl"}`} style={{ background: active ? soft(tone) : "var(--wash)", color: active ? tone : "var(--faint)" }}>{badge ?? count}</span>
           <div className="min-w-0 flex-1 pt-0.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Passo {n}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Passo {n}</div>
             <h3 className="mt-0.5 text-[13.5px] font-semibold leading-snug text-txt">{label}</h3>
           </div>
         </div>
         {children ? <div className="mt-3 flex-1 space-y-1.5">{children}</div> : <div className="flex-1" />}
-        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 max-sm:py-3 max-sm:text-sm text-xs font-semibold text-white transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
+        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 max-sm:py-3 max-sm:text-sm text-xs font-semibold text-on-focus transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
       </div>
     </article>
   );
@@ -81,14 +81,14 @@ function DoneRow({ left, right }: { left: string; right?: string }) {
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[12.5px]">
       <span className="truncate text-dim"><span className="text-[color:var(--ok)]">✓</span> {left}</span>
-      {right && <span className="shrink-0 font-mono text-faint">{right}</span>}
+      {right && <span className="shrink-0 font-mono text-dim">{right}</span>}
     </div>
   );
 }
 
 // Etichetta di sezione (Da fare / Fatti) dentro una card.
 function SubHead({ children, mt }: { children: React.ReactNode; mt?: boolean }) {
-  return <div className={`text-[10px] font-semibold uppercase tracking-wide text-faint ${mt ? "mt-2" : ""}`}>{children}</div>;
+  return <div className={`text-[11px] font-semibold uppercase tracking-wide text-dim ${mt ? "mt-2" : ""}`}>{children}</div>;
 }
 
 // Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
@@ -133,8 +133,8 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
   return (
     <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {shownName(b, g)}{rooms && rooms > 1 ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {rooms} camere</span> : b.groupId ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span> : null}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
-        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
+        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-dim">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {shownName(b, g)}{rooms && rooms > 1 ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {rooms} camere</span> : b.groupId ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span> : null}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
           {partial ? `Incompleto ${declared}/${expected}` : declared === 0 ? "Check-in mancante" : "Da fare"}
         </span>
       </div>
@@ -144,9 +144,9 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
         <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className="rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70" style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "#25D366" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
-        {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
-        <button onClick={compila} className="rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
+        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold hover:opacity-90 disabled:opacity-70 ${ws === "sent" ? "text-on-ok" : ws === "err" ? "text-on-err" : "text-white"}`} style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "#25D366" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
+        {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)] text-on-ok" : mail === "err" ? "bg-[color:var(--err)] text-on-err" : "bg-focus text-on-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
+        <button onClick={compila} className="rounded-md px-2 py-1 max-sm:px-3 max-sm:py-2 max-sm:text-xs text-[11px] font-semibold text-on-warn hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
       </div>
     </div>
   );
@@ -430,7 +430,7 @@ export default function AdempimentiPage() {
           </>
         )}
         {/* Azione "in un click": elabora TUTTI gli adempimenti PA dovuti (schedine, ISTAT, tassa) in sequenza. */}
-        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 max-sm:ml-auto max-sm:shrink-0 max-sm:justify-center max-sm:px-3 max-sm:py-2.5 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
+        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 max-sm:ml-auto max-sm:shrink-0 max-sm:justify-center max-sm:px-3 max-sm:py-2.5 rounded-xl px-4 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
           <span aria-hidden>⚡</span>{runBusy ? "Elaboro…" : "Elabora tutto"}
         </button>
       </section>
@@ -451,7 +451,7 @@ export default function AdempimentiPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] font-semibold text-txt">{s.label}</span>
-                      <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ background: soft(m.tone), color: m.tone }}>{m.label}</span>
+                      <span className="rounded-full px-1.5 py-0.5 text-[11px] font-bold uppercase" style={{ background: soft(m.tone), color: m.tone }}>{m.label}</span>
                     </div>
                     <div className="mt-0.5 text-[12px] text-dim">{s.detail}</div>
                   </div>
@@ -504,7 +504,7 @@ export default function AdempimentiPage() {
                     const openCheckin = () => { const u = `${origin}/checkin?b=${b.id}`; const w = window.open(u, "_blank"); if (!w) window.location.href = u; };
                     return (
                       <button key={gr.key} onClick={openCheckin} title="Apri il check-in online per completare/correggere i dati" className="flex w-full items-center justify-between gap-2 rounded-lg border bg-paper px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-wash" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" }}>
-                        <span className="truncate text-dim"><span className="font-mono text-faint">{bkNo(b)}</span> · {shownName(b, g)}{gr.rooms > 1 && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {gr.rooms} camere</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
+                        <span className="truncate text-dim"><span className="font-mono text-dim">{bkNo(b)}</span> · {shownName(b, g)}{gr.rooms > 1 && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {gr.rooms} camere</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
                         <span className="shrink-0 font-semibold" style={{ color: "var(--err)" }}>⚠ correggi →</span>
                       </button>
                     );

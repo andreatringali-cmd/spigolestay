@@ -50,13 +50,13 @@ export default function WeatherWidget({ compact }: { compact?: boolean }) {
     );
     return (
       <div className="hidden items-center gap-2 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-1 sm:flex" title={`${t("Previsioni")} ${cityName} · ${t("prossimi giorni")}`}>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{cityName === "Siracusa" ? t("Siracusa") : cityName}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">{cityName === "Siracusa" ? t("Siracusa") : cityName}</span>
         {days.slice(0, 3).map((d, i) => {
           const w = WMO[d.code] ?? { t: "—", e: "🌡️" };
           const dow = DOW[new Date(d.date + "T12:00:00").getDay()];
           return (
             <div key={d.date} className={`flex items-center gap-1 pr-2 ${i > 0 ? "border-l border-line pl-2" : ""}`} title={w.t}>
-              <span className="text-[10px] text-faint">{i === 0 ? t("oggi") : dow}</span>
+              <span className="text-[11px] text-faint">{i === 0 ? t("oggi") : dow}</span>
               <span className="text-sm leading-none">{w.e}</span>
               <span className="text-xs font-bold text-txt">{d.tmax}°</span>
             </div>
@@ -69,7 +69,7 @@ export default function WeatherWidget({ compact }: { compact?: boolean }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Meteo")} · {cityName === "Siracusa" ? t("Siracusa") : cityName}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Meteo")} · {cityName === "Siracusa" ? t("Siracusa") : cityName}</span>
         <span className="text-[11px] text-faint">{t("prossimi giorni")}</span>
       </div>
       {err ? (

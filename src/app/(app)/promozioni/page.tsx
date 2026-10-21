@@ -216,12 +216,12 @@ export default function PromozioniPage() {
               <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-3 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0"><div className="truncate font-bold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div></div>
-                  {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
+                  {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
                 </div>
                 {p.description && <p className="mt-1 text-xs text-dim">{p.description}</p>}
                 <p className="mt-1.5 line-clamp-2 flex-1 text-xs text-dim">{p.body}</p>
                 <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
-                  <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 max-sm:min-h-10"><Icon name="mail" size={13} /> Invia</button>
+                  <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 max-sm:min-h-10"><Icon name="mail" size={13} /> Invia</button>
                   <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Modifica</button>
                   <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash max-sm:min-h-10"><Icon name="copy" size={13} /></button>
                   <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)] max-sm:min-h-10">✕</button>
@@ -252,7 +252,7 @@ export default function PromozioniPage() {
           </div>
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
             {editId && <button onClick={resetEditor} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">Annulla modifica</button>}
-            <button onClick={savePromo} disabled={!name.trim() && !subject.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{editId ? "Salva modifiche" : "Salva promo"}</button>
+            <button onClick={savePromo} disabled={!name.trim() && !subject.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{editId ? "Salva modifiche" : "Salva promo"}</button>
           </div>
         </Card>
 
@@ -275,7 +275,7 @@ export default function PromozioniPage() {
           <SectionTitle>Invii ({logs.length})</SectionTitle>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full min-w-[560px] text-sm">
-              <thead><tr className="border-b border-line bg-wash text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-2 font-semibold">Promo</th><th className="px-3 py-2 font-semibold">Segmento</th><th className="px-3 py-2 font-semibold">Destinatari</th><th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2"></th></tr></thead>
+              <thead><tr className="border-b border-line bg-wash text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-2 font-semibold">Promo</th><th className="px-3 py-2 font-semibold">Segmento</th><th className="px-3 py-2 font-semibold">Destinatari</th><th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2"></th></tr></thead>
               <tbody>{logs.map((l) => (
                 <tr key={l.id} className="border-b border-line last:border-0">
                   <td className="px-3 py-2 font-medium text-txt">{l.promoName}</td>
@@ -305,7 +305,7 @@ export default function PromozioniPage() {
             <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b>{excluded > 0 && <span> · {excluded} esclusi (senza consenso marketing o con email di inoltro OTA)</span>}</div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-              <button onClick={doSend} disabled={audience.length === 0 || limitReached || promoSending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> {promoSending ? "Invio in corso…" : `Invia ora (${audience.length})`}</button>
+              <button onClick={doSend} disabled={audience.length === 0 || limitReached || promoSending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> {promoSending ? "Invio in corso…" : `Invia ora (${audience.length})`}</button>
             </div>
           </div>
         </div>

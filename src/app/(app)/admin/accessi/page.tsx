@@ -92,7 +92,7 @@ export default function AccessiPage() {
             <label className="text-[11px] font-semibold text-dim">Nota (opzionale)</label>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="es. B&B Aurora, Siracusa" className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt" />
           </div>
-          <button onClick={add} disabled={busy} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--focus)" }}>
+          <button onClick={add} disabled={busy} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-focus disabled:opacity-60" style={{ backgroundColor: "var(--focus)" }}>
             {busy ? "Aggiungo…" : "Approva accesso"}
           </button>
         </div>

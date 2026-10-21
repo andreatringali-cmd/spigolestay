@@ -51,7 +51,7 @@ export default function ContattiDaCorreggere() {
   const tidyBar = tidyAll.length > 0 && (
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm max-sm:mb-3">
       <span><b className="text-txt">{tidyAll.length}</b> numeri di telefono sono scritti in formati diversi (trattini, spazi, con o senza prefisso).</span>
-      <button onClick={uniforma} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 max-sm:min-h-10">Uniforma i numeri</button>
+      <button onClick={uniforma} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 max-sm:min-h-10">Uniforma i numeri</button>
     </div>
   );
   if (list.length === 0) return tidyBar || null;
@@ -96,10 +96,10 @@ export default function ContattiDaCorreggere() {
                     {i.detail && <span className="text-dim">{i.detail}</span>}
                   </div>
                 ))}
-                <div className="mt-0.5 truncate font-mono text-[11px] text-faint">{[x.guest.phone || "nessun telefono", x.guest.email ? (isRelayEmail(x.guest.email) ? "email OTA" : x.guest.email) : "nessuna email"].join(" · ")}</div>
+                <div className="mt-0.5 truncate font-mono text-[11px] text-dim">{[x.guest.phone || "nessun telefono", x.guest.email ? (isRelayEmail(x.guest.email) ? "email OTA" : x.guest.email) : "nessuna email"].join(" · ")}</div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-                {fixes.map((f) => <button key={f.field + f.value} onClick={() => apply(x, f.field, f.value)} className="rounded-lg bg-focus px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90">{f.label}</button>)}
+                {fixes.map((f) => <button key={f.field + f.value} onClick={() => apply(x, f.field, f.value)} className="rounded-lg bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus hover:opacity-90">{f.label}</button>)}
                 <button onClick={() => copy(x)} title={OTA.has(x.booking.channel) ? `Copia un messaggio per chiedere il contatto: incollalo nella chat di ${ch}` : "Copia un messaggio per chiedere il contatto all'ospite"} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{copied === x.guest.id ? "Copiato ✓" : OTA.has(x.booking.channel) ? `Chiedi su ${ch}` : "Chiedi il contatto"}</button>
                 <Link href={`/ospiti/${x.guest.id}`} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Correggi</Link>
               </div>

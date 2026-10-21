@@ -29,9 +29,9 @@ function NextStrip({ task, onAction, busyId, structName }: { task: Task | null; 
   const busy = busyId === task.id;
   return (
     <div className="mt-2.5 flex items-center gap-2.5 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: tint(c, 9) }}>
-      <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-wide sm:inline" style={{ color: c }}>{URGENCY_LABEL[task.urgency]}</span>
+      <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide sm:inline" style={{ color: c }}>{URGENCY_LABEL[task.urgency]}</span>
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-[13px] font-semibold text-txt"><span className="mr-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">Prossimo</span>{task.title}</div>
+        <div className="truncate text-[13px] font-semibold text-txt"><span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">Prossimo</span>{task.title}</div>
         <div className="truncate text-[11px] text-dim">{ENTE_META[task.ente].short} · {task.status}{structName ? ` · ${structName}` : ""} · <span className="font-semibold" style={{ color: c }}>{task.dueLabel}</span></div>
       </div>
       <button type="button" disabled={busy} onClick={() => onAction(task, task.action)} className={BTN_PRIMARY}>{busy ? "…" : task.action.label}</button>
@@ -84,7 +84,7 @@ export default function Hero({ summary, next, nextStruct, loading, onAction, bus
                   <span className="hidden sm:block"><IconTile icon={m.icon} color={c} size="sm" /></span>
                   <span className="font-mono text-[13px] font-bold tabular-nums" style={{ color: e.urgent > 0 ? c : "var(--ok)" }}>{e.urgent > 0 ? e.urgent : "✓"}</span>
                   <span className="min-w-0 truncate text-[11.5px] font-semibold text-txt">{m.short}</span>
-                  {e.soon > 0 && <span className="shrink-0 text-[10px] font-medium text-faint">+{e.soon}</span>}
+                  {e.soon > 0 && <span className="shrink-0 text-[11px] font-medium text-faint">+{e.soon}</span>}
                 </button>
               );
             })}

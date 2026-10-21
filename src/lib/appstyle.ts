@@ -8,10 +8,10 @@ export const VAR_KEYS = ["--paper", "--surface", "--wash", "--line", "--txt", "-
 // Solo 4 palette (su richiesta): le altre proposte/varianti sono state rimosse per
 // semplificare la scelta in Impostazioni. L'indice 0 resta il default.
 export const PALETTES: Pal[] = [
-  { name: "Greige (predefinito)", swatch: ["#EEECE8", "#FAF9F7", "#2F6BB0"], vars: { "--paper": "#EEECE8", "--surface": "#FAF9F7", "--wash": "#E6E2DB", "--line": "#E1DDD6", "--txt": "#26241F", "--dim": "#726D64", "--faint": "#A69E90", "--focus": "#2F6BB0" }, dark: { "--paper": "#17150F", "--surface": "#221F18", "--wash": "#2B2820", "--line": "#37322A", "--txt": "#ECE8E0", "--dim": "#A69E90", "--faint": "#6F685C", "--focus": "#6FA3DC" } },
-  { name: "Sabbia", swatch: ["#F1ECE3", "#FBF9F4", "#A6763B"], vars: { "--paper": "#F1ECE3", "--surface": "#FBF9F4", "--wash": "#EFE7D8", "--line": "#E5DDCE", "--txt": "#2A2620", "--dim": "#7A7160", "--faint": "#B3A992", "--focus": "#A6763B" }, dark: { "--paper": "#1A1610", "--surface": "#241F17", "--wash": "#2E271C", "--line": "#3A3227", "--txt": "#EEE7DA", "--dim": "#B3A992", "--faint": "#7A7160", "--focus": "#C89B5E" } },
-  { name: "Grafite (rail scuri)", swatch: ["#F4F4F5", "#1F1F26", "#4F46E5"], vars: { "--paper": "#F4F4F5", "--surface": "#FFFFFF", "--wash": "#EFEFF1", "--line": "#E4E4E7", "--txt": "#18181B", "--dim": "#5F6067", "--faint": "#9A9BA2", "--focus": "#4F46E5" }, dark: { "--paper": "#131318", "--surface": "#1E1E24", "--wash": "#26262C", "--line": "#313138", "--txt": "#ECECEF", "--dim": "#9A9AA2", "--faint": "#6C6C74", "--focus": "#8B84F5" }, rails: "aside{--surface:#1F1F26;--wash:#2A2A33;--line:#2E2E38;--txt:#E9E9EE;--dim:#B4B4BE;--faint:#8A8A94;--focus:#8B84F5}footer{--line:#2E2E38;--faint:#9A9AA4;--dim:#B4B4BE;background:#1F1F26}" },
-  { name: "Stampa", swatch: ["#F7F3EA", "#FFFFFF", "#B3241A"], vars: { "--paper": "#F7F3EA", "--surface": "#FFFFFF", "--wash": "#EFE9DB", "--line": "#DAD2BF", "--txt": "#1A1714", "--dim": "#5B5348", "--faint": "#9C9284", "--focus": "#B3241A" }, dark: { "--paper": "#14110D", "--surface": "#1E1A15", "--wash": "#262019", "--line": "#362E24", "--txt": "#F1EAD9", "--dim": "#C2B8A4", "--faint": "#7C7365", "--focus": "#E2493C" } },
+  { name: "Greige (predefinito)", swatch: ["#EEECE8", "#FAF9F7", "#2F6BB0"], vars: { "--paper": "#EEECE8", "--surface": "#FAF9F7", "--wash": "#E6E2DB", "--line": "#E1DDD6", "--txt": "#26241F", "--dim": "#57524A", "--faint": "#6A6459", "--focus": "#2F6BB0" }, dark: { "--paper": "#17150F", "--surface": "#221F18", "--wash": "#2B2820", "--line": "#37322A", "--txt": "#ECE8E0", "--dim": "#A69E90", "--faint": "#969085", "--focus": "#6FA3DC" } },
+  { name: "Sabbia", swatch: ["#F1ECE3", "#FBF9F4", "#A6763B"], vars: { "--paper": "#F1ECE3", "--surface": "#FBF9F4", "--wash": "#EFE7D8", "--line": "#E5DDCE", "--txt": "#2A2620", "--dim": "#60584B", "--faint": "#6E6759", "--focus": "#A6763B" }, dark: { "--paper": "#1A1610", "--surface": "#241F17", "--wash": "#2E271C", "--line": "#3A3227", "--txt": "#EEE7DA", "--dim": "#B3A992", "--faint": "#978F7F", "--focus": "#C89B5E" } },
+  { name: "Grafite (rail scuri)", swatch: ["#F4F4F5", "#1F1F26", "#4F46E5"], vars: { "--paper": "#F4F4F5", "--surface": "#FFFFFF", "--wash": "#EFEFF1", "--line": "#E4E4E7", "--txt": "#18181B", "--dim": "#5B5C63", "--faint": "#6B6C71", "--focus": "#4F46E5" }, dark: { "--paper": "#131318", "--surface": "#1E1E24", "--wash": "#26262C", "--line": "#313138", "--txt": "#ECECEF", "--dim": "#9E9EA6", "--faint": "#8D8D94", "--focus": "#8B84F5" }, rails: "aside{--surface:#1F1F26;--wash:#2A2A33;--line:#2E2E38;--txt:#E9E9EE;--dim:#B4B4BE;--faint:#8A8A94;--focus:#8B84F5}footer{--line:#2E2E38;--faint:#9A9AA4;--dim:#B4B4BE;background:#1F1F26}" },
+  { name: "Stampa", swatch: ["#F7F3EA", "#FFFFFF", "#B3241A"], vars: { "--paper": "#F7F3EA", "--surface": "#FFFFFF", "--wash": "#EFE9DB", "--line": "#DAD2BF", "--txt": "#1A1714", "--dim": "#5B5348", "--faint": "#6E675D", "--focus": "#B3241A" }, dark: { "--paper": "#14110D", "--surface": "#1E1A15", "--wash": "#262019", "--line": "#362E24", "--txt": "#F1EAD9", "--dim": "#C2B8A4", "--faint": "#91887A", "--focus": "#E2493C" } },
 ];
 
 export type Struct = { name: string; css: string };
@@ -46,7 +46,8 @@ export function applyPalette(i: number | null) {
   }
   const p = PALETTES[i];
   // Palette theme-aware via <style>: :root per il chiaro, .dark per lo scuro
-  // (la classe .dark è su un contenitore, quindi vince sulle variabili di :root).
+  // (la classe .dark è su <html> e sul contenitore dell'app; questa regola viene DOPO :root, quindi vince sul chiaro).
+  // dim/faint di ogni palette sono tarati a >= 4,5:1 su wash (vedi nota in globals.css).
   const light = VAR_KEYS.map((k) => `${k}:${p.vars[k]}`).join(";");
   const darkVars = p.dark ?? p.vars;
   const dark = VAR_KEYS.map((k) => (darkVars[k] ? `${k}:${darkVars[k]}` : "")).filter(Boolean).join(";");

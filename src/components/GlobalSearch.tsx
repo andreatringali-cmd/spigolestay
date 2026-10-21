@@ -56,7 +56,7 @@ export default function GlobalSearch() {
       <button onClick={() => setOpen(true)} className="flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-faint transition hover:border-focus">
         <Icon name="search" size={16} />
         <span>{t("Cerca qualsiasi cosa…")}</span>
-        <span className="ml-auto hidden rounded border border-line px-1.5 py-0.5 text-[10px] sm:inline">Ctrl K</span>
+        <span className="ml-auto hidden rounded border border-line px-1.5 py-0.5 text-[11px] sm:inline">Ctrl K</span>
       </button>
 
       {open && (
@@ -98,7 +98,7 @@ function Group({ title, show, children }: { title: string; show: boolean; childr
   if (!show) return null;
   return (
     <div className="mb-1">
-      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-faint">{title}</div>
+      <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-dim">{title}</div>
       {children}
     </div>
   );

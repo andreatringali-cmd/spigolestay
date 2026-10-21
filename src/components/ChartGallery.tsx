@@ -21,7 +21,7 @@ export default function ChartGallery({ charts, perPage = 4 }: { charts: ChartIte
   return (
     <div>
       <div className="mb-4 flex items-center justify-between rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <span className="text-xs font-semibold uppercase tracking-wide text-faint">Grafici</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-dim">Grafici</span>
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-dim">{p + 1} / {pages}</span>
           <button onClick={() => setPage(Math.max(0, p - 1))} disabled={p === 0} className="rounded-lg border border-line p-1.5 text-dim enabled:hover:bg-wash enabled:hover:text-txt disabled:opacity-40">

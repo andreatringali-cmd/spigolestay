@@ -102,7 +102,7 @@ export default function ModelliPanel() {
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-2">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 max-sm:h-9 max-sm:min-w-0 max-sm:py-0 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button type="button" disabled={!newTplStructure} title={!newTplStructure ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(newTplStructure ? [newTplStructure] : undefined)); setEditLang("it"); }} className="inline-flex disabled:cursor-not-allowed disabled:opacity-50 items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:gap-1 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
+        <button type="button" disabled={!newTplStructure} title={!newTplStructure ? t("Scegli una struttura in alto a destra: ogni modello è di una struttura") : undefined} onClick={() => { setEditing(emptyTpl(newTplStructure ? [newTplStructure] : undefined)); setEditLang("it"); }} className="inline-flex disabled:cursor-not-allowed disabled:opacity-50 items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:gap-1 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]"><span aria-hidden className="text-base leading-none">+</span>{t("Nuovo modello")}</button>
         <button type="button" onClick={() => setShowSettings((v) => !v)} aria-pressed={showSettings} aria-label={t("Impostazioni")} title={t("Impostazioni (link recensioni…)")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition ${showSettings ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
@@ -121,7 +121,7 @@ export default function ModelliPanel() {
                 <Card key={tpl.id}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
+                      <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
                       <div className="mt-0.5 text-xs text-dim">{tpl.structureIds?.length ? `${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
                     </div>
                     {(tpl.showInBooking || tpl.srcId) && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Nella scheda")}</span>}
@@ -158,7 +158,7 @@ export default function ModelliPanel() {
 
             <div className="mt-4">
               <div className="mb-1.5 flex items-center gap-1">
-                {LANGS.map(([l, n]) => (<button key={l} onClick={() => setEditLang(l)} className={`rounded-md px-2 py-1 text-xs font-medium max-sm:min-h-9 max-sm:px-3 ${editLang === l ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n.slice(0, 3)}</button>))}
+                {LANGS.map(([l, n]) => (<button key={l} onClick={() => setEditLang(l)} className={`rounded-md px-2 py-1 text-xs font-medium max-sm:min-h-9 max-sm:px-3 ${editLang === l ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{n.slice(0, 3)}</button>))}
               </div>
               <textarea value={editing.texts[editLang]} onChange={(e) => setEditing({ ...editing, texts: { ...editing.texts, [editLang]: e.target.value } })} rows={5} className="w-full resize-none rounded-lg border border-line bg-paper p-3 text-sm text-txt outline-none focus:border-focus" placeholder={`${t("Testo in")} ${LANGS.find(([l]) => l === editLang)?.[1]}…`} />
               <div className="mt-2"><VarLegend vars={MSG_VARS} onInsert={insertVar} /></div>
@@ -175,7 +175,7 @@ export default function ModelliPanel() {
 
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
-              <button onClick={saveTpl} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:min-h-11">{t("Salva modello")}</button>
+              <button onClick={saveTpl} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:min-h-11">{t("Salva modello")}</button>
             </div>
           </Card>
         </div>

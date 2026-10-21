@@ -75,9 +75,9 @@ export default function DateField({
             <button type="button" onClick={() => setView(new Date(y, m + 1, 1))} aria-label={cal.next} className="grid h-7 w-7 place-items-center rounded-lg text-lg leading-none text-dim hover:bg-wash">›</button>
           </div>
           <div className="grid grid-cols-7 gap-0.5 text-center">
-            {DOW.map((d) => <span key={d} className="py-1 text-[10px] font-semibold text-faint">{d}</span>)}
+            {DOW.map((d) => <span key={d} className="py-1 text-[11px] font-semibold text-dim">{d}</span>)}
             {cells.map((d, i) => d === null ? <span key={i} /> : (
-              <button key={i} type="button" disabled={out(d)} onClick={() => { onChange(iso(d)); setOpen(false); }} className={`grid h-7 place-items-center rounded-lg text-xs transition ${value === iso(d) ? "bg-focus font-semibold text-white" : iso(d) === todayIso ? "font-semibold text-focus hover:bg-wash" : "text-txt hover:bg-wash"}`}>{d}</button>
+              <button key={i} type="button" disabled={out(d)} onClick={() => { onChange(iso(d)); setOpen(false); }} className={`grid h-7 place-items-center rounded-lg text-xs transition ${value === iso(d) ? "bg-focus font-semibold text-on-focus" : iso(d) === todayIso ? "font-semibold text-focus hover:bg-wash" : "text-txt hover:bg-wash"}`}>{d}</button>
             ))}
           </div>
           <div className="mt-1 flex gap-1">

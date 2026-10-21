@@ -90,7 +90,7 @@ export default function GoogleHotelSection({ structure }: { structure: Structure
           : <><span className="text-dim">{t("Mancano")}:</span>{missing.map((m) => <span key={m.key} title={t(m.hint ?? "")} className="rounded-full px-2.5 py-1 font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: warnColor }}>{t(m.label)}</span>)}</>}
       </div>
 
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Foto")} {photos ? `· ${photos.length}` : ""}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Foto")} {photos ? `· ${photos.length}` : ""}</div>
       <div className="mt-1 grid grid-cols-5 gap-1.5 sm:grid-cols-8 lg:grid-cols-10">
         {(photos ?? []).map((p, i) => (
           <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg border border-line bg-wash">
@@ -98,13 +98,13 @@ export default function GoogleHotelSection({ structure }: { structure: Structure
             <img src={p.url} alt="" loading="lazy" className="h-full w-full object-cover" />
             {i === 0 && <span className="absolute left-0.5 top-0.5 rounded bg-black/60 px-1 py-px text-[8px] font-semibold text-white">{t("Copertina")}</span>}
             <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-              <button type="button" onClick={() => removePhoto(p.id)} className="rounded bg-white/90 px-1.5 py-px text-[9px] font-semibold text-[color:var(--err)]">{t("Elimina")}</button>
+              <button type="button" onClick={() => removePhoto(p.id)} className="rounded bg-white/90 px-1.5 py-px text-[10px] font-semibold text-[color:var(--err)]">{t("Elimina")}</button>
             </div>
           </div>
         ))}
         {(photos?.length ?? 0) < MAX_PHOTOS && (
           <button type="button" onClick={() => fileRef.current?.click()} disabled={!!upload?.running} className="grid aspect-square place-items-center rounded-lg border border-dashed border-line text-faint transition hover:bg-wash hover:text-focus disabled:opacity-50">
-            {upload?.running ? <span className="text-xs">{upload.done}/{upload.total}…</span> : <span className="text-center text-[10px] leading-tight">＋<br />{t("Carica")}</span>}
+            {upload?.running ? <span className="text-xs">{upload.done}/{upload.total}…</span> : <span className="text-center text-[11px] leading-tight">＋<br />{t("Carica")}</span>}
           </button>
         )}
       </div>

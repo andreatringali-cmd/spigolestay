@@ -74,7 +74,7 @@ function AdsForm({ st, showPicker, structures, sid, onPick, saved, setSaved }: {
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+        <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
         {saved && <span className="text-xs font-semibold" style={{ color: "var(--ok)" }}>✓ {t("Salvato. Ora ripubblica il sito della struttura per applicarlo alla pagina di prenotazione.")}</span>}
         {!saved && active && label.trim() === "" && <span className="text-xs" style={{ color: "var(--warn)" }}>{t("Senza etichetta il tag si carica ma non si inviano conversioni.")}</span>}
       </div>

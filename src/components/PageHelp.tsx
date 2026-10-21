@@ -306,7 +306,7 @@ const HELP: Record<string, Guide> = {
       { h: "Il movimento del giorno", items: ["Sotto trovi l'elenco con l'etichetta del giorno: 🟢 Arrivo, Partenza, 🔵 Presente.", "Apri una riga per il dettaglio (notti, camera, provenienza, canale) e «Modifica dati» se serve correggere (è collegato alle prenotazioni e ad Alloggiati).", "Gli arrivi futuri non sono «da inviare»: si comunicano dopo l'arrivo."] },
       { h: "Chiudi giornata", items: ["«Chiudi giornata» trasmette il movimento di quel giorno all'Osservatorio e passa al giorno dopo (come la «Chiusura Giornaliera» del portale).", "Con l'invio automatico attivo (impostazioni ⚙) la chiusura può partire da sola ogni giorno.", "Ogni chiusura finisce nell'«📁 Archivio» (pagina con elenco e filtri per data)."] },
       { h: "Archivio e CSV", items: ["«📁 Archivio»: storico di tutte le chiusure giornaliere inviate.", "«⬇ Scarica CSV»: esporta il movimento (dettaglio per ospite: permanenza, camera, età, sesso, cittadinanza, nascita, residenza), utile per inserimento o riconciliazione manuale."] },
-      { h: "Collegamento automatico", items: ["Per l'invio automatico reale serve un account «USER PMS» del portale regionale (uno per struttura), da richiedere una volta al Servizio Osservatorio Turistico.", "Finché non è collegato, la pagina funziona in modalità dimostrativa e puoi comunque usare il CSV per l'inserimento manuale.", "Le credenziali si inseriscono nelle impostazioni ⚙ (regione, portale, username, password)."] },
+      { h: "Collegamento automatico", items: ["Per l'invio automatico reale serve un account «USER PMS» del portale regionale (uno per struttura), da richiedere una volta al Servizio Osservatorio Turistico.", "Finché non è collegato l'invio non è automatico: puoi comunque usare il CSV per l'inserimento manuale.", "Le credenziali si inseriscono nelle impostazioni ⚙ (regione, portale, username, password)."] },
     ],
   },
   "/tassa-soggiorno": {
@@ -413,7 +413,7 @@ export default function PageHelp() {
           <div className="relative max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-white">?</span>
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-on-focus">?</span>
                 <h2 className="font-display text-lg font-bold text-txt">Guida · {guide.title}</h2>
               </div>
               <button onClick={() => setOpen(false)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>

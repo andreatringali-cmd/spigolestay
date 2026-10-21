@@ -23,7 +23,9 @@ import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
 import { isValidEmail, structuresToShare, humanInviteError } from "@/lib/user-access";
 import { friendlyError } from "@/lib/friendly-error";
+import { PASSWORD_MIN } from "@/components/PublicUi";
 
+import { onSolid } from "@/lib/on-solid";
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)", label }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string; label?: string }) {
   return (
@@ -47,9 +49,9 @@ const IcoBan = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strok
 const IcoEye = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 const IcoPen = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></svg>;
 const LEVEL_META: Record<PermLevel, { label: string; icon: React.ReactNode; color: string }> = {
-  none: { label: "Nessuno", icon: IcoBan, color: "#D64545" },
-  view: { label: "Visualizza", icon: IcoEye, color: "#2563EB" },
-  edit: { label: "Modifica", icon: IcoPen, color: "#0E9F6E" },
+  none: { label: "Nessuno", icon: IcoBan, color: "var(--err)" },
+  view: { label: "Visualizza", icon: IcoEye, color: "var(--focus)" },
+  edit: { label: "Modifica", icon: IcoPen, color: "var(--ok)" },
 };
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -84,7 +86,7 @@ export default function UserSchedaPage() {
   const resetPwFields = () => { setCurPw(""); setNewPw(""); setNewPw2(""); setPwMsg(null); };
   const changePw = async () => {
     setPwMsg(null);
-    if (newPw.length < 6) { setPwMsg({ ok: false, text: t("La nuova password deve avere almeno 6 caratteri.") }); return; }
+    if (newPw.length < PASSWORD_MIN) { setPwMsg({ ok: false, text: t(`La nuova password deve avere almeno ${PASSWORD_MIN} caratteri.`) }); return; }
     if (newPw !== newPw2) { setPwMsg({ ok: false, text: t("Le due nuove password non coincidono.") }); return; }
     if (!isSelf) { setPwMsg({ ok: false, text: t("Puoi cambiare direttamente solo la password del TUO account. Per gli altri usa «Invia email di reset».") }); return; }
     if (!supabase || !authUser?.email) { setPwMsg({ ok: false, text: t("Accesso non disponibile.") }); return; }
@@ -231,7 +233,7 @@ export default function UserSchedaPage() {
           <div className="flex flex-wrap items-center gap-2">
             {canDelete && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={() => router.push("/utenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!valid} title={valid ? "" : `${t("Mancano:")} ${errs.join(", ")}`} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea utente") : t("Salva")}</button>
+            <button onClick={save} disabled={!valid} title={valid ? "" : `${t("Mancano:")} ${errs.join(", ")}`} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea utente") : t("Salva")}</button>
           </div>
         }
       />
@@ -295,10 +297,10 @@ export default function UserSchedaPage() {
               {pwOpen && (isSelf ? (
                 <div className="mt-2 space-y-2">
                   <input type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder={t("Password attuale")} className={inp} />
-                  <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t("Nuova password (min. 6)")} className={inp} />
+                  <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t(`Nuova password (min. ${PASSWORD_MIN})`)} className={inp} />
                   <input type="password" autoComplete="new-password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} placeholder={t("Ripeti nuova password")} className={inp} />
                   <div className="flex flex-wrap items-center gap-3">
-                    <button onClick={changePw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : t("Aggiorna password")}</button>
+                    <button onClick={changePw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : t("Aggiorna password")}</button>
                     <button type="button" onClick={forgotPw} disabled={pwBusy} className="text-xs font-medium text-focus hover:underline">{t("Password dimenticata?")}</button>
                   </div>
                   <p className="text-[11px] text-faint">{t("Se non ricordi quella attuale, usa «Password dimenticata»: ti arriva un link via email per reimpostarla.")}</p>
@@ -306,7 +308,7 @@ export default function UserSchedaPage() {
               ) : (
                 <div className="mt-2 space-y-2">
                   <p className="text-[12px] text-dim">{t("Per motivi di sicurezza non puoi impostare tu la password di un altro utente. Invia un'email di reset: l'utente sceglierà la sua nuova password.")}</p>
-                  <button onClick={forgotPw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</button>
+                  <button onClick={forgotPw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</button>
                 </div>
               ))}
               {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
@@ -331,7 +333,7 @@ export default function UserSchedaPage() {
                   <div key={s.id} className="flex items-center gap-2 py-2">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-wash text-dim"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M11 18h2" /></svg></span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 text-sm text-txt">{s.device}{s.current && <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("questa sessione")}</span>}</div>
+                      <div className="flex items-center gap-1.5 text-sm text-txt">{s.device}{s.current && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("questa sessione")}</span>}</div>
                       <div className="text-[11px] text-faint"><span className="font-mono">{s.ip}</span> · {fmtDateTime(s.lastActive)}</div>
                     </div>
                     {!s.current && <button onClick={() => set("sessions", (u.sessions ?? []).filter((x) => x.id !== s.id))} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]" title={t("Termina sessione")}>✕</button>}
@@ -406,12 +408,12 @@ export default function UserSchedaPage() {
                 <div className="grid grid-cols-[1fr_auto_1fr] gap-2">
                   {/* Disponibili */}
                   <div className="rounded-lg border border-line">
-                    <div className="border-b border-line px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Disponibili")} ({available.length})</div>
+                    <div className="border-b border-line px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Disponibili")} ({available.length})</div>
                     <input value={q1} onChange={(e) => setQ1(e.target.value)} placeholder={t("Cerca…")} className="w-full border-b border-line bg-paper px-2 py-1.5 text-xs outline-none" />
                     <div className="max-h-44 overflow-y-auto p-1">
                       {fA.length === 0 ? <div className="px-2 py-3 text-center text-[11px] text-faint">—</div> : fA.map((s) => (
                         <button key={s.id} onClick={() => togglePick(setPickA, s.id)} className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${pickA.has(s.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] text-focus" : "text-txt hover:bg-wash"}`}>
-                          <span className="truncate">{s.name}</span><span className="ml-2 font-mono text-[10px] text-faint">{s.cin ?? ""}</span>
+                          <span className="truncate">{s.name}</span><span className="ml-2 font-mono text-[11px] text-dim">{s.cin ?? ""}</span>
                         </button>
                       ))}
                     </div>
@@ -425,12 +427,12 @@ export default function UserSchedaPage() {
                   </div>
                   {/* Selezionate */}
                   <div className="rounded-lg border border-line">
-                    <div className="border-b border-line px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Selezionate")} ({selected.length})</div>
+                    <div className="border-b border-line px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Selezionate")} ({selected.length})</div>
                     <input value={q2} onChange={(e) => setQ2(e.target.value)} placeholder={t("Cerca…")} className="w-full border-b border-line bg-paper px-2 py-1.5 text-xs outline-none" />
                     <div className="max-h-44 overflow-y-auto p-1">
                       {fS.length === 0 ? <div className="px-2 py-3 text-center text-[11px] text-faint">{t("Nessuna struttura")}</div> : fS.map((s) => (
                         <button key={s.id} onClick={() => togglePick(setPickS, s.id)} className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${pickS.has(s.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] text-focus" : "text-txt hover:bg-wash"}`}>
-                          <span className="truncate">{s.name}</span><span className="ml-2 font-mono text-[10px] text-faint">{s.cin ?? ""}</span>
+                          <span className="truncate">{s.name}</span><span className="ml-2 font-mono text-[11px] text-dim">{s.cin ?? ""}</span>
                         </button>
                       ))}
                     </div>
@@ -458,8 +460,8 @@ export default function UserSchedaPage() {
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-wash px-3 py-2 text-xs">
               <span className="font-semibold text-txt">{templateLabel}</span>
               <span className="text-faint">·</span>
-              <span className="flex items-center gap-1" style={{ color: "#0E9F6E" }}>{stats.edit} {t("in modifica")}</span>
-              <span className="flex items-center gap-1" style={{ color: "#2563EB" }}>{stats.view} {t("in lettura")}</span>
+              <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}>{stats.edit} {t("in modifica")}</span>
+              <span className="flex items-center gap-1" style={{ color: "var(--focus)" }}>{stats.view} {t("in lettura")}</span>
               <span className="text-faint">{stats.none} {t("nessuno")}</span>
             </div>
 
@@ -467,9 +469,9 @@ export default function UserSchedaPage() {
               {PERM_GROUPS.map((group) => (
                 <div key={group}>
                   <div className="mb-1.5 flex flex-wrap items-center justify-between gap-y-1">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t(group)}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t(group)}</div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-semibold uppercase tracking-wide text-faint">{t("tutta la categoria")}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-dim">{t("tutta la categoria")}</span>
                       <div className="flex shrink-0 overflow-hidden rounded-lg border border-dashed border-line">
                         {(["none", "view", "edit"] as PermLevel[]).map((lv) => {
                           const m = LEVEL_META[lv];
@@ -498,7 +500,7 @@ export default function UserSchedaPage() {
                               const m = LEVEL_META[lv];
                               return (
                                 <button key={lv} disabled={!allowed} onClick={() => setPerm(perm.key, lv)} title={allowed ? t(m.label) : t("Non disponibile")}
-                                  className={`grid h-7 w-8 place-items-center border-l border-line first:border-l-0 transition max-sm:h-10 max-sm:w-10 ${!allowed ? "cursor-not-allowed opacity-25" : active ? "text-white" : "text-faint hover:bg-wash"}`}
+                                  className={`grid h-7 w-8 place-items-center border-l border-line first:border-l-0 transition max-sm:h-10 max-sm:w-10 ${!allowed ? "cursor-not-allowed opacity-25" : active ? onSolid(m.color) : "text-faint hover:bg-wash"}`}
                                   style={active && allowed ? { backgroundColor: m.color } : undefined}>
                                   {m.icon}
                                 </button>
@@ -522,7 +524,7 @@ export default function UserSchedaPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-faint">
+                  <tr className="text-[11px] uppercase tracking-wide text-dim">
                     <th className="py-1.5 text-left font-semibold">{t("Evento")}</th>
                     {NOTIFY_CHANNELS.map((c) => <th key={c.key} className="px-1 py-1.5 text-center font-semibold">{t(c.label)}</th>)}
                   </tr>
@@ -537,8 +539,8 @@ export default function UserSchedaPage() {
                         return (
                           <td key={c.key} className="px-1 py-1.5 text-center">
                             <button onClick={() => set("notify", { ...(u.notify ?? defaultNotify()), [key]: !on })} title={on ? t("Attivo") : t("Disattivo")}
-                              className="mx-auto grid h-6 w-6 place-items-center rounded-full transition max-sm:h-9 max-sm:w-9"
-                              style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { backgroundColor: "var(--wash)", color: "var(--faint)" }}>
+                              className={`mx-auto grid h-6 w-6 place-items-center rounded-full transition max-sm:h-9 max-sm:w-9 ${on ? "text-on-ok" : ""}`}
+                              style={on ? { backgroundColor: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--faint)" }}>
                               {on ? "✓" : ""}
                             </button>
                           </td>

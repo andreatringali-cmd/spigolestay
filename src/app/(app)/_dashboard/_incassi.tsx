@@ -23,7 +23,7 @@ export default function Incassi({ total, count, nights, delay = 0 }: {
             {([["ADR", nights ? total / nights : 0, P.vi, "Prezzo medio a notte"], ["Per prenotazione", total / count, P.az, "Ricavo medio per prenotazione"]] as const).map(([label, value, color, hint]) => (
               <div key={label} className="rounded-xl px-3 py-2" style={{ backgroundColor: tint(color, 9) }} title={hint}>
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>{label}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color }}>{label}</span>
                   <span className="font-mono text-sm font-bold tabular-nums text-txt">€ <CountUp value={value} format={(v) => num(v)} delay={300} /></span>
                 </div>
               </div>

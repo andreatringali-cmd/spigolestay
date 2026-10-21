@@ -77,7 +77,7 @@ export default function ScrollStrip({ items, onReorder, gap = "gap-4" }: { items
   };
 
   const activeIdx = items.findIndex((i) => i.key === active);
-  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-white shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";
+  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-on-focus shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";
 
   return (
     <div>
@@ -86,7 +86,7 @@ export default function ScrollStrip({ items, onReorder, gap = "gap-4" }: { items
         <div className="mb-1.5 flex justify-center">
           <div className="flex items-center gap-1 rounded-full border border-line bg-surface px-1.5 py-1 shadow-md">
             <button type="button" onClick={() => move(active, -1)} disabled={activeIdx <= 0} aria-label="Sposta a sinistra" className="grid h-6 w-6 place-items-center rounded-full text-sm text-dim hover:text-txt disabled:opacity-30">◀</button>
-            <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Sposta il grafico</span>
+            <span className="px-1 text-[11px] font-semibold uppercase tracking-wide text-dim">Sposta il grafico</span>
             <button type="button" onClick={() => move(active, 1)} disabled={activeIdx === items.length - 1} aria-label="Sposta a destra" className="grid h-6 w-6 place-items-center rounded-full text-sm text-dim hover:text-txt disabled:opacity-30">▶</button>
             <button type="button" onClick={() => setActive(null)} aria-label="Fine" className="grid h-6 w-6 place-items-center rounded-full text-[color:var(--ok)] hover:opacity-80">✓</button>
           </div>
@@ -156,7 +156,7 @@ export function ArrowScroller({ children, className = "", wrapperClassName = "",
       el.scrollTo({ left: prevs.length ? prevs[prevs.length - 1].offsetLeft : 0, behavior: "smooth" });
     }
   };
-  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-white shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";
+  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-on-focus shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";
   return (
     <div className={`relative ${wrapperClassName}`}>
       <button type="button" onClick={() => nudge(-1)} disabled={!canL} aria-label="Scorri a sinistra" className={`${arrowCls} left-0 -translate-x-1/3`}>‹</button>

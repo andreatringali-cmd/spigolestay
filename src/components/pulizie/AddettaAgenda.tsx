@@ -116,22 +116,22 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
                   if (!rs.length) return null;
                   return (
                     <div key={s.id}>
-                      {structures.length > 1 && <div className="bg-wash px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-faint">{s.name}</div>}
+                      {structures.length > 1 && <div className="bg-wash px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-dim">{s.name}</div>}
                       {rs.map((r) => (
                         <div key={r.unit.id} className="relative flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-line px-3 py-2 first:border-t-0" title={rowText(r)}>
                           <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: cleanBar(r.action) }} />
                           <span className="w-20 shrink-0 truncate pl-1 font-display text-sm font-bold text-txt">{r.unit.name}</span>
-                          <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{ACT_LABEL[r.action]}</span>
+                          <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{ACT_LABEL[r.action]}</span>
                           <span className="min-w-0 basis-full pl-1 text-xs text-dim sm:basis-0 sm:flex-1 sm:truncate sm:pl-0">{rowText(r)}</span>
                           {actions && (() => {
                             const fatta = actions.isDone(d.date, r.unit.id);
                             const prob = actions.hasIssue?.(d.date, r.unit.id);
                             return (
                               <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1">
-                                <button onClick={() => actions.toggle(d.date, r.unit.id)} title={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-label={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-pressed={fatta} className={`grid h-6 w-6 place-items-center rounded-md border transition ${fatta ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-white" : "border-[color:var(--ok)] text-[color:var(--ok)] hover:bg-wash"}`}>
+                                <button onClick={() => actions.toggle(d.date, r.unit.id)} title={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-label={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-pressed={fatta} className={`grid h-6 w-6 place-items-center rounded-md border transition ${fatta ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-on-ok" : "border-[color:var(--ok)] text-[color:var(--ok)] hover:bg-wash"}`}>
                                   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12" /></svg>
                                 </button>
-                                <button onClick={() => actions.issue(r, d.date)} title="Segnala problema" aria-label="Segnala problema" className={`grid h-6 w-6 place-items-center rounded-md border transition ${prob ? "border-[color:var(--err)] bg-[color:var(--err)] text-white" : "border-[color:var(--warn)] text-[color:var(--warn)] hover:bg-wash"}`}><Icon name="alertTriangle" size={12} /></button>
+                                <button onClick={() => actions.issue(r, d.date)} title="Segnala problema" aria-label="Segnala problema" className={`grid h-6 w-6 place-items-center rounded-md border transition ${prob ? "border-[color:var(--err)] bg-[color:var(--err)] text-on-err" : "border-[color:var(--warn)] text-[color:var(--warn)] hover:bg-wash"}`}><Icon name="alertTriangle" size={12} /></button>
                               </span>
                             );
                           })()}

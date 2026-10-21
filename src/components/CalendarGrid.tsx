@@ -1068,7 +1068,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               const full = c.avail <= 0;
               const scarce = c.avail === 1 && cap > 1;
               const availBg = full ? "var(--err)" : scarce ? "var(--warn)" : "var(--ok)";
-              const availText = scarce ? "#3a2600" : "#ffffff";
+              const availText = full ? "var(--on-err)" : scarce ? "var(--on-warn)" : "var(--on-ok)"; // testo su fondo pieno: segue il tema (bianco in chiaro, scuro in scuro)
               const pastDay = c.iso < todayISO;
               return (
                 <div key={c.iso}
@@ -1111,7 +1111,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 {monthList.map((mm) => {
                   const active = start.getFullYear() === mm.y && start.getMonth() === mm.m;
                   return (
-                    <button key={`${mm.y}-${mm.m}`} onClick={() => { setStart(new Date(mm.y, mm.m, 1)); patchView({ span: "month" }); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>
+                    <button key={`${mm.y}-${mm.m}`} onClick={() => { setStart(new Date(mm.y, mm.m, 1)); patchView({ span: "month" }); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-on-focus" : "text-txt hover:bg-wash"}`}>{mm.label}</button>
                   );
                 })}
             </Popover>
@@ -1131,7 +1131,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Finestra</div>
                 <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
                   {([[7, "7 giorni"], ["month", "Mensile"]] as [Span, string][]).map(([v, lab]) => (
-                    <button key={String(v)} onClick={() => patchView({ span: v })} className={`rounded-md py-1 text-xs font-semibold transition ${vw.span === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
+                    <button key={String(v)} onClick={() => patchView({ span: v })} className={`rounded-md py-1 text-xs font-semibold transition ${vw.span === v ? "bg-focus text-on-focus" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
                   ))}
                 </div>
                 <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} onClick={() => { const nf = !vw.fromYesterday; patchView({ fromYesterday: nf }); const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); setStart(nf ? addDays(base, -1) : base); }} />
@@ -1143,8 +1143,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <div className="my-1 border-t border-line" />
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichetta barra</div>
                 <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
-                  <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
-                  <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
+                  <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-on-focus" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
+                  <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-on-focus" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
                 </div>
             </Popover>
           </div>
@@ -1176,7 +1176,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             </Popover>
           </div>
           {phone && <FilterSheet count={0}><div className="flex flex-wrap items-center gap-2">{filterControls}</div></FilterSheet>}
-          <Link href="/prenotazioni/nuova" className="max-sm:w-[5.5rem] max-sm:justify-center sm:order-[41] sm:ml-auto inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+          <Link href="/prenotazioni/nuova" className="max-sm:w-[5.5rem] max-sm:justify-center sm:order-[41] sm:ml-auto inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
         </div>
         {phone && <div className="w-full [&>div]:h-9 [&>div]:w-full [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap">{viewSwitch}</div>}
         <div className="contents max-sm:hidden">
@@ -1250,7 +1250,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <span className="min-w-0 flex-1 text-xs leading-snug text-txt">{s.text}</span>
                 {s.apply && s.cta && (tipDone.has(tipKey(s))
                   ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--ok)]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>Applicato</span>
-                  : <button onClick={() => { const k = tipKey(s); const doIt = () => { s.apply!(); markTip(k); }; if (s.from != null && s.to != null && s.subject) setPriceConfirm({ kind: "single", subject: s.subject, detail: s.detail, from: s.from, to: s.to, onOk: doIt }); else doIt(); }} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 max-sm:min-h-10 max-sm:px-3" style={{ backgroundColor: s.dir === "up" ? "var(--ok)" : s.dir === "down" ? "var(--err)" : "var(--focus)" }}>{s.cta}</button>)}
+                  : <button onClick={() => { const k = tipKey(s); const doIt = () => { s.apply!(); markTip(k); }; if (s.from != null && s.to != null && s.subject) setPriceConfirm({ kind: "single", subject: s.subject, detail: s.detail, from: s.from, to: s.to, onOk: doIt }); else doIt(); }} className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold hover:opacity-90 max-sm:min-h-10 max-sm:px-3 ${s.dir === "up" ? "text-on-ok" : s.dir === "down" ? "text-on-err" : "text-on-focus"}`} style={{ backgroundColor: s.dir === "up" ? "var(--ok)" : s.dir === "down" ? "var(--err)" : "var(--focus)" }}>{s.cta}</button>)}
               </div>
             ))}
           </div>
@@ -1345,7 +1345,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               )}
             </span>
           </div>
-          <button onClick={() => setPriceConfirm({ kind: "bulk", pct: whatIf, from: toISO(days[0]), to: toISO(days[days.length - 1]) })} disabled={!whatIf} className="mt-2 w-full rounded-lg py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ backgroundColor: whatIf > 0 ? "var(--ok)" : whatIf < 0 ? "var(--err)" : "var(--focus)" }}>
+          <button onClick={() => setPriceConfirm({ kind: "bulk", pct: whatIf, from: toISO(days[0]), to: toISO(days[days.length - 1]) })} disabled={!whatIf} className={`mt-2 w-full rounded-lg py-1.5 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${whatIf > 0 ? "text-on-ok" : whatIf < 0 ? "text-on-err" : "text-on-focus"}`} style={{ backgroundColor: whatIf > 0 ? "var(--ok)" : whatIf < 0 ? "var(--err)" : "var(--focus)" }}>
             {whatIf ? `Applica ${whatIf > 0 ? "+" : ""}${whatIf}% ai prezzi` : "Sposta lo slider per applicare"}
           </button>
           <p className="mt-1.5 text-[10px] leading-snug text-faint">Meno prezzo riempie più camere: con spazio libero i ricavi possono salire; oltre un certo sconto no.</p>
@@ -1640,7 +1640,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Badge durante il drag */}
       {dragView && (
-        <div className="pointer-events-none fixed z-50 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-lg" style={{ left: dragView.x + 14, top: dragView.y + 14, backgroundColor: !dragView.valid ? "var(--err)" : dragView.overbook ? "var(--warn)" : "var(--focus)", color: "#fff" }}>
+        <div className={`pointer-events-none fixed z-50 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-lg ${!dragView.valid ? "text-on-err" : dragView.overbook ? "text-on-warn" : "text-on-focus"}`} style={{ left: dragView.x + 14, top: dragView.y + 14, backgroundColor: !dragView.valid ? "var(--err)" : dragView.overbook ? "var(--warn)" : "var(--focus)" }}>
           {dragView.valid ? `${destinationLabel(dragView, bookings, units)}${dragView.overbook ? " · Sovrapposizione" : ""}` : dragView.reason}
         </div>
       )}
@@ -1675,7 +1675,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                   title={noRate ? "Tariffa a €0: imposta un prezzo per poter vendere queste date" : undefined}
                   className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${noRate ? "cursor-not-allowed border-line opacity-55" : "border-line bg-paper hover:border-focus hover:bg-wash"}`}
                 >
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: noRate ? "var(--faint)" : "var(--focus)" }}>+</span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-on-focus" style={{ backgroundColor: noRate ? "var(--faint)" : "var(--focus)" }}>+</span>
                   <span>
                     <span className="block text-sm font-semibold text-txt">Nuova prenotazione</span>
                     <span className="block text-[11px] text-dim">{noRate ? "Tariffa a €0 — imposta un prezzo per vendere" : "Ospite, canale, date e prezzo"}</span>
@@ -1692,7 +1692,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                   </span>
                 </button>
               </div>
-              <button onClick={() => setPick(null)} className="mt-4 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">Annulla</button>
+              <button onClick={() => setPick(null)} className="mt-4 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Annulla</button>
             </div>
           </div>
         );
@@ -1701,7 +1701,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       {/* Avviso selezione in corso (evento / tariffa / prenotazione) */}
       {sel && (
         <div className="fixed bottom-6 max-md:bottom-20 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-lg">
-          <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-focus px-2 text-xs font-bold text-white">{selDays}</span>
+          <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-focus px-2 text-xs font-bold text-on-focus">{selDays}</span>
           <span className="text-sm text-txt">{sel.kind === "event" ? "Evento" : sel.kind === "rate" ? "Tariffa" : sel.kind === "avail" ? "Disponibilità" : "Prenotazione"} · {selDays === 1 ? "1 giorno" : `${selDays} giorni`} — clicca sull'ultimo giorno per <b>confermare</b></span>
           <button onClick={cancelSel} className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Annulla</button>
         </div>
@@ -1732,7 +1732,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             <div className="mt-5 flex items-center gap-2">
               {evDraft.id && <button onClick={() => { deleteEvent(evDraft.id!); setEvDraft(null); }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">Elimina</button>}
               <button onClick={() => setEvDraft(null)} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-              <button onClick={saveEvent} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Salva</button>
+              <button onClick={saveEvent} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Salva</button>
             </div>
           </div>
         </div>
@@ -1757,8 +1757,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               </div>
 
               <div className="mt-3 flex items-center rounded-lg border border-line p-0.5">
-                <button onClick={() => setRateEdit({ ...rateEdit, mode: "fixed", ...(rateEdit.mode === "percent" ? { value: startFixedRate(rateEdit.typeId, rateEdit.from, rateEdit.to, rateEdit.weekendPct) } : {}) })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "fixed" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Importo fisso</button>
-                <button onClick={() => setRateEdit({ ...rateEdit, mode: "percent", value: 10 })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "percent" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Variazione %</button>
+                <button onClick={() => setRateEdit({ ...rateEdit, mode: "fixed", ...(rateEdit.mode === "percent" ? { value: startFixedRate(rateEdit.typeId, rateEdit.from, rateEdit.to, rateEdit.weekendPct) } : {}) })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "fixed" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>Importo fisso</button>
+                <button onClick={() => setRateEdit({ ...rateEdit, mode: "percent", value: 10 })} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${rateEdit.mode === "percent" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>Variazione %</button>
               </div>
 
               <label className="mt-3 block text-xs font-medium text-dim">
@@ -1790,7 +1790,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div className="mt-4 flex items-center gap-2">
                 <button onClick={resetRate} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash" title="Rimuovi le modifiche e torna alla tariffa base">Ripristina base</button>
                 <button onClick={() => setRateEdit(null)} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-                <button onClick={saveRate} disabled={isos.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica</button>
+                <button onClick={saveRate} disabled={isos.length === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Applica</button>
               </div>
             </div>
           </div>
@@ -1856,7 +1856,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setAvailEdit(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-                <button onClick={saveAvail} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Applica</button>
+                <button onClick={saveAvail} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Applica</button>
               </div>
             </div>
           </div>
@@ -1891,7 +1891,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             <button aria-label="Chiudi" onClick={() => setPriceConfirm(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center gap-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold text-white" style={{ backgroundColor: col }}>{up ? "▲" : "▼"}</span>
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold ${up ? "text-on-ok" : "text-on-err"}`} style={{ backgroundColor: col }}>{up ? "▲" : "▼"}</span>
                 <span className="font-display text-lg font-bold text-txt">Confermi la correzione prezzo?</span>
               </div>
               <p className="text-sm text-dim">Sicuro di voler modificare il prezzo di <b className="text-txt">{pc.subject}</b>{pc.detail ? <> · <span className="text-txt">{pc.detail}</span></> : null}?</p>
@@ -1902,7 +1902,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setPriceConfirm(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-                <button onClick={() => { pc.onOk(); setPriceConfirm(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: col }}>Conferma</button>
+                <button onClick={() => { pc.onOk(); setPriceConfirm(null); }} className={`rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 ${up ? "text-on-ok" : "text-on-err"}`} style={{ backgroundColor: col }}>Conferma</button>
               </div>
             </div>
           </div>
@@ -1917,13 +1917,13 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const wkFrom = toISO(start), wkTo = toISO(addDays(start, 6));
         const nxFrom = toISO(addDays(start, 7)), nxTo = toISO(addDays(start, 13));
         const moFrom = toISO(new Date(start.getFullYear(), start.getMonth(), 1)), moTo = toISO(new Date(start.getFullYear(), start.getMonth() + 1, 0));
-        const presetBtn = (lab: string, f: string, tt: string) => { const on = pc.from === f && pc.to === tt; return (<button onClick={() => setPriceConfirm({ ...pc, from: f, to: tt })} className={`rounded-md py-1.5 text-[11px] font-semibold transition ${on ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>); };
+        const presetBtn = (lab: string, f: string, tt: string) => { const on = pc.from === f && pc.to === tt; return (<button onClick={() => setPriceConfirm({ ...pc, from: f, to: tt })} className={`rounded-md py-1.5 text-[11px] font-semibold transition ${on ? "bg-focus text-on-focus" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>); };
         return (
           <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12dvh]">
             <button aria-label="Chiudi" onClick={() => setPriceConfirm(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-1 flex items-center gap-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold text-white" style={{ backgroundColor: col }}>{up ? "▲" : "▼"}</span>
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold ${up ? "text-on-ok" : "text-on-err"}`} style={{ backgroundColor: col }}>{up ? "▲" : "▼"}</span>
                 <span className="font-display text-lg font-bold text-txt">Confermi la variazione prezzi?</span>
               </div>
               <p className="text-sm text-dim">Applico <b style={{ color: col }}>{up ? "+" : ""}{pc.pct}%</b> a tutti i prezzi delle <b className="text-txt">{nTypes}</b> tipologie visibili, nel periodo scelto.</p>
@@ -1940,7 +1940,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-xs text-dim">Verranno aggiornati <b className="text-txt">{nDays}</b> {nDays === 1 ? "giorno" : "giorni"} × <b className="text-txt">{nTypes}</b> tipologie. La modifica è reversibile dal calendario.</div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setPriceConfirm(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-                <button onClick={() => { applyWhatIfRange(pc.from, pc.to, pc.pct); setPriceConfirm(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: col }}>Applica {up ? "+" : ""}{pc.pct}%</button>
+                <button onClick={() => { applyWhatIfRange(pc.from, pc.to, pc.pct); setPriceConfirm(null); }} className={`rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 ${up ? "text-on-ok" : "text-on-err"}`} style={{ backgroundColor: col }}>Applica {up ? "+" : ""}{pc.pct}%</button>
               </div>
             </div>
           </div>
@@ -1959,7 +1959,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             <button aria-label="Chiudi" onClick={() => setMoveConfirm(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center gap-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>⇄</span>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold text-on-focus" style={{ backgroundColor: "var(--focus)" }}>⇄</span>
                 <span className="font-display text-lg font-bold text-txt">Confermi lo spostamento?</span>
               </div>
               <p className="text-sm text-dim">Spostare la prenotazione di <b className="text-txt">{b ? guestName(b.guestId) : "—"}</b>?</p>
@@ -1974,7 +1974,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setMoveConfirm(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-                <button onClick={applyMove} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Conferma spostamento</button>
+                <button onClick={applyMove} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Conferma spostamento</button>
               </div>
             </div>
           </div>
@@ -2001,7 +2001,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 Riapri camera
               </button>}
               <button onClick={() => setOos(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-              <button onClick={saveOos} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{oos.id ? "Salva" : "Metti fuori servizio"}</button>
+              <button onClick={saveOos} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{oos.id ? "Salva" : "Metti fuori servizio"}</button>
             </div>
           </div>
         </div>
@@ -2085,7 +2085,7 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
           <div className={RS_ROW}><span className="text-sm text-dim">Frequenza rassetto</span><select value={tidy} onChange={(e) => setTidy(e.target.value)} className={RS_FLD}>{FREQ_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div className={RS_ROW}><span className="text-sm text-dim">Giorni servizio</span>
             <div className="inline-flex overflow-hidden rounded-lg border border-line">
-              {WEEK_DAYS.map((d) => { const on = days.includes(d); return <button key={d} onClick={() => toggleDay(d)} className="border-r border-line px-2.5 py-1.5 text-xs font-semibold last:border-r-0" style={on ? { backgroundColor: "var(--focus)", color: "#fff" } : { color: "var(--dim)" }}>{d}</button>; })}
+              {WEEK_DAYS.map((d) => { const on = days.includes(d); return <button key={d} onClick={() => toggleDay(d)} className={`border-r border-line px-2.5 py-1.5 text-xs font-semibold last:border-r-0 ${on ? "text-on-focus" : ""}`} style={on ? { backgroundColor: "var(--focus)" } : { color: "var(--dim)" }}>{d}</button>; })}
             </div>
           </div>
           <div className={RS_ROW}><span className="text-sm text-dim">Stato pulizia</span><select value={clean} onChange={(e) => setClean(e.target.value)} className={RS_FLD}><option value="Da pulire">Da pulire</option><option value="Pulita">Pulita</option></select></div>
@@ -2096,9 +2096,9 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
         <div className="mt-3"><span className="text-sm text-dim">Note interne</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={`${RS_FLD} mt-1 resize-y`} /></div>
         <div className="mt-4 flex items-center gap-2">
           <button onClick={onClose} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Chiudi</button>
-          <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-white" style={{ backgroundColor: "var(--err)" }}>Elimina</button>
+          <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-on-err" style={{ backgroundColor: "var(--err)" }}>Elimina</button>
           <button onClick={copy} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Copia</button>
-          <button onClick={save} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Salva</button>
+          <button onClick={save} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Salva</button>
         </div>
       </div>
     </div>

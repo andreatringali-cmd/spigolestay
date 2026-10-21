@@ -27,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="it"
+      suppressHydrationWarning /* la classe `dark` viene aggiunta dallo script anti-flash prima dell'idratazione */
       className={`${inter.variable} ${archivo.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="min-h-full font-sans">{children}</body>

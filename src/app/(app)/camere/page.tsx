@@ -49,7 +49,7 @@ function AddMenu({ onRoom, onType }: { onRoom: () => void; onType: () => void })
   const ref = useRef<HTMLButtonElement>(null);
   return (
     <div className="sm:hidden">
-      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-focus px-3 text-sm font-semibold text-white hover:opacity-90">+ {t("Aggiungi")}</button>
+      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-focus px-3 text-sm font-semibold text-on-focus hover:opacity-90">+ {t("Aggiungi")}</button>
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align="end" width={200} label={t("Aggiungi")}>
         <button type="button" onClick={() => { setOpen(false); onRoom(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Camera")}</button>
         <button type="button" onClick={() => { setOpen(false); onType(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Tipologia")}</button>
@@ -235,7 +235,7 @@ export default function CamerePage() {
               <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-auto sm:flex-1 max-sm:min-w-0 max-sm:flex-1" />
               <div className="ml-auto flex items-center gap-2 max-sm:shrink-0">
                 <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:hidden">{t("+ Tipologia")}</button>
-                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 whitespace-nowrap max-sm:hidden">{t("+ Camera")}</button>
+                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 whitespace-nowrap max-sm:hidden">{t("+ Camera")}</button>
                 {/* Telefono: UN solo «+ Aggiungi» che apre la scelta Camera / Tipologia */}
                 <AddMenu onRoom={() => addRoom(s.id, sUnits.length)} onType={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} />
               </div>
@@ -273,7 +273,7 @@ export default function CamerePage() {
                       <div className="flex flex-1 flex-col p-3 max-sm:p-2.5">
                         <div className="flex items-start justify-between gap-x-2 max-sm:flex-wrap">
                           <div className="font-semibold text-txt">{rt.name}</div>
-                          <div className="shrink-0 whitespace-nowrap font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
+                          <div className="shrink-0 whitespace-nowrap font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[11px] font-normal text-faint">{t("/notte")}</span></div>
                         </div>
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.beds} {rt.beds === 1 ? t("letto") : t("letti")}</span>
@@ -282,7 +282,7 @@ export default function CamerePage() {
                           <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{n} {n === 1 ? t("camera") : t("camere")}</span>
                         </div>
                         {rt.bedConfig && <div className="mt-1.5 text-[11px] text-faint">{rt.bedConfig}</div>}
-                        {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5 text-dim">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} title={t(a)} aria-label={t(a)} className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>)}{(rt.amenities ?? []).length > 6 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 6}</span>}</div>}
+                        {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5 text-dim">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} title={t(a)} aria-label={t(a)} className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>)}{(rt.amenities ?? []).length > 6 && <span className="text-[11px] text-faint">+{(rt.amenities ?? []).length - 6}</span>}</div>}
                         <div className="mt-auto pt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100 max-sm:hidden">{t("Apri scheda")} →</div>
                       </div>
                     </button>
@@ -318,7 +318,7 @@ export default function CamerePage() {
                           <div className="overflow-x-auto">
                             <table className="w-full min-w-[820px] table-fixed text-sm"><colgroup><col style={{ width: 40 }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "18%" }} /><col style={{ width: "12%" }} /><col style={{ width: 44 }} /></colgroup>
                               <thead>
-                                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                                   <th className="px-2 py-2"><input type="checkbox" checked={g.length > 0 && g.every((u) => sel.has(u.id))} onChange={(e) => setManySel(g.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
                                   <SortTh k="name" label={t("Camera")} />
                                   <SortTh k="code" label={t("Codice")} />
@@ -347,7 +347,7 @@ export default function CamerePage() {
                         <div className="overflow-x-auto">
                           <table className="w-full min-w-[820px] table-fixed text-sm"><colgroup><col style={{ width: 40 }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "18%" }} /><col style={{ width: "12%" }} /><col style={{ width: 44 }} /></colgroup>
                             <thead>
-                              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                                 <th className="px-2 py-2"><input type="checkbox" checked={orphans.length > 0 && orphans.every((u) => sel.has(u.id))} onChange={(e) => setManySel(orphans.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
                                 <SortTh k="name" label={t("Camera")} />
                                 <SortTh k="code" label={t("Codice")} />
@@ -380,7 +380,7 @@ export default function CamerePage() {
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Piano")}<input value={bulkFloor} onChange={(e) => setBulkFloor(e.target.value)} placeholder={t("Terra / 1° / 2°")} className="w-28 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Vista")}<select value={bulkView} onChange={(e) => setBulkView(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus"><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
             <button onClick={() => setShowAmen((s) => !s)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium ${showAmen || bulkAmen.size ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Dotazioni")}{bulkAmen.size ? ` (${bulkAmen.size})` : ""}</button>
-            <button onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView && bulkAmen.size === 0} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Applica a")} {sel.size}</button>
+            <button onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView && bulkAmen.size === 0} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Applica a")} {sel.size}</button>
             <button onClick={() => { clearSel(); setBulkFloor(""); setBulkView(""); setBulkAmen(new Set()); setShowAmen(false); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
           </div>
           {showAmen && (
@@ -461,12 +461,12 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       {hasGuide ? (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
           <span className="text-[11px] text-dim">{t("Questi codici e istruzioni possono comparire nella guida ospiti della camera.")}</span>
-          <button type="button" onClick={openGuide} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Apri la guida")} →</button>
+          <button type="button" onClick={openGuide} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Apri la guida")} →</button>
         </div>
       ) : (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
           <span className="text-[11px] text-dim">🔒 {t("Con la Guida ospiti, codici e istruzioni della camera compaiono in una pagina web per l'ospite.")}</span>
-          <button type="button" onClick={() => { onClose(); router.push("/abbonamento"); }} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Aggiungi il servizio")} →</button>
+          <button type="button" onClick={() => { onClose(); router.push("/abbonamento"); }} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Aggiungi il servizio")} →</button>
         </div>
       )}
       <label className={`${lbl} mt-3`}>{t("Note interne")}<textarea value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Manutenzioni, particolarità…")} /></label>
@@ -508,7 +508,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       <div className="mt-4 flex items-center gap-2">
         {unit && <button onClick={async () => { if (await ask({ title: t("Elimina camera"), message: `${t("Eliminare")} "${unit.name}"?${(() => { const today = new Date().toLocaleDateString("sv-SE"); const nb = bookings.filter((x) => x.unitId === unit.id && x.channel !== "blocked" && x.status !== "cancelled" && x.checkOut >= today).length; return nb ? ` ${nb} ${nb === 1 ? t("prenotazione in corso o futura resterà") : t("prenotazioni in corso o future resteranno")} ${t("senza camera (da assegnare).")}` : ""; })()}`, danger: true, confirmLabel: t("Elimina") })) { deleteUnit(unit.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
         <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-        <button onClick={save} disabled={!f.name?.trim() || !f.roomTypeId} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{unit ? t("Salva") : t("Crea")}</button>
+        <button onClick={save} disabled={!f.name?.trim() || !f.roomTypeId} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{unit ? t("Salva") : t("Crea")}</button>
       </div>
     </Modal>
   );

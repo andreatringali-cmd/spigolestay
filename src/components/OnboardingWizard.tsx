@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { kvGet, kvSet, kvFlush } from "@/lib/bigstore";
 import Image from "next/image";
 import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabase";
 import { adoptProfile } from "@/lib/adopt-profile";
 import { useAuth } from "@/lib/authsync";
 import { TIERS as PLAN_TIERS, TRIAL_DAYS } from "@/lib/plans";
+import { eur } from "@/lib/format";
+import { PUB } from "@/components/PublicUi";
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
 const emailOk = (s: string) => /\S+@\S+\.\S+/.test(s);
@@ -38,13 +40,16 @@ const MODULE_LABELS: Record<string, string> = {
   rms: "Revenue · prezzi dinamici",
   ratecheck: "Rate checker · confronto tariffe",
   team: "Utenti & permessi · multi-utente",
+  guide: "Guida ospiti · QR WiFi e codici d'ingresso",
+  checkin: "Self check-in online · documenti e firma",
+  sharing: "Gestione condivisa · co-gestisci con un socio",
+  market: "Rete città · confronto con il mercato",
 };
 
 // Piani, prezzi e moduli arrivano da lib/plans.ts (fonte unica con la pagina Abbonamento): qui non si ridefiniscono.
 const TIERS = PLAN_TIERS.map((t) => ({ ...t, desc: `${t.structures === 1 ? "1 struttura" : `fino a ${t.structures} strutture`} · ${t.tagline.toLowerCase()}` }));
 
-const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-txt outline-none transition focus:border-focus";
-const lbl = "mb-1 block text-xs font-medium text-dim";
+// Campi, etichette, pulsanti e schede: gli stessi di login e pagine di accesso (PUB in components/PublicUi.tsx).
 
 type Cam = { name: string; count: string; beds: string };
 
@@ -109,6 +114,9 @@ export default function OnboardingWizard() {
   }, [authUser?.email]);
 
   const [step, setStep] = useState(0);
+  // A ogni passo il titolo prende il focus: chi usa la tastiera o un lettore di schermo sa dove si trova.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (step > 0) titleRef.current?.focus(); }, [step]);
   // Profilo
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -140,13 +148,13 @@ export default function OnboardingWizard() {
   const delCam = (i: number) => setCamere((cs) => (cs.length > 1 ? cs.filter((_, j) => j !== i) : cs));
 
   const STEPS = [
-    { title: "Benvenuto in Xenora", sub: "Configuriamo il tuo gestionale in pochi passi. Ci vogliono un paio di minuti." },
+    { title: "Benvenuto in Xenora", sub: "Configuriamo il tuo gestionale in pochi passi: ci vogliono un paio di minuti." },
     { title: "Il tuo profilo", sub: "I dati dell'intestatario dell'account." },
     { title: "Il tuo accesso", sub: "Crea le credenziali con cui entrerai nel gestionale." },
     { title: "La tua struttura", sub: "La prima struttura da gestire (potrai aggiungerne altre)." },
     { title: "Le camere", sub: "Le tipologie di camera e quante ne hai per ciascuna." },
     { title: "Scegli il piano", sub: `${TRIAL_DAYS} giorni di prova gratuita. Il piano si attiva e si paga dall'area Abbonamento, e lo cambi quando vuoi.` },
-    { title: "Tutto pronto!", sub: "Controlla il riepilogo e inizia. Poi potrai importare il calendario da Octorate." },
+    { title: "Tutto pronto", sub: "Controlla il riepilogo e inizia: potrai importare le prenotazioni esistenti subito dopo." },
   ];
 
   const canNext = (() => {
@@ -196,164 +204,176 @@ export default function OnboardingWizard() {
   if (!active) return null;
   const s = STEPS[step];
   const isLast = step === STEPS.length - 1;
+  const req = <span aria-hidden="true" className="text-dim"> *</span>;
+  const selectedTier = TIERS.find((t) => t.key === plan);
+  const nTypes = camere.filter((c) => c.name.trim()).length;
 
   return (
-    <div className="fixed inset-0 z-[200] overflow-y-auto bg-paper">
-      {/* Progress */}
-      <div className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-xl items-center gap-3 px-5 py-3">
+    <div className="fixed inset-0 z-[200] overflow-y-auto bg-paper" role="dialog" aria-modal="true" aria-labelledby="wiz-title">
+      {/* Intestazione: marchio, avanzamento (una sola numerazione) e uscita */}
+      <div className="sticky top-0 z-10 border-b border-line bg-surface">
+        <div className="mx-auto flex max-w-xl items-center gap-3 px-4 py-3 sm:px-5">
           <Image src="/xenora-mark.png" alt="Xenora" width={34} height={34} priority className="shrink-0 object-contain" style={{ width: 34, height: 34 }} />
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-faint"><span>Configurazione</span><span>{step + 1} / {STEPS.length}</span></div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full transition-all duration-300" style={{ width: `${((step + 1) / STEPS.length) * 100}%`, backgroundColor: "var(--focus)" }} /></div>
+            <div className="mb-1 flex items-center justify-between text-xs font-medium text-dim"><span>Configurazione</span><span>Passaggio {step + 1} di {STEPS.length}</span></div>
+            <div role="progressbar" aria-label="Avanzamento della configurazione" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus transition-all duration-300" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div>
           </div>
           {hasData && (
-            <button onClick={skipOnboarding} title="Salta la configurazione: hai già i tuoi dati" className="flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)", borderColor: "var(--focus)" }}>
-              Ho già configurato →
+            <button onClick={skipOnboarding} aria-label="Ho già configurato: salta la configurazione" title="Salta la configurazione: hai già i tuoi dati" className={`${PUB.btnSecondary} shrink-0 h-9! px-3! font-medium!`}>
+              <span className="sm:hidden">Salta</span><span className="hidden sm:inline">Ho già configurato</span>
             </button>
           )}
           {authEnabled && (
-            <button onClick={() => void signOut()} title="Esci e torna all'accesso" className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+            <button onClick={() => void signOut()} aria-label="Esci" title="Esci e torna all'accesso" className={`${PUB.btnSecondary} shrink-0 h-9! px-3! font-medium!`}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
               <span className="hidden sm:inline">Esci</span>
             </button>
           )}
         </div>
       </div>
 
-      <div className="mx-auto max-w-xl px-5 py-8">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-txt">{s.title}</h1>
-        <p className="mt-1 text-sm text-dim">{s.sub}</p>
+      <div className="mx-auto max-w-xl px-4 py-8 sm:px-5">
+        <h1 id="wiz-title" ref={titleRef} tabIndex={-1} className={`${PUB.h1} outline-none`}>{s.title}</h1>
+        <p className={PUB.lead}>{s.sub}</p>
 
-        <div className="mt-6 space-y-4">
+        <div className={`mt-6 ${step === 5 ? "" : PUB.card}`}>
           {step === 0 && (
-            <div className="rounded-xl border border-line bg-surface p-5 text-sm text-dim">
-              <p>Imposteremo, uno alla volta:</p>
-              <ul className="mt-3 space-y-2">
-                {[["👤", "Profilo e credenziali di accesso"], ["🏠", "Struttura e camere"], ["💳", "Piano di abbonamento"], ["📅", "A breve: import prenotazioni da Octorate (CSV/iCal)"]].map(([i, tx]) => (
-                  <li key={tx} className="flex items-start gap-2.5"><span className="text-base">{i}</span><span className="text-txt">{tx}</span></li>
+            <div className="text-sm">
+              <p className="font-medium text-txt">Imposteremo, un passo alla volta:</p>
+              <ol className="mt-4 space-y-3">
+                {[["Profilo e accesso", "I tuoi dati e le credenziali con cui entrerai."], ["Struttura e camere", "Nome, indirizzo e tipologie di camera."], ["Piano di abbonamento", `${TRIAL_DAYS} giorni di prova gratuita, poi scegli tu.`]].map(([t, d], i) => (
+                  <li key={t} className="flex items-start gap-3">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold text-focus" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>{i + 1}</span>
+                    <span><span className="block font-medium text-txt">{t}</span><span className="block text-xs text-dim">{d}</span></span>
+                  </li>
                 ))}
-              </ul>
-              <div className="mt-4 rounded-lg bg-wash px-3 py-2.5 text-[12px] text-dim">
-                <span className="font-semibold text-txt">Ti servono:</span> nome struttura, indirizzo e numero camere.
+              </ol>
+              <div className="mt-5 rounded-lg bg-wash px-3 py-2.5 text-xs text-txt">
+                <span className="font-semibold">Ti servono:</span> nome della struttura, indirizzo e numero di camere. Dopo la configurazione potrai importare le prenotazioni esistenti.
               </div>
-              <p className="mt-2 text-[11px] text-faint">Potrai modificare tutto in seguito dalle Impostazioni. I dati restano su questo dispositivo (prototipo).</p>
+              <p className="mt-3 text-xs text-dim">Potrai modificare tutto in seguito dalle Impostazioni. I tuoi dati sono salvati in modo sicuro sul tuo account Xenora.</p>
             </div>
           )}
 
           {step === 1 && (
-            <div className="grid grid-cols-2 gap-3">
-              <label><span className={lbl}>Nome *</span><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder="Mario" /></label>
-              <label><span className={lbl}>Cognome *</span><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder="Rossi" /></label>
-              <label className="col-span-2"><span className={lbl}>Email *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className={inp} placeholder="mario@esempio.it" /></label>
-              <label><span className={lbl}>Telefono *</span><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="+39 333 …" /></label>
-              <label><span className={lbl}>Lingua</span><select value={language} onChange={(e) => setLanguage(e.target.value)} className={inp}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
-              <p className="col-span-2 text-[11px] text-faint">Useremo questi dati per l&apos;intestazione dell&apos;account e le comunicazioni. I dati fiscali (P.IVA/CF) li aggiungerai dopo, nell&apos;area Abbonamento.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <label><span className={PUB.label}>Nome{req}</span><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={PUB.field} placeholder="Mario" required autoComplete="given-name" /></label>
+              <label><span className={PUB.label}>Cognome{req}</span><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={PUB.field} placeholder="Rossi" required autoComplete="family-name" /></label>
+              <label className="col-span-2"><span className={PUB.label}>Email{req}</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className={PUB.field} placeholder="mario@esempio.it" required autoComplete="email" /></label>
+              <label><span className={PUB.label}>Telefono{req}</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" className={PUB.field} placeholder="+39 333 1234567" required autoComplete="tel" /></label>
+              <label><span className={PUB.label}>Lingua</span><select value={language} onChange={(e) => setLanguage(e.target.value)} className={PUB.field}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
+              <p className="col-span-2 text-xs text-dim">Useremo questi dati per l&apos;intestazione dell&apos;account e le comunicazioni. I dati fiscali (P.IVA/CF) li aggiungerai dopo, nell&apos;area Abbonamento.</p>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-3">
-              <label className="block"><span className={lbl}>Nome utente *</span><input value={username} onChange={(e) => setUsername(e.target.value)} className={inp} placeholder="mario.rossi" autoCapitalize="none" /></label>
-              <p className="text-[11px] text-faint">È il nome con cui compari nel registro attività. Per accedere usi sempre la tua email e la password dell&apos;account; per recuperarla useremo l&apos;email del passo precedente.</p>
+              <label className="block"><span className={PUB.label}>Nome utente{req}</span><input value={username} onChange={(e) => setUsername(e.target.value)} className={PUB.field} placeholder="mario.rossi" autoCapitalize="none" autoComplete="username" required aria-describedby="wiz-username-hint" /></label>
+              <p id="wiz-username-hint" className="text-xs text-dim">È il nome con cui compari nel registro attività (almeno 3 caratteri). Per accedere usi sempre la tua email e la password dell&apos;account; per recuperarla useremo l&apos;email del passo precedente.</p>
             </div>
           )}
 
           {step === 3 && (
-            <div className="grid grid-cols-2 gap-3">
-              <label className="col-span-2"><span className={lbl}>Nome struttura *</span><input value={sName} onChange={(e) => setSName(e.target.value)} className={inp} placeholder="Es. Spigole House" /></label>
-              <label><span className={lbl}>Tipologia *</span><select value={sType} onChange={(e) => setSType(e.target.value)} className={inp}>{STRUCTURE_TYPES.map((tp) => <option key={tp} value={tp}>{tp}</option>)}</select></label>
-              <label><span className={lbl}>Città *</span><input value={sCity} onChange={(e) => setSCity(e.target.value)} className={inp} placeholder="Siracusa" /></label>
-              <label className="col-span-2"><span className={lbl}>Indirizzo</span><input value={sAddress} onChange={(e) => setSAddress(e.target.value)} className={inp} placeholder="Via / Piazza" /></label>
-              <label><span className={lbl}>Civico</span><input value={sStreetNo} onChange={(e) => setSStreetNo(e.target.value)} className={inp} placeholder="12" /></label>
-              <label><span className={lbl}>CAP</span><input value={sCap} onChange={(e) => setSCap(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" className={inp} placeholder="96100" /></label>
-              <label><span className={lbl}>Provincia</span><input value={sProvince} onChange={(e) => setSProvince(e.target.value.toUpperCase().slice(0, 2))} className={inp} placeholder="SR" /></label>
-              <label><span className={lbl}>CIN <span className="font-normal text-faint">(facolt.)</span></span><input value={sCin} onChange={(e) => setSCin(e.target.value)} className={inp} placeholder="IT…" /></label>
-              <p className="col-span-2 text-[11px] text-faint">Indirizzo, CAP e provincia servono per ISTAT e tassa di soggiorno — puoi completarli anche dopo dalla scheda struttura.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="col-span-2"><span className={PUB.label}>Nome struttura{req}</span><input value={sName} onChange={(e) => setSName(e.target.value)} className={PUB.field} placeholder="Es. Spigole House" required /></label>
+              <label><span className={PUB.label}>Tipologia{req}</span><select value={sType} onChange={(e) => setSType(e.target.value)} className={PUB.field}>{STRUCTURE_TYPES.map((tp) => <option key={tp} value={tp}>{tp}</option>)}</select></label>
+              <label><span className={PUB.label}>Città{req}</span><input value={sCity} onChange={(e) => setSCity(e.target.value)} className={PUB.field} placeholder="Siracusa" required /></label>
+              <label className="col-span-2"><span className={PUB.label}>Indirizzo</span><input value={sAddress} onChange={(e) => setSAddress(e.target.value)} className={PUB.field} placeholder="Via / Piazza" /></label>
+              <label><span className={PUB.label}>Civico</span><input value={sStreetNo} onChange={(e) => setSStreetNo(e.target.value)} className={PUB.field} placeholder="12" /></label>
+              <label><span className={PUB.label}>CAP</span><input value={sCap} onChange={(e) => setSCap(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" className={PUB.field} placeholder="96100" /></label>
+              <label><span className={PUB.label}>Provincia</span><input value={sProvince} onChange={(e) => setSProvince(e.target.value.toUpperCase().slice(0, 2))} className={PUB.field} placeholder="SR" /></label>
+              <label><span className={PUB.label}>CIN <span className="font-normal text-dim">(facoltativo)</span></span><input value={sCin} onChange={(e) => setSCin(e.target.value)} className={PUB.field} placeholder="IT…" /></label>
+              <p className="col-span-2 text-xs text-dim">Indirizzo, CAP e provincia servono per ISTAT e tassa di soggiorno: puoi completarli anche dopo dalla scheda struttura.</p>
             </div>
           )}
 
           {step === 4 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {camere.map((c, i) => {
                 const isCustom = !!c.name && !ROOM_TYPE_OPTIONS.includes(c.name);
                 const selVal = isCustom ? "__other__" : c.name;
                 return (
-                  <div key={i} className="space-y-2 rounded-lg border border-line p-2">
-                    <div className="flex flex-wrap items-end gap-2">
-                      <label className="w-full sm:flex-1"><span className={lbl}>Tipologia</span>
-                        <select value={selVal} onChange={(e) => { const v = e.target.value; setCam(i, v === "__other__" ? { name: " " } : { name: v, ...(v ? { beds: guessBeds(v) } : {}) }); }} className={inp}>
+                  <div key={i} className="space-y-3 rounded-lg border border-line p-3">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="w-full sm:flex-1"><span className={PUB.label}>Tipologia</span>
+                        <select value={selVal} onChange={(e) => { const v = e.target.value; setCam(i, v === "__other__" ? { name: " " } : { name: v, ...(v ? { beds: guessBeds(v) } : {}) }); }} className={PUB.field}>
                           <option value="">Seleziona…</option>
                           {ROOM_TYPE_OPTIONS.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
                           <option value="__other__">Altro (personalizzata)…</option>
                         </select>
                       </label>
-                      <label className="w-20"><span className={lbl}>N° camere</span><Stepper value={c.count} onChange={(v) => setCam(i, { count: v })} min={1} /></label>
-                      <label className="w-20"><span className={lbl}>Posti letto</span><Stepper value={c.beds} onChange={(v) => setCam(i, { beds: v })} min={1} /></label>
-                      <button onClick={() => delCam(i)} disabled={camere.length <= 1} className="mb-0.5 grid h-[42px] w-10 shrink-0 place-items-center rounded-lg border border-line text-faint transition hover:text-[color:var(--err)] disabled:opacity-30" title="Rimuovi">✕</button>
+                      <label className="w-24"><span className={PUB.label}>N° camere</span><Stepper value={c.count} onChange={(v) => setCam(i, { count: v })} min={1} /></label>
+                      <label className="w-24"><span className={PUB.label}>Posti letto</span><Stepper value={c.beds} onChange={(v) => setCam(i, { beds: v })} min={1} /></label>
+                      <button type="button" onClick={() => delCam(i)} disabled={camere.length <= 1} className={`${PUB.btnSecondary} w-10! px-0! hover:text-[color:var(--err)] sm:w-9!`} aria-label={`Rimuovi la tipologia ${i + 1}`} title="Rimuovi">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+                      </button>
                     </div>
                     {selVal === "__other__" && (
-                      <input value={c.name.trimStart()} onChange={(e) => setCam(i, { name: e.target.value })} className={inp} placeholder="Nome tipologia personalizzata (es. Camera con jacuzzi)" autoFocus />
+                      <input value={c.name.trimStart()} onChange={(e) => setCam(i, { name: e.target.value })} className={PUB.field} placeholder="Nome della tipologia (es. Camera con jacuzzi)" aria-label="Nome della tipologia personalizzata" autoFocus />
                     )}
                   </div>
                 );
               })}
-              <button onClick={addCam} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">+ Aggiungi tipologia</button>
-              <p className="pt-1 text-[11px] text-faint">Totale camere: <b className="text-dim">{totalRooms}</b>. Creeremo le singole camere numerate automaticamente (le rinomini poi da «Camere»).</p>
+              <button type="button" onClick={addCam} className={`${PUB.btnSecondary} text-focus`}>Aggiungi tipologia</button>
+              <p className="pt-1 text-xs text-dim">Totale camere: <b className="text-txt">{totalRooms}</b>. Creeremo le singole camere numerate automaticamente (le rinomini poi da «Camere»).</p>
             </div>
           )}
 
           {step === 5 && (
-            <div className="space-y-2.5">
-              <p className="text-xs text-faint">Per iniziare consigliamo <b className="text-focus">{autoTier.name}</b> (1 struttura, 6 camere incluse). Lo cambi quando vuoi da Abbonamento.</p>
-              {TIERS.map((tps, idx) => {
-                const on = plan === tps.key;
-                const prev = idx > 0 ? TIERS[idx - 1] : null;
-                const feats = tps.includes.filter((k) => k !== "pms" && (!prev || !prev.includes.includes(k)));
-                return (
-                  <button key={tps.key} onClick={() => setPlan(tps.key)} className={`block w-full rounded-xl border p-3 text-left transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "border-line bg-surface hover:bg-wash"}`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? "border-focus" : "border-line"}`}>{on && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--focus)" }} />}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2"><span className="text-sm font-bold text-txt">{tps.name}</span>{tps.key === autoTier.key && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus">consigliato</span>}</span>
-                        <span className="block text-[11px] text-dim">{tps.structures === 1 ? "1 struttura" : `fino a ${tps.structures} strutture`} · 6 camere incluse/struttura</span>
-                      </span>
-                      <span className="shrink-0 font-mono text-sm font-bold text-txt">€{tps.price}<span className="text-[10px] font-normal text-faint">/mese</span></span>
-                    </div>
-                    <ul className="mt-2 space-y-0.5 pl-8 text-[11px] text-dim">
-                      {prev && <li className="font-semibold text-txt">Tutto {prev.name}, più:</li>}
-                      {feats.map((k) => <li key={k} className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{MODULE_LABELS[k] ?? k}</li>)}
-                    </ul>
-                  </button>
-                );
-              })}
-              <p className="pl-8 text-[11px] text-faint">Ogni piano include il <b className="text-dim">PMS</b> (prenotazioni, calendario, ospiti). Potrai aggiungere singoli moduli extra in qualsiasi momento dall&apos;area Abbonamento.</p>
+            <div className="space-y-3">
+              <p className="text-sm text-dim">Per iniziare consigliamo <b className="text-txt">{autoTier.name}</b> (1 struttura, 6 camere incluse). Lo cambi quando vuoi da Abbonamento.</p>
+              <div role="radiogroup" aria-label="Piano di abbonamento" className="space-y-3">
+                {TIERS.map((tps, idx) => {
+                  const on = plan === tps.key;
+                  const prev = idx > 0 ? TIERS[idx - 1] : null;
+                  const feats = tps.includes.filter((k) => k !== "pms" && (!prev || !prev.includes.includes(k)));
+                  return (
+                    <button type="button" role="radio" aria-checked={on} key={tps.key} onClick={() => setPlan(tps.key)} className={`block w-full rounded-xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "border-line bg-surface hover:bg-wash"}`}>
+                      <div className="flex items-center gap-3">
+                        <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? "border-focus" : "border-line"}`}>{on && <span className="h-2.5 w-2.5 rounded-full bg-focus" />}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2"><span className="font-display text-base font-bold text-txt">{tps.name}</span>{tps.key === autoTier.key && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-focus" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>Consigliato</span>}</span>
+                          <span className="block text-xs text-dim">{tps.structures === 1 ? "1 struttura" : `fino a ${tps.structures} strutture`} · 6 camere incluse per struttura</span>
+                        </span>
+                        <span className="shrink-0 text-right font-mono text-sm font-bold text-txt">{eur(tps.price)}<span className="text-xs font-normal text-dim">/mese</span></span>
+                      </div>
+                      <ul className="mt-3 space-y-1 pl-8 text-xs text-dim">
+                        {prev && <li className="font-semibold text-txt">Tutto {prev.name}, più:</li>}
+                        {feats.map((k) => <li key={k} className="flex items-start gap-1.5"><span aria-hidden className="text-[color:var(--ok)]">✓</span>{MODULE_LABELS[k] ?? k}</li>)}
+                      </ul>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-dim">Ogni piano include il <b className="text-txt">PMS</b> (prenotazioni, calendario, ospiti). Potrai aggiungere singoli moduli extra in qualsiasi momento dall&apos;area Abbonamento.</p>
             </div>
           )}
 
           {step === 6 && (
-            <div className="rounded-xl border border-line bg-surface p-5 text-sm">
-              {[["Profilo", `${firstName} ${lastName} · ${email}`], ["Accesso", username], ["Struttura", `${sName} · ${sType} · ${sCity}`], ["Camere", `${totalRooms} camere · ${camere.filter((c) => c.name.trim()).length} tipologie`], ["Piano", `${TIERS.find((t) => t.key === plan)?.name ?? "—"} · prova ${TRIAL_DAYS} giorni`]].map(([k, v]) => (
-                <div key={k} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-0">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-faint">{k}</span>
-                  <span className="min-w-0 flex-1 text-right text-txt">{v}</span>
-                </div>
-              ))}
-              <p className="mt-3 text-[11px] text-faint">Dopo «Inizia» ti troverai la dashboard vuota: da lì importerai le prenotazioni da Octorate (CSV/iCal).</p>
+            <div className="text-sm">
+              <dl>
+                {[["Profilo", `${firstName} ${lastName} · ${email}`], ["Nome utente", username], ["Struttura", `${sName} · ${sType} · ${sCity}`], ["Camere", `${totalRooms} ${totalRooms === 1 ? "camera" : "camere"} · ${nTypes} ${nTypes === 1 ? "tipologia" : "tipologie"}`], ["Piano", `${selectedTier?.name ?? "—"} · prova gratuita di ${TRIAL_DAYS} giorni`]].map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between gap-3 border-b border-line py-2.5 first:pt-0 last:border-0">
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-dim">{k}</dt>
+                    <dd className="min-w-0 flex-1 text-right text-txt">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-4 text-xs text-dim">Dopo «Inizia» entri nel gestionale: da lì potrai importare le prenotazioni esistenti e collegare i tuoi canali.</p>
             </div>
           )}
         </div>
 
-        {/* Nav */}
-        <div className="mt-8 flex items-center justify-between gap-3">
-          <button onClick={() => setStep((n) => Math.max(0, n - 1))} disabled={step === 0} className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-dim transition hover:bg-wash disabled:opacity-0">← Indietro</button>
+        {/* Navigazione: sempre Indietro a sinistra, Avanti a destra */}
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button type="button" onClick={() => setStep((n) => Math.max(0, n - 1))} className={`${PUB.btnSecondary} ${step === 0 ? "invisible" : ""}`} aria-hidden={step === 0} tabIndex={step === 0 ? -1 : 0}>Indietro</button>
           {isLast ? (
-            <button onClick={finish} className="rounded-lg bg-focus px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90">Inizia 🚀</button>
+            <button type="button" onClick={finish} className={`${PUB.btnPrimary} min-w-28`}>Inizia</button>
           ) : (
-            <button onClick={() => canNext && setStep((n) => n + 1)} disabled={!canNext} className="rounded-lg bg-focus px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">Avanti →</button>
+            <button type="button" onClick={() => canNext && setStep((n) => n + 1)} disabled={!canNext} className={`${PUB.btnPrimary} min-w-28`}>Avanti</button>
           )}
         </div>
-        {!canNext && step > 0 && <p className="mt-2 text-right text-[11px] text-faint">Completa i campi obbligatori (*) per continuare.</p>}
+        {!canNext && step > 0 && <p role="status" className="mt-3 text-right text-xs text-dim">Compila i campi contrassegnati con * per continuare.</p>}
       </div>
     </div>
   );
@@ -365,10 +385,10 @@ function Stepper({ value, onChange, min = 0, max = 99 }: { value: string; onChan
   const set = (x: number) => onChange(String(Math.max(min, Math.min(max, x))));
   return (
     <div className="relative">
-      <input value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" className={`${inp} pr-6 text-center`} />
-      <div className="absolute inset-y-1 right-1 flex w-4 flex-col">
-        <button type="button" tabIndex={-1} onClick={() => set(n + 1)} className="flex h-1/2 items-center justify-center rounded-sm text-[8px] leading-none text-faint transition hover:bg-wash hover:text-txt" aria-label="Aumenta">▲</button>
-        <button type="button" tabIndex={-1} onClick={() => set(n - 1)} className="flex h-1/2 items-center justify-center rounded-sm text-[8px] leading-none text-faint transition hover:bg-wash hover:text-txt" aria-label="Diminuisci">▼</button>
+      <input value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" className={`${PUB.field} pr-7 text-center`} />
+      <div className="absolute inset-y-1 right-1 flex w-5 flex-col">
+        <button type="button" tabIndex={-1} onClick={() => set(n + 1)} className="flex h-1/2 items-center justify-center rounded-sm text-[8px] leading-none text-dim transition hover:bg-wash hover:text-txt" aria-label="Aumenta">▲</button>
+        <button type="button" tabIndex={-1} onClick={() => set(n - 1)} className="flex h-1/2 items-center justify-center rounded-sm text-[8px] leading-none text-dim transition hover:bg-wash hover:text-txt" aria-label="Diminuisci">▼</button>
       </div>
     </div>
   );

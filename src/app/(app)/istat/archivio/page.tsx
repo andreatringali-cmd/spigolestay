@@ -70,7 +70,7 @@ export default function IstatArchivioPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-dim">
                   <th className="py-2 pr-3">Giornata</th>
                   <th className="py-2 pr-3">Movimenti</th>
                   <th className="py-2 pr-3">Stato</th>
@@ -83,7 +83,7 @@ export default function IstatArchivioPage() {
                   <tr key={it.id} className="border-b border-line last:border-0">
                     <td className="py-2.5 pr-3 font-medium text-txt">{fmtDay(it.day)}</td>
                     <td className="py-2.5 pr-3 text-dim">{it.count}</td>
-                    <td className="py-2.5 pr-3"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${okStato(it.stato) ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: okStato(it.stato) ? "var(--ok)" : "var(--err)" }}>{okStato(it.stato) ? "Inviato" : "Errore"}</span></td>
+                    <td className="py-2.5 pr-3"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${okStato(it.stato) ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: okStato(it.stato) ? "var(--ok)" : "var(--err)" }}>{okStato(it.stato) ? "Inviato" : "Errore"}</span></td>
                     <td className="py-2.5 pr-3 text-[12px] text-faint">{fmt(it.created_at)}</td>
                     <td className="py-2.5 pr-3 text-[12px] text-faint">{it.esito || "—"}</td>
                   </tr>

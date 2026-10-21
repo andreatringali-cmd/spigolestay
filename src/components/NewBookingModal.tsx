@@ -143,7 +143,7 @@ export default function NewBookingModal() {
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5 max-sm:px-3 max-sm:py-4">
             {/* Soggiorno */}
             <div className="rounded-2xl border border-line bg-paper p-4">
-              <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">{t("Soggiorno")}</div>
+              <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-dim">{t("Soggiorno")}</div>
               <div className="flex flex-wrap items-end gap-3">
                 <label className="flex-1 text-[11px] font-medium text-dim">{t("Check-in")}
                   <DateField value={checkIn} onChange={(v) => { setCheckIn(v); if (v >= checkOut) setCheckOut(shiftISO(v, 1)); }} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus text-left" />
@@ -158,7 +158,7 @@ export default function NewBookingModal() {
 
             {/* Ospiti */}
             <div className="rounded-2xl border border-line bg-paper p-4">
-              <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">{t("Ospiti")}</div>
+              <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-dim">{t("Ospiti")}</div>
               <div className="grid grid-cols-1 gap-3 min-[460px]:grid-cols-2">
                 <Stepper label={t("Adulti")} sub={t("14 anni +")} value={adults} min={1} onChange={setAdults} icon={<PersonGlyph />} />
                 <Stepper label={t("Bambini")} sub={t("0–13 anni")} value={children} min={0} onChange={setChildrenN} icon={<PersonGlyph small />} />
@@ -181,10 +181,10 @@ export default function NewBookingModal() {
             {/* Struttura — nascosta se già scelta in alto a destra */}
             {!locked && (
               <div className="rounded-2xl border border-line bg-paper p-4">
-                <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">{t("Struttura")}</div>
+                <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-dim">{t("Struttura")}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {[{ id: "all", name: t("Tutte") }, ...structures].map((s) => (
-                    <button key={s.id} onClick={() => setStructFilter(s.id)} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${structFilter === s.id ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>
+                    <button key={s.id} onClick={() => setStructFilter(s.id)} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${structFilter === s.id ? "border-focus bg-focus text-on-focus" : "border-line text-dim hover:bg-wash"}`}>
                       {s.id !== "all" && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: structColor(s.id) }} />}{s.name}
                     </button>
                   ))}
@@ -226,7 +226,7 @@ export default function NewBookingModal() {
                             <div className="min-w-0 flex-1 basis-40">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="text-sm font-bold text-txt">{rt.name}</span>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-dim"><Guests n={cap(rt)} /> {t("fino a")} {cap(rt)}</span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim"><Guests n={cap(rt)} /> {t("fino a")} {cap(rt)}</span>
                                 <span className="inline-flex items-center gap-1 text-[11px] text-faint"><BedIcon /> {rt.beds}</span>
                               </div>
                               <div className="mt-1 flex items-center gap-2 text-[11px]">
@@ -236,12 +236,12 @@ export default function NewBookingModal() {
                             </div>
                             <div className="shrink-0 text-right">
                               <div className="text-lg font-extrabold leading-none text-txt">€{stayPrice(rt)}</div>
-                              <div className="text-[10px] text-faint">{nightsN} {nightsN === 1 ? t("notte") : t("notti")}</div>
+                              <div className="text-[11px] text-faint">{nightsN} {nightsN === 1 ? t("notte") : t("notti")}</div>
                             </div>
                             <div className="flex shrink-0 items-center gap-1.5 max-sm:ml-auto">
                               <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
                               <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                              <button disabled={q >= av} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-full border text-lg leading-none disabled:opacity-30 max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                              <button disabled={q >= av} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-full border text-lg leading-none disabled:opacity-30 max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                             </div>
                           </div>
                         );
@@ -265,7 +265,7 @@ export default function NewBookingModal() {
                     const st = structures.find((x) => x.id === rt.structureId);
                     return (
                       <div key={rt.id} className="flex items-center gap-2 text-sm">
-                        <span className="shrink-0 rounded bg-focus px-1.5 py-0.5 text-[11px] font-bold text-white">×{qty[rt.id]}</span>
+                        <span className="shrink-0 rounded bg-focus px-1.5 py-0.5 text-[11px] font-bold text-on-focus">×{qty[rt.id]}</span>
                         <span className="min-w-0 flex-1 truncate text-txt">{rt.name} <span className="text-faint">· {st?.name}</span></span>
                         <span className="flex shrink-0 items-center gap-1 text-xs text-dim">€ <input type="number" min={0} value={linePrice(rt)} onChange={(e) => setPriceOv((o) => ({ ...o, [rt.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /><span className="text-faint">/cam</span></span>
                         <button onClick={() => setQ(rt.id, 0)} title={t("Rimuovi")} className="shrink-0 px-1 text-faint hover:text-[color:var(--err)] max-sm:px-2.5 max-sm:py-2">✕</button>
@@ -298,7 +298,7 @@ export default function NewBookingModal() {
               <span className="text-xs text-faint">{totalAvail > 0 ? `${totalAvail} ${t("tipologie disponibili")}` : ""}</span>
               <div className="flex gap-2">
                 <button onClick={closeNewBooking} className="rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
-                <button onClick={goResults} className="flex items-center gap-1.5 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 max-sm:min-h-11"><SearchIcon /> {t("Cerca disponibilità")}</button>
+                <button onClick={goResults} className="flex items-center gap-1.5 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 max-sm:min-h-11"><SearchIcon /> {t("Cerca disponibilità")}</button>
               </div>
             </>
           ) : (
@@ -306,7 +306,7 @@ export default function NewBookingModal() {
               <div className="text-sm text-dim">
                 {totalRooms > 0 ? (<>{totalRooms} {totalRooms === 1 ? t("camera") : t("camere")} · <b className="text-txt">€ {totalPrice}</b> <span className="text-faint">· {nightsN} {nightsN === 1 ? t("notte") : t("notti")}</span></>) : t("Nessuna camera selezionata")}
               </div>
-              <button onClick={submit} disabled={totalRooms < 1} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{isGroup ? t("Crea gruppo") : t("Crea prenotazione")}</button>
+              <button onClick={submit} disabled={totalRooms < 1} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{isGroup ? t("Crea gruppo") : t("Crea prenotazione")}</button>
             </>
           )}
         </div>
@@ -326,12 +326,12 @@ function Stepper({ label, sub, value, min, onChange, icon }: { label: string; su
     <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-3 py-2.5">
       <div className="flex items-center gap-2">
         <span className="text-dim">{icon}</span>
-        <div><div className="text-sm font-semibold text-txt">{label}</div><div className="text-[10px] text-faint">{sub}</div></div>
+        <div><div className="text-sm font-semibold text-txt">{label}</div><div className="text-[11px] text-faint">{sub}</div></div>
       </div>
       <div className="flex items-center gap-2">
         <button onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
         <span className="w-5 text-center text-base font-bold tabular-nums text-txt">{value}</span>
-        <button onClick={() => onChange(value + 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-focus bg-focus text-lg leading-none text-white hover:opacity-90 max-sm:h-10 max-sm:w-10">+</button>
+        <button onClick={() => onChange(value + 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-focus bg-focus text-lg leading-none text-on-focus hover:opacity-90 max-sm:h-10 max-sm:w-10">+</button>
       </div>
     </div>
   );

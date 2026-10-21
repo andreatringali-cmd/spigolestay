@@ -35,7 +35,7 @@ export function CameraLibera({ f, roomType, structure, showStructure, guestName,
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
           <h3 className="min-w-0 truncate text-base font-bold text-txt">{unit.name}</h3>
-          {showStructure && structure && <span className="truncate text-[11px] font-semibold text-faint">{structure.name}</span>}
+          {showStructure && structure && <span className="truncate text-[11px] font-semibold text-dim">{structure.name}</span>}
         </div>
         <div className="truncate text-xs text-dim">{roomType?.name ?? "—"}</div>
         <div className="mt-1 text-xs text-dim">

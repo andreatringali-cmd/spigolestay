@@ -24,7 +24,7 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
   if (!open) return null;
   const net = impact.net;
   const cell = "rounded-lg border border-line bg-paper px-3 py-2";
-  const lab = "text-[10px] font-semibold uppercase tracking-wide text-faint";
+  const lab = "text-[11px] font-semibold uppercase tracking-wide text-dim";
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
       <button aria-label="Annulla" onClick={onCancel} className="absolute inset-0 bg-black/45" />
@@ -37,14 +37,14 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
         ) : (
           <>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className={cell}><div className={lab}>Tariffe</div><div className="font-mono text-lg font-bold text-txt">{impact.changes}</div><div className="text-[10px] text-faint">{impact.ups} su · {impact.downs} giù</div></div>
+              <div className={cell}><div className={lab}>Tariffe</div><div className="font-mono text-lg font-bold text-txt">{impact.changes}</div><div className="text-[11px] text-faint">{impact.ups} su · {impact.downs} giù</div></div>
               <div className={cell}><div className={lab}>Variazione media</div><div className="font-mono text-lg font-bold" style={{ color: impact.avgDeltaPct >= 0 ? "var(--ok)" : "var(--warn)" }}>{impact.avgDeltaPct > 0 ? "+" : ""}{impact.avgDeltaPct}%</div></div>
-              <div className={cell}><div className={lab}>Camere libere</div><div className="font-mono text-lg font-bold text-txt">{impact.freeNightRooms}</div><div className="text-[10px] text-faint">notti-camera toccate</div></div>
-              <div className={cell}><div className={lab}>Già vendute</div><div className="font-mono text-lg font-bold text-txt">{impact.soldNightRooms}</div><div className="text-[10px] text-faint">prezzo invariato</div></div>
+              <div className={cell}><div className={lab}>Camere libere</div><div className="font-mono text-lg font-bold text-txt">{impact.freeNightRooms}</div><div className="text-[11px] text-faint">notti-camera toccate</div></div>
+              <div className={cell}><div className={lab}>Già vendute</div><div className="font-mono text-lg font-bold text-txt">{impact.soldNightRooms}</div><div className="text-[11px] text-faint">prezzo invariato</div></div>
             </div>
 
             <div className="mt-3 rounded-lg border border-line p-3 text-sm">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Se si vendessero tutte le camere ancora libere</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Se si vendessero tutte le camere ancora libere</div>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-2 text-txt">
                 <span className="font-mono">{eur(impact.revenueBefore)}</span><span className="text-faint">→</span><span className="font-mono font-semibold">{eur(impact.revenueAfter)}</span>
                 <span className="font-mono text-base font-bold" style={{ color: net >= 0 ? "var(--ok)" : "var(--warn)" }}>{net >= 0 ? "+" : "−"}{eur(Math.abs(net))}</span>
@@ -59,7 +59,7 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
                   <li key={i} className="flex flex-wrap items-baseline justify-between gap-2 rounded-md bg-wash px-2.5 py-1.5">
                     <span className="min-w-0 truncate text-txt">{e.label}</span>
                     <span className="shrink-0 font-mono">{eur(e.from)} → <b style={{ color: e.to >= e.from ? "var(--ok)" : "var(--warn)" }}>{eur(e.to)}</b></span>
-                    {e.note && <span className="w-full text-[10px] text-faint">{e.note}</span>}
+                    {e.note && <span className="w-full text-[11px] text-faint">{e.note}</span>}
                   </li>
                 ))}
                 {impact.changes > Math.min(5, examples.length) && <li className="px-1 text-[11px] text-faint">…e {impact.changes - Math.min(5, examples.length) === 1 ? "un'altra tariffa" : `altre ${impact.changes - Math.min(5, examples.length)} tariffe`}.</li>}
@@ -73,7 +73,7 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
 
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onCancel} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-dim hover:bg-wash">Annulla</button>
-          <button onClick={onConfirm} disabled={impact.changes === 0} autoFocus className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{confirmLabel}</button>
+          <button onClick={onConfirm} disabled={impact.changes === 0} autoFocus className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{confirmLabel}</button>
         </div>
       </div>
     </div>

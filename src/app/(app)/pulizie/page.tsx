@@ -30,6 +30,7 @@ import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 import { downscaleImage } from "@/lib/images";
 import { realGuestRequests } from "@/lib/guest-requests";
 
+import { onSolid } from "@/lib/on-solid";
 const fmt = (iso: string) => fmtDM(iso);
 const fmtShort = (iso: string) => fmtDM(iso);
 const fmtLong = (iso: string) => `${parseISO(iso).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(iso)}`;
@@ -66,7 +67,7 @@ const DEFAULT_PRODUCTS = ["Carta igienica", "Prodotti cortesia (kit bagno)", "An
 const statusOf = (p: Prod): StockStatus => (p.qty <= 0 ? "out" : p.qty <= p.min ? "low" : "ok");
 const STOCK_STATUS: { key: StockStatus; label: string; short: string; color: string }[] = [
   { key: "ok", label: "Disponibile", short: "Disp.", color: "var(--ok)" },
-  { key: "low", label: "In esaurimento", short: "In esaur.", color: "#CA8A04" },
+  { key: "low", label: "In esaurimento", short: "In esaur.", color: "var(--warn)" },
   { key: "out", label: "Terminato", short: "Terminato", color: "var(--err)" },
 ];
 const stockMeta = (key: StockStatus) => STOCK_STATUS.find((s) => s.key === key) ?? STOCK_STATUS[0];
@@ -373,7 +374,7 @@ export default function PuliziePage() {
     />
   );
   const Seg = ({ v, icon, title }: { v: "rows" | "cards"; icon: string; title: string }) => (
-    <button onClick={() => pickView(v)} title={title} className={`rounded-md p-1.5 transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name={icon} size={16} /></button>
+    <button onClick={() => pickView(v)} title={title} className={`rounded-md p-1.5 transition ${view === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}><Icon name={icon} size={16} /></button>
   );
 
   // Blocco icone (persone + cane) e date, come sulle card — niente parola "persone".
@@ -411,12 +412,12 @@ export default function PuliziePage() {
     <div key={p.id} className="flex flex-wrap items-center gap-2 py-2 pl-2.5" style={{ borderLeft: `3px solid ${low ? sm.color : "transparent"}` }}>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-txt">{p.name}</div>
-        {p.supplier && <div className="truncate text-[10px] leading-tight text-faint">{p.supplier}</div>}
+        {p.supplier && <div className="truncate text-[11px] leading-tight text-faint">{p.supplier}</div>}
       </div>
       {/* Pulsanti stato — semplici per la signora */}
       <div className="flex shrink-0 items-center overflow-hidden rounded-lg border border-line">
         {STOCK_STATUS.map((s, i) => (
-          <button key={s.key} onClick={() => setStatusQuick(p, s.key)} title={t(s.label)} className={`px-2.5 py-1 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${st === s.key ? "text-white" : "text-dim hover:bg-wash"}`} style={st === s.key ? { backgroundColor: s.color } : undefined}>{t(s.short)}</button>
+          <button key={s.key} onClick={() => setStatusQuick(p, s.key)} title={t(s.label)} className={`px-2.5 py-1 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${st === s.key ? onSolid(s.color) : "text-dim hover:bg-wash"}`} style={st === s.key ? { backgroundColor: s.color } : undefined}>{t(s.short)}</button>
         ))}
       </div>
       <div className="relative shrink-0" data-prodmenu>
@@ -432,9 +433,9 @@ export default function PuliziePage() {
 
   const shopItem = (p: Prod) => { const st = statusOf(p); return (
     <div key={p.id} className="flex items-center gap-1.5 rounded-md border border-line bg-paper px-2 py-1">
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: st === "out" ? "var(--err)" : "#CA8A04" }} title={st === "out" ? t("Terminato") : t("In esaurimento")} />
+      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: st === "out" ? "var(--err)" : "var(--warn)" }} title={st === "out" ? t("Terminato") : t("In esaurimento")} />
       <span className="min-w-0 flex-1 truncate text-xs text-txt">{p.name}</span>
-      {p.supplier && <span className="shrink-0 truncate text-[9px] text-faint" title={t("Fornitore")}>{p.supplier}</span>}
+      {p.supplier && <span className="shrink-0 truncate text-[10px] text-faint" title={t("Fornitore")}>{p.supplier}</span>}
       <button onClick={() => setStatusQuick(p, "ok")} title={t("Riassortisci")} className="shrink-0 text-[color:var(--ok)] hover:opacity-70">✓</button>
     </div>
   ); };
@@ -448,9 +449,9 @@ export default function PuliziePage() {
       <div className="mb-4 flex flex-wrap items-center gap-3 max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-2">
         <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:min-w-0 max-sm:flex-1">
           {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["checklist", "Checklist"]] as ["planning" | "scorte" | "checklist", string][]).map(([v, lab]) => (
-            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-[13px] ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
+            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-[13px] ${tab === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>
               <span className="max-sm:hidden"><Icon name={v === "planning" ? "sparkles" : v === "checklist" ? "menu" : "clipboard"} size={15} /></span> {t(lab)}
-              {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[10px] font-bold text-white">{shopList.length}</span>}
+              {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[11px] font-bold text-on-err">{shopList.length}</span>}
             </button>
           ))}
         </div>
@@ -467,7 +468,7 @@ export default function PuliziePage() {
               <div className="ml-auto flex items-center gap-2">
                 <button disabled={empty} onClick={() => persistStock((cur) => cur.map((p) => (!p._deleted && scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2, updatedAt: Date.now() } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
                 <div className="relative">
-                  <button ref={shareBtnRef} disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+                  <button ref={shareBtnRef} disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
                   <Popover open={shareOpen} anchorRef={shareBtnRef} onClose={() => setShareOpen(false)} align="end" width={176} label={t("Condividi")}>
                     <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
                     <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
@@ -511,7 +512,7 @@ export default function PuliziePage() {
             const segs = (cls: string, bcls: string) => (
               <div className={cls}>
                 {([["all", "Tutti", stockCounts.all], ["ok", "Disponibili", stockCounts.ok], ["low", "In esaurimento", stockCounts.low], ["out", "Esauriti", stockCounts.out]] as ["all" | StockStatus, string, number][]).map(([k, lab, n], i) => (
-                  <button key={k} onClick={() => setProdFilter(k)} className={`${bcls} ${prodFilter === k ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(lab)} <span className={prodFilter === k ? "opacity-90" : "text-faint"}>{n}</span></button>
+                  <button key={k} onClick={() => setProdFilter(k)} className={`${bcls} ${prodFilter === k ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>{t(lab)} <span className={prodFilter === k ? "opacity-90" : "text-faint"}>{n}</span></button>
                 ))}
               </div>
             );
@@ -527,7 +528,7 @@ export default function PuliziePage() {
             <FilterSheet count={prodFilter !== "all" ? 1 : 0} onReset={() => setProdFilter("all")}>
               {segs("grid grid-cols-2 gap-1.5", "h-9 rounded-lg border border-line px-2 text-xs font-semibold transition")}
             </FilterSheet>
-            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:ml-0 max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
+            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:ml-0 max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
           </div>
             );
           })()}
@@ -574,7 +575,7 @@ export default function PuliziePage() {
               className={`anim-in w-full rounded-xl border bg-surface p-4 text-left shadow-sm transition-transform hover:-translate-y-0.5 max-sm:min-w-0 max-sm:px-2 max-sm:py-2 ${on ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line"}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-dim max-sm:text-[10px] max-sm:tracking-normal">{t(c.label)}</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-dim max-sm:text-[11px] max-sm:tracking-normal">{t(c.label)}</span>
                 <span className="max-sm:hidden"><Icon name={on ? "eye" : "chevron"} size={13} /></span>
               </div>
               <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color: c.color }}>{c.count}</div>
@@ -592,7 +593,7 @@ export default function PuliziePage() {
             <span className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt">{linen.changeRooms}</span><span className="text-xs text-dim">{t("Cambi completi")}</span></span>
             {/* Separatore: a destra il dettaglio di cosa serve per i cambi */}
             <span className="hidden self-stretch border-l border-line sm:block" />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("di cui")}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("di cui")}</span>
             {([["Matrimoniali", linen.matr], ["Singole", linen.sing], ["Federe", linen.federe], ["Asciugamani · set", linen.towels], ["Tappetini bagno", linen.mats]] as [string, number][]).map(([lab, v]) => (
               <span key={lab} className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt max-sm:text-base">{v}</span><span className="text-xs text-dim">{t(lab)}</span></span>
             ))}
@@ -623,7 +624,7 @@ export default function PuliziePage() {
           {view === "rows" && (<>
             <div className="flex items-center rounded-lg border border-line p-0.5">
               {(["3", "7", "14"] as const).map((n) => (
-                <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
+                <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
               ))}
             </div>
             <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
@@ -652,7 +653,7 @@ export default function PuliziePage() {
         </div>
         <div className="relative flex items-center gap-2 sm:ml-auto max-sm:shrink-0">
           {copied && <span className="text-xs font-medium text-[color:var(--ok)] max-sm:hidden">{t("Copiato ✓")}</span>}
-          <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:px-2 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+          <button ref={planShareBtnRef} onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:px-2 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
           <button
             onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
             disabled={!autoShareStructure}
@@ -682,7 +683,7 @@ export default function PuliziePage() {
                   <div className="flex flex-wrap items-center gap-1.5 text-xs"><span className="font-bold text-txt">{iss.unitName}</span><span className="text-faint">· {iss.structureName}</span></div>
                   <div className="text-[11px] font-semibold" style={{ color: m.color }}>{t(m.label)}</div>
                   <div className="break-words text-xs text-dim">{iss.note}</div>
-                  <div className="mt-0.5 text-[10px] text-faint">{fmtShort(iss.date)} · {(() => { try { return new Date(iss.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}</div>
+                  <div className="mt-0.5 text-[11px] text-faint">{fmtShort(iss.date)} · {(() => { try { return new Date(iss.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}</div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1">
                   <button onClick={() => resolveIssue(iss.id)} title={t("Segna risolto")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-[color:var(--ok)] hover:bg-wash">✓</button>
@@ -698,7 +699,7 @@ export default function PuliziePage() {
       {resolvedIssues.length > 0 && (
         <div className="mb-4 rounded-xl border border-line bg-surface p-3 shadow-sm">
           <button onClick={() => setShowResolved((s) => !s)} className="flex w-full items-center gap-2 text-sm font-bold text-txt">
-            <span className="grid h-4 w-4 place-items-center rounded-full bg-[color:var(--ok)] text-[10px] font-bold text-white">✓</span>
+            <span className="grid h-4 w-4 place-items-center rounded-full bg-[color:var(--ok)] text-[10px] font-bold text-on-ok">✓</span>
             <span>{t("Storico segnalazioni risolte")} · {resolvedIssues.length}</span>
             <span className="ml-auto text-xs font-medium text-dim">{showResolved ? t("nascondi") : t("mostra")} {showResolved ? "▲" : "▼"}</span>
           </button>
@@ -708,10 +709,10 @@ export default function PuliziePage() {
                 <div key={iss.id} className="flex items-start gap-2 rounded-lg border border-line bg-paper p-2">
                   {iss.photo ? <img src={iss.photo} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" /> : <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${m.color} 12%, transparent)`, color: m.color }}><Icon name={m.icon} size={18} /></span>}
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs"><span className="font-bold text-txt">{iss.unitName}</span><span className="text-faint">· {iss.structureName}</span><span className="rounded-full px-1.5 text-[10px] font-bold text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>✓ {t("risolta")}</span></div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs"><span className="font-bold text-txt">{iss.unitName}</span><span className="text-faint">· {iss.structureName}</span><span className="rounded-full px-1.5 text-[11px] font-bold text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>✓ {t("risolta")}</span></div>
                     <div className="text-[11px] font-semibold" style={{ color: m.color }}>{t(m.label)}</div>
                     <div className="break-words text-xs text-dim">{iss.note}</div>
-                    <div className="mt-0.5 text-[10px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return fmtDM(d) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
+                    <div className="mt-0.5 text-[11px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return fmtDM(d) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">
                     <button onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>
@@ -803,7 +804,7 @@ export default function PuliziePage() {
             </label>
             <div className="mt-4 flex items-center justify-end gap-2">
               <button onClick={() => setProdDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveProd} disabled={!prodDraft.name.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{prodDraft.id ? t("Salva") : t("Aggiungi")}</button>
+              <button onClick={saveProd} disabled={!prodDraft.name.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{prodDraft.id ? t("Salva") : t("Aggiungi")}</button>
             </div>
           </div>
         </div>
@@ -818,7 +819,7 @@ export default function PuliziePage() {
             <p className="text-sm text-dim">{t("Vuoi rimuovere")} <b className="text-txt">{confirmDelProd.name}</b> {t("dalla lista prodotti?")}</p>
             <div className="mt-4 flex items-center justify-end gap-2">
               <button onClick={() => setConfirmDelProd(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={() => { delProd(confirmDelProd.id); setConfirmDelProd(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina")}</button>
+              <button onClick={() => { delProd(confirmDelProd.id); setConfirmDelProd(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-err hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina")}</button>
             </div>
           </div>
         </div>
@@ -836,7 +837,7 @@ export default function PuliziePage() {
             <div className="mb-3 text-xs text-dim">{issueDraft.unitName} · {issueDraft.structureName} · {fmtShort(issueDraft.date ?? date)}</div>
             <div className="mb-3 grid grid-cols-2 gap-1.5">
               {ISSUE_TYPES.map((it) => (
-                <button key={it.key} onClick={() => setIssueDraft({ ...issueDraft, type: it.key })} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${issueDraft.type === it.key ? "text-white" : "border-line text-dim hover:bg-wash"}`} style={issueDraft.type === it.key ? { backgroundColor: it.color, borderColor: it.color } : undefined}><Icon name={it.icon} size={14} /> {t(it.label)}</button>
+                <button key={it.key} onClick={() => setIssueDraft({ ...issueDraft, type: it.key })} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${issueDraft.type === it.key ? onSolid(it.color) : "border-line text-dim hover:bg-wash"}`} style={issueDraft.type === it.key ? { backgroundColor: it.color, borderColor: it.color } : undefined}><Icon name={it.icon} size={14} /> {t(it.label)}</button>
               ))}
             </div>
             <textarea value={issueDraft.note} onChange={(e) => setIssueDraft({ ...issueDraft, note: e.target.value })} placeholder={t("Descrivi il problema…")} rows={3} className="w-full rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
@@ -850,7 +851,7 @@ export default function PuliziePage() {
             {issueSaveErr && <p role="alert" className="mt-2 text-xs font-medium text-[color:var(--err)]">{issueSaveErr}</p>}
             <div className="mt-4 flex items-center justify-end gap-2">
               <button onClick={() => setIssueDraft(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={saveIssue} disabled={!issueDraft.note.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Invia segnalazione")}</button>
+              <button onClick={saveIssue} disabled={!issueDraft.note.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-err hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Invia segnalazione")}</button>
             </div>
           </div>
         </div>
@@ -898,7 +899,7 @@ function GuestLine({ dir, label, name, b, dog }: { dir: "in" | "out" | "stay"; l
 // Una colonna della riga (chi esce / chi entra / chi è in casa): nome, ospiti, date, animale e richiesta. Vuota: "nessuna partenza/arrivo".
 function RowGuest({ label, color, b, name, dog, empty }: { label: string; color: string; b?: Booking; name?: string; dog?: boolean; empty: string }) {
   const { t } = useLang();
-  if (!b) return <div className="min-w-0 text-xs"><div className="text-[11px] font-semibold uppercase tracking-wide text-faint md:hidden">{label}</div><div className="text-faint">{empty}</div></div>;
+  if (!b) return <div className="min-w-0 text-xs"><div className="text-[11px] font-semibold uppercase tracking-wide text-dim md:hidden">{label}</div><div className="text-faint">{empty}</div></div>;
   return (
     <div className="min-w-0 text-xs">
       <div className="text-[11px] font-semibold uppercase tracking-wide md:hidden" style={{ color }}>{label}</div>
@@ -941,9 +942,9 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
         <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--faint) 40%, var(--surface)) 0 8px, color-mix(in srgb, var(--faint) 18%, var(--surface)) 8px 16px)" }}>
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate font-display text-[15px] font-bold text-txt">{r.unit.name}</span>
-            {r.typeName && <span className="shrink-0 text-[10px] font-medium text-dim">· {r.typeName}</span>}
+            {r.typeName && <span className="shrink-0 text-[11px] font-medium text-dim">· {r.typeName}</span>}
           </span>
-          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim shadow-sm">{t("Fuori servizio")}</span>
+          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-dim shadow-sm">{t("Fuori servizio")}</span>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-2.5 text-dim">
           <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 18%, transparent)" }}>
@@ -964,10 +965,10 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
       <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`truncate font-display text-[15px] font-bold text-txt ${done ? "line-through opacity-70" : ""}`}>{r.unit.name}</span>
-          {r.typeName && <span className="shrink-0 text-[10px] font-medium text-faint">· {r.typeName}</span>}
+          {r.typeName && <span className="shrink-0 text-[11px] font-medium text-faint">· {r.typeName}</span>}
           {hasIssue && <span title={t("Segnalazione aperta")} className="shrink-0" style={{ color: "var(--err)" }}><Icon name="alertTriangle" size={13} /></span>}
         </span>
-        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{t(a.label)}</span>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{t(a.label)}</span>
       </div>
 
       {/* Chi parte / arriva / alloggia */}

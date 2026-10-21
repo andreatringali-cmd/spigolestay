@@ -12,7 +12,7 @@ export const tint = (color: string, pct = 12) => `color-mix(in srgb, ${color} ${
 
 export const daysFrom = (iso: string, today: string) => Math.round((Date.parse(iso) - Date.parse(today)) / 86400000);
 
-export const EYEBROW = "text-[10px] font-semibold uppercase tracking-wide text-faint"; // come le card della dashboard
+export const EYEBROW = "text-[11px] font-semibold uppercase tracking-wide text-dim"; // come le card della dashboard
 
 /** Card base: grande, respirata, hover con bordo --focus e ombra morbida. */
 export function Panel({ children, className = "", style, hover = true }: { children: ReactNode; className?: string; style?: CSSProperties; hover?: boolean }) {
@@ -147,7 +147,7 @@ export function StructureLabel({ name, color, count }: { name?: string; color?: 
     <div className="flex items-center gap-2 px-1 pb-1.5 pt-0.5">
       <span className="h-3 w-3 shrink-0 rounded-md" style={{ backgroundColor: col }} />
       <span className="truncate text-xs font-bold uppercase tracking-wide" style={{ color: color ?? "var(--dim)" }}>{name}</span>
-      <span className="font-mono text-[11px] text-faint">· {count}</span>
+      <span className="font-mono text-[11px] text-dim">· {count}</span>
     </div>
   );
 }

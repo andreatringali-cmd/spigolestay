@@ -301,7 +301,7 @@ export default function ImpostazioniPage() {
                   {gcalInfo?.serviceAccountEmail && (
                     <div className="mt-1.5 flex min-w-0 items-center gap-2">
                       <code className="min-w-0 truncate rounded-lg border border-line bg-wash px-2 py-1.5 text-[11px] text-txt">{gcalInfo.serviceAccountEmail}</code>
-                      <button onClick={copyServiceEmail} className="shrink-0 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90">{gcalCopied ? `✓ ${t("Copiata")}` : t("Copia")}</button>
+                      <button onClick={copyServiceEmail} className="shrink-0 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{gcalCopied ? `✓ ${t("Copiata")}` : t("Copia")}</button>
                     </div>
                   )}
                   <div className="mt-1.5">{t("→ scegli il ruolo \"Apportare modifiche agli eventi\" → Invia.")}</div>
@@ -327,7 +327,7 @@ export default function ImpostazioniPage() {
               <div className="mt-1 flex items-center gap-2">
                 <input value={gcalIdInput} onChange={(e) => { setGcalIdInput(e.target.value); setGcalVerifyMsg(null); }} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
                 <button onClick={verifyGcal} disabled={!gcalIdInput.trim() || gcalVerifying} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{gcalVerifying ? t("Verifico…") : t("Verifica")}</button>
-                <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
+                <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
               </div>
             </label>
             {gcalVerifyMsg && (
@@ -362,14 +362,14 @@ export default function ImpostazioniPage() {
         <SectionTitle>{t("Backup & dati")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Esporta tutti i dati del gestionale (prenotazioni, cassa, tariffe, utenti, immagini…) in un file, o ripristinali da un backup. Utile per spostare i dati o metterli al sicuro.")}</p>
         <div className="flex flex-wrap gap-2">
-          <button onClick={doExport} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">↓ {t("Esporta backup (.json)")}</button>
+          <button onClick={doExport} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">↓ {t("Esporta backup (.json)")}</button>
           <button onClick={() => fileRef.current?.click()} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">↑ {t("Importa backup")}</button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => doImport(e.target.files?.[0])} />
         </div>
         {msg && <p className="mt-2 text-xs font-medium text-focus">{msg}</p>}
       </Card>
 
-      <p className="mt-3 text-xs text-faint">{t("Dimostrativo. Le preferenze saranno salvate per utente sul backend; il backup include tutti i dati locali dell'app.")}</p>
+      <p className="mt-3 text-xs text-faint">{t("Le preferenze di questa pagina (notifiche, assistente) valgono per questo dispositivo; il backup include tutti i dati del gestionale.")}</p>
     </div>
   );
 }
@@ -388,7 +388,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 function ThemeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
   return (
-    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition max-sm:min-h-10 ${active ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
+    <button onClick={onClick} className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition max-sm:min-h-10 ${active ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>
       <Icon name={icon} size={14} /> {label}
     </button>
   );

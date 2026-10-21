@@ -758,8 +758,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
       {/* Sezioni: Nuovo preventivo · Archivio */}
       <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:mb-3">
-        <button onClick={() => { if (editingId) { setEditingId(null); setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setNote(""); const t0 = toISO(new Date()); setCheckIn(t0); setCheckOut(shiftISO(t0, 1)); } setTab("nuovo"); }} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
-        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
+        <button onClick={() => { if (editingId) { setEditingId(null); setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setNote(""); const t0 = toISO(new Date()); setCheckIn(t0); setCheckOut(shiftISO(t0, 1)); } setTab("nuovo"); }} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
+        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
       </div>
 
       {tab === "nuovo" && (
@@ -792,12 +792,12 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                     <div key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5">
                       <span className="text-[11px] text-faint">{t("Bimbo")} {i + 1}</span>
                       <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
-                      <span className="text-[10px] font-semibold" style={{ color: age >= 15 ? "var(--warn)" : "var(--ok)" }}>{age >= 15 ? t("paga") : t("esente")}</span>
+                      <span className="text-[11px] font-semibold" style={{ color: age >= 15 ? "var(--warn)" : "var(--ok)" }}>{age >= 15 ? t("paga") : t("esente")}</span>
                     </div>
                   ))}
                   <div className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5">
                     <label className="flex items-center gap-1.5"><input type="checkbox" checked={cot} onChange={(e) => setCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-[11px] text-faint">{t("Culla")}</span></label>
-                    {cot && <span className="text-[10px] font-semibold text-[color:var(--ok)]">{t("gratis")}</span>}
+                    {cot && <span className="text-[11px] font-semibold text-[color:var(--ok)]">{t("gratis")}</span>}
                   </div>
                 </div>
               </div>
@@ -831,7 +831,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             {/* Camere del preventivo — multi-camera con disponibilità reale nel periodo */}
             <div className="col-span-2">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Camere del preventivo")} · {roomsTotal}</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Camere del preventivo")} · {roomsTotal}</span>
                 <button type="button" onClick={addLine} className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ {t("Aggiungi camera")}</button>
               </div>
               <div className="space-y-2">
@@ -890,12 +890,12 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </div>
               <div className="flex items-center rounded-lg border border-line p-0.5">
                 {([[0, t("Nessuno")], [structPct, `${structPct}% (${t("saldo prima")})`], [100, "100%"]] as [number, string][]).map(([v, lab]) => (
-                  <button key={v} onClick={() => setAcconto(v)} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${acconto === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+                  <button key={v} onClick={() => setAcconto(v)} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${acconto === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{lab}</button>
                 ))}
               </div>
             </div>
             <div className="col-span-2 rounded-lg border border-line bg-paper p-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Dati di pagamento")}</div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-dim">{t("Dati di pagamento")}</div>
               {(structure?.iban || structure?.ibanHolder) ? (
                 <div className="rounded-lg border border-line bg-wash p-2.5 text-xs text-dim">
                   <div className="mb-0.5 font-semibold text-txt">{t("IBAN dalla scheda struttura")}</div>
@@ -961,7 +961,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> {t("Salva")}</button>
-            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
+            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
             <button onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="grid h-9 w-9 max-sm:h-11 max-sm:w-11 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="fileText" size={16} /></button>
             {saveNote && <span className={`text-xs ${saveNote.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{saveNote.ok ? "✓ " : "⚠ "}{t(saveNote.msg)}</span>}
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
@@ -980,7 +980,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
             <table className="w-full min-w-[860px] text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                   <th className="px-3 py-2 font-semibold">{t("N°")}</th>
                   <th className="px-3 py-2 font-semibold">{t("Data")}</th>
                   <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
@@ -1015,7 +1015,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                         <button onClick={() => loadQuote(p)} className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Modifica")}</button>
                         {p.status === "confermato"
                           ? <span className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>{t("Prenotazione creata")}</span>
-                          : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
+                          : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Conferma")}</button>}
                         <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="rounded-md border border-line px-2 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                       </div>
                     </td>
@@ -1046,7 +1046,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                   <button onClick={() => loadQuote(p)} className="flex-1 rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
                   {p.status === "confermato"
                     ? <span className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2.5 py-2.5 text-sm font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}>{t("Prenotazione creata")} ✓</span>
-                    : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="flex-1 rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
+                    : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: p.acconto === 0 || p.acconto === 100 ? p.acconto : 50 }); }} className="flex-1 rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Conferma")}</button>}
                   <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-line text-sm font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                 </div>
               </div>
@@ -1079,7 +1079,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <div className="text-xs font-medium text-dim">{t("Anticipo")}</div>
               <div className="mt-1 flex items-center rounded-lg border border-line p-0.5">
                 {[0, 50, 100].map((v) => (
-                  <button key={v} onClick={() => setConfirming({ q, pct: v })} className={`flex-1 rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${pct === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}%</button>
+                  <button key={v} onClick={() => setConfirming({ q, pct: v })} className={`flex-1 rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${pct === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{v}%</button>
                 ))}
               </div>
               <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-sm">
@@ -1095,7 +1095,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               )}
 
               <div className="mt-3 flex flex-nowrap items-center gap-1.5 max-sm:flex-wrap">
-                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
+                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 max-sm:py-2.5 text-xs font-semibold text-on-focus hover:opacity-90">{t("Crea prenotazione")}</button>}
                 <button disabled={confMail.sending} onClick={async () => {
                   if (!q.email) { setConfMail({ ok: false, msg: t("Email destinatario mancante") }); return; }
                   setConfMail({ sending: true, msg: t("Invio…") });

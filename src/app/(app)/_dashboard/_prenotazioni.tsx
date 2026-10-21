@@ -11,8 +11,8 @@ function Mini({ title, unit, histo, color, delay, fmtAvg }: { title: string; uni
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-faint">{title}</span>
-        <span className="font-display text-xl font-bold tabular-nums text-txt">{histo.avg !== null ? <CountUp value={histo.avg} format={fmtAvg} delay={delay} /> : "–"}<span className="ml-1 text-[11px] font-semibold text-faint">{unit}</span></span>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-dim">{title}</span>
+        <span className="font-display text-xl font-bold tabular-nums text-txt">{histo.avg !== null ? <CountUp value={histo.avg} format={fmtAvg} delay={delay} /> : "–"}<span className="ml-1 text-[11px] font-semibold text-dim">{unit}</span></span>
       </div>
       <div className="relative mt-2" {...bind} role="img" aria-label={`${title}: media ${histo.avg !== null ? fmtAvg(histo.avg) : "n.d."} ${unit}. Fascia più frequente: ${histo.labels[peak]}.`}>
         <Columns values={histo.counts} colors={color} height={56} gap={4} highlight={peak} hover={idx} delay={delay} />
@@ -23,7 +23,7 @@ function Mini({ title, unit, histo, color, delay, fmtAvg }: { title: string; uni
           </Tip>
         )}
       </div>
-      <div className="mt-1 grid text-center text-[10px] text-faint" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, columnGap: 4 }}>
+      <div className="mt-1 grid text-center text-[11px] text-faint" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, columnGap: 4 }}>
         {histo.labels.map((l, i) => <span key={l} className={i === peak ? "font-bold text-dim" : ""}>{l}</span>)}
       </div>
     </div>

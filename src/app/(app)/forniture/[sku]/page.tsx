@@ -108,7 +108,7 @@ export default function ProductPage() {
 
         {/* dettagli */}
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-faint">{cat?.name}</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-dim">{cat?.name}</div>
           <h1 className="mt-1 text-2xl font-bold text-txt">{p.name}</h1>
           <div className="mt-2 font-mono text-2xl font-bold text-txt">{c(p.sale_price_cents)}</div>
           {p.description && <p className="mt-3 text-sm leading-relaxed text-dim">{p.description}</p>}
@@ -125,7 +125,7 @@ export default function ProductPage() {
               <label className="text-xs font-semibold text-dim">{variants[0].name.charAt(0).toUpperCase() + variants[0].name.slice(1)}</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 {variants.map((v) => (
-                  <button key={v.id} onClick={() => setVariantId(v.id)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${variantId === v.id ? "border-focus bg-focus text-white" : "border-line text-txt hover:bg-wash"}`}>{v.value}</button>
+                  <button key={v.id} onClick={() => setVariantId(v.id)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${variantId === v.id ? "border-focus bg-focus text-on-focus" : "border-line text-txt hover:bg-wash"}`}>{v.value}</button>
                 ))}
               </div>
             </div>
@@ -156,7 +156,7 @@ export default function ProductPage() {
               <input type="number" min={minQty} step={Math.max(1, p.min_order_qty)} value={qty} onChange={(e) => setQty(parseInt(e.target.value) || minQty)} className="w-20 border-x border-line bg-surface px-2 py-2 text-center text-sm" />
               <button onClick={() => setQty((q) => q + Math.max(1, p.min_order_qty))} className="px-3 py-2 text-lg text-dim hover:text-txt">+</button>
             </div>
-            <button onClick={add} className="flex-1 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+            <button onClick={add} className="flex-1 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90">
               {added ? "Aggiunto ✓" : `Aggiungi · ${c(p.sale_price_cents * Math.max(minQty, qty))}`}
             </button>
           </div>

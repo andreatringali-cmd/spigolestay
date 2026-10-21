@@ -69,7 +69,7 @@ function RowMenu({ items, onPick }: { items: TaskAction[]; onPick: (a: TaskActio
   if (!items.length) return <span className="w-1 shrink-0" aria-hidden />;
   return (
     <div className="relative shrink-0">
-      <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Altre azioni" onClick={() => setOpen((o) => !o)} className="grid h-8 w-8 place-items-center rounded-lg text-base font-bold leading-none text-faint transition hover:bg-line hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">⋯</button>
+      <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Altre azioni" onClick={() => setOpen((o) => !o)} className="grid h-8 w-8 place-items-center rounded-lg text-base font-bold leading-none text-dim transition hover:bg-line hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">⋯</button>
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={200} label="Altre azioni">
         <div role="menu">
           {items.map((a, i) => (
@@ -98,16 +98,16 @@ export function TaskRow({ t, structName, busyId, onAction, showEnte }: { t: Task
       <span aria-hidden className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full" style={{ backgroundColor: c, opacity: 0.85 }} />
       <div className="min-w-0 flex-1 leading-tight">
         <div className="flex min-w-0 items-center gap-2">
-          {showEnte && <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-wide text-faint sm:inline">{short}</span>}
+          {showEnte && <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide text-dim sm:inline">{short}</span>}
           <span className="min-w-0 truncate text-[13px] font-semibold text-txt">{t.title}</span>
-          <span className="hidden shrink-0 sm:inline-flex"><Pill color={sc} className="text-[10px]! py-px!">{t.status}</Pill></span>
+          <span className="hidden shrink-0 sm:inline-flex"><Pill color={sc} className="text-[11px]! py-px!">{t.status}</Pill></span>
           {meta && <span className="hidden min-w-0 truncate text-[11px] text-faint lg:inline">{meta}</span>}
         </div>
         {/* Mobile: seconda riga sottile con stato e scadenza (la pillola a destra c'è solo da sm in su) */}
         <div className="mt-0.5 truncate text-[11px] sm:hidden"><span style={{ color: sc }} className="font-semibold">{showEnte ? `${short} · ` : ""}{t.status}</span><span className="text-faint"> · </span><span style={{ color: c }}>{t.dueLabel}</span>{t.amount !== undefined && <span className="font-mono text-dim"> · {eur(t.amount)}</span>}</div>
       </div>
       {t.amount !== undefined && <span className="hidden shrink-0 font-mono text-xs font-bold tabular-nums text-txt sm:inline">{eur(t.amount)}</span>}
-      <span className="hidden shrink-0 sm:inline-flex"><Pill color={c} icon="clock" className="text-[10px]! py-px!">{t.dueLabel}</Pill></span>
+      <span className="hidden shrink-0 sm:inline-flex"><Pill color={c} icon="clock" className="text-[11px]! py-px!">{t.dueLabel}</Pill></span>
       <button type="button" disabled={busy} onClick={() => onAction(t, t.action)} className={BTN_PRIMARY}>{busy ? "…" : t.action.label}</button>
       <RowMenu items={items} onPick={(a) => onAction(t, a)} />
     </li>
@@ -147,9 +147,9 @@ function EnteCard({ ente, tasks, done, structOf, busyId, onAction, delay }: { en
         <IconTile icon={m.icon} color={toneColor(tone)} size="sm" />
         <h3 className="min-w-0 flex-1 truncate font-display text-sm font-bold leading-tight text-txt" title={m.sub}>{m.label}</h3>
         <div className="flex shrink-0 items-center gap-1">
-          {late > 0 && <Pill color={URG_COLOR.late} className="text-[10px]! py-px!">{late} in ritardo</Pill>}
-          {today > 0 && <Pill color={URG_COLOR.today} className="text-[10px]! py-px!">{today} oggi</Pill>}
-          {soon > 0 && <Pill color={URG_COLOR.soon} className="text-[10px]! py-px!">{soon} in arrivo</Pill>}
+          {late > 0 && <Pill color={URG_COLOR.late} className="text-[11px]! py-px!">{late} in ritardo</Pill>}
+          {today > 0 && <Pill color={URG_COLOR.today} className="text-[11px]! py-px!">{today} oggi</Pill>}
+          {soon > 0 && <Pill color={URG_COLOR.soon} className="text-[11px]! py-px!">{soon} in arrivo</Pill>}
         </div>
       </header>
       <ul className="flex flex-col px-1 pb-1">
@@ -184,7 +184,7 @@ function UrgencyCard({ urgency, tasks, structOf, busyId, onAction, delay }: { ur
       <header className="flex items-center gap-2 rounded-t-2xl px-2.5 py-2" style={{ backgroundColor: tint(c, 8) }}>
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: c }} />
         <h3 className="font-display text-sm font-bold leading-tight text-txt">{URGENCY_LABEL[urgency]}</h3>
-        <span className="rounded-full px-1.5 py-px font-mono text-[10px] font-bold" style={{ backgroundColor: tint(c, 14), color: c }}>{tasks.length}</span>
+        <span className="rounded-full px-1.5 py-px font-mono text-[11px] font-bold" style={{ backgroundColor: tint(c, 14), color: c }}>{tasks.length}</span>
       </header>
       <ul className="flex flex-col px-1 py-1">
         {shown.map((t) => <TaskRow key={t.id} t={t} showEnte structName={structOf(t)} busyId={busyId} onAction={onAction} />)}

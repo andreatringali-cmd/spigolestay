@@ -354,8 +354,8 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
           return (
             <div key={ph} className="flex items-center gap-2">
               {i > 0 && <span className="h-px w-5" style={{ backgroundColor: order[phase] >= i ? "var(--ok)" : "var(--line)" }} />}
-              <button type="button" disabled={order[phase] < i} onClick={() => setPhase(ph)} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 transition hover:bg-wash max-sm:min-h-10 max-sm:px-3" style={state === "current" ? { backgroundColor: "var(--ok)", color: "#fff" } : state === "done" ? { color: "var(--ok)" } : { color: "var(--faint)" }}>
-                <span className="grid h-5 w-5 place-items-center rounded-full text-[10px]" style={state === "current" ? { backgroundColor: "rgba(255,255,255,.25)" } : state === "done" ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)" } : { backgroundColor: "var(--wash)" }}>{state === "done" ? "✓" : n}</span>
+              <button type="button" disabled={order[phase] < i} onClick={() => setPhase(ph)} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 transition hover:bg-wash max-sm:min-h-10 max-sm:px-3 ${state === "current" ? "text-on-ok" : ""}`} style={state === "current" ? { backgroundColor: "var(--ok)" } : state === "done" ? { color: "var(--ok)" } : { color: "var(--faint)" }}>
+                <span className="grid h-5 w-5 place-items-center rounded-full text-[11px]" style={state === "current" ? { backgroundColor: "rgba(255,255,255,.25)" } : state === "done" ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)" } : { backgroundColor: "var(--wash)" }}>{state === "done" ? "✓" : n}</span>
                 <span className="hidden sm:inline">{lab}</span>
               </button>
             </div>
@@ -390,7 +390,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
             <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Partenza<DateField value={checkOut} min={shiftISO(checkIn, 1)} onChange={(v) => setCheckOut(v)} className={`${inp} text-left`} /></label>
             <label className="flex w-[88px] flex-col gap-1.5 text-xs font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={inp} /></label>
             <label className="flex w-[88px] flex-col gap-1.5 text-xs font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={inp} /></label>
-            <button onClick={doSearch} className="rounded-lg bg-focus px-6 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ height: 38 }}>Verifica disponibilità</button>
+            <button onClick={doSearch} className="rounded-lg bg-focus px-6 py-2 text-sm font-semibold text-on-focus transition hover:opacity-90" style={{ height: 38 }}>Verifica disponibilità</button>
           </div>
 
           {/* Età dei bambini */}
@@ -407,7 +407,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                 <span className="ml-2 flex items-center gap-2 text-sm text-dim">Culle
                   <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-9 max-sm:w-9">−</button>
                   <span className="w-4 text-center text-sm font-semibold tabular-nums text-txt">{cribs}</span>
-                  <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30 max-sm:h-9 max-sm:w-9">+</button>
+                  <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-on-focus hover:opacity-90 disabled:opacity-30 max-sm:h-9 max-sm:w-9">+</button>
                 </span>
               </div>
             </div>
@@ -472,18 +472,18 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                           return (
                             <tr key={rt.id} className={`max-md:grid max-md:grid-cols-2 max-md:items-center max-md:gap-x-3 max-md:gap-y-2 max-md:px-4 max-md:py-3 ${q > 0 ? "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" : ""}`}>
                               <td className="px-4 py-3 max-md:col-span-2 max-md:p-0">
-                                <div className="flex items-center gap-1.5 font-semibold text-txt">{rt.name}{isDerived && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ derivata</span>}</div>
+                                <div className="flex items-center gap-1.5 font-semibold text-txt">{rt.name}{isDerived && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ derivata</span>}</div>
                                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-dim"><Icon name="cup" size={12} /> BB · Flessibile 7 gg{isDerived && <span className="text-faint">· stesse camere della madre</span>}{!fits && <span className="text-[color:var(--warn)]">· capienza {cap(rt)} &lt; {party} ospiti</span>}</div>
                               </td>
                               <td className="px-3 py-3 text-center max-md:p-0 max-md:text-left"><span className="inline-flex items-center gap-[1px] text-dim">{Array.from({ length: Math.min(cap(rt), 5) }).map((_, i) => <Person key={i} />)}</span></td>
                               <td className="px-3 py-3 text-center max-md:hidden"><span className="inline-grid h-6 w-6 place-items-center rounded-full text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}><Icon name="check" size={13} /></span></td>
-                              <td className="px-3 py-3 text-center max-md:p-0 max-md:text-right">{(() => { const tot = unitsOfType(rt); const occ = tot - av; return (<><span className="text-[11px] text-faint md:hidden">Disponibili </span><span className={`font-semibold ${av > 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{av}</span><span className="text-faint"> / {tot}</span>{occ > 0 && <div className="text-[10px] text-faint">{occ} {occ === 1 ? "occupata" : "occupate"}</div>}</>); })()}</td>
-                              <td className="px-3 py-3 text-right max-md:p-0 max-md:text-left"><span className="text-base font-extrabold text-txt">{eur(stayPrice(rt))}</span><div className="text-[10px] text-faint">{nightsN} {nightsN === 1 ? "notte" : "notti"}</div></td>
+                              <td className="px-3 py-3 text-center max-md:p-0 max-md:text-right">{(() => { const tot = unitsOfType(rt); const occ = tot - av; return (<><span className="text-[11px] text-faint md:hidden">Disponibili </span><span className={`font-semibold ${av > 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{av}</span><span className="text-faint"> / {tot}</span>{occ > 0 && <div className="text-[11px] text-faint">{occ} {occ === 1 ? "occupata" : "occupate"}</div>}</>); })()}</td>
+                              <td className="px-3 py-3 text-right max-md:p-0 max-md:text-left"><span className="text-base font-extrabold text-txt">{eur(stayPrice(rt))}</span><div className="text-[11px] text-faint">{nightsN} {nightsN === 1 ? "notte" : "notti"}</div></td>
                               <td className="px-4 py-3 max-md:p-0">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-md:h-10 max-md:w-10">−</button>
                                   <span className={`w-6 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                                  <button disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 max-md:h-10 max-md:w-10 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                                  <button disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 max-md:h-10 max-md:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                                 </div>
                               </td>
                             </tr>
@@ -508,7 +508,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         )}
         <div className="sticky bottom-3 z-10 mt-2 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg">
           <div className="text-sm text-dim">{totalRooms > 0 ? (<>{totalRooms} {totalRooms === 1 ? "camera" : "camere"} · <b className="text-txt">{eur(grandTotal)}</b></>) : "Seleziona almeno una camera"}</div>
-          <button onClick={() => setPhase("details")} disabled={totalRooms < 1} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">Continua →</button>
+          <button onClick={() => setPhase("details")} disabled={totalRooms < 1} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40">Continua →</button>
         </div>
         </>
       )}
@@ -578,7 +578,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                         <div className="flex shrink-0 items-center gap-1.5">
                           <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
                           <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                          <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                          <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                         </div>
                       </div>
                     ); })}
@@ -606,7 +606,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                 <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span></div>
                 {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}
                 {depositN > 0 && saldo > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">Saldo in struttura</span><span className="font-mono font-semibold text-txt">{eur(saldo)}</span></div>}
-                <button onClick={confirm} className="mt-3 w-full rounded-lg bg-focus px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90">Conferma prenotazione</button>
+                <button onClick={confirm} className="mt-3 w-full rounded-lg bg-focus px-5 py-3 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90">Conferma prenotazione</button>
                 <button onClick={() => printVoucher()} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Anteprima voucher / PDF</button>
                 {err && <div className="mt-2 text-center text-sm font-medium text-[color:var(--err)]">{err}</div>}
                 <p className="mt-2 text-center text-[11px] text-faint">{sendConfirm && email.trim() ? "Alla conferma parte il voucher via email all'ospite." : "Tassa di soggiorno, commissioni e fattura si gestiscono dalla scheda."}</p>

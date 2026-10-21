@@ -15,7 +15,7 @@ export function stamp(d = new Date()) {
 export const hhmm = (iso: string | undefined): string => (iso && iso.length >= 16 ? iso.slice(11, 16) : "");
 
 export const inputCls = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus";
-export const btnPrimary = "rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40";
+export const btnPrimary = "rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40";
 export const btnGhost = "rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-dim hover:bg-wash";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -58,7 +58,7 @@ export function Seg<T extends string>({ value, onChange, options, className = ""
   return (
     <div className={`flex overflow-hidden rounded-lg border border-line ${className}`}>
       {options.map((o, i) => (
-        <button key={o.key} type="button" onClick={() => onChange(o.key)} className={`min-h-[40px] flex-1 px-2 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${value === o.key ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{o.label}</button>
+        <button key={o.key} type="button" onClick={() => onChange(o.key)} className={`min-h-[40px] flex-1 px-2 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${value === o.key ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>{o.label}</button>
       ))}
     </div>
   );

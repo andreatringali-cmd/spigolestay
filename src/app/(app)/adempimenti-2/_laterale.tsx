@@ -36,7 +36,7 @@ export function Calendario({ days, loading }: { days: CalDay[]; loading: boolean
             return (
               <li key={d.iso} className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 ${d.isToday ? "bg-wash" : ""}`} title={text || undefined}>
                 <span className="w-10 shrink-0 text-center leading-none" style={d.isToday ? { color: "var(--focus)" } : { color: "var(--dim)" }}>
-                  <span className="block text-[10px] font-semibold uppercase tracking-wide">{d.dow}</span>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wide">{d.dow}</span>
                   <span className="block font-display text-base font-bold tabular-nums">{Number(d.iso.slice(8, 10))}</span>
                 </span>
                 <span className={`min-w-0 flex-1 text-[12.5px] leading-snug ${text ? "text-dim" : "text-faint"}`}>{text || "Niente in programma"}</span>

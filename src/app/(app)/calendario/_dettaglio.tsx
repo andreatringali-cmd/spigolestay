@@ -240,7 +240,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
           <Popover open={monthOpen} anchorRef={monthRef} onClose={() => setMonthOpen(false)} align="start" width={208} maxHeight={288} label="Mese">
               {monthList.map((mm) => {
                 const active = selDate.getFullYear() === mm.y && selDate.getMonth() === mm.m;
-                return <button key={mm.iso} onClick={() => { pick(mm.iso); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>;
+                return <button key={mm.iso} onClick={() => { pick(mm.iso); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-on-focus" : "text-txt hover:bg-wash"}`}>{mm.label}</button>;
               })}
           </Popover>
         </div>
@@ -266,7 +266,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
         {filtersOn && <button onClick={() => setQ("")} className="whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline max-sm:hidden">Azzera ricerca</button>}
         <div className="ml-auto flex items-center gap-2 max-sm:contents">
           <div className="max-sm:hidden">{importBtn}</div>
-          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:order-3 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:justify-center max-sm:whitespace-nowrap max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 max-sm:order-3 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:justify-center max-sm:whitespace-nowrap max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
         </div>
       </div>
         );
@@ -350,7 +350,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
                     if (!openCols[c.key]) { const before = groups.slice(0, groups.indexOf(g)).reduce((a, x) => a + x.items.length, 0); if (before >= COL_LIMIT) return null; g = { ...g, items: g.items.slice(0, COL_LIMIT - before) }; }
                     return (
                     <div key={g.day || "all"} className="flex flex-col gap-3">
-                      {g.day && <div className="text-xs font-bold uppercase tracking-wide text-faint">{dayShort(g.day)}{g.day === today ? " · oggi" : ""}</div>}
+                      {g.day && <div className="text-xs font-bold uppercase tracking-wide text-dim">{dayShort(g.day)}{g.day === today ? " · oggi" : ""}</div>}
                       <div className="flex flex-col gap-3">{g.items.map(card)}</div>
                     </div>
                     );

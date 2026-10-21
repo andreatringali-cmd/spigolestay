@@ -179,7 +179,7 @@ export default function TassaSoggiornoPage() {
       <PageHeader
         title={t("Tassa di soggiorno")}
         subtitle={t("Partita di giro · esclusa da ricavi e statistiche")}
-        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white max-sm:hidden">{t("Stampa dichiarazione")}</button>}
+        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus max-sm:hidden">{t("Stampa dichiarazione")}</button>}
       />
 
       {/* Periodo */}
@@ -193,7 +193,7 @@ export default function TassaSoggiornoPage() {
           <FilterSheet count={filtersActive} onReset={resetFilters}>{periodControls}</FilterSheet>
           <div className="contents max-sm:hidden">{periodControls}</div>
           <div className="ml-auto text-right max-sm:flex max-sm:w-full max-sm:items-center max-sm:justify-between max-sm:gap-3">
-            <button onClick={stampaDichiarazione} className="h-9 shrink-0 rounded-lg bg-focus px-3 text-[13px] font-semibold text-white sm:hidden">{t("Stampa dichiarazione")}</button>
+            <button onClick={stampaDichiarazione} className="h-9 shrink-0 rounded-lg bg-focus px-3 text-[13px] font-semibold text-on-focus sm:hidden">{t("Stampa dichiarazione")}</button>
             <div>
               <div className="text-xs text-dim">{t("Imposta da versare")} · {label}</div>
               <div className="font-mono text-2xl font-bold text-txt max-sm:text-xl">{eur(total)}</div>
@@ -242,7 +242,7 @@ export default function TassaSoggiornoPage() {
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                   <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Pers.")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
@@ -273,7 +273,7 @@ export default function TassaSoggiornoPage() {
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                   <th className="px-3 py-2 font-semibold">{t("Provenienza")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Presenze")}</th>
@@ -314,5 +314,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="text-xs text-dim">{label}<div className="mt-1">{children}</div></label>;
 }
 function Toggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${active ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{children}</button>;
+  return <button onClick={onClick} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${active ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{children}</button>;
 }

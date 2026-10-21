@@ -67,7 +67,7 @@ export default function AssistantBar() {
       >
         <span className="text-focus"><Icon name="chat" size={16} /></span>
         <span className="truncate">{t("Chiedimi qualsiasi cosa…")}</span>
-        <kbd className="ml-auto hidden shrink-0 rounded border border-line bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-dim sm:block">/</kbd>
+        <kbd className="ml-auto hidden shrink-0 rounded border border-line bg-surface px-1.5 py-0.5 text-[11px] font-semibold text-dim sm:block">/</kbd>
       </button>
 
       {open && (
@@ -76,7 +76,7 @@ export default function AssistantBar() {
           <div className="anim-pop relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             {/* Barra di richiesta */}
             <div className="flex items-center gap-2.5 border-b border-line px-3.5 py-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white shadow-sm" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="chat" size={16} /></span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-on-focus shadow-sm" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="chat" size={16} /></span>
               <input
                 ref={inputRef}
                 value={q}
@@ -87,7 +87,7 @@ export default function AssistantBar() {
               />
               {q
                 ? <button onClick={() => setQ("")} title="Cancella" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim transition hover:bg-wash hover:text-txt">✕</button>
-                : <kbd className="hidden shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] font-semibold text-dim sm:block">/</kbd>}
+                : <kbd className="hidden shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-dim sm:block">/</kbd>}
             </div>
 
             {/* Conversazione / risposta */}
@@ -96,7 +96,7 @@ export default function AssistantBar() {
                 <div>
                   {res.detail && (
                     <div className="mb-3 flex items-start gap-2.5">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="chat" size={14} /></span>
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-on-focus" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="chat" size={14} /></span>
                       <p className="max-w-[85%] rounded-2xl rounded-tl-md border border-line bg-wash px-3.5 py-2.5 text-sm leading-relaxed text-txt">{res.detail}</p>
                     </div>
                   )}
@@ -110,9 +110,9 @@ export default function AssistantBar() {
 
               {aiShown && ai && (
                 <div className="mb-3 flex items-start gap-2.5">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="sparkles" size={14} /></span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-on-focus" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="sparkles" size={14} /></span>
                   <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">Assistente AI</div>
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-dim">Assistente AI</div>
                     {ai.loading && <div className="text-sm text-dim">Sto guardando i tuoi dati…</div>}
                     {ai.err && <div className="text-sm text-err">{ai.err}</div>}
                     {ai.text && <p className="whitespace-pre-line text-sm leading-relaxed text-txt">{ai.text}</p>}
@@ -122,7 +122,7 @@ export default function AssistantBar() {
 
               {res.kind === "empty" && !res.suggestions && (
                 <div className="flex items-start gap-2.5">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name={res.icon} size={14} /></span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-on-focus" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name={res.icon} size={14} /></span>
                   <div className="max-w-[85%] rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
                     <div className="text-sm font-semibold text-txt">{res.title}</div>
                     {res.detail && <div className="mt-0.5 text-xs text-dim">{res.detail}</div>}
@@ -132,7 +132,7 @@ export default function AssistantBar() {
 
               {res.kind === "answer" && (
                 <div className="flex items-start gap-2.5">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name={res.icon} size={14} /></span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-on-focus" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name={res.icon} size={14} /></span>
                   <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">

@@ -505,7 +505,7 @@ export default function DocumentoPage() {
               <label className={lbl}>Città<input value={cp.city} onChange={(e) => setCp({ ...cp, city: e.target.value })} className={inp} /></label>
               <div className="grid grid-cols-2 gap-2"><label className={lbl}>CAP<input value={cp.cap} onChange={(e) => setCp({ ...cp, cap: e.target.value })} className={inp} /></label><label className={lbl}>Prov.<input value={cp.province} onChange={(e) => setCp({ ...cp, province: e.target.value })} className={inp} /></label></div>
               <div className="sm:col-span-2 mt-1 border-t border-line pt-2">
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Fattura elettronica</div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-dim">Fattura elettronica</div>
                 <label className="flex items-center justify-between"><span className="text-sm text-txt">Comunica documento al SDI</span><input type="checkbox" checked={f.send_sdi} onChange={(e) => setF({ ...f, send_sdi: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
                 <div className="mt-2 grid grid-cols-2 gap-2"><label className={lbl}>Codice destinatario<input value={f.sdi_code} onChange={(e) => setF({ ...f, sdi_code: e.target.value })} className={inp} /></label><label className={lbl}>PEC<input value={f.pec} onChange={(e) => setF({ ...f, pec: e.target.value })} className={inp} /></label></div>
               </div>
@@ -519,7 +519,7 @@ export default function DocumentoPage() {
           <SectionTitle>Voci del documento</SectionTitle>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1.5 pr-2 font-semibold">Descrizione</th><th className="py-1.5 px-1 text-right font-semibold">Q.tà</th><th className="py-1.5 px-1 text-right font-semibold">Prezzo</th><th className="py-1.5 px-1 font-semibold">IVA</th><th className="py-1.5 pl-1 text-right font-semibold">Totale</th>{!frozen && <th></th>}</tr></thead>
+              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="py-1.5 pr-2 font-semibold">Descrizione</th><th className="py-1.5 px-1 text-right font-semibold">Q.tà</th><th className="py-1.5 px-1 text-right font-semibold">Prezzo</th><th className="py-1.5 px-1 font-semibold">IVA</th><th className="py-1.5 pl-1 text-right font-semibold">Totale</th>{!frozen && <th></th>}</tr></thead>
               <tbody>
                 {lines.map((l, i) => (
                   <tr key={i} className="border-b border-line last:border-0">
@@ -580,14 +580,14 @@ export default function DocumentoPage() {
                   <input value={payAmt} onChange={(e) => setPayAmt(e.target.value)} inputMode="decimal" placeholder={`€ (max ${e2(residuo)})`} className="w-28 rounded border border-line bg-paper px-2 py-1.5 text-sm" />
                   <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="rounded border border-line bg-paper px-1.5 py-1.5 text-sm"><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select>
                   <button onClick={() => { const pn = parseDecimalIT(payAmt); if (pn === null) { setMsg("Importo non valido: scrivi un numero, per esempio 1234,56."); return; } const c = Math.round(pn * 100); if (c <= 0) { setMsg("Indica un importo da incassare."); return; } if (c > residuo) { setMsg(`L'importo supera il residuo (${e2(residuo)}).`); return; } setPayAmt(""); addPayment(c, payMethod); }} disabled={!!busy || !payAmt.trim()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">Registra incasso</button>
-                  <button onClick={() => addPayment(residuo, payMethod)} disabled={!!busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>
+                  <button onClick={() => addPayment(residuo, payMethod)} disabled={!!busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>
                 </div>
               )}
             </>)}
           </div>
           {related.length > 0 && (
             <div className="mt-3 border-t border-line pt-2">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Documenti collegati</div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-dim">Documenti collegati</div>
               {related.map((r) => (
                 <button key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-sm hover:bg-wash">
                   <span className="text-dim">{r.role}</span>
@@ -618,11 +618,11 @@ export default function DocumentoPage() {
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {!frozen && <>
           <button onClick={onSave} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "save" ? "Salvo…" : "Salva bozza"}</button>
-          <button onClick={onIssue} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
-          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
+          <button onClick={onIssue} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
+          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
           <button onClick={deleteDraft} disabled={!!busy} className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)] disabled:opacity-50">{busy === "del" ? "Elimino…" : "Elimina bozza"}</button>
         </>}
-        {sendAct && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : sendButtonLabel(doc.provider)}</button>}
+        {sendAct && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : sendButtonLabel(doc.provider)}</button>}
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
         <button onClick={previewDoc} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Anteprima</button>
         <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>

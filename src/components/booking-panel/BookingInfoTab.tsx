@@ -70,14 +70,14 @@ function CopyBtn({ text }: { text: string }) {
     try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500); } catch { /* appunti non disponibili */ }
   };
   return (
-    <button type="button" onClick={go} aria-label={t("Copia")} className="ml-2 rounded border border-line px-1.5 py-0.5 align-middle text-[10px] font-semibold text-dim hover:bg-wash hover:text-txt">
+    <button type="button" onClick={go} aria-label={t("Copia")} className="ml-2 rounded border border-line px-1.5 py-0.5 align-middle text-[11px] font-semibold text-dim hover:bg-wash hover:text-txt">
       {done ? t("Copiato") : t("Copia")}
     </button>
   );
 }
 
 const nightsTxt = (n: number, t: (s: string) => string) => `${n} ${n === 1 ? t("notte") : t("notti")}`;
-const SubTitle = ({ children }: { children: ReactNode }) => <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{children}</div>;
+const SubTitle = ({ children }: { children: ReactNode }) => <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-dim">{children}</div>;
 
 export default function BookingInfoTab({ booking }: { booking: Booking }) {
   const { bookings, getGuest, getRoomType, getStructure, updateGuest, patchBookingsSilently } = useData();
@@ -262,7 +262,7 @@ export default function BookingInfoTab({ booking }: { booking: Booking }) {
                               <span className="min-w-0 text-dim">{n.label}{r.ratePlanName ? <span className="text-faint"> · {r.ratePlanName}</span> : null}</span>
                               <span className="shrink-0 font-mono tabular-nums text-txt">{eur(n.amount)}</span>
                             </div>
-                            {promoUnderNights && <div className="text-[10px] leading-tight text-faint">{promo}</div>}
+                            {promoUnderNights && <div className="text-[11px] leading-tight text-faint">{promo}</div>}
                           </div>
                         ))
                       : (

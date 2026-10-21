@@ -57,7 +57,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             )}
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => close(false)} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-dim hover:bg-wash">{state.cancelLabel ?? "Annulla"}</button>
-              <button autoFocus={!state.typeToConfirm} disabled={!wordOk} onClick={() => close(true)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ backgroundColor: state.danger ? "var(--err)" : "var(--focus)" }}>{state.confirmLabel ?? "Conferma"}</button>
+              <button autoFocus={!state.typeToConfirm} disabled={!wordOk} onClick={() => close(true)} className={`rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${state.danger ? "text-on-err" : "text-on-focus"}`} style={{ backgroundColor: state.danger ? "var(--err)" : "var(--focus)" }}>{state.confirmLabel ?? "Conferma"}</button>
             </div>
           </div>
         </div>

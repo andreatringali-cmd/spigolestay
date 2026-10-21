@@ -191,7 +191,7 @@ export default function PreventivoPubblico() {
     } catch { setState("error"); setMsgKey("Errore di rete."); }
   };
 
-  const card = "w-full rounded-2xl border border-line bg-surface p-6 shadow-sm";
+  const card = "w-full rounded-xl border border-line bg-surface p-5 shadow-sm sm:p-6";
   const row = "flex items-baseline justify-between gap-3 py-1.5 text-sm";
   const accent = data?.accent || undefined;
   const shownMsg = msgKey ? t(msgKey) : msg;
@@ -208,7 +208,7 @@ export default function PreventivoPubblico() {
               <img src="/xenora-mark.png" alt="" width={32} height={32} style={{ objectFit: "contain" }} />}
           <div className="min-w-0">
             <div className="font-display text-base font-bold text-txt">{data?.s ?? t("La tua prenotazione")}</div>
-            {data?.ref && <div className="text-xs text-faint">{t("Preventivo n. {ref}", { ref: data.ref })}</div>}
+            {data?.ref && <div className="text-xs text-dim">{t("Preventivo n. {ref}", { ref: data.ref })}</div>}
           </div>
           <div className="ml-auto"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
         </div>
@@ -228,7 +228,7 @@ export default function PreventivoPubblico() {
               <h1 className="font-display text-xl font-bold text-txt">{t("Non riusciamo ancora a confermare la prenotazione")}</h1>
               <p className="mt-2 text-sm text-dim">{t("Il pagamento potrebbe essere andato a buon fine, ma non abbiamo ancora potuto registrare la prenotazione. Non pagare di nuovo: riprova tra un istante oppure contatta la struttura indicando questo riferimento.")}</p>
               <p className="mt-2 font-mono text-sm font-bold text-txt">{sessionRef}</p>
-              <button onClick={() => { const sid = new URLSearchParams(window.location.search).get("session_id"); if (sid) void confirmPayment(sid, data?.acct ?? ""); }} className="mt-4 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Riprova")}</button>
+              <button onClick={() => { const sid = new URLSearchParams(window.location.search).get("session_id"); if (sid) void confirmPayment(sid, data?.acct ?? ""); }} className="mt-4 min-h-11 rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Riprova")}</button>
             </div>
           </div>
         ) : state === "paid" ? (
@@ -237,7 +237,7 @@ export default function PreventivoPubblico() {
               <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full text-2xl text-white" style={{ backgroundColor: "var(--ok)" }}>✓</div>
               <h1 className="font-display text-xl font-bold text-txt">{t("Prenotazione confermata")}</h1>
               <p className="mt-1 text-sm text-dim">{data?.gn ? t("Grazie, {name}! Il pagamento è andato a buon fine e la struttura ha ricevuto la conferma.", { name: data.gn.split(" ")[0] }) : t("Grazie! Il pagamento è andato a buon fine e la struttura ha ricevuto la conferma.")}</p>
-              {balance > 0 && <p className="mt-2 text-xs text-faint">{t("Saldo residuo {amount} da versare in struttura.", { amount: eur(balance) })}</p>}
+              {balance > 0 && <p className="mt-2 text-xs text-dim">{t("Saldo residuo {amount} da versare in struttura.", { amount: eur(balance) })}</p>}
             </div>
           </div>
         ) : state === "already" ? (
@@ -247,7 +247,7 @@ export default function PreventivoPubblico() {
         ) : !data ? (
           <div className={card}>
             {shownMsg
-              ? <p className="py-8 text-center text-sm text-faint">{shownMsg}</p>
+              ? <div className="py-6 text-center" role="alert"><div className="text-3xl" aria-hidden>🔎</div><h1 className="mt-2 font-display text-lg font-bold text-txt">{shownMsg}</h1><p className="mt-1 text-sm text-dim">{t("Usa il link ricevuto nell'email di conferma. Se il problema persiste, contatta la struttura.")}</p></div>
               : <div className="grid place-items-center py-10" role="status" aria-busy="true">{/* Solo la farfalla che pulsa, niente testo durante il caricamento. */}{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/xenora-mark.png" alt="" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} /><style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style></div>}
           </div>
         ) : (
@@ -257,7 +257,7 @@ export default function PreventivoPubblico() {
 
             {/* Riepilogo soggiorno */}
             <div className={card}>
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Il tuo soggiorno")}</div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-dim">{t("Il tuo soggiorno")}</div>
               <div className="divide-y divide-[color:var(--line)]">
                 <div className={row}><span className="text-dim">{t("Check-in")}</span><span className="font-medium text-txt">{fmtD(data.ci)}</span></div>
                 <div className={row}><span className="text-dim">{t("Check-out")}</span><span className="font-medium text-txt">{fmtD(data.co)}</span></div>
@@ -266,22 +266,22 @@ export default function PreventivoPubblico() {
                   <span className="text-dim">{t("Ospiti")}</span>
                   <span className="flex items-center gap-3">
                     <label className="flex items-center gap-1.5 text-xs text-dim">{t("Adulti")}
-                      <input type="number" inputMode="numeric" min={1} max={30} value={adultsSel} onChange={(e) => setAdultsSel(Math.min(30, Math.max(1, Number(e.target.value) || 1)))} className="w-14 rounded-md border border-line bg-paper px-1.5 py-1 text-center text-base font-medium text-txt outline-none focus:border-focus sm:w-12 sm:text-sm" />
+                      <input type="number" inputMode="numeric" min={1} max={30} value={adultsSel} onChange={(e) => setAdultsSel(Math.min(30, Math.max(1, Number(e.target.value) || 1)))} className="min-h-11 w-16 rounded-md border border-line bg-paper px-1.5 py-1 text-center text-base font-medium text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:w-12 sm:text-sm" />
                     </label>
                     <label className="flex items-center gap-1.5 text-xs text-dim">{t("Bambini")}
-                      <input type="number" inputMode="numeric" min={0} max={30} value={childrenSel} onChange={(e) => setChildrenSel(Math.min(30, Math.max(0, Number(e.target.value) || 0)))} className="w-14 rounded-md border border-line bg-paper px-1.5 py-1 text-center text-base font-medium text-txt outline-none focus:border-focus sm:w-12 sm:text-sm" />
+                      <input type="number" inputMode="numeric" min={0} max={30} value={childrenSel} onChange={(e) => setChildrenSel(Math.min(30, Math.max(0, Number(e.target.value) || 0)))} className="min-h-11 w-16 rounded-md border border-line bg-paper px-1.5 py-1 text-center text-base font-medium text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:w-12 sm:text-sm" />
                     </label>
                   </span>
                 </div>
                 {(data.rooms ?? []).map((r, i) => <div key={i} className={row}><span className="text-dim">{r.name}</span><span className="font-mono text-txt">{eur(r.amount)}</span></div>)}
               </div>
-              <p className="mt-2 text-[11px] text-faint">{t("Le date e le tariffe delle camere sono quelle del preventivo. Per modificarle contatta la struttura.")}</p>
+              <p className="mt-2 text-xs text-dim">{t("Le date e le tariffe delle camere sono quelle del preventivo. Per modificarle contatta la struttura.")}</p>
             </div>
 
             {/* Servizi extra proposti dalla struttura */}
             {extrasList.length > 0 && !payBlock && (
               <div className={card}>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Servizi extra")}</div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-dim">{t("Servizi extra")}</div>
                 <p className="mb-3 text-xs text-dim">{t("Rendi il soggiorno ancora più speciale: aggiungi ciò che desideri, si paga per intero insieme alla conferma.")}</p>
                 <div className="divide-y divide-[color:var(--line)]">
                   {extrasList.map((e, i) => {
@@ -289,14 +289,14 @@ export default function PreventivoPubblico() {
                     const unit = extraUnitPrice(e);
                     return (
                       <label key={e.id ?? i} className="flex cursor-pointer items-start gap-3 py-3">
-                        <input type="checkbox" checked={on} onChange={(ev) => setSelectedExtras((prev) => ({ ...prev, [i]: ev.target.checked }))} className="mt-0.5 h-5 w-5 accent-[color:var(--focus)]" />
+                        <input type="checkbox" checked={on} onChange={(ev) => setSelectedExtras((prev) => ({ ...prev, [i]: ev.target.checked }))} className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--focus)]" />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-txt">{e.name}</div>
-                          {e.desc && <div className="mt-0.5 text-xs text-faint">{e.desc}</div>}
+                          {e.desc && <div className="mt-0.5 text-xs text-dim">{e.desc}</div>}
                           <div className="mt-0.5 text-xs text-dim">{eur(e.price)} {e.per ? (PER_LABEL[e.per] ?? e.per) : PER_LABEL.stay}</div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <div className={`font-mono text-sm font-semibold ${on ? "text-txt" : "text-faint"}`}>{eur(unit)}</div>
+                          <div className={`font-mono text-sm font-semibold ${on ? "text-txt" : "text-dim"}`}>{eur(unit)}</div>
                         </div>
                       </label>
                     );
@@ -312,18 +312,18 @@ export default function PreventivoPubblico() {
                 {extrasTotal > 0 && <div className="mt-1 flex items-baseline justify-between text-sm"><span className="text-dim">{t("Servizi extra selezionati")}</span><span className="font-mono font-semibold text-txt">{eur(extrasTotal)}</span></div>}
                 <div className="mt-2 flex items-baseline justify-between border-t border-[color:var(--line)] pt-2"><span className="text-sm font-semibold text-txt">{t("Totale prenotazione")}</span><span className="font-mono text-lg font-bold text-txt">{eur(grandTotal)}</span></div>
                 {!payBlock && payAmount !== grandTotal && <div className="mt-1 flex items-baseline justify-between text-sm"><span className="text-dim">{t("Da pagare ora")}</span><span className="font-mono font-semibold text-txt">{eur(payAmount)}</span></div>}
-                {!payBlock && balance > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-faint">{t("Saldo in struttura")}</span><span className="font-mono text-faint">{eur(balance)}</span></div>}
+                {!payBlock && balance > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">{t("Saldo in struttura")}</span><span className="font-mono text-dim">{eur(balance)}</span></div>}
               </div>
 
               {state === "noconfig" || payBlock ? (
                 <div className="mt-4 rounded-lg border border-line bg-paper p-3 text-sm text-dim">{payBlock ? t(payBlock) : t("Il pagamento online non è ancora attivo. Contatta la struttura per completare la prenotazione.")}</div>
               ) : (
-                <button onClick={pay} disabled={state === "paying"} className="mt-4 w-full rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent || "var(--focus)" }}>
+                <button onClick={pay} disabled={state === "paying"} className="mt-4 min-h-12 w-full rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent || "var(--focus)" }}>
                   {state === "paying" ? t("Avvio pagamento…") : t("Conferma e paga {amount}", { amount: eur(payAmount) })}
                 </button>
               )}
-              {shownMsg && state === "error" && <p role="alert" className="mt-2 text-center text-xs" style={{ color: "var(--err)" }}>{shownMsg}</p>}
-              {!payBlock && state !== "noconfig" && <p className="mt-3 text-center text-[11px] text-faint">{t("Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.")}</p>}
+              {shownMsg && state === "error" && <p role="alert" className="mt-2 rounded-lg px-3 py-2 text-center text-sm font-medium text-txt" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", boxShadow: "inset 3px 0 0 var(--err)" }}>{shownMsg}</p>}
+              {!payBlock && state !== "noconfig" && <p className="mt-3 text-center text-xs text-dim">{t("Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.")}</p>}
             </div>
           </>
         )}

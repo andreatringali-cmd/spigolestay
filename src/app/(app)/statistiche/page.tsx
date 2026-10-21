@@ -386,7 +386,7 @@ export default function StatistichePage() {
         ); })()}
         <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm max-sm:order-1 max-sm:shrink-0">
           {([["produzione", t("Mensile")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
-            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 max-sm:h-8 max-sm:py-0 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 max-sm:h-8 max-sm:py-0 font-semibold transition ${report === k ? "bg-focus text-on-focus shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
           ))}
         </div>
         <FilterSheet count={filtersActive} onReset={resetFilters} className="max-sm:order-2">{controls}</FilterSheet>
@@ -408,7 +408,7 @@ export default function StatistichePage() {
       <table className="w-full min-w-[1000px] table-fixed text-sm">
         <RepCols />
         <thead className="sticky top-0 z-20">
-          <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
+          <tr className="bg-wash text-left text-xs uppercase tracking-wide text-dim shadow-[0_1px_0_var(--line)]">
             <th className="px-3 py-2 font-semibold">{periodLabel}</th>
             <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
             <th className="px-3 py-2 text-right font-semibold">{t("Camere")}</th>
@@ -425,8 +425,8 @@ export default function StatistichePage() {
         <tbody>
           {rows.map((r) => (
             <tr key={r.iso} className={`border-b border-line last:border-0 ${r.highlight ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : r.storico ? "" : "bg-[color:color-mix(in_srgb,var(--ok)_4%,transparent)]"}`}>
-              <td className="truncate px-3 py-2 font-medium capitalize text-txt">{r.label}{r.highlight && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">{t("oggi")}</span>}</td>
-              <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
+              <td className="truncate px-3 py-2 font-medium capitalize text-txt">{r.label}{r.highlight && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[10px] font-bold uppercase text-on-focus">{t("oggi")}</span>}</td>
+              <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
               <td className="px-3 py-2 text-right font-mono text-dim">{r.camere}{scopedUnits.length ? `/${scopedUnits.length * (r.days ?? 1)}` : ""}</td>
               <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(r.occ * 100)}%</td>
               <td className="px-3 py-2 text-right font-mono text-dim">{r.arrivi || ""}</td>
@@ -440,7 +440,7 @@ export default function StatistichePage() {
           ))}
         </tbody>
         <tfoot className="bg-surface">
-          <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
+          <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-on-focus" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
           {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
             <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "bg-surface font-medium"}`}>
               <td className="truncate px-3 py-2" colSpan={2} style={{ color: col }}>{t(lab)}</td>
@@ -493,7 +493,7 @@ export default function StatistichePage() {
             className: `flex flex-none snap-start flex-col ${wide ? "w-[calc(100vw-2rem)] sm:w-[520px] sm:max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[calc(100vw-2rem)] sm:w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
             node: (
               <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-dim">{c.title}</div>
                 <div className="flex-1">{c.node}</div>
               </div>
             ),
@@ -550,7 +550,7 @@ export default function StatistichePage() {
               className: `flex flex-none snap-start flex-col ${wide ? "w-[calc(100vw-2rem)] sm:w-[520px] sm:max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[calc(100vw-2rem)] sm:w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
               node: (
                 <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
-                  <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-dim">{c.title}</div>
                   <div className="flex-1">{c.node}</div>
                 </div>
               ),

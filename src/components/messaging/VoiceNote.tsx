@@ -29,7 +29,7 @@ export default function VoiceNote({ mediaId, transcribed }: { mediaId: string; t
             🎙️ {state === "loading" ? "Carico…" : "Ascolta vocale"}
           </button>}
       {err && <div className="mt-1 text-[11px] text-err">{err}</div>}
-      {transcribed && <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">Trascrizione</div>}
+      {transcribed && <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-dim">Trascrizione</div>}
     </div>
   );
 }

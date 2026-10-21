@@ -102,7 +102,7 @@ export default function StrutturePage() {
         subtitle={t("Anagrafica completa delle tue strutture · le singole camere si gestiscono in “Camere”")}
         actions={overLimit
           ? <button onClick={() => router.push("/abbonamento")} title={`${t("Il tuo piano")} ${planName()} ${t("include")} ${limit === 1 ? t("1 struttura") : `${limit} ${t("strutture")}`}`} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> {t("Aggiungi struttura (piano superiore)")}</button>
-          : <button onClick={() => router.push("/strutture/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuova struttura")}</button>}
+          : <button onClick={() => router.push("/strutture/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">+ {t("Nuova struttura")}</button>}
       />
 
       {/* Unica tabella: i due registri (proprietà / condivise) sono separati da righe-intestazione,
@@ -123,7 +123,7 @@ export default function StrutturePage() {
             <col className="w-[3%] max-sm:w-[12%]" />{/* apri (›) */}
           </colgroup>
           <thead>
-            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
               <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>
               <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Città")}</th>
               <th className="px-3 py-2 font-semibold max-sm:hidden">{t("Indirizzo")}</th>

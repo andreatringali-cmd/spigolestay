@@ -39,7 +39,7 @@ export default function Pickup({ pickup, delay = 0 }: { pickup: PickupStats; del
               </Tip>
             )}
           </div>
-          <div className="mt-1.5 flex justify-between text-[10px] text-faint"><span>30 giorni fa</span><span>oggi</span></div>
+          <div className="mt-1.5 flex justify-between text-[11px] text-faint"><span>30 giorni fa</span><span>oggi</span></div>
         </>
       )}
     </Tile>

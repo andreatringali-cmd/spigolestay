@@ -16,6 +16,7 @@ import { fmtDate } from "@/lib/dates";
 import { todayRome } from "@/lib/dates-rome";
 import { REQUIRE_DOC_PHOTOS, checkinStatus, docTypeFromText, needsMoreGuests, roomHeads, stepsWithMissing, type CheckinStep, type Miss } from "@/lib/checkin-flow";
 import { COUNTRY_OPTIONS } from "@/lib/alloggiati/countries";
+import { GUEST_DEFAULT_ACCENT } from "@/lib/guest-brand";
 
 // Check-in online per l'OSPITE — pagina PUBBLICA e SERVER-backed.
 // Carica e salva tutto tramite /api/checkin (service role): funziona per l'ospite
@@ -27,13 +28,14 @@ import { COUNTRY_OPTIONS } from "@/lib/alloggiati/countries";
 // al ritorno il modulo sarebbe vuoto. Il pulsante di invio non è mai "spento senza spiegazione": se manca qualcosa lo dice e porta al campo.
 
 const box = "rounded-xl border border-line bg-surface";
-const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+const field = "min-h-11 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:text-sm"; // 16 px su telefono: iOS non ingrandisce la pagina
 const fieldErr = field.replace("border-line", "border-[color:var(--err)] ring-1 ring-[color:var(--err)]");
 const lbl = "block text-xs font-medium text-dim";
 const fmtDL = (iso: string, locale: string) => { try { return `${new Date(iso + "T00:00:00").toLocaleDateString(locale, { weekday: "short" })} ${fmtDate(iso)}`; } catch { return iso; } };
-const errBox = { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" } as const;
-const warnBox = { backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)",  } as const;
-const okBox = { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } as const;
+// Avvisi: testo in colore pieno (leggibile) + barra laterale col colore del significato (il rosso/verde chiaro da solo non regge il contrasto)
+const errBox = { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--txt)", boxShadow: "inset 3px 0 0 var(--err)" } as const;
+const warnBox = { backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", boxShadow: "inset 3px 0 0 var(--warn)" } as const;
+const okBox = { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--txt)", boxShadow: "inset 3px 0 0 var(--ok)" } as const;
 
 type T = (s: string, vars?: Record<string, string | number>) => string;
 
@@ -59,15 +61,15 @@ function DocFace({ label, photo, onPick, onRemove, onReread, extracting, aiOff, 
       <div className="flex items-center gap-2">
         <MediaImg src={photo} alt={label} className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
         <div className="flex flex-col items-start gap-1">
-          <span className="text-[11px] font-medium text-dim">✓ {label}</span>
-          {onReread && !aiOff && <button type="button" onClick={onReread} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50 max-sm:py-2">{extracting ? t("Leggo…") : t("✨ Rileggi dal documento")}</button>}
-          <button type="button" onClick={onRemove} className="text-[11px] text-dim hover:text-[color:var(--err)] max-sm:py-2">{t("Rimuovi")}</button>
+          <span className="text-xs font-medium text-dim">✓ {label}</span>
+          {onReread && !aiOff && <button type="button" onClick={onReread} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50 max-sm:py-3">{extracting ? t("Leggo…") : t("✨ Rileggi dal documento")}</button>}
+          <button type="button" onClick={onRemove} className="text-xs text-dim hover:text-[color:var(--err)] max-sm:py-3">{t("Rimuovi")}</button>
         </div>
       </div>
     );
   }
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>
+    <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus-within:ring-2 focus-within:ring-focus/40 focus-within:ring-offset-2" style={{ backgroundColor: "var(--focus)" }}>
       {extracting && onReread ? t("Leggo…") : `${aiOff || !onReread ? "📷" : "✨"} ${label}`}
       <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPick(e.target.files?.[0])} />
     </label>
@@ -493,15 +495,15 @@ function Engine() {
     } catch { setPaying(false); setPayErr(t("Errore di rete. Riprova.")); }
   };
 
-  const accent = st?.color || "#4F46E5";
+  const accent = st?.color || GUEST_DEFAULT_ACCENT;
   const header = (
     <div className="border-b border-line bg-surface">
       <div className="mx-auto max-w-5xl px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {st?.logo
             ? <img src={st.logo} alt={st?.name ?? "Logo"} className="h-9 w-auto max-w-[150px] object-contain" />
-            : <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "SS").slice(0, 2).toUpperCase()}</div>}
-          <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">{t("Gestisci la tua prenotazione")}</div></div>
+            : <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "XN").slice(0, 2).toUpperCase()}</div>}
+          <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-xs text-dim">{t("Gestisci la tua prenotazione")}</div></div>
           <div className="ml-auto"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
         </div>
       </div>
@@ -543,7 +545,7 @@ function Engine() {
           const content = (
             <>
               <span className="grid h-7 w-7 place-items-center rounded-full border border-line text-xs font-bold text-dim" style={circle}>{isDone && !isCur ? "✓" : warn ? "!" : s.n}</span>
-              <span className={`text-[10px] leading-tight [overflow-wrap:anywhere] ${isCur ? "font-bold text-txt" : "text-dim"}`}>{s.label}</span>
+              <span className={`text-xs leading-tight [overflow-wrap:anywhere] ${isCur ? "font-bold text-txt" : "text-dim"}`}>{s.label}</span>
             </>
           );
           return (
@@ -567,7 +569,7 @@ function Engine() {
       {baseExtras > 0 && <div className="flex justify-between"><span className="text-dim">{t("Extra")}</span><span className="font-mono text-txt">{eur(baseExtras)}</span></div>}
       {upsellItems.map((x) => <div key={x.name} className="flex justify-between"><span className="text-dim">+ {x.name}</span><span className="font-mono text-txt">{eur(x.price)}</span></div>)}
       {cityTax > 0 && <div className="flex justify-between"><span className="text-dim">{t("Tassa di soggiorno")}{isGroup && b?.cityTaxGroup ? ` · ${t("quota di questa camera")}` : ""}</span><span className="font-mono text-txt">{eur(cityTax)}</span></div>}
-      {cityTax > 0 && isGroup && b?.cityTaxGroup ? <div className="text-right text-[11px] text-faint">{t("Tassa del gruppo (tutte le camere)")}: {eur(b.cityTaxGroup)}</div> : null}
+      {cityTax > 0 && isGroup && b?.cityTaxGroup ? <div className="text-right text-xs text-dim">{t("Tassa del gruppo (tutte le camere)")}: {eur(b.cityTaxGroup)}</div> : null}
       <div className="mt-1 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">{t("Totale")}</span><span className="font-mono font-bold text-txt">{eur(grand)}</span></div>
       {paid > 0 && <div className="flex justify-between"><span className="text-dim">{t("Già versato")}</span><span className="font-mono" style={{ color: "var(--ok)" }}>−{eur(paid)}</span></div>}
       <div className="flex justify-between"><span className="font-semibold text-txt">{groupPay ? t("Saldo del gruppo (tutte le camere)") : t("Saldo")}</span><span className="font-mono text-lg font-extrabold" style={{ color: balance > 0 ? "var(--err)" : "var(--ok)" }}>{eur(balance)}</span></div>
@@ -583,11 +585,11 @@ function Engine() {
           <h1 className="font-display text-2xl font-bold text-txt">{t("Check-in completato!")}</h1>
           <p className="mt-1 text-sm text-dim">{t("Grazie {name}. Abbiamo ricevuto i tuoi dati per il soggiorno a {structure}. A presto!", { name: doc?.firstName || info.guest.firstName, structure: st?.name ?? "" })}</p>
           {st?.checkInFrom && <p className="mt-3 text-sm text-txt">{t("Ti aspettiamo dal {date}, check-in dalle {time}.", { date: fmtD(info.booking.checkIn), time: st.checkInFrom })}</p>}
-          <button type="button" onClick={() => { setDone(false); setEditing(true); setStep(1); setShowErr(false); setAckMissing(false); topScroll(); }} className="mt-3 text-xs font-medium text-focus hover:underline max-sm:py-2">{t("Devi correggere qualcosa o aggiungere un ospite? Modifica i dati")}</button>
+          <button type="button" onClick={() => { setDone(false); setEditing(true); setStep(1); setShowErr(false); setAckMissing(false); topScroll(); }} className="mt-3 min-h-11 text-xs font-medium text-focus hover:underline">{t("Devi correggere qualcosa o aggiungere un ospite? Modifica i dati")}</button>
           <div className="mx-auto mt-4 max-w-sm">
             {walletState === "unavailable"
-              ? <p className="mt-2 text-center text-xs text-faint">{t("Aggiungi a Google Wallet: disponibile a breve.")}</p>
-              : <button type="button" onClick={addToWallet} disabled={walletState === "loading"} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90 disabled:opacity-50">{walletState === "loading" ? t("Preparo il pass…") : t("🔖 Aggiungi a Google Wallet")}</button>}
+              ? null /* senza Wallet attivo il pulsante non compare: niente promesse "a breve" */
+              : <button type="button" onClick={addToWallet} disabled={walletState === "loading"} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{walletState === "loading" ? t("Preparo il pass…") : t("🔖 Aggiungi a Google Wallet")}</button>}
           </div>
         </div>
 
@@ -617,7 +619,7 @@ function Engine() {
     <ul className="mt-2 flex flex-col gap-1">
       {items.map((m, i) => (
         <li key={`${m.code}-${m.guest ?? 0}-${i}`}>
-          <button type="button" onClick={() => { setShowErr(true); goTo(m); }} className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:opacity-80" style={errBox}>
+          <button type="button" onClick={() => { setShowErr(true); goTo(m); }} className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2 py-2.5 text-left text-xs font-medium hover:opacity-80" style={errBox}>
             <span aria-hidden>→</span><span><span className="font-bold">{t("Passo")} {m.step}</span> · {missText(m)}</span>
           </button>
         </li>
@@ -627,8 +629,8 @@ function Engine() {
 
   const navBtns = (back: CheckinStep | null, next?: { label: string; onClick: () => void }) => (
     <div className="mt-4 flex gap-2">
-      {back && <button type="button" onClick={() => goStep(back)} className="rounded-lg border border-line bg-surface px-4 py-3 text-sm font-semibold text-txt hover:bg-wash">← {t("Indietro")}</button>}
-      {next && <button type="button" onClick={next.onClick} className="flex-1 rounded-lg bg-focus py-3 text-sm font-semibold text-white hover:opacity-90">{next.label}</button>}
+      {back && <button type="button" onClick={() => goStep(back)} className="min-h-11 rounded-lg border border-line bg-surface px-4 py-3 text-sm font-semibold text-txt hover:bg-wash">← {t("Indietro")}</button>}
+      {next && <button type="button" onClick={next.onClick} className="min-h-11 flex-1 rounded-lg bg-focus py-3 text-sm font-semibold text-white hover:opacity-90">{next.label}</button>}
     </div>
   );
 
@@ -648,7 +650,7 @@ function Engine() {
               <div className="font-display text-lg font-bold text-txt">{t("Ciao {name}, benvenuto!", { name: info.guest.firstName || doc?.firstName || "" })}</div>
               <div className="text-sm text-dim">{info.roomType.name}{info.unit ? ` · ${info.unit.name}` : ""} · {info.booking.adults} {info.booking.adults === 1 ? t("adulto") : t("adulti")}{info.booking.children ? ` · ${info.booking.children} ${info.booking.children === 1 ? t("bambino") : t("bambini")}` : ""}</div>
             </div>
-            <div className="text-right text-sm"><div className="text-txt">{fmtD(info.booking.checkIn)}</div><div className="text-faint">→ {fmtD(info.booking.checkOut)}</div></div>
+            <div className="text-right text-sm"><div className="text-txt">{fmtD(info.booking.checkIn)}</div><div className="text-dim">→ {fmtD(info.booking.checkOut)}</div></div>
           </div>
           {info.booking.webCheckin && <div className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium" style={okBox}>{needsMoreGuests(expectedGuests, info.booking.extraGuests?.length ?? 0) && !isGroup ? t("Check-in già inviato, ma mancano i dati di altri ospiti: aggiungili e reinvia.") : t("Check-in già inviato — se devi aggiornare i dati, compila di nuovo tutti i campi e reinvia.")}</div>}
           {paidNow && <div className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium" style={okBox}>{t("✓ Pagamento ricevuto — grazie! L'incasso è stato registrato.")}</div>}
@@ -664,7 +666,7 @@ function Engine() {
             <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--focus)" }}>
               <div className="flex items-center gap-2"><span className="text-lg">👥</span><h2 className="font-display text-base font-bold text-txt">{t("Prenotazione di gruppo")} · {groupRooms.length} {t("camere")}</h2></div>
               <p className="mt-1 text-xs text-dim">{t("Compila qui gli ospiti di tutte le camere: per ogni persona scegli la camera. Al termine invii tutto in una volta.")}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">{groupRooms.map((r) => { const n = (r.adults || 1) + (r.children || 0); return <span key={r.b} className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-dim">{roomLabel(r)} · {n} {n === 1 ? t("ospite") : t("ospiti")}</span>; })}</div>
+              <div className="mt-2 flex flex-wrap gap-1.5">{groupRooms.map((r) => { const n = (r.adults || 1) + (r.children || 0); return <span key={r.b} className="rounded-full border border-line bg-surface px-2 py-0.5 text-xs text-dim">{roomLabel(r)} · {n} {n === 1 ? t("ospite") : t("ospiti")}</span>; })}</div>
             </div>
           )}
 
@@ -673,8 +675,8 @@ function Engine() {
             <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--ok)" }}>
               <div className="flex items-center gap-2"><span className="text-lg">👋</span><h2 className="font-display text-base font-bold text-txt">{t("Bentornato, {name}!", { name: info.guest.firstName || doc?.firstName || "" })}</h2></div>
               <p className="mt-1 text-xs text-dim">{t("Abbiamo già i tuoi dati e il documento del soggiorno precedente. Controlla che sia tutto corretto qui sotto e conferma — oppure invia subito.")}</p>
-              <button onClick={() => submit({ assumeConsent: true })} disabled={submitting || (!isOperator && !signature)} className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? t("Invio…") : t("Confermo: i dati sono corretti → invia check-in")}</button>
-              <p className="mt-2 text-center text-[10px] text-faint">{(isOperator || signature) ? t("Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura.") : t("Per inviare, apponi la firma in fondo alla pagina.")}</p>
+              <button onClick={() => submit({ assumeConsent: true })} disabled={submitting || (!isOperator && !signature)} className="mt-3 min-h-11 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? t("Invio…") : t("Confermo: i dati sono corretti → invia check-in")}</button>
+              <p className="mt-2 text-center text-xs text-dim">{(isOperator || signature) ? t("Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura.") : t("Per inviare, apponi la firma in fondo alla pagina.")}</p>
             </div>
           )}
 
@@ -702,16 +704,16 @@ function Engine() {
 
           {/* Co-ospiti (sezione sempre visibile: si può sempre aggiungere un ospite) */}
           <div className={`${box} mb-4 p-4`}>
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Altri ospiti")}</h2><button onClick={() => setExtras((p) => [...p, { ...emptyExtra(), room: isGroup ? (primaryRoom || groupRooms[0].b) : "" }])} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash max-sm:min-h-10 max-sm:px-3">＋ {t("Aggiungi")}</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Altri ospiti")}</h2><button onClick={() => setExtras((p) => [...p, { ...emptyExtra(), room: isGroup ? (primaryRoom || groupRooms[0].b) : "" }])} className="min-h-11 rounded-md border border-line px-3 py-1 text-xs font-medium text-focus hover:bg-wash sm:min-h-9">＋ {t("Aggiungi")}</button></div>
             {extras.length === 0 ? (
-              <p className="text-xs text-faint">{t("Se con te soggiornano altre persone, aggiungile con «＋ Aggiungi».")}</p>
+              <p className="text-xs text-dim">{t("Se con te soggiornano altre persone, aggiungile con «＋ Aggiungi».")}</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {extras.map((e, i) => (
                   <div key={i} className="rounded-lg border border-line p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-xs font-semibold text-dim">{t("Ospite")} {i + 2}</span>
-                      <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="grid h-8 w-8 place-items-center text-faint hover:text-[color:var(--err)] max-sm:h-10 max-sm:w-10" aria-label={t("Rimuovi")}>✕</button>
+                      <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="grid h-8 w-8 place-items-center text-dim hover:text-[color:var(--err)] max-sm:h-11 max-sm:w-11" aria-label={t("Rimuovi")}>✕</button>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {isGroup && <select value={e.room} onChange={(ev) => setExtra(i, "room", ev.target.value)} className={`${field} sm:col-span-2`}>{groupRooms.map((r) => <option key={r.b} value={r.b}>{t("Camera")}: {roomLabel(r)}</option>)}</select>}
@@ -724,7 +726,7 @@ function Engine() {
                       <select value={e.docType} onChange={(ev) => setExtra(i, "docType", ev.target.value)} className={field}>{DOC_TYPES.map((d) => <option key={d} value={d}>{t(d)}</option>)}</select>
                       <input id={`f-docNumber-${i + 2}`} value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder={t("Numero documento") + (headExtraIdx.has(i) ? " *" : "")} className={headExtraIdx.has(i) ? fcls(`f-docNumber-${i + 2}`) : field} />
                       <input id={`f-docPlace-${i + 2}`} value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder={t("Luogo di rilascio") + (headExtraIdx.has(i) ? " *" : "")} className={`${headExtraIdx.has(i) ? fcls(`f-docPlace-${i + 2}`) : field} sm:col-span-2`} />
-                      {headExtraIdx.has(i) && <p className="text-[11px] text-dim sm:col-span-2">{t("Capocamera: servono i dati del documento (la schedina della camera è a suo nome).")}</p>}
+                      {headExtraIdx.has(i) && <p className="text-xs text-dim sm:col-span-2">{t("Capocamera: servono i dati del documento (la schedina della camera è a suo nome).")}</p>}
                     </div>
                   </div>
                 ))}
@@ -767,10 +769,10 @@ function Engine() {
             {extractMsg && (
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--focus)" }}>
                 <span>✨ {t(extractMsg)}</span>
-                <button type="button" onClick={() => goStep(1)} className="rounded-md border border-line bg-surface px-2 py-1 font-semibold text-txt hover:bg-wash max-sm:min-h-10 max-sm:px-3">{t("Controlla i dati")}</button>
+                <button type="button" onClick={() => goStep(1)} className="rounded-md border border-line bg-surface px-2 py-1 font-semibold text-txt hover:bg-wash max-sm:min-h-11 max-sm:px-3">{t("Controlla i dati")}</button>
               </div>
             )}
-            {!aiOff && !photoFront && !extractMsg && <p className="mt-3 text-[11px] text-faint">{t("Fotografa il documento: i campi del passo 1 si compilano da soli.")}</p>}
+            {!aiOff && !photoFront && !extractMsg && <p className="mt-3 text-xs text-dim">{t("Fotografa il documento: i campi del passo 1 si compilano da soli.")}</p>}
           </div>
           {navBtns(1, { label: t("Avanti: consenso e invio →"), onClick: () => goStep(3) })}
         </>)}
@@ -799,7 +801,7 @@ function Engine() {
           {/* Servizi extra (upsell) */}
           {offer.length > 0 && (
             <div className={`${box} mb-4 p-4`}>
-              <h2 className="mb-1 font-display text-lg font-bold text-txt">{t("Servizi extra")} <span className="text-xs font-normal text-faint">({t("facoltativi")})</span></h2>
+              <h2 className="mb-1 font-display text-lg font-bold text-txt">{t("Servizi extra")} <span className="text-xs font-normal text-dim">({t("facoltativi")})</span></h2>
               <p className="mb-3 text-xs text-dim">{t("Aggiungi comfort al tuo soggiorno: li troverai pronti all'arrivo.")}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {offer.map((e) => {
@@ -808,13 +810,13 @@ function Engine() {
                     <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg border border-line p-3">
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-txt">{e.name}</div>
-                        {e.desc && <div className="text-[11px] text-faint">{e.desc}</div>}
+                        {e.desc && <div className="text-xs text-dim">{e.desc}</div>}
                         <div className="text-xs text-dim">{eur(extraUnit(e))}{e.per === "night" ? ` · ${nightsN} ${nightsN === 1 ? t("notte") : t("notti")}` : e.per === "person" ? ` · ${t("a persona")}` : ""}</div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-10 max-sm:w-10">−</button>
+                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-11 max-sm:w-11">−</button>
                         <span className="w-5 text-center font-mono text-sm">{qy}</span>
-                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-10 max-sm:w-10">+</button>
+                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-11 max-sm:w-11">+</button>
                       </div>
                     </div>
                   );
@@ -826,8 +828,8 @@ function Engine() {
           {/* Richiedi fattura (facoltativo) */}
           <div className={`${box} mb-4 p-4`}>
             <label className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-txt">{t("Richiedo fattura")} <span className="text-xs font-normal text-faint">({t("facoltativo")})</span></span>
-              <input type="checkbox" checked={inv.wants} onChange={(e) => setI("wants", e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />
+              <span className="text-sm font-semibold text-txt">{t("Richiedo fattura")} <span className="text-xs font-normal text-dim">({t("facoltativo")})</span></span>
+              <input type="checkbox" checked={inv.wants} onChange={(e) => setI("wants", e.target.checked)} className="h-5 w-5 accent-[color:var(--focus)]" />
             </label>
             {inv.wants && (
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -853,7 +855,7 @@ function Engine() {
           {/* Arrivo + note */}
           <div className={`${box} mb-4 p-4`}>
             <label className={lbl}>{t("Orario di arrivo previsto")}<select value={arrival} onChange={(e) => setArrival(e.target.value)} className={`${field} mt-1`}>{["Non lo so", "12:00-14:00", "14:00-16:00", "16:00-18:00", "18:00-20:00", "dopo le 20:00"].map((o) => <option key={o} value={o}>{t(o)}</option>)}</select></label>
-            <label className={`${lbl} mt-3`}>{t("Note o richieste")} <span className="font-normal text-faint">({t("facoltative")})</span><textarea value={guestReq} onChange={(e) => setGuestReq(e.target.value)} rows={3} className={`${field} mt-1 resize-y`} placeholder={t("Es. arriviamo in auto, culla, allergie, orari particolari…")} /></label>
+            <label className={`${lbl} mt-3`}>{t("Note o richieste")} <span className="font-normal text-dim">({t("facoltative")})</span><textarea value={guestReq} onChange={(e) => setGuestReq(e.target.value)} rows={3} className={`${field} mt-1 resize-y`} placeholder={t("Es. arriviamo in auto, culla, allergie, orari particolari…")} /></label>
           </div>
 
           {/* Firma: obbligatoria per l'OSPITE; se compila l'operatore (loggato) NON serve. */}
@@ -862,7 +864,7 @@ function Engine() {
               <h2 className="mb-1 font-display text-base font-bold text-txt">{t("Firma")} <span style={{ color: "var(--err)" }}>*</span></h2>
               <p className="mb-3 text-xs text-dim">{t("Firma per confermare la correttezza dei dati e l'accettazione delle condizioni.")}</p>
               {signature && isMediaRef(signature)
-                ? <div className="flex items-end gap-3"><MediaImg src={signature} alt={t("Firma")} className="h-24 rounded-lg border border-line bg-white p-1" /><button type="button" onClick={() => setSignature(undefined)} className="text-[11px] font-medium text-dim hover:text-[color:var(--err)] max-sm:py-2">{t("Cancella firma")}</button></div>
+                ? <div className="flex items-end gap-3"><MediaImg src={signature} alt={t("Firma")} className="h-24 rounded-lg border border-line bg-white p-1" /><button type="button" onClick={() => setSignature(undefined)} className="text-xs font-medium text-dim hover:text-[color:var(--err)] max-sm:py-3">{t("Cancella firma")}</button></div>
                 : <SignaturePad value={signature} onChange={setSignature} placeholder={t("Firma qui col dito o col mouse")} clearLabel={t("Cancella firma")} />}
               {showErr && missIds.has("f-signature") && <p className="mt-1 text-xs font-medium" style={{ color: "var(--err)" }}>{t("Firma nel riquadro")}</p>}
             </div>
@@ -877,7 +879,7 @@ function Engine() {
                 <span className="mt-1 block text-xs text-dim">{t("Confermo che i dati sono corretti e acconsento al trattamento dei dati personali e del documento ai fini della registrazione degli alloggiati (Questura) e degli adempimenti di legge.")}</span>
               </span>
             </label>
-            <a href="/privacy" target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-focus hover:underline">{t("Leggi l'informativa privacy")}</a>
+            <a href="/privacy" target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-11 items-center text-xs text-focus hover:underline sm:min-h-0">{t("Leggi l'informativa privacy")}</a>
           </div>
 
           {/* Avvisi che non bloccano */}
@@ -902,18 +904,18 @@ function Engine() {
 
           {/* Pulsante di invio: mai muto. Bloccato = grigio ma leggibile, e al tocco porta al campo mancante. */}
           <button type="button" onClick={onSubmitClick} disabled={submitting} aria-disabled={!valid}
-            className={`mt-4 w-full rounded-lg py-3.5 text-sm font-bold transition ${valid ? "bg-focus text-white hover:opacity-90" : "border border-line bg-wash text-dim"} disabled:opacity-50`}>
+            className={`mt-4 min-h-12 w-full rounded-lg py-3.5 text-sm font-bold transition ${valid ? "bg-focus text-white hover:opacity-90" : "border border-line bg-wash text-dim"} disabled:opacity-50`}>
             {submitting ? t("Invio…") : `${valid ? "" : "🔒 "}${isGroup ? t("Invia il check-in del gruppo") : t("Invia il check-in")}`}
           </button>
           {valid
-            ? <p className="mt-2 text-center text-xs font-medium" style={{ color: "var(--ok)" }}>{t("✓ Tutto pronto: tocca per inviare.")}</p>
+            ? <p className="mt-2 text-center text-xs font-medium text-txt">{t("✓ Tutto pronto: tocca per inviare.")}</p>
             : (
               <div className="mt-2 rounded-xl border p-3" style={{ borderColor: "var(--err)" }}>
-                <div className="text-xs font-bold" style={{ color: "var(--err)" }}>{t("Per inviare ti manca ancora:")}</div>
+                <div className="text-xs font-bold text-txt">{t("Per inviare ti manca ancora:")}</div>
                 {missList(status.blocking)}
               </div>
             )}
-          {showPayStep && <p className="mt-3 text-center text-[11px] text-faint">{t("Dopo l'invio potrai pagare online il saldo (facoltativo, oppure all'arrivo).")}</p>}
+          {showPayStep && <p className="mt-3 text-center text-xs text-dim">{t("Dopo l'invio potrai pagare online il saldo (facoltativo, oppure all'arrivo).")}</p>}
           {navBtns(2)}
         </>)}
       </div>

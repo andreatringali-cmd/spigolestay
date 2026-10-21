@@ -266,13 +266,13 @@ export default function WidgetPage() {
       if (pubState === "loading") return <span className="text-faint">…</span>;
       if (pubState !== "ok") return <span className="text-faint">—</span>;
       return pub[sid]
-        ? <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>Online</span>
-        : <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-faint">Non pubblicato</span>;
+        ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-on-ok" style={{ backgroundColor: "var(--ok)" }}>Online</span>
+        : <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-dim">Non pubblicato</span>;
     };
     return (
       <div>
         <PageHeader title={t("Widget sito")} subtitle={t("Crea uno o più widget di prenotazione per il tuo sito")}
-          actions={<button onClick={createWidget} disabled={!structures.length} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">+ {t("Crea un nuovo widget")}</button>} />
+          actions={<button onClick={createWidget} disabled={!structures.length} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">+ {t("Crea un nuovo widget")}</button>} />
         {pubState === "error" && <div className="mb-3"><Notice kind="warn">Non riesco a leggere lo stato di pubblicazione delle strutture (errore di rete o di accesso). Puoi comunque configurare i widget; lo stato Online/Non pubblicato non è verificato. <button onClick={loadPub} className="font-semibold text-focus hover:underline">Riprova</button></Notice></div>}
         {pubState === "offline" && <div className="mb-3"><Notice kind="info">Non sei connesso al server: lo stato di pubblicazione non è disponibile.</Notice></div>}
         <Card>
@@ -301,7 +301,7 @@ export default function WidgetPage() {
               {/* Tabella (tablet/desktop) */}
               <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[680px] text-sm">
-                <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+                <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
                   <th className="py-2 pr-3 font-semibold">{t("Nome")}</th><th className="py-2 pr-3 font-semibold">{t("Struttura")}</th><th className="py-2 pr-3 font-semibold">Stato</th><th className="py-2 pr-3 font-semibold">{t("Colore")}</th><th className="py-2 pr-3 font-semibold">Altezza min.</th><th className="py-2 text-right font-semibold"></th>
                 </tr></thead>
                 <tbody>
@@ -383,7 +383,7 @@ export default function WidgetPage() {
   return (
     <div>
       <PageHeader title={c.name || t("Widget")} subtitle={t("Configura il widget; le prenotazioni entrano dirette nel calendario")}
-        actions={<div className="flex flex-wrap items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={async () => { if (c && await ask({ title: t("Elimina widget"), message: `${t("Eliminare")} "${c.name || t("Widget")}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva")}</button></div>} />
+        actions={<div className="flex flex-wrap items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={async () => { if (c && await ask({ title: t("Elimina widget"), message: `${t("Eliminare")} "${c.name || t("Widget")}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Salva")}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
@@ -404,7 +404,7 @@ export default function WidgetPage() {
             <div className="mt-3 text-xs font-medium text-dim">Colore del motore di prenotazione</div>
             <div className="mt-1 grid grid-cols-3 gap-1 rounded-lg border border-line p-0.5">
               {([["default", "Predefinito"], ["structure", "Colore struttura"], ["custom", "Personalizzato"]] as const).map(([k, lab]) => (
-                <button key={k} onClick={() => { set("embedAccentMode", k); set("embedInheritAccent", k === "default"); }} className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${accentMode === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+                <button key={k} onClick={() => { set("embedAccentMode", k); set("embedInheritAccent", k === "default"); }} className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${accentMode === k ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{lab}</button>
               ))}
             </div>
             {accentMode === "custom" && (
@@ -436,7 +436,7 @@ export default function WidgetPage() {
               {pubState === "error" && <Notice kind="warn">Non riesco a verificare la pubblicazione (errore di rete o di accesso). <button onClick={loadPub} className="font-semibold text-focus hover:underline">Riprova</button></Notice>}
               {pubState === "ok" && publishedSlug && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-xs">
-                  <span className="rounded-full px-2 py-0.5 font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>{t("Online")}</span>
+                  <span className="rounded-full px-2 py-0.5 font-semibold text-on-ok" style={{ backgroundColor: "var(--ok)" }}>{t("Online")}</span>
                   <span className="text-dim">{PUBLIC_HOST}/embed/</span><span className="font-mono font-semibold text-txt">{publishedSlug}</span>
                   {publishedAtTxt && <span className="text-faint">· ultima pubblicazione {publishedAtTxt}</span>}
                 </div>
@@ -452,20 +452,20 @@ export default function WidgetPage() {
 
             {/* Scelta metodo */}
             <div className="grid grid-cols-2 gap-1 rounded-lg border border-line p-0.5">
-              <button onClick={() => setSnippetKind("script")} className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${snippetKind === "script" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Script responsivo (consigliato)</button>
-              <button onClick={() => setSnippetKind("iframe")} className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${snippetKind === "iframe" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Iframe semplice</button>
+              <button onClick={() => setSnippetKind("script")} className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${snippetKind === "script" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>Script responsivo (consigliato)</button>
+              <button onClick={() => setSnippetKind("iframe")} className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${snippetKind === "iframe" ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>Iframe semplice</button>
             </div>
             <p className="mt-1.5 text-[11px] text-faint">{snippetKind === "script" ? "Lo script adatta l'altezza da solo e resta responsivo, senza barre di scorrimento interne. Alcuni costruttori di siti (es. Wix) bloccano gli script esterni: in quel caso usa l'iframe." : "L'iframe funziona quasi ovunque ma ha altezza fissa: se il contenuto è più alto compare una barra di scorrimento interna."}</p>
             <div className="mt-2 flex items-start gap-2">
               <textarea readOnly value={shownSnippet} rows={4} onFocus={(e) => e.currentTarget.select()} className="w-full resize-none rounded-lg border border-line bg-paper p-2 font-mono text-[11px] text-txt" />
-              <button onClick={() => copy("snip", shownSnippet)} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90">{copied === "snip" ? "Copiato ✓" : t("Copia")}</button>
+              <button onClick={() => copy("snip", shownSnippet)} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-on-focus hover:opacity-90">{copied === "snip" ? "Copiato ✓" : t("Copia")}</button>
             </div>
             {copyErr && <div className="mt-2"><Notice kind="err">{copyErr}</Notice></div>}
 
             {/* Istruzioni per piattaforma */}
             <div className="mt-4 text-xs font-medium text-dim">Come incollarlo</div>
             <div className="mt-1 flex flex-wrap gap-1">
-              {PLATFORMS.map((p) => (<button key={p.key} onClick={() => setPlatform(p.key)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${platform === p.key ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{p.label}</button>))}
+              {PLATFORMS.map((p) => (<button key={p.key} onClick={() => setPlatform(p.key)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${platform === p.key ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{p.label}</button>))}
             </div>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-dim">
               {platformSteps.steps.map((st, i) => <li key={i}>{st}</li>)}
@@ -488,7 +488,7 @@ export default function WidgetPage() {
             </div>
             {directUrl && (
               <div className="mt-3 rounded-lg border border-line bg-paper p-2.5">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Link diretto (social, WhatsApp, QR in struttura)</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Link diretto (social, WhatsApp, QR in struttura)</div>
                 <div className="mt-1 flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="break-all font-mono text-[11px] text-txt">{directUrl}</div>
@@ -549,7 +549,7 @@ export default function WidgetPage() {
               <Card>
                 <SectionTitle>{t("Correzione prezzo")}</SectionTitle>
                 <div className="flex items-center rounded-lg border border-line p-0.5">
-                  {(["none", "fixed", "percent"] as const).map((m) => (<button key={m} onClick={() => set("adjMode", m)} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${c.adjMode === m ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{m === "none" ? t("Nessuna") : m === "fixed" ? t("Valore fisso") : t("Percentuale")}</button>))}
+                  {(["none", "fixed", "percent"] as const).map((m) => (<button key={m} onClick={() => set("adjMode", m)} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${c.adjMode === m ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{m === "none" ? t("Nessuna") : m === "fixed" ? t("Valore fisso") : t("Percentuale")}</button>))}
                 </div>
                 {c.adjMode !== "none" && <label className="mt-2 block text-xs font-medium text-dim">{c.adjMode === "fixed" ? t("Variazione €") : t("Variazione %")} {t("(negativo per ridurre)")}<input type="number" value={c.adjValue} onChange={(e) => set("adjValue", +e.target.value)} className={`mt-1 ${inp}`} /></label>}
               </Card>
@@ -567,13 +567,13 @@ export default function WidgetPage() {
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex rounded-lg bg-wash p-0.5 text-xs">
               {([["real", "Motore reale"], ["sim", "Simulatore"]] as const).map(([k, lab]) => (
-                <button key={k} onClick={() => setPreviewTab(k)} className={`rounded-md px-3 py-1.5 font-semibold transition ${previewTab === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+                <button key={k} onClick={() => setPreviewTab(k)} className={`rounded-md px-3 py-1.5 font-semibold transition ${previewTab === k ? "bg-focus text-on-focus shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
               ))}
             </div>
             {previewTab === "real" && (
               <div className="flex items-center gap-1">
                 {([["mobile", "Telefono"], ["tablet", "Tablet"], ["desktop", "Desktop"]] as const).map(([k, lab]) => (
-                  <button key={k} onClick={() => setViewport(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${viewport === k ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{lab}</button>
+                  <button key={k} onClick={() => setViewport(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${viewport === k ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{lab}</button>
                 ))}
                 <button onClick={() => setReloadTick((x) => x + 1)} title="Ricarica l'anteprima" className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-dim hover:bg-wash">↻</button>
               </div>
@@ -632,11 +632,11 @@ export default function WidgetPage() {
                     </div>
                   )}
                   {doneMsg ? (
-                    <div className="px-3 py-3 text-center text-sm font-semibold text-white" style={{ backgroundColor: "var(--ok)", borderRadius: radius / 2 }}>✓ Simulazione: nessuna prenotazione è stata creata.</div>
+                    <div className="px-3 py-3 text-center text-sm font-semibold text-on-ok" style={{ backgroundColor: "var(--ok)", borderRadius: radius / 2 }}>✓ Simulazione: nessuna prenotazione è stata creata.</div>
                   ) : (
                     <button onClick={prenota} className="py-2.5 text-sm font-bold text-white transition hover:opacity-90" style={{ backgroundColor: c.accent, borderRadius: radius / 2 }}>{t("Prenota ora")}</button>
                   )}
-                  <div className="text-center text-[10px] text-faint">{t("Pagamenti:")} {[c.payCard && t("Carta"), c.payPaypal && "PayPal", c.payTransfer && t("Bonifico"), c.payOnsite && t("Sul posto")].filter(Boolean).join(" · ") || "—"}</div>
+                  <div className="text-center text-[11px] text-faint">{t("Pagamenti:")} {[c.payCard && t("Carta"), c.payPaypal && "PayPal", c.payTransfer && t("Bonifico"), c.payOnsite && t("Sul posto")].filter(Boolean).join(" · ") || "—"}</div>
                 </div>
                 ) : (
                 <div className={`flex flex-wrap items-end gap-2 ${c.layout === "inline" ? "p-2.5" : "p-4"}`}>
@@ -645,9 +645,9 @@ export default function WidgetPage() {
                   <label className="block text-[11px] font-medium text-dim" style={{ width: 68 }}>{t("Adulti")}<input type="number" min={1} value={guests} onChange={(e) => setGuests(Math.max(1, +e.target.value))} className={`mt-1 ${inp}`} /></label>
                   {c.askChildren && <label className="block text-[11px] font-medium text-dim" style={{ width: 68 }}>{t("Bambini")}<input type="number" min={0} value={children} onChange={(e) => setChildren(Math.max(0, +e.target.value))} className={`mt-1 ${inp}`} /></label>}
                   <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 130 }}>{t("Camera")}<select value={rtId} onChange={(e) => setRtId(e.target.value)} className={`mt-1 ${inp}`}>{typesOf.length === 0 && <option value="">Nessuna camera</option>}{typesOf.map((rt) => (<option key={rt.id} value={rt.id}>{rt.name}</option>))}</select></label>
-                  {c.showPrices && c.layout !== "inline" && <div className="text-right"><div className="text-[10px] text-faint">{n} {n === 1 ? t("notte") : t("notti")}</div><div className="font-mono text-lg font-bold text-txt">{priceTxt}</div></div>}
+                  {c.showPrices && c.layout !== "inline" && <div className="text-right"><div className="text-[11px] text-faint">{n} {n === 1 ? t("notte") : t("notti")}</div><div className="font-mono text-lg font-bold text-txt">{priceTxt}</div></div>}
                   {doneMsg ? (
-                    <div className="flex-1 px-3 py-2.5 text-center text-sm font-semibold text-white" style={{ backgroundColor: "var(--ok)", borderRadius: radius / 2, minWidth: 140 }}>✓ Simulazione</div>
+                    <div className="flex-1 px-3 py-2.5 text-center text-sm font-semibold text-on-ok" style={{ backgroundColor: "var(--ok)", borderRadius: radius / 2, minWidth: 140 }}>✓ Simulazione</div>
                   ) : (
                     <button onClick={prenota} className="px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90" style={{ backgroundColor: c.accent, borderRadius: radius / 2 }}>{t("Prenota")}</button>
                   )}

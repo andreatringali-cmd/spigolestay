@@ -31,7 +31,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
           </div>
           <h1 className="font-display text-xl font-bold text-txt">Accesso non consentito</h1>
           <p className="mt-2 text-sm text-dim">Il tuo profilo non ha i permessi per «{item.label}». Chiedi a un amministratore di abilitarti dalla sezione Utenti.</p>
-          <Link href="/" className="mt-5 inline-block rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Torna alla Dashboard</Link>
+          <Link href="/" className="mt-5 inline-block rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Torna alla Dashboard</Link>
         </div>
       );
     }
@@ -49,7 +49,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
               <h1 className="font-display text-xl font-bold text-txt">«{item.label}» è nel piano superiore</h1>
               <p className="mt-2 text-sm text-dim">Questa è un&apos;anteprima della sezione. Attiva il piano che la include per usarla davvero.</p>
               <div className="mt-5 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
-                <Link href="/abbonamento" className="w-full rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 sm:w-auto">Vedi i piani</Link>
+                <Link href="/abbonamento" className="w-full rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 sm:w-auto">Vedi i piani</Link>
                 <Link href="/" className="w-full rounded-lg border border-line px-4 py-2 text-sm font-medium text-dim hover:bg-wash sm:w-auto">Torna alla Dashboard</Link>
               </div>
             </div>

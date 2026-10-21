@@ -175,7 +175,7 @@ export default function AutoShareSettings({ structureId, structureName, structur
 
           {/* In copia: altri indirizzi che ricevono la stessa email */}
           <div className="rounded-xl border border-line bg-paper px-3 py-2.5">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("In copia")}</div>
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("In copia")}</div>
             <div className="flex flex-wrap items-center gap-1.5">
               {(cfg.emailCc ?? []).map((a) => (
                 <span key={a} className="inline-flex items-center gap-1 rounded-full border border-line bg-surface py-0.5 pl-2.5 pr-1 text-xs text-txt">
@@ -198,7 +198,7 @@ export default function AutoShareSettings({ structureId, structureName, structur
 
         {logHere.length > 0 && (
           <details className="group mt-3 rounded-xl border border-line bg-paper px-3 py-2">
-            <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Ultimi invii")} <span className="text-xs transition group-open:rotate-180">▾</span></summary>
+            <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Ultimi invii")} <span className="text-xs transition group-open:rotate-180">▾</span></summary>
             <ul className="mt-1 flex flex-col gap-1">
               {logHere.slice(0, 4).map((e, i) => {
                 const why = e.ok ? "" : spiegaErroreWa(e.detail);
@@ -235,7 +235,7 @@ export default function AutoShareSettings({ structureId, structureName, structur
         {saveErr && <p className="mt-3 text-[11px] font-medium" style={{ color: "var(--err)" }}>{saveErr}</p>}
         <div className="mt-4 flex items-center justify-end gap-2">
           <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash hover:text-txt">{t("Annulla")}</button>
-          <button onClick={save} className="rounded-lg px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{saved ? t("Salvato ✓") : t("Salva")}</button>
+          <button onClick={save} className="rounded-lg px-4 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{saved ? t("Salvato ✓") : t("Salva")}</button>
         </div>
       </div>
     </div>

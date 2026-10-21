@@ -67,7 +67,7 @@ export default function Giorni({ cells, delay = 0 }: { cells: DayCell[]; delay?:
               </Tip>
             )}
           </div>
-          <div className="relative mt-1.5 flex justify-between text-[10px] text-faint">
+          <div className="relative mt-1.5 flex justify-between text-[11px] text-faint">
             <span>{noPast ? "oggi" : fmtDM(cells[0].iso)}</span>
             {noPast ? <span /> : <span className="font-semibold text-dim">oggi</span>}
             <span>{fmtDM(cells[n - 1].iso)}</span>

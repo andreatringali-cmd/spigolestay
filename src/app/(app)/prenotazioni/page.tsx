@@ -481,11 +481,11 @@ export default function PrenotazioniPage() {
           gli altri filtri occupano le colonne restanti. */}
       <div className="no-print mb-4 grid grid-cols-[minmax(0,1fr)] items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm max-sm:flex max-sm:flex-wrap max-sm:gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full max-sm:order-1 max-sm:min-w-0 max-sm:flex-1" />
-        <Link href="/prenotazioni/nuova" className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:order-3 sm:hidden" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
+        <Link href="/prenotazioni/nuova" className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 max-sm:order-3 sm:hidden" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
         <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:hidden sm:col-span-2 lg:col-span-3">
           {filterControls}
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:flex-wrap">
-          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:hidden" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
+          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 max-sm:hidden" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
             <ExportMenu onExcel={doExcel} excelFields={excelFields} />
           </div>
         </div>
@@ -499,7 +499,7 @@ export default function PrenotazioniPage() {
 
       {pastActive && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] px-3 py-2 text-xs text-dim">
-          <span className="rounded-full bg-focus px-2 py-0.5 text-[10px] font-bold uppercase text-white">{t("Storico")}</span>
+          <span className="rounded-full bg-focus px-2 py-0.5 text-[11px] font-bold uppercase text-on-focus">{t("Storico")}</span>
           {dateField === "tutte" ? t("Stai vedendo tutte le prenotazioni, da sempre. Card e grafici si riferiscono a tutto lo storico.") : <>{t("Stai consultando prenotazioni passate (dal")} {fmt(from)}{to ? ` ${t("al")} ${fmt(to)}` : ""}{t("). Card e grafici si riferiscono a questo periodo.")}</>}
           <button onClick={clearFilters} className="ml-auto font-semibold text-focus hover:underline">{t("Torna a in corso e futuri")}</button>
         </div>
@@ -514,7 +514,7 @@ export default function PrenotazioniPage() {
               <div key={gid} className={`rounded-xl border border-line bg-surface shadow-sm ${members.some(isCounted) ? "" : members.every((x) => x.status === "cancelled") ? "[&>button:first-child]:opacity-50" : "opacity-50"}`}>
                 <button onClick={() => toggleGroup(gid)} className="block w-full p-3 text-left active:bg-wash">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-1.5 font-semibold text-txt"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><span className="truncate">{guestName(b) || "—"}</span></span>
+                    <span className="flex min-w-0 items-center gap-1.5 font-semibold text-txt"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-on-focus" style={{ backgroundColor: "var(--focus)" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><span className="truncate">{guestName(b) || "—"}</span></span>
                     <BookingChannelLogo booking={b} size={18} title={ch.label} />
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-dim"><span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span><span className="text-faint">·</span><span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span></div>
@@ -527,7 +527,7 @@ export default function PrenotazioniPage() {
                   <div className="border-t border-line">
                     {members.map((m) => (
                       <button key={m.id} onClick={() => openBooking(m.id)} className={`flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash ${m.status === "no_show" ? "opacity-50" : ""}`}>
-                        <span className="truncate text-xs text-dim">{m.status === "cancelled" ? <CancTag /> : (unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={m.status === "cancelled" ? "opacity-50" : ""}> · {m.adults + m.children} {t("osp.")}</span>{m.status === "no_show" && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
+                        <span className="truncate text-xs text-dim">{m.status === "cancelled" ? <CancTag /> : (unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>)}<span className={m.status === "cancelled" ? "opacity-50" : ""}> · {m.adults + m.children} {t("osp.")}</span>{m.status === "no_show" && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
                         <span className={`shrink-0 font-mono text-xs text-txt ${m.status === "cancelled" ? "opacity-50" : ""}`}>{m.total ? eur(grand(m)) : "—"}</span>
                       </button>
                     ))}
@@ -542,7 +542,7 @@ export default function PrenotazioniPage() {
           return (
             <button key={b.id} onClick={() => openBooking(b.id)} className={`block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash ${counted ? "" : b.status === "cancelled" ? "[&>div:not([data-room])]:opacity-50" : "opacity-50"}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>{!counted && b.status !== "cancelled" && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim">{STATUS_LABEL[b.status] ?? b.status}</span>}</span>
+                <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>{!counted && b.status !== "cancelled" && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{STATUS_LABEL[b.status] ?? b.status}</span>}</span>
                 <BookingChannelLogo booking={b} size={18} title={ch.label} />
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs text-dim">
@@ -573,7 +573,7 @@ export default function PrenotazioniPage() {
       <div className="hidden max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block print:block print:max-h-none print:overflow-visible">
         <table className="w-max min-w-full whitespace-nowrap text-sm">
           <thead className="sticky top-0 z-20">
-            <tr className="text-left text-xs uppercase tracking-wide text-faint">
+            <tr className="text-left text-xs uppercase tracking-wide text-dim">
               <Th k="id" sort={sort} onSort={toggleSort}>{t("Codice")}</Th>
               <Th k="bookedOn" sort={sort} onSort={toggleSort}>{t("Prenotata il")}</Th>
               {activeStructureId === "all" && <Th k="struttura" sort={sort} onSort={toggleSort}>{t("Struttura")}</Th>}
@@ -614,7 +614,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => grand(x)))}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => commissionOf(x)) ? <>{eur(gSum(members, (x) => commissionOf(x)))} <span className="text-[0.82em] text-faint" title="Commissioni ÷ lordo">({pctIt(gSum(members, (x) => grand(x)) > 0 ? Math.round((gSum(members, (x) => commissionOf(x)) / gSum(members, (x) => grand(x))) * 1000) / 10 : 0)}%)</span></> : "—"}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
-                    <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
+                    <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-on-focus" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
                   {open && members.map((m) => (
                     <tr key={m.id} onClick={() => openBooking(m.id)} className={`cursor-pointer border-b border-line hover:bg-wash ${freshSet.has(m.id) ? NEW_ROW : "bg-wash/40"} ${rowDim(m)}`}>{renderCells(m, true)}</tr>
@@ -675,7 +675,7 @@ function Th({ children, k, sort, onSort }: { children: React.ReactNode; k?: stri
     <th onClick={() => onSort(k)} className="sticky top-0 cursor-pointer select-none whitespace-nowrap border-b border-line bg-surface px-3 py-2 font-semibold hover:text-txt">
       <span className="inline-flex items-center gap-1">
         {children}
-        <span className="text-[9px] leading-none" style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === "asc" ? "▲" : "▼") : "▲"}</span>
+        <span className="text-[10px] leading-none" style={{ opacity: active ? 1 : 0.3 }}>{active ? (sort.dir === "asc" ? "▲" : "▼") : "▲"}</span>
       </span>
     </th>
   );

@@ -38,10 +38,10 @@ export default function ImageUploader({ entityKey, max = 6 }: { entityKey: strin
         {imgs.map((src, i) => (
           <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-line">
             <MediaImg src={src} alt="" className="h-full w-full object-cover" />
-            {i === 0 && <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white">Copertina</span>}
+            {i === 0 && <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">Copertina</span>}
             <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/40 opacity-0 transition group-hover:opacity-100">
-              {i !== 0 && <button onClick={() => makeCover(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-black" title="Rendi copertina">★</button>}
-              <button onClick={() => remove(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--err)]">Elimina</button>
+              {i !== 0 && <button onClick={() => makeCover(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-black" title="Rendi copertina">★</button>}
+              <button onClick={() => remove(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--err)]">Elimina</button>
             </div>
           </div>
         ))}

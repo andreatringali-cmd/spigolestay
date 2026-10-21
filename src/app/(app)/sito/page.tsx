@@ -171,7 +171,7 @@ export default function SitoPage() {
             <div className="flex items-center gap-2">
               {c.heroBg
                 ? <div className="h-12 w-20 shrink-0 overflow-hidden rounded-lg border border-line" style={{ backgroundImage: cssBgUrl(c.heroBg), backgroundSize: "cover", backgroundPosition: "center" }} />
-                : <div className="grid h-12 w-20 shrink-0 place-items-center rounded-lg border border-line text-[10px] text-faint" style={{ background: `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>{t("colore")}</div>}
+                : <div className="grid h-12 w-20 shrink-0 place-items-center rounded-lg border border-line text-[11px] text-faint" style={{ background: `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>{t("colore")}</div>}
               <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">{c.heroBg ? t("Cambia foto") : t("Carica foto")}<input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setHeroErr(""); try { set({ heroBg: await uploadImage(f, "public") }); } catch (err) { setHeroErr(err instanceof Error ? err.message : t("Caricamento foto non riuscito.")); } } e.target.value = ""; }} /></label>
               {c.heroBg && <button onClick={() => set({ heroBg: "" })} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi")}</button>}
             </div>
@@ -188,7 +188,7 @@ export default function SitoPage() {
               ))}
             </div>
             <div className="mb-1 mt-4 text-xs text-dim">{t("Lingue")}</div>
-            <div className="flex flex-wrap gap-1.5">{LANGS.map(([code, label]) => <button key={code} onClick={() => toggleLang(code)} className={`rounded-full px-3 py-1 text-xs font-medium transition max-sm:min-h-10 ${c.lang.includes(code) ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{label}</button>)}</div>
+            <div className="flex flex-wrap gap-1.5">{LANGS.map(([code, label]) => <button key={code} onClick={() => toggleLang(code)} className={`rounded-full px-3 py-1 text-xs font-medium transition max-sm:min-h-10 ${c.lang.includes(code) ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{label}</button>)}</div>
           </Card>
         </div>
 
@@ -225,7 +225,7 @@ export default function SitoPage() {
           <div className="mt-4 border-t border-line pt-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-bold text-txt">{t("Indirizzo pubblico")}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-on-ok" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
             </div>
             <p className="mb-2 mt-0.5 text-xs text-dim">{t("Generato dal nome della struttura.")}</p>
             <div className="mt-2 flex flex-wrap items-stretch gap-2">
@@ -236,12 +236,12 @@ export default function SitoPage() {
                 {pubCopied ? <span className="text-sm font-semibold text-[color:var(--ok)]">✓</span> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>}
               </button>
               <button onClick={openPreview} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Anteprima")} ↗</button>
-              <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
+              <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
             </div>
             {publishedSlug && (
               <div className="mt-3 border-t border-line pt-3">
                 <span className="text-xs font-bold text-txt">{t("Link diretto per il pulsante \"Prenota\"")}</span>
-                <p className="mb-2 mt-0.5 text-xs text-dim">{t("Va dritto al modulo di prenotazione, senza passare dal mini-sito — da mettere al posto del vecchio link a Octorate sul tuo sito ufficiale.")}</p>
+                <p className="mb-2 mt-0.5 text-xs text-dim">{t("Va dritto al modulo di prenotazione, senza passare dal mini-sito — da mettere al posto del vecchio link di prenotazione sul tuo sito ufficiale.")}</p>
                 <div className="flex flex-wrap items-stretch gap-2">
                   <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-wash px-3 py-2 text-sm">
                     <span className="truncate"><span className="text-faint">{PUBLIC_HOST}/prenota?site=</span><span className="font-semibold text-txt">{publishedSlug}</span></span>
@@ -252,7 +252,7 @@ export default function SitoPage() {
                 </div>
               </div>
             )}
-            {publishedSlug && <div className="mt-2 flex items-center gap-2"><button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button></div>}
+            {publishedSlug && <div className="mt-2 flex items-center gap-2"><button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-dim hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button></div>}
             {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
           </div>
         </Card>

@@ -80,7 +80,7 @@ export default function OtaReportMenu({ booking }: { booking: Booking }) {
             </label>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={close} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash disabled:opacity-50">{t("Annulla")}</button>
-              <button onClick={run} disabled={busy || word.trim() !== info.confirmWord} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>
+              <button onClick={run} disabled={busy || word.trim() !== info.confirmWord} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-on-err disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>
                 {busy ? t("Invio…") : t("Invia a Booking.com")}
               </button>
             </div>

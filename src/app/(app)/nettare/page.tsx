@@ -226,7 +226,7 @@ export default function NettarePage() {
       <PageHeader title="Nèttare" subtitle={`${t("Prezzi dinamici")}${city ? ` · ${city}` : ""}`} />
       {activeStructureId === "all" && structures.length > 1 && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm max-sm:gap-x-2 max-sm:gap-y-1">
-          <span className="text-xs font-semibold text-faint">{t("Struttura")}</span>
+          <span className="text-xs font-semibold text-dim">{t("Struttura")}</span>
           <select value={struct?.id ?? ""} onChange={(e) => setLocalSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -239,14 +239,14 @@ export default function NettarePage() {
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-xl border border-line text-xl" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
-            <div><div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div><div className="font-display text-xl font-bold tracking-tight text-txt">Nèttare</div></div>
+            <div><div className="text-[11px] font-semibold uppercase tracking-wider text-dim">{t("Motore prezzi dinamici")}</div><div className="font-display text-xl font-bold tracking-tight text-txt">Nèttare</div></div>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 max-sm:grid max-sm:w-full max-sm:grid-cols-3 max-sm:gap-x-3 max-sm:gap-y-2">
-            <div className="max-sm:col-span-3" title={stats.potential == null ? t("Serve lo storico delle prenotazioni per stimare.") : `${t("Stima: differenza rispetto alla tariffa di partenza × la tua occupazione storica")} (${Math.round(my.occ * 100)}%)`}><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: (stats.potential ?? 0) > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential == null ? "—" : `${stats.potential > 0 ? "+" : ""}${eur(stats.potential)}`}</div><div className="text-[10px] text-faint">{stats.potential == null ? t("nessuno storico: stima non disponibile") : `${t("stima con occupazione storica")} ${Math.round(my.occ * 100)}%`}</div></div>
+            <div className="max-sm:col-span-3" title={stats.potential == null ? t("Serve lo storico delle prenotazioni per stimare.") : `${t("Stima: differenza rispetto alla tariffa di partenza × la tua occupazione storica")} (${Math.round(my.occ * 100)}%)`}><div className="text-[11px] font-semibold text-dim">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: (stats.potential ?? 0) > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential == null ? "—" : `${stats.potential > 0 ? "+" : ""}${eur(stats.potential)}`}</div><div className="text-[11px] text-faint">{stats.potential == null ? t("nessuno storico: stima non disponibile") : `${t("stima con occupazione storica")} ${Math.round(my.occ * 100)}%`}</div></div>
             <div><div className="text-[11px] text-faint">{t("Prezzo medio")}</div><div className="font-mono text-lg font-bold text-txt">{eur(stats.avg)}</div></div>
             <div><div className="text-[11px] text-faint">{t("Periodi")}</div><div className="font-mono text-lg font-bold text-txt">{strat.periods.length}</div></div>
             <div><div className="text-[11px] text-faint">{t("Da applicare")}</div><div className="font-mono text-lg font-bold" style={{ color: stats.pending ? "var(--warn)" : "var(--ok)" }}>{stats.pending}</div></div>
-            <button onClick={() => setPreview(true)} disabled={!sTypes.length} className="rounded-full px-5 py-2.5 max-sm:col-span-3 max-sm:mt-1 disabled:opacity-50 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
+            <button onClick={() => setPreview(true)} disabled={!sTypes.length} className="rounded-full px-5 py-2.5 max-sm:col-span-3 max-sm:mt-1 disabled:opacity-50 text-sm font-semibold text-on-focus transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]">
@@ -254,9 +254,9 @@ export default function NettarePage() {
           <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ok)" }} />{t("Dati tuoi · occupazione reale")}</span>
           {market.hasZoneData
             ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}</span>
-            : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
+            : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] font-medium text-faint">{t("Media di zona (Rete città): non ancora disponibile")}</span>}
           {market.hasZoneData && pulseHasDemo(pulse) && (
-            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb,var(--warn) 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
           )}
           {city && <Link href="/mercato" className="inline-block font-medium max-sm:py-2.5" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
         </div>
@@ -266,7 +266,7 @@ export default function NettarePage() {
       <Card title={t("Prezzi di partenza")} desc={t("La base su cui Nèttare costruisce i prezzi: tariffa per tipologia e stagionalità per mese.")} open={openStart} onToggle={() => setOpenStart((v) => !v)}>
         <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Tariffa di partenza per tipologia")}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Tariffa di partenza per tipologia")}</div>
             <div className="mt-1.5 divide-y divide-[var(--line)] rounded-xl border border-line">
               {sTypes.map((rt) => {
                 const def = Math.max(0, effBase(rt, roomTypes)) || basePrice;
@@ -286,15 +286,15 @@ export default function NettarePage() {
             <div className="mt-4"><Slider label={t("Regolazione generale prezzi di partenza")} value={strat.startAdj} min={-30} max={50} step={1} suffix="%" onChange={(v) => upd({ startAdj: v })} hint={t("Alza o abbassa tutte le tariffe di partenza in un colpo.")} /></div>
           </div>
           <div>
-            <div className="flex items-end justify-between"><div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Stagionalità")}</div><button onClick={() => upd({ season: Array(12).fill(0) })} className="text-[11px] text-faint hover:underline">{t("azzera")}</button></div>
+            <div className="flex items-end justify-between"><div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Stagionalità")}</div><button onClick={() => upd({ season: Array(12).fill(0) })} className="text-[11px] text-faint hover:underline">{t("azzera")}</button></div>
             <div className="mt-1.5 grid grid-cols-4 gap-2 sm:grid-cols-6">
               {MONTHS.map((m, i) => {
                 const v = strat.season[i] || 0;
                 return (
                   <label key={m} className="rounded-xl border border-line p-2 text-center" style={{ background: v > 0 ? "color-mix(in srgb,var(--ok) 8%,var(--surface))" : v < 0 ? "color-mix(in srgb,var(--focus) 8%,var(--surface))" : "var(--surface)" }}>
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-dim">{t(m)}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-dim">{t(m)}</div>
                     <div className="mx-auto my-1 flex h-8 w-2 flex-col justify-end overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><div style={{ height: `${Math.min(100, Math.abs(v) * 2)}%`, background: v >= 0 ? "var(--ok)" : "var(--focus)", borderRadius: 4 }} /></div>
-                    <div className="flex items-center justify-center"><input type="number" inputMode="numeric" value={v || ""} placeholder="0" onChange={(e) => { const s = [...strat.season]; s[i] = e.target.value === "" ? 0 : Number(e.target.value); upd({ season: s }); }} className="w-10 bg-transparent text-right font-mono text-xs outline-none" style={{ color: "var(--txt)" }} /><span className="text-[10px] text-dim">%</span></div>
+                    <div className="flex items-center justify-center"><input type="number" inputMode="numeric" value={v || ""} placeholder="0" onChange={(e) => { const s = [...strat.season]; s[i] = e.target.value === "" ? 0 : Number(e.target.value); upd({ season: s }); }} className="w-10 bg-transparent text-right font-mono text-xs outline-none" style={{ color: "var(--txt)" }} /><span className="text-[11px] text-dim">%</span></div>
                   </label>
                 );
               })}
@@ -327,7 +327,7 @@ export default function NettarePage() {
           </div>
         )}
 
-        <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Obiettivo")}</div>
+        <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Obiettivo")}</div>
         <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
           <GoalBtn on={cur.goal === "fill"} onClick={() => updScope({ goal: "fill" })} label={t("Riempi")} desc={t("più occupazione, prezzi più morbidi")} />
           <GoalBtn on={cur.goal === "balanced"} onClick={() => updScope({ goal: "balanced" })} label={t("Bilanciato")} desc={t("equilibrio prezzo/occupazione")} />
@@ -337,7 +337,7 @@ export default function NettarePage() {
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <div>
             <div className="flex items-end justify-between gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Aggressività")}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Aggressività")}</div>
               <span className="text-[11px] text-faint">{presetOf(cur.down, cur.up) ? "" : t("personalizzata")}</span>
             </div>
             <div className="mt-1.5 flex rounded-lg border border-line p-0.5" style={{ background: "var(--wash)" }}>
@@ -352,7 +352,7 @@ export default function NettarePage() {
             {period && <Slider label={t("Prezzi di partenza in questo periodo")} value={period.startAdj} min={-30} max={80} step={1} suffix="%" onChange={(v) => updScope({ startAdj: v })} hint={t("Si aggiunge alla stagionalità del mese.")} />}
             <Slider label={t("Impatto eventi locali")} value={cur.eventImpact} min={0} max={60} step={1} prefix="+" suffix="%" onChange={(v) => updScope({ eventImpact: v })} hint={t("Di quanto alzare nei giorni con un evento in calendario.")} />
             {!period && <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Guardrail")} · {t("prezzo min / max")}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Guardrail")} · {t("prezzo min / max")}</div>
               <div className="mt-1.5 flex gap-2">
                 <input type="number" inputMode="numeric" placeholder={t("min €")} value={strat.minPrice ?? ""} onChange={(e) => upd({ minPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
                 <input type="number" inputMode="numeric" placeholder={t("max €")} value={strat.maxPrice ?? ""} onChange={(e) => upd({ maxPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
@@ -363,7 +363,7 @@ export default function NettarePage() {
         </div>
 
         {!period && <>
-          <div className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Regole")}</div>
+          <div className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Regole")}</div>
           <div className="mt-1 grid gap-x-8 sm:grid-cols-2">
             <div className="border-t border-line"><Tgl on={strat.followMarket} onClick={() => upd({ followMarket: !strat.followMarket })} label={t("Segui il mercato")} hint={t("usa i segnali della Rete città")} /></div>
             <div className="border-t border-line"><Tgl on={strat.events} onClick={() => upd({ events: !strat.events })} label={t("Eventi, festività & weekend")} hint={t("cavalca weekend, festivi, ponti ed eventi")} /></div>
@@ -415,7 +415,7 @@ export default function NettarePage() {
                     const dt = new Date(d + "T00:00:00"), wd = dt.getDay(), we = wd === 5 || wd === 6, isToday = d === today;
                     return (
                       <th key={d} className="border-b border-line px-1 py-2 text-center" style={{ width: COL, minWidth: COL, background: isToday ? "var(--focus)" : we ? "color-mix(in srgb,var(--focus) 9%,var(--surface))" : "var(--surface)", color: isToday ? "#fff" : "var(--txt)" }}>
-                        <div className="text-[10px] font-bold uppercase tracking-wide" style={{ opacity: isToday ? 1 : 0.7 }}>{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
+                        <div className="text-[11px] font-bold uppercase tracking-wide" style={{ opacity: isToday ? 1 : 0.7 }}>{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
                         <div className="text-[12px] font-semibold">{fmtDM(d)}</div>
                       </th>
                     );
@@ -425,7 +425,7 @@ export default function NettarePage() {
               <tbody>
                 {/* Occupazione struttura */}
                 <tr>
-                  <td className="sticky left-0 z-10 border-b border-r border-line px-3 py-2 font-bold text-txt" style={{ background: "var(--surface)" }}>{struct.name}<div className="text-[10px] font-medium text-faint">{t("occupazione")}</div></td>
+                  <td className="sticky left-0 z-10 border-b border-r border-line px-3 py-2 font-bold text-txt" style={{ background: "var(--surface)" }}>{struct.name}<div className="text-[11px] font-medium text-faint">{t("occupazione")}</div></td>
                   {gridDates.map((d) => { const di = dayMap[d]; const p = Math.round((di?.occ ?? 0) * 100); return (
                     <td key={d} className="relative border-b border-line text-center" style={{ height: 52 }}>
                       <div className="absolute inset-x-0 bottom-0" style={{ height: `${Math.max(3, p * 0.5)}%`, background: "color-mix(in srgb,var(--ok) 22%,transparent)" }} />
@@ -438,16 +438,16 @@ export default function NettarePage() {
                   <td className="sticky left-0 z-10 border-b border-r border-line px-3 py-1.5 text-[12px] font-semibold" style={{ background: "var(--surface)", color: "var(--focus)" }}>{t("Festività & ponti")}</td>
                   {gridDates.map((d) => { const h = dayMap[d]?.holiday, br = dayMap[d]?.bridge; return (
                     <td key={d} className="border-b border-line px-1 py-1.5">
-                      {h && <div title={h} className="truncate rounded-md px-1.5 py-0.5 text-center text-[10px] font-semibold text-white" style={{ background: "var(--focus)" }}>{h}</div>}
-                      {!h && br && <div title={`${t("Ponte")} · ${br}`} className="truncate rounded-md border px-1.5 py-0.5 text-center text-[10px] font-semibold" style={{ borderColor: "var(--focus)", color: "var(--focus)" }}>{t("Ponte")}</div>}
+                      {h && <div title={h} className="truncate rounded-md px-1.5 py-0.5 text-center text-[11px] font-semibold text-on-focus" style={{ background: "var(--focus)" }}>{h}</div>}
+                      {!h && br && <div title={`${t("Ponte")} · ${br}`} className="truncate rounded-md border px-1.5 py-0.5 text-center text-[11px] font-semibold" style={{ borderColor: "var(--focus)", color: "var(--focus)" }}>{t("Ponte")}</div>}
                     </td>
                   ); })}
                 </tr>
                 {/* Eventi locali */}
                 <tr>
-                  <td className="sticky left-0 z-10 border-b border-r border-line px-3 py-1.5 text-[12px] font-semibold" style={{ background: "var(--surface)", color: "var(--warn)" }}>{t("Eventi locali")}<Link href="/calendario" className="ml-1 text-[10px] font-medium text-faint hover:underline">+ {t("aggiungi")}</Link></td>
+                  <td className="sticky left-0 z-10 border-b border-r border-line px-3 py-1.5 text-[12px] font-semibold" style={{ background: "var(--surface)", color: "var(--warn)" }}>{t("Eventi locali")}<Link href="/calendario" className="ml-1 text-[11px] font-medium text-faint hover:underline">+ {t("aggiungi")}</Link></td>
                   {gridDates.map((d) => { const evs = dayMap[d]?.events ?? []; return (
-                    <td key={d} className="border-b border-line px-1 py-1.5">{evs.slice(0, 2).map((e) => <div key={e.id} title={e.name} className="mb-0.5 truncate rounded-md px-1.5 py-0.5 text-center text-[10px] font-semibold text-white" style={{ background: e.color }}>{e.name}</div>)}</td>
+                    <td key={d} className="border-b border-line px-1 py-1.5">{evs.slice(0, 2).map((e) => <div key={e.id} title={e.name} className="mb-0.5 truncate rounded-md px-1.5 py-0.5 text-center text-[11px] font-semibold text-white" style={{ background: e.color }}>{e.name}</div>)}</td>
                   ); })}
                 </tr>
                 {/* Tipologie */}
@@ -460,7 +460,7 @@ export default function NettarePage() {
                           : <span className="w-5 shrink-0 text-center text-faint">{depth ? "└" : ""}</span>}
                         <div className="min-w-0">
                           <div className={`truncate text-[13px] text-txt ${depth ? "font-medium" : "font-semibold"}`} title={rt.name}>{rt.name}</div>
-                          <div className="truncate text-[10px] text-faint">{depth ? `${t("derivata")}${rt.ratePlan ? ` · ${rt.ratePlan}` : ""}` : `${t("partenza")} ${eur(res.cells[cellKey(rt.id, gridDates[0])]?.base ?? rt.basePrice)}`}{kids > 0 && !openKids[rt.id] ? ` · ${kids} ${kids === 1 ? t("derivata") : t("derivate")}` : ""}</div>
+                          <div className="truncate text-[11px] text-faint">{depth ? `${t("derivata")}${rt.ratePlan ? ` · ${rt.ratePlan}` : ""}` : `${t("partenza")} ${eur(res.cells[cellKey(rt.id, gridDates[0])]?.base ?? rt.basePrice)}`}{kids > 0 && !openKids[rt.id] ? ` · ${kids} ${kids === 1 ? t("derivata") : t("derivate")}` : ""}</div>
                         </div>
                       </div>
                     </td>
@@ -478,13 +478,13 @@ export default function NettarePage() {
                             style={{ height: 62, outline: c.modActive ? "2px solid var(--warn)" : sel ? "2px solid var(--focus)" : "none", outlineOffset: -2, background: sel ? "color-mix(in srgb,var(--focus) 7%,transparent)" : "transparent" }}
                           >
                             <div className="absolute inset-x-0 bottom-0" style={{ height: 5, background: "var(--wash)" }}><div style={{ height: "100%", width: `${Math.round(c.occ * 100)}%`, background: "color-mix(in srgb,var(--ok) 55%,transparent)" }} /></div>
-                            <span className="absolute left-1 top-1 flex gap-0.5 text-[9px] leading-none">
+                            <span className="absolute left-1 top-1 flex gap-0.5 text-[10px] leading-none">
                               {c.mod?.locked != null && <span title={t("Prezzo bloccato")}>🔒</span>}
                               {c.modSet && c.mod?.locked == null && <span title={t("Modificatore impostato")} style={{ color: c.modActive ? "var(--warn)" : "var(--dim)" }}>◆</span>}
                             </span>
                             {pending && <span title={t("Da applicare")} className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full" style={{ background: "var(--warn)" }} />}
                             <span className="font-mono text-[13px] font-bold text-txt">€ {c.final}</span>
-                            <span className="text-[10px] font-semibold" style={{ color: pct > 2 ? "var(--ok)" : pct < -2 ? "var(--focus)" : "var(--faint)" }}>{pct === 0 ? "=" : `${pct > 0 ? "+" : ""}${pct}%`}{c.minNights > 1 ? ` · ${c.minNights}n` : ""}</span>
+                            <span className="text-[11px] font-semibold" style={{ color: pct > 2 ? "var(--ok)" : pct < -2 ? "var(--focus)" : "var(--faint)" }}>{pct === 0 ? "=" : `${pct > 0 ? "+" : ""}${pct}%`}{c.minNights > 1 ? ` · ${c.minNights}n` : ""}</span>
                           </button>
                         </td>
                       );
@@ -601,7 +601,7 @@ function CellPanel({ c, rtName, published, floor, t, onClose, onSave, onReset }:
         </div>
 
         <div className="space-y-3 p-5">
-          <div className="overflow-hidden rounded-xl text-white" style={{ background: "var(--focus)" }}>
+          <div className="overflow-hidden rounded-xl text-on-focus" style={{ background: "var(--focus)" }}>
             <div className="flex items-end justify-between px-4 py-3">
               <div><div className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{t("Prezzo Nèttare")}</div><div className="text-[11px] opacity-80">{published != null ? `${t("Applicato ora")}: ${eur(published)}` : t("Non ancora applicato")}</div></div>
               <div className="font-mono text-3xl font-extrabold">{eur(preview.final)}</div>
@@ -642,7 +642,7 @@ function CellPanel({ c, rtName, published, floor, t, onClose, onSave, onReset }:
             </div>
             <div className="flex justify-end gap-2 border-t border-line px-3 py-3">
               <button onClick={onReset} className="rounded-lg border px-4 py-2 text-sm font-semibold" style={{ borderColor: "var(--focus)", color: "var(--focus)" }}>{t("Reset")}</button>
-              <button onClick={() => onSave(draft)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: "var(--focus)" }}>{t("Salva e applica")}</button>
+              <button onClick={() => onSave(draft)} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-focus" style={{ background: "var(--focus)" }}>{t("Salva e applica")}</button>
             </div>
           </div>
         </div>
@@ -695,7 +695,7 @@ function Slider({ label, value, min, max, step, prefix = "", suffix = "", hint, 
   const shown = prefix ? `${prefix}${Math.abs(value)}` : `${value > 0 ? "+" : ""}${value}`;
   return (
     <div>
-      <div className="flex items-end justify-between gap-2"><span className="text-[12px] font-medium text-txt">{label}</span><span className="rounded-md px-1.5 py-0.5 font-mono text-[12px] font-bold text-white" style={{ background: "var(--focus)" }}>{shown}{suffix}</span></div>
+      <div className="flex items-end justify-between gap-2"><span className="text-[12px] font-medium text-txt">{label}</span><span className="rounded-md px-1.5 py-0.5 font-mono text-[12px] font-bold text-on-focus" style={{ background: "var(--focus)" }}>{shown}{suffix}</span></div>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-1.5 w-full" style={{ accentColor: "var(--focus)" }} aria-label={label} />
       {hint && <div className="text-[11px] text-faint">{hint}</div>}
     </div>

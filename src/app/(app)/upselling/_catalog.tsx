@@ -44,7 +44,7 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm max-sm:flex-nowrap">
         <SearchInput value={q} onChange={setQ} placeholder="Cerca extra…" className="w-full sm:w-64 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1" />
-        <button onClick={add} disabled={addDisabled} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white max-sm:h-10 max-sm:shrink-0 max-sm:py-0 shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
+        <button onClick={add} disabled={addDisabled} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus max-sm:h-10 max-sm:shrink-0 max-sm:py-0 shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
       </div>
 
       {unverified > 0 && (
@@ -91,25 +91,25 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
                     <label className="text-[11px] text-dim">Notti minime<input type="number" min={1} value={e.minNights ?? ""} placeholder="nessun minimo" onChange={(ev) => upd(e.id, { minNights: ev.target.value ? Math.max(1, Math.round(Number(ev.target.value))) : undefined })} className={`${inp} mt-0.5`} /></label>
                     <label className="flex items-end gap-1.5 pb-1.5 text-[11px] text-dim"><input type="checkbox" checked={!!e.free} onChange={(ev) => upd(e.id, ev.target.checked ? { free: true, price: 0, confirmed: true } : { free: undefined })} /> Gratuito (prezzo 0 voluto)</label>
                   </div>
-                  <div className="text-[10px] text-faint">Stagione, notti minime e quantità max guidano le <b>proposte</b> di questo modulo; il motore di prenotazione online e il check-in mostrano l&apos;extra finché è attivo.</div>
-                  <div className="flex justify-end gap-2"><button onClick={() => del(e)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-white">Fatto</button></div>
+                  <div className="text-[11px] text-faint">Stagione, notti minime e quantità max guidano le <b>proposte</b> di questo modulo; il motore di prenotazione online e il check-in mostrano l&apos;extra finché è attivo.</div>
+                  <div className="flex justify-end gap-2"><button onClick={() => del(e)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-on-focus">Fatto</button></div>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => upd(e.id, { active: !isActive(e) })} title={isActive(e) ? "Disattiva" : "Attiva"} role="switch" aria-checked={isActive(e)} aria-label={`Attivo: ${e.name}`} className={`relative h-5 w-9 shrink-0 rounded-full transition ${isActive(e) ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all" style={{ left: isActive(e) ? "18px" : "2px" }} /></button>
                   <div className="min-w-0 flex-1 basis-40">
                     <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{e.name}
-                      <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-faint">{KIND_LABEL[kind]}</span>
-                      {hasSeason(e) && <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">{seasonLabel(e)}</span>}
-                      {e.minNights ? <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">min {e.minNights} {e.minNights === 1 ? "notte" : "notti"}</span> : null}
-                      {unv && <span className="rounded bg-[color:color-mix(in_srgb,var(--warn,#b7791f)_18%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold text-[color:var(--warn,#b7791f)]">prezzo di esempio</span>}
-                      {e.free && <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium text-faint">gratuito</span>}
-                      {!(e.price > 0) && !e.free && <span className="rounded bg-[color:color-mix(in_srgb,var(--err)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold text-[color:var(--err)]">prezzo da impostare</span>}
+                      <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-dim">{KIND_LABEL[kind]}</span>
+                      {hasSeason(e) && <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] font-medium text-faint">{seasonLabel(e)}</span>}
+                      {e.minNights ? <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] font-medium text-faint">min {e.minNights} {e.minNights === 1 ? "notte" : "notti"}</span> : null}
+                      {unv && <span className="rounded bg-[color:color-mix(in_srgb,var(--warn,#b7791f)_18%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn,#b7791f)]">prezzo di esempio</span>}
+                      {e.free && <span className="rounded bg-wash px-1.5 py-0.5 text-[10px] font-medium text-faint">gratuito</span>}
+                      {!(e.price > 0) && !e.free && <span className="rounded bg-[color:color-mix(in_srgb,var(--err)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--err)]">prezzo da impostare</span>}
                     </div>
                     {e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}
                     {st && (st.soldQty > 0 || st.offered > 0) && <div className="text-[11px] text-dim">Venduti {st.soldQty} · {eur(st.soldRevenue)}{st.offered > 0 ? ` · proposto ${st.offered} ${st.offered === 1 ? "volta" : "volte"}` : ""}</div>}
                   </div>
-                  <span className="shrink-0 font-mono text-sm font-bold text-txt">{e.free ? "Gratis" : eur(e.price)} <span className="text-[10px] font-normal text-faint">{e.free ? "" : PER_LABEL[e.per]}</span></span>
+                  <span className="shrink-0 font-mono text-sm font-bold text-txt">{e.free ? "Gratis" : eur(e.price)} <span className="text-[11px] font-normal text-faint">{e.free ? "" : PER_LABEL[e.per]}</span></span>
                   {unv && <button onClick={() => upd(e.id, { confirmed: true })} className="shrink-0 rounded border border-line bg-surface px-2 py-1 text-[11px] font-medium text-txt hover:bg-paper">Conferma prezzo</button>}
                   <button onClick={() => setEditId(e.id)} className="shrink-0 text-xs font-medium text-focus hover:underline">Modifica</button>
                 </div>

@@ -44,7 +44,7 @@ export const MODULES: Module[] = [
   { key: "meta", name: "Meta Search", desc: "Connessione ai principali metasearch (Google, Trivago…).", href: "/metasearch" },
   { key: "bi", name: "Statistiche & BI", desc: "Report avanzati e statistiche sui tuoi dati, con esportazione Excel a scelta dei campi: oltre alle colonne di tabella, anche dati dal dettaglio prenotazione come richieste dell'ospite, note, tassa di soggiorno e stato del pagamento.", href: "/statistiche" },
   { key: "site", name: "Xenosite", desc: "Il tuo mini-sito integrato con il motore prenotazioni.", href: "/sito" },
-  { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi; in arrivo i prezzi dinamici locali basati sulla domanda reale della Rete città.", href: "/revenue" },
+  { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi, con il confronto con la media di zona della Rete città.", href: "/revenue" },
   { key: "ratecheck", name: "Rate checker", desc: "Confronto tariffe con i competitor.", href: "/rate-checker" },
   { key: "team", name: "Utenti & permessi", desc: "Multi-utente con permessi granulari, ruoli, turni e limiti operativi.", href: "/utenti" },
   { key: "sharing", name: "Gestione condivisa (soci)", desc: "Co-gestisci una struttura in società: inviti un socio via email e in due gestite calendario, tariffe e prenotazioni; le tue altre strutture restano private. Vista 'Tutte' per l'aggregato.", href: "/strutture" },

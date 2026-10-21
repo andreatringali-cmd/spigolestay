@@ -153,8 +153,8 @@ export default function TariffePage() {
               <span className="font-semibold text-txt">{rt.name}</span>
               <Occ n={occ} />
               {derived
-                ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
-                : <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim">master</span>}
+                ? <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
+                : <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-dim">master</span>}
             </div>
           </div>
         </td>
@@ -173,7 +173,7 @@ export default function TariffePage() {
           <button disabled={inheriting} onClick={() => updateRoomType(rt.id, { salesClosed: !closed })} className="rounded-full px-2 py-0.5 text-[11px] font-semibold disabled:opacity-40 max-sm:min-h-10" style={{ backgroundColor: `color-mix(in srgb, ${closed ? "var(--err)" : "var(--ok)"} 15%, transparent)`, color: closed ? "var(--err)" : "var(--ok)" }}>{closed ? t("Chiuse") : t("Aperte")}</button>
           {inheriting && <span className="ml-1 text-xs text-faint">{t("da madre")}</span>}
         </td>
-        <td className="px-3 py-2.5 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[10px] text-faint">/{t("notte")}</span></td>
+        <td className="px-3 py-2.5 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[11px] text-faint">/{t("notte")}</span></td>
       </tr>
     );
   };
@@ -195,7 +195,7 @@ export default function TariffePage() {
             <span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
             <div>
               <div className="text-sm font-medium text-txt">{rt.name}</div>
-              <div className="text-[10px] text-faint">
+              <div className="text-[11px] text-faint">
                 {effStructure === "all" ? `${structureNameOf(rt.structureId)} · ` : ""}{t("base")} {eur(base)}{derived ? ` · ${t("der.")}` : ""}
               </div>
             </div>
@@ -234,7 +234,7 @@ export default function TariffePage() {
       {/* Come nasce il prezzo — catena essenziale, un colore diverso per passaggio invece di
           quattro pillole grigie identiche: si legge come un percorso, non come un elenco piatto. */}
       <div className="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm max-sm:mb-3 max-sm:gap-x-1 max-sm:gap-y-1 max-sm:px-2.5 max-sm:py-1.5">
-        <span className="mr-1 shrink-0 font-semibold uppercase tracking-wide text-faint max-sm:hidden">{t("Come nasce il prezzo")}</span>
+        <span className="mr-1 shrink-0 font-semibold uppercase tracking-wide text-dim max-sm:hidden">{t("Come nasce il prezzo")}</span>
         {([
           [t("Prezzo base"), "#5B74E6"],
           [t("Regola weekend"), "#C08A3A"],
@@ -267,7 +267,7 @@ export default function TariffePage() {
                     <col style={{ width: "14%" }} />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                    <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                       <th className="px-3 py-2.5 font-semibold">{t("Tipologia")}</th>
                       <th className="px-3 py-2.5 font-semibold">{t("Prezzo base")}</th>
                       <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
@@ -331,7 +331,7 @@ export default function TariffePage() {
         <div className="mb-2.5 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm max-sm:gap-x-3 max-sm:gap-y-1.5 max-sm:px-2.5 max-sm:py-2">
           <span className="flex shrink-0 items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
           <span className="flex shrink-0 items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
-          <span className="flex shrink-0 items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
+          <span className="flex shrink-0 items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
           <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2 max-sm:ml-0 max-sm:w-full max-sm:shrink">
             <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:w-full max-sm:py-1 max-sm:text-[13px]">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
           </div>
@@ -356,15 +356,15 @@ export default function TariffePage() {
                 })()}
               </tr>
               <tr className="border-b border-line">
-                <th className="sticky left-0 z-10 bg-wash px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-faint">{t("Tipologia")}</th>
+                <th className="sticky left-0 z-10 bg-wash px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-dim">{t("Tipologia")}</th>
                 {days.map((d) => {
                   const isToday = toISO(d) === toISO(s);
                   const we = isWeekend(d);
                   const dow = d.getDay(); // 0 = domenica, 6 = sabato
                   return (
                     <th key={toISO(d)} className="border-l border-line px-2 py-2 text-center text-xs font-medium" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
-                      <div className="font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : we ? "var(--dim)" : "var(--faint)" }}>{weekdayShort(d)}</div>
-                      <div className="font-mono font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : "var(--txt)" }}>{d.getDate()}</div>
+                      <div className="font-semibold" style={{ color: dow === 6 ? "var(--warn)" : dow === 0 ? "var(--err)" : we ? "var(--dim)" : "var(--faint)" }}>{weekdayShort(d)}</div>
+                      <div className="font-mono font-semibold" style={{ color: dow === 6 ? "var(--warn)" : dow === 0 ? "var(--err)" : "var(--txt)" }}>{d.getDate()}</div>
                     </th>
                   );
                 })}

@@ -70,7 +70,7 @@ function lastFullSyncTs(sid: string): number | null {
 
 const Badge = ({ children, tone }: { children: React.ReactNode; tone: "real" | "est" | "ok" | "err" | "warn" }) => {
   const color = tone === "real" || tone === "ok" ? "var(--ok)" : tone === "err" ? "var(--err)" : tone === "warn" ? "var(--warn)" : "var(--dim)";
-  return <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ color, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}>{children}</span>;
+  return <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}>{children}</span>;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-txt">
           Correzione prezzo
-          <span title="Rispetto al prezzo Xenora: si somma sopra eventuali promozioni attive sul canale stesso (Genius, offerte a tempo, ecc.) — non le sostituisce." className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span>
+          <span title="Rispetto al prezzo Xenora: si somma sopra eventuali promozioni attive sul canale stesso (Genius, offerte a tempo, ecc.) — non le sostituisce." className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-dim">?</span>
         </span>
         <span className="flex items-center gap-1.5 text-xs text-dim">
           Attuale su Channex <b className="text-txt">{reading ? "…" : readFailed ? "?" : correctionLabel(before)}</b>
@@ -183,7 +183,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
             </select>
             <input type="number" min={0} step="0.01" value={val} onChange={(e) => { dirty.current = true; setVal(e.target.value); setMsg(null); }} placeholder="0" className={`w-20 ${inpCls}`} aria-label="Percentuale" />
             <span className="text-sm text-dim">%</span>
-            <button onClick={() => toPreview()} disabled={step === "saving" || reading || readFailed || !check.ok} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Anteprima →</button>
+            <button onClick={() => toPreview()} disabled={step === "saving" || reading || readFailed || !check.ok} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Anteprima →</button>
           </div>
           {!check.ok && val !== "" && <div className="mt-1.5 text-xs font-semibold" style={{ color: "var(--err)" }}>{check.error}</div>}
           {check.ok && check.warning && <div className="mt-1.5 text-xs font-semibold" style={{ color: "var(--warn)" }}>⚠ {check.warning}</div>}
@@ -234,7 +234,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
               </div>
               <div className="mt-1 overflow-x-auto rounded-lg border border-line">
                 <table className="w-full min-w-[420px] text-[11px]">
-                  <thead><tr className="border-b border-line bg-wash text-left text-[9px] font-bold uppercase tracking-wide text-faint">
+                  <thead><tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-dim">
                     <th className="px-2 py-1.5">Data</th><th className="px-2 py-1.5 text-right">Xenora</th><th className="px-2 py-1.5 text-right">OTA dopo (stima)</th><th className="px-2 py-1.5 text-right">Δ €</th><th className="px-2 py-1.5 text-right">Δ %</th><th className="px-2 py-1.5 text-right">Netto</th>
                   </tr></thead>
                   <tbody>
@@ -251,7 +251,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
                   </tbody>
                 </table>
               </div>
-              <p className="mt-1.5 text-[10px] leading-snug text-faint">Stima calcolata da Xenora: Channex non permette di leggere il prezzo realmente pubblicato sull&apos;OTA, e le promozioni del canale (Genius, offerte a tempo…) si sommano sopra. Il netto usa la commissione impostata per questo canale.</p>
+              <p className="mt-1.5 text-[11px] leading-snug text-faint">Stima calcolata da Xenora: Channex non permette di leggere il prezzo realmente pubblicato sull&apos;OTA, e le promozioni del canale (Genius, offerte a tempo…) si sommano sopra. Il netto usa la commissione impostata per questo canale.</p>
             </>
           )}
 
@@ -261,7 +261,7 @@ export function CorrectionEditor({ sid, c, api, rows, initialDraft, onLogged }: 
           </label>
           <div className="mt-3 flex justify-end gap-2">
             <button onClick={() => setStep("edit")} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">← Modifica</button>
-            <button onClick={() => confirmSend(target)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Conferma e invia a Channex</button>
+            <button onClick={() => confirmSend(target)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Conferma e invia a Channex</button>
           </div>
         </div>
       )}
@@ -396,7 +396,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
                 {channels.map((c) => (
                   <label key={c.id} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm text-txt hover:bg-wash">
                     <input type="checkbox" checked={!!sel[c.id]} onChange={(e) => setSel((s) => ({ ...s, [c.id]: e.target.checked }))} />
-                    {channelLabelOf(c)}{!c.active && <span className="text-[10px] text-faint">(non attivo)</span>}
+                    {channelLabelOf(c)}{!c.active && <span className="text-[11px] text-faint">(non attivo)</span>}
                   </label>
                 ))}
               </div>
@@ -406,7 +406,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
                 </select>
                 <input type="number" min={0} step="0.01" value={val} onChange={(e) => setVal(e.target.value)} placeholder="0" className="w-20 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                 <span className="text-sm text-dim">%</span>
-                <button onClick={goPreview} disabled={!check.ok || picked.length === 0} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Anteprima →</button>
+                <button onClick={goPreview} disabled={!check.ok || picked.length === 0} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Anteprima →</button>
               </div>
               {!check.ok && val !== "" && <div className="mt-1.5 text-xs font-semibold" style={{ color: "var(--err)" }}>{check.error}</div>}
               {check.ok && check.warning && <div className="mt-1.5 text-xs font-semibold" style={{ color: "var(--warn)" }}>⚠ {check.warning}</div>}
@@ -418,7 +418,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
               <div className="text-sm text-txt">Nuova correzione: <b>{correctionLabel(target)}</b> su {picked.length} canali <Badge tone="est">stima</Badge></div>
               <div className="mt-2 overflow-x-auto rounded-lg border border-line">
                 <table className="w-full min-w-[520px] text-xs">
-                  <thead><tr className="border-b border-line bg-wash text-left text-[9px] font-bold uppercase tracking-wide text-faint">
+                  <thead><tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-dim">
                     <th className="px-2 py-1.5">Canale</th><th className="px-2 py-1.5">Attuale</th><th className="px-2 py-1.5">Nuova</th><th className="px-2 py-1.5 text-right">OTA medio (14 gg)</th><th className="px-2 py-1.5 text-right">Netto medio</th><th className="px-2 py-1.5">Esito</th>
                   </tr></thead>
                   <tbody>
@@ -452,7 +452,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
                   <label className="mt-2 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={resend} onChange={(e) => setResend(e.target.checked)} className="mt-0.5" /><span>Al termine reinvia a Channex tutti i prezzi di questa struttura (consigliato).</span></label>
                   <div className="mt-3 flex justify-end gap-2">
                     <button onClick={() => setStep("edit")} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">← Modifica</button>
-                    <button onClick={start} disabled={picked.some((c) => api.current[c.id]?.loading)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Conferma e invia a {picked.length} canali</button>
+                    <button onClick={start} disabled={picked.some((c) => api.current[c.id]?.loading)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus shadow-sm hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>Conferma e invia a {picked.length} canali</button>
                   </div>
                 </>
               )}
@@ -514,7 +514,7 @@ export function ParityPanel({ sid, channels, api, rows, onSuggest }: {
 
       <div className="mt-3 overflow-x-auto rounded-lg border border-line">
         <table className="w-full min-w-[620px] text-xs">
-          <thead><tr className="border-b border-line bg-wash text-left text-[9px] font-bold uppercase tracking-wide text-faint">
+          <thead><tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-dim">
             <th className="px-2 py-1.5">Canale</th><th className="px-2 py-1.5">Correzione</th><th className="px-2 py-1.5 text-right">Xenora medio</th><th className="px-2 py-1.5 text-right">OTA medio</th><th className="px-2 py-1.5 text-right">Comm.</th><th className="px-2 py-1.5 text-right">Netto medio</th><th className="px-2 py-1.5 text-right">Netto vs diretto</th><th className="px-2 py-1.5"></th>
           </tr></thead>
           <tbody>
@@ -527,7 +527,7 @@ export function ParityPanel({ sid, channels, api, rows, onSuggest }: {
               const readable = !!cs?.loaded;
               return (
                 <tr key={c.id} className="border-b border-line last:border-0" style={alertIds.has(c.id) ? { backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)" } : undefined}>
-                  <td className="px-2 py-1.5 font-semibold text-txt">{channelLabelOf(c)}{!c.active && <span className="ml-1 text-[10px] font-normal text-faint">(non attivo)</span>}</td>
+                  <td className="px-2 py-1.5 font-semibold text-txt">{channelLabelOf(c)}{!c.active && <span className="ml-1 text-[11px] font-normal text-faint">(non attivo)</span>}</td>
                   <td className="px-2 py-1.5 text-dim">{readable ? correctionLabel(corr) : "?"}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-dim">{rows.length ? eur(s.avgXenora) : "—"}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-txt">{rows.length && readable ? eur(s.avgOta) : "—"}</td>
@@ -542,7 +542,7 @@ export function ParityPanel({ sid, channels, api, rows, onSuggest }: {
         </table>
       </div>
       {rows.length === 0 && <p className="mt-2 text-xs text-faint">Nessun prezzo Xenora per questa struttura: imposta le tariffe delle tipologie per vedere il confronto in euro.</p>}
-      <p className="mt-2 text-[10px] leading-snug text-faint">«Netto vs diretto» = quanto incassi in più/meno per notte vendendo dal canale rispetto a venderla direttamente al prezzo Xenora. Il prezzo OTA è una stima (prezzo Xenora × correzione), non il prezzo letto dall&apos;OTA.</p>
+      <p className="mt-2 text-[11px] leading-snug text-faint">«Netto vs diretto» = quanto incassi in più/meno per notte vendendo dal canale rispetto a venderla direttamente al prezzo Xenora. Il prezzo OTA è una stima (prezzo Xenora × correzione), non il prezzo letto dall&apos;OTA.</p>
     </div>
   );
 }

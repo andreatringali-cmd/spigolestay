@@ -226,7 +226,7 @@ export default function AdminPage() {
   }, [allPay.invoices, payF, q]);
 
   const toneStyle = (tone: Alert["tone"]) => tone === "red"
-    ? { backgroundColor: "color-mix(in srgb, var(--bad,#dc2626) 14%, transparent)", color: "var(--bad,#dc2626)" }
+    ? { backgroundColor: "color-mix(in srgb, var(--err) 14%, transparent)", color: "var(--err)" }
     : tone === "amber" ? { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }
     : { backgroundColor: "var(--wash)", color: "var(--dim)" };
 
@@ -259,9 +259,9 @@ export default function AdminPage() {
   const filtersInner = (
     <>
       <div className="inline-flex rounded-lg border border-line p-0.5">
-        <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
-        <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
-        <button onClick={() => setView("pagamenti")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "pagamenti" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Pagamenti</button>
+        <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>Panoramica</button>
+        <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>Account paganti</button>
+        <button onClick={() => setView("pagamenti")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "pagamenti" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>Pagamenti</button>
       </div>
       {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
       {view === "accounts" && (
@@ -302,7 +302,7 @@ export default function AdminPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Abbonati paganti" value={stripeOn ? kpi.paganti : "—"} color="var(--ok)" hint="Account con abbonamento" />
         <StatCard label="In prova" value={stripeOn ? kpi.trialing : "—"} color="var(--warn)" hint="trial in corso" />
-        <StatCard label="Da recuperare" value={stripeOn ? kpi.recupero : "—"} color={kpi.recupero > 0 ? "var(--bad,#dc2626)" : undefined} hint="scaduti o in scadenza 7g" />
+        <StatCard label="Da recuperare" value={stripeOn ? kpi.recupero : "—"} color={kpi.recupero > 0 ? "var(--err)" : undefined} hint="scaduti o in scadenza 7g" />
         <StatCard label="MRR stimato" value={stripeOn ? `€ ${kpi.mrr.toFixed(0)}` : "—"} hint="ricavo mensile ricorrente" />
         <StatCard label="Iscritti totali" value={kpi.total} hint="account registrati" />
       </div>
@@ -317,7 +317,7 @@ export default function AdminPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard label="Incasso totale finora" value={stripeOn ? `€ ${dash.lifetime.toFixed(0)}` : "—"} color="var(--ok)" hint="fatture pagate (ultime 500)" />
-            <StatCard label="Da incassare" value={stripeOn ? `€ ${dash.dueTotal.toFixed(0)}` : "—"} color={dash.dueTotal > 0 ? "var(--bad,#dc2626)" : undefined} hint="fatture aperte" />
+            <StatCard label="Da incassare" value={stripeOn ? `€ ${dash.dueTotal.toFixed(0)}` : "—"} color={dash.dueTotal > 0 ? "var(--err)" : undefined} hint="fatture aperte" />
             <StatCard label="ARPU" value={stripeOn ? `€ ${dash.arpu.toFixed(0)}` : "—"} hint="ricavo medio per abbonato" />
           </div>
 
@@ -343,7 +343,7 @@ export default function AdminPage() {
                   <div key={m.key} className="flex flex-1 flex-col items-center justify-end gap-1">
                     <div className="text-[11px] font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{m.count || ""}</div>
                     <div className="w-full rounded-t-md" style={{ height: `${Math.max(4, (m.count / dash.maxMonth) * 100)}%`, backgroundColor: "var(--focus)", minHeight: 4 }} />
-                    <div className="text-[10px] uppercase text-faint">{m.label}</div>
+                    <div className="text-[11px] uppercase text-dim">{m.label}</div>
                   </div>
                 ))}
               </div>
@@ -386,16 +386,16 @@ export default function AdminPage() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <StatCard label="Incassato (ultime 500 fatture)" value={stripeOn ? `€ ${filteredPay.incassato.toFixed(0)}` : "—"} color="var(--ok)" hint="fatture pagate" />
-            <StatCard label="Da recuperare" value={stripeOn ? `€ ${filteredPay.daRecuperare.toFixed(0)}` : "—"} color={filteredPay.daRecuperare > 0 ? "var(--bad,#dc2626)" : undefined} hint="fatture aperte / non pagate" onClick={() => setPayF("due")} />
+            <StatCard label="Da recuperare" value={stripeOn ? `€ ${filteredPay.daRecuperare.toFixed(0)}` : "—"} color={filteredPay.daRecuperare > 0 ? "var(--err)" : undefined} hint="fatture aperte / non pagate" onClick={() => setPayF("due")} />
           </div>
           <Card className="overflow-x-auto p-0">
             {allPay.loading ? (
               <div className="py-10 text-center text-sm text-faint">Carico i pagamenti…</div>
             ) : filteredPay.inv.length === 0 ? (
-              <div className="py-10 text-center text-sm text-faint">{allPay.error ? `Errore: ${allPay.error}` : "Nessuna fattura."}</div>
+              <div className="py-10 text-center text-sm text-dim">{allPay.error ? `Errore: ${allPay.error}` : "Nessuna fattura."}</div>
             ) : (
               <table className="w-full min-w-[840px] text-sm">
-                <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+                <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
                   <th className="px-3 py-2 font-semibold">Data</th>
                   <th className="px-3 py-2 font-semibold">Cliente</th>
                   <th className="px-3 py-2 font-semibold">Descrizione</th>
@@ -424,7 +424,7 @@ export default function AdminPage() {
         <Card className="overflow-x-auto p-0">
           {accLoading && pagedAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Carico gli account…</div> : pagedAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
             <table className="w-full min-w-[1000px] text-sm">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim">
                 <th className="px-3 py-2 font-semibold">Titolare / collaboratore</th>
                 <th className="px-3 py-2 font-semibold">Piano</th>
                 <th className="px-3 py-2 font-semibold">Ruolo</th>
@@ -446,7 +446,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-2">
                             <span className="shrink-0 text-faint">›</span>
                             <div className="min-w-0">
-                              <div className="truncate font-semibold text-txt">{r.name || r.email || "—"}{acc.members.length > 0 && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-medium text-dim">👥 {acc.members.length}</span>}</div>
+                              <div className="truncate font-semibold text-txt">{r.name || r.email || "—"}{acc.members.length > 0 && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-medium text-dim">👥 {acc.members.length}</span>}</div>
                               <div className="truncate text-[12px] text-dim">{r.email}{r.phone ? ` · ${r.phone}` : ""}</div>
                             </div>
                           </div>
@@ -457,7 +457,7 @@ export default function AdminPage() {
                         <td className="px-3 py-2.5 whitespace-nowrap text-right text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{r.rooms || "—"}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           {r.subStatus ? <span className="text-dim">{r.subStatus}</span> : <span className="text-faint">—</span>}
-                          {topAlert && <span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={toneStyle(topAlert.tone)}>{topAlert.label}</span>}
+                          {topAlert && <span className="ml-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium" style={toneStyle(topAlert.tone)}>{topAlert.label}</span>}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.periodEnd)}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-right text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{r.monthlyAmount != null ? `${eur(r.monthlyAmount, r.currency || "EUR")}` : "—"}</td>

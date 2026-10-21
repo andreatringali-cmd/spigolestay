@@ -99,7 +99,7 @@ export default function MfaSetup() {
           <p className="mb-1 text-xs text-dim">2. Inserisci il codice a 6 cifre che vedi nell&apos;app:</p>
           <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" className={`${inp} text-center tracking-widest`} />
           <div className="mt-2 flex items-center gap-2">
-            <button onClick={confirm} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy ? "Verifico…" : "Attiva"}</button>
+            <button onClick={confirm} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy ? "Verifico…" : "Attiva"}</button>
             <button onClick={() => { setStatus("off"); setQr(""); setSecret(""); setCode(""); }} className="text-xs font-medium text-dim hover:underline">Annulla</button>
           </div>
         </div>

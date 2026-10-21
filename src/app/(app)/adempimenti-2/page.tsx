@@ -166,7 +166,7 @@ export default function Adempimenti2() {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <div className="min-w-0">
-          <h1 className="font-display text-xl font-bold leading-tight tracking-tight text-txt">Adempimenti <span className="ml-1 align-middle rounded-full bg-wash px-1.5 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-dim">v2</span></h1>
+          <h1 className="font-display text-xl font-bold leading-tight tracking-tight text-txt">Adempimenti <span className="ml-1 align-middle rounded-full bg-wash px-1.5 py-0.5 font-sans text-[11px] font-semibold uppercase tracking-wide text-dim">v2</span></h1>
           <p className="truncate text-xs text-dim">{dateLabel}{scopeLabel ? ` · ${scopeLabel}` : ""}</p>
         </div>
         <div className="flex items-center gap-1">

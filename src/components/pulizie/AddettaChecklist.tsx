@@ -18,7 +18,7 @@ import { Card, Field, Seg, Sheet, btnGhost, btnPrimary, hhmm, inputCls, newId, s
 const STATE_CHIP: Record<TaskState["state"], { label: string; color: string }> = {
   done: { label: "Fatta", color: "var(--ok)" },
   urgent: { label: "Da fare oggi", color: "var(--err)" },
-  todo: { label: "Da fare", color: "#CA8A04" },
+  todo: { label: "Da fare", color: "var(--warn)" },
   later: { label: "", color: "var(--faint)" },
 };
 
@@ -91,12 +91,12 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
         className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left transition active:bg-wash ${s.state === "done" && !ticked ? "opacity-70" : ""}`}
         aria-pressed={ticked}
       >
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 font-bold leading-none ${full ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-lg text-white" : partial ? "border-[color:#CA8A04] bg-[color:color-mix(in_srgb,#CA8A04_12%,transparent)] text-[11px] text-[color:#CA8A04]" : "border-line text-lg text-transparent"}`}>{partial ? `${s.done}/${s.required}` : "✓"}</span>
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 font-bold leading-none ${full ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-lg text-on-ok" : partial ? "border-[color:var(--warn)] bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)] text-[11px] text-[color:var(--warn)]" : "border-line text-lg text-transparent"}`}>{partial ? `${s.done}/${s.required}` : "✓"}</span>
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-sm font-semibold ${s.state === "done" ? "text-dim" : "text-txt"}`}>{task.scope === "room" ? target.label : task.name}</span>
           <span className="block truncate text-[11px] text-dim">{sub(s)}</span>
         </span>
-        {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{isCurrent && s.overdue ? "In ritardo" : chip.label}</span>}
+        {chip.label && <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ color: chip.color, background: `color-mix(in srgb, ${chip.color} 14%, transparent)` }}>{isCurrent && s.overdue ? "In ritardo" : chip.label}</span>}
       </button>
       {isManager && <button onClick={() => setEditing(task)} aria-label={`Modifica la voce «${task.name}»`} title="Modifica la voce" className="grid w-11 shrink-0 place-items-center text-dim hover:bg-wash hover:text-txt"><Icon name="settings" size={15} /></button>}
       </div>
@@ -141,8 +141,8 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button type="button" onClick={() => setOnlyTodo((v) => !v)} aria-pressed={onlyTodo} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${onlyTodo ? "border-transparent bg-focus text-white" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>Solo da fare</button>
-  {isManager && <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="flex h-9 items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>}
+            <button type="button" onClick={() => setOnlyTodo((v) => !v)} aria-pressed={onlyTodo} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${onlyTodo ? "border-transparent bg-focus text-on-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>Solo da fare</button>
+  {isManager && <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="flex h-9 items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-on-focus hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>}
           </div>
         </div>
       </Card>
@@ -152,7 +152,7 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
 
       {groups.map(({ s, common, rooms }) => (
         <div key={s.id} className="flex flex-col gap-3">
-          {structures.length > 1 && <div className="px-1 text-[11px] font-bold uppercase tracking-wide text-faint">{s.name}</div>}
+          {structures.length > 1 && <div className="px-1 text-[11px] font-bold uppercase tracking-wide text-dim">{s.name}</div>}
           {common.length > 0 && (
             <Card className="overflow-hidden">
               <div className="flex items-center gap-1.5 border-b border-line bg-wash px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><Icon name="building" size={13} /> Zone comuni</div>
@@ -216,7 +216,7 @@ function TaskEditor({ task, structures, units, onChange, onClose, onSave, onDele
           <div className="flex flex-wrap gap-1.5">
             {roomsOfStruct.map((u) => {
               const on = picked.has(u.id);
-              return <button key={u.id} type="button" onClick={() => { const next = new Set(picked); if (on) next.delete(u.id); else next.add(u.id); onChange({ ...task, unitIds: [...next] }); }} className={`min-h-[36px] rounded-lg border px-3 text-xs font-semibold ${on ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>{u.name}</button>;
+              return <button key={u.id} type="button" onClick={() => { const next = new Set(picked); if (on) next.delete(u.id); else next.add(u.id); onChange({ ...task, unitIds: [...next] }); }} className={`min-h-[36px] rounded-lg border px-3 text-xs font-semibold ${on ? "border-focus bg-focus text-on-focus" : "border-line text-dim hover:bg-wash"}`}>{u.name}</button>;
             })}
           </div>
         </Field>
@@ -234,7 +234,7 @@ function TaskEditor({ task, structures, units, onChange, onClose, onSave, onDele
         <div className="mt-2 grid grid-cols-7 gap-1">
           {WEEKDAY_SHORT.map((d, i) => {
             const on = freq.days.includes(i + 1);
-            return <button key={d} type="button" onClick={() => toggleDay(i + 1)} className={`min-h-[44px] rounded-lg border text-xs font-semibold ${on ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>{d}</button>;
+            return <button key={d} type="button" onClick={() => toggleDay(i + 1)} className={`min-h-[44px] rounded-lg border text-xs font-semibold ${on ? "border-focus bg-focus text-on-focus" : "border-line text-dim hover:bg-wash"}`}>{d}</button>;
           })}
         </div>
       )}

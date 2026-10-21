@@ -53,7 +53,7 @@ const toDraft = (e: Row): Draft => ({
 
 const Badge = ({ children, tone }: { children: React.ReactNode; tone?: "auto" | "level" }) => (
   <span
-    className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+    className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
     style={tone === "auto"
       ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }
       : { backgroundColor: "var(--wash)", color: "var(--dim)" }}
@@ -93,23 +93,23 @@ function EntryForm({ draft, setDraft, onSave, onCancel, saving, isNew, structure
     <div className="space-y-2 rounded-lg border border-focus bg-paper p-3">
       {isNew && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <label className="text-[11px] font-semibold text-faint">Livello
+          <label className="text-[11px] font-semibold text-dim">Livello
             <select value={draft.level} onChange={(e) => upd({ level: e.target.value as Draft["level"] })} className={`${inputCls} mt-0.5`}>
               <option value="property">Struttura: {structureName}</option>
               <option value="shared">Condiviso</option>
             </select>
           </label>
-          <label className="text-[11px] font-semibold text-faint">Categoria
+          <label className="text-[11px] font-semibold text-dim">Categoria
             <select value={draft.category} onChange={(e) => upd({ category: e.target.value })} className={`${inputCls} mt-0.5`}>
               {CATEGORY_ORDER.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
             </select>
           </label>
-          <label className="text-[11px] font-semibold text-faint">Lingua
+          <label className="text-[11px] font-semibold text-dim">Lingua
             <select value={draft.lang} onChange={(e) => upd({ lang: e.target.value as ConciergeLang })} className={`${inputCls} mt-0.5`}>
               <option value="it">Italiano</option><option value="en">English</option>
             </select>
           </label>
-          <label className="text-[11px] font-semibold text-faint">Tipo
+          <label className="text-[11px] font-semibold text-dim">Tipo
             <select
               value={draft.field_type}
               onChange={(e) => {
@@ -124,17 +124,17 @@ function EntryForm({ draft, setDraft, onSave, onCancel, saving, isNew, structure
         </div>
       )}
       {isAuto && (
-        <label className="block text-[11px] font-semibold text-faint">Sorgente automatica
+        <label className="block text-[11px] font-semibold text-dim">Sorgente automatica
           <select value={draft.auto_source ?? ""} onChange={(e) => upd({ auto_source: (e.target.value || null) as AutoSource | null })} className={`${inputCls} mt-0.5`}>
             <option value="">Scegli…</option>
             {AUTO_SOURCES.map((s) => <option key={s} value={s}>{AUTO_LABEL[s]}</option>)}
           </select>
         </label>
       )}
-      <label className="block text-[11px] font-semibold text-faint">Titolo
+      <label className="block text-[11px] font-semibold text-dim">Titolo
         <input value={draft.title} onChange={(e) => upd({ title: e.target.value })} className={`${inputCls} mt-0.5 font-semibold`} />
       </label>
-      <label className="block text-[11px] font-semibold text-faint">Testo
+      <label className="block text-[11px] font-semibold text-dim">Testo
         <textarea value={draft.body} onChange={(e) => upd({ body: e.target.value })} rows={4} className={`${inputCls} mt-0.5 resize-y`} />
       </label>
       {isAuto && (
@@ -145,23 +145,23 @@ function EntryForm({ draft, setDraft, onSave, onCancel, saving, isNew, structure
         </p>
       )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="text-[11px] font-semibold text-faint">Telefono (con prefisso, es. +39…)
+        <label className="text-[11px] font-semibold text-dim">Telefono (con prefisso, es. +39…)
           <input value={draft.phone} onChange={(e) => upd({ phone: e.target.value })} className={`${inputCls} mt-0.5`} />
         </label>
-        <label className="text-[11px] font-semibold text-faint">Ordine
+        <label className="text-[11px] font-semibold text-dim">Ordine
           <input type="number" value={draft.sort_order} onChange={(e) => upd({ sort_order: e.target.value })} className={`${inputCls} mt-0.5`} />
         </label>
-        <label className="text-[11px] font-semibold text-faint">Indirizzo (per la mappa)
+        <label className="text-[11px] font-semibold text-dim">Indirizzo (per la mappa)
           <input value={draft.address} onChange={(e) => upd({ address: e.target.value })} className={`${inputCls} mt-0.5`} />
         </label>
-        <label className="text-[11px] font-semibold text-faint">Link mappa (override facoltativo)
+        <label className="text-[11px] font-semibold text-dim">Link mappa (override facoltativo)
           <input value={draft.map_url} onChange={(e) => upd({ map_url: e.target.value })} placeholder="https://…" className={`${inputCls} mt-0.5`} />
         </label>
       </div>
       <p className="text-[11px] text-faint">Link mappa: lascia vuoto, la mappa si genera dall&apos;indirizzo.</p>
       <div className="flex justify-end gap-2">
         <button onClick={onCancel} disabled={saving} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash disabled:opacity-50">Annulla</button>
-        <button onClick={onSave} disabled={saving || invalid} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : isNew ? "Crea voce" : "Salva"}</button>
+        <button onClick={onSave} disabled={saving || invalid} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : isNew ? "Crea voce" : "Salva"}</button>
       </div>
     </div>
   );
@@ -288,7 +288,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
       {list.length === 0 && <p className="text-xs text-faint">{empty}</p>}
       {group(list).map((g) => (
         <div key={g.cat} className="space-y-1.5">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{catLabel(g.cat)}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{catLabel(g.cat)}</div>
           {g.items.map(renderRow)}
         </div>
       ))}
@@ -341,7 +341,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
           <div className="mb-3 flex items-center gap-2">
             <div className="flex items-center gap-0.5 rounded-lg border border-line p-0.5">
               {(["it", "en"] as ConciergeLang[]).map((l) => (
-                <button key={l} onClick={() => { setLang(l); setDraft(null); }} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${lang === l ? "bg-wash text-txt" : "text-faint hover:text-dim"}`}>{l.toUpperCase()}</button>
+                <button key={l} onClick={() => { setLang(l); setDraft(null); }} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${lang === l ? "bg-wash text-txt" : "text-dim hover:text-dim"}`}>{l.toUpperCase()}</button>
               ))}
             </div>
             <button onClick={() => setDraft(emptyDraft(lang))} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ Nuova voce</button>
@@ -369,7 +369,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
             {preview.map(({ e, r }, i) => (
               <div key={(e.id ?? "") + i} className="rounded-lg border border-line bg-paper p-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{catLabel(e.category)}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">{catLabel(e.category)}</span>
                   <Badge tone="level">{e.level === "property" ? "Struttura" : "Condiviso"}</Badge>
                   {r.auto && <Badge tone="auto">Automatico</Badge>}
                 </div>
@@ -384,13 +384,13 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
         <Card>
           <SectionTitle>Prova il Concierge</SectionTitle>
           <p className="mb-2 text-[11px] text-faint">La domanda passa dal Concierge vero (stessa logica di WhatsApp): vedi cosa risponderebbe.</p>
-          <label className="block text-[11px] font-semibold text-faint">Prenotazione (facoltativa)
+          <label className="block text-[11px] font-semibold text-dim">Prenotazione (facoltativa)
             <select value={bookingId} onChange={(e) => setBookingId(e.target.value)} className={`${inputCls} mt-0.5`}>
               <option value="">Nessuna prenotazione</option>
               {bookingOptions.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
             </select>
           </label>
-          <label className="mt-2 block text-[11px] font-semibold text-faint">Lingua dell&apos;ospite
+          <label className="mt-2 block text-[11px] font-semibold text-dim">Lingua dell&apos;ospite
             <select value={testLang} onChange={(e) => setTestLang(e.target.value as "" | GuestLang)} className={`${inputCls} mt-0.5`}>
               <option value="">Automatica (dalla prenotazione o dal testo)</option>
               {(["it", "en", "de", "fr", "es"] as GuestLang[]).map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
@@ -398,17 +398,17 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
           </label>
           <div className="mt-2 flex gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="Scrivi la domanda dell'ospite…" className={`${inputCls} flex-1`} />
-            <button onClick={submit} disabled={asking || !q.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Invia</button>
+            <button onClick={submit} disabled={asking || !q.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Invia</button>
           </div>
           <div className="mt-3 space-y-2 rounded-xl border border-line bg-wash p-3" style={{ minHeight: 120 }}>
             {!asking && !res && !askErr && <p className="text-xs text-faint">Nessuna prova ancora.</p>}
             {res && (
               <>
-                <div className="flex justify-end"><div className="max-w-[85%] rounded-2xl bg-focus px-3 py-2 text-sm text-white">{res.question}</div></div>
+                <div className="flex justify-end"><div className="max-w-[85%] rounded-2xl bg-focus px-3 py-2 text-sm text-on-focus">{res.question}</div></div>
                 {res.answered ? (
                   <div className="flex justify-start"><div className="max-w-[85%] whitespace-pre-line rounded-2xl border border-line bg-surface px-3 py-2 text-sm text-txt">
                     {res.reply}
-                    {(res.topic || res.lang) && <div className="mt-1 text-[10px] text-faint">{res.topic ? `Argomento: ${res.topic}` : ""}{res.topic && res.lang ? " · " : ""}{res.lang ? `Lingua: ${res.lang.toUpperCase()}` : ""}</div>}
+                    {(res.topic || res.lang) && <div className="mt-1 text-[11px] text-faint">{res.topic ? `Argomento: ${res.topic}` : ""}{res.topic && res.lang ? " · " : ""}{res.lang ? `Lingua: ${res.lang.toUpperCase()}` : ""}</div>}
                   </div></div>
                 ) : (
                   <div className="rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>

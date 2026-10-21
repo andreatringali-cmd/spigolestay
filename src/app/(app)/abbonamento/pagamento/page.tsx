@@ -144,10 +144,10 @@ export default function PagamentoPage() {
             </div>
           </div>
           {customer
-            ? <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : t("Gestisci carta su Stripe")}</button>
-            : <Link href="/abbonamento" className="mt-3 block w-full rounded-lg bg-focus py-2 text-center text-sm font-semibold text-white transition hover:opacity-90">{t("Scegli un piano")} →</Link>}
+            ? <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : t("Gestisci carta su Stripe")}</button>
+            : <Link href="/abbonamento" className="mt-3 block w-full rounded-lg bg-focus py-2 text-center text-sm font-semibold text-on-focus transition hover:opacity-90">{t("Scegli un piano")} →</Link>}
           <div className="mt-3 border-t border-line pt-3">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Metodi accettati")}</div>
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Metodi accettati")}</div>
             <div className="flex flex-wrap gap-1.5">
               {[t("Carta"), "Apple Pay", "Google Pay", t("Addebito SEPA")].map((m) => (
                 <span key={m} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-dim">{m}</span>
@@ -157,7 +157,7 @@ export default function PagamentoPage() {
           </div>
           {notice && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--dim)" }}>{notice}</div>}
           <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
-            <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
+            <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-on-focus" style={{ backgroundColor: "var(--focus)" }}>i</span>
             <span>{t("In produzione il pagamento è gestito in modo sicuro da Stripe: i dati della carta non passano né vengono salvati dall'app.")}</span>
           </div>
         </Card>
@@ -179,7 +179,7 @@ export default function PagamentoPage() {
             <label className={lbl}>{t("Email per le fatture")}<input value={b.email} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="nome@email.it" /></label>
             {srvErr && <p className="col-span-2 text-xs font-medium text-[color:var(--err)]">{srvErr}</p>}
             <div className="flex items-end">
-              <button onClick={save} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
+              <button onClick={save} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
             </div>
           </div>
         </Card>

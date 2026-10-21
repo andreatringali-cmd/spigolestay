@@ -116,7 +116,7 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
           {avail.length === 0 && <div className="rounded-lg border border-dashed border-line py-4 text-center text-xs text-faint">Nessun extra proponibile a questa prenotazione.</div>}
           {avail.length > 0 && (
             <>
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Proposte (seleziona cosa inviare)</div>
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">Proposte (seleziona cosa inviare)</div>
               <div className="space-y-1.5">
                 {avail.map((p) => {
                   const on = picked.has(p.extra.id);
@@ -126,9 +126,9 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
                   return (
                     <div key={p.extra.id} className={`rounded-lg border p-2 transition ${on ? "border-focus bg-surface" : "border-line bg-surface/60"}`}>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setPicked((s) => { const nx = new Set(s); if (nx.has(p.extra.id)) nx.delete(p.extra.id); else nx.add(p.extra.id); return nx; })} aria-pressed={on} aria-label={`Includi: ${p.extra.name}`} className={`grid h-5 w-5 shrink-0 place-items-center rounded border text-[11px] font-bold ${on ? "border-focus bg-focus text-white" : "border-line text-transparent"}`}>✓</button>
+                        <button onClick={() => setPicked((s) => { const nx = new Set(s); if (nx.has(p.extra.id)) nx.delete(p.extra.id); else nx.add(p.extra.id); return nx; })} aria-pressed={on} aria-label={`Includi: ${p.extra.name}`} className={`grid h-5 w-5 shrink-0 place-items-center rounded border text-[11px] font-bold ${on ? "border-focus bg-focus text-on-focus" : "border-line text-transparent"}`}>✓</button>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{p.extra.name}<span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-faint">{KIND_LABEL[p.kind]}</span></div>
+                          <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{p.extra.name}<span className="rounded bg-wash px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-dim">{KIND_LABEL[p.kind]}</span></div>
                           <div className={`text-[11px] ${p.status === "warn" ? "text-[color:var(--warn,#b7791f)]" : "text-faint"}`}>{p.status === "warn" ? "⚠ " : ""}{p.reason}</div>
                           <div className="text-[11px] text-dim">{detail}</div>
                         </div>
@@ -148,17 +148,17 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
 
               {items.length > 0 && (
                 <div className="mt-3">
-                  <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-faint">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-dim">
                     <span>Messaggio ({guestLang(g).toUpperCase()}) · totale {eur(total)}</span>
                     {draft !== null && <button onClick={() => setDraft(null)} className="font-medium normal-case text-focus hover:underline">Ripristina testo automatico</button>}
                   </div>
                   <textarea value={msg} onChange={(e) => setDraft(e.target.value)} rows={8} className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs leading-relaxed text-txt outline-none focus:border-focus" />
-                  <div className="mt-0.5 text-[10px] text-faint">Il link porta l&apos;ospite al suo check-in online, dove può aggiungere lui stesso gli extra (compaiono nella prenotazione e in questo registro).</div>
+                  <div className="mt-0.5 text-[11px] text-faint">Il link porta l&apos;ospite al suo check-in online, dove può aggiungere lui stesso gli extra (compaiono nella prenotazione e in questo registro).</div>
                 </div>
               )}
 
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                <button onClick={sendWa} disabled={!items.length || !g?.phone || busy} title={!g?.phone ? "Nessun numero per questo ospite" : undefined} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={14} /> WhatsApp</button>
+                <button onClick={sendWa} disabled={!items.length || !g?.phone || busy} title={!g?.phone ? "Nessun numero per questo ospite" : undefined} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={14} /> WhatsApp</button>
                 <button onClick={sendEmail} disabled={!items.length || !g?.email || busy} title={!g?.email ? "Nessuna email per questo ospite" : undefined} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-txt transition hover:bg-paper disabled:opacity-40"><Icon name="mail" size={14} /> {busy ? "Invio…" : "Email"}</button>
                 <button onClick={sendCopy} disabled={!items.length || busy} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-txt transition hover:bg-paper disabled:opacity-40"><Icon name="copy" size={14} /> Copia testo</button>
                 <button onClick={sellDirect} disabled={!items.length || busy} title="L'ospite ha già accettato (di persona, al telefono, in chat): aggiungili subito alla prenotazione" className="ml-auto flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-txt transition hover:bg-paper disabled:opacity-40"><Icon name="plus" size={14} /> Ospite ha accettato: aggiungi</button>
@@ -201,8 +201,8 @@ function CandidateCard({ c, today, open, onToggle }: { c: Candidate; today: stri
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-txt">{g?.fullName || "Ospite"}</span>
-            {ch && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, var(${ch.cssVar}) 16%, transparent)`, color: `var(${ch.cssVar})` }}>{ch.label}</span>}
-            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ph.inHouse ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "bg-wash text-dim"}`}>{ph.text}</span>
+            {ch && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, var(${ch.cssVar}) 16%, transparent)`, color: `var(${ch.cssVar})` }}>{ch.label}</span>}
+            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${ph.inHouse ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "bg-wash text-dim"}`}>{ph.text}</span>
           </div>
           <div className="mt-0.5 truncate text-[11px] text-faint">{[st?.name, roomLabel].filter(Boolean).join(" · ")}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-dim">
@@ -213,7 +213,7 @@ function CandidateCard({ c, today, open, onToggle }: { c: Candidate; today: stri
         </div>
         <div className="shrink-0 text-right">
           {avail.length > 0
-            ? (<><div className="font-mono text-sm font-bold text-[color:var(--ok)]">+{eur(pot)}</div><div className="text-[10px] text-faint">{avail.length} {avail.length === 1 ? "proposta" : "proposte"}</div></>)
+            ? (<><div className="font-mono text-sm font-bold text-[color:var(--ok)]">+{eur(pot)}</div><div className="text-[11px] text-faint">{avail.length} {avail.length === 1 ? "proposta" : "proposte"}</div></>)
             : <div className="text-[11px] text-faint">Nessuna proposta</div>}
         </div>
         <span className={`shrink-0 text-faint transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>▸</span>
@@ -250,7 +250,7 @@ export default function ProposalsTab({ candidates, today, windowDays, setWindowD
             <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
               <span className="text-xs text-dim">Arrivi nei prossimi {windowDays} giorni</span>
               <FilterSheet count={(windowDays !== 14 ? 1 : 0) + (showEmpty ? 1 : 0)} onReset={() => { setWindowDays(14); setShowEmpty(false); }}>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Arrivi nei prossimi</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">Arrivi nei prossimi</div>
                 <div className="flex flex-wrap gap-2">{windowChips}</div>
                 {emptyToggle}
               </FilterSheet>
@@ -264,7 +264,7 @@ export default function ProposalsTab({ candidates, today, windowDays, setWindowD
       {catalogEmpty ? (
         <div className="rounded-xl border border-dashed border-line bg-surface">
           <EmptyState title="Nessun extra pronto da proporre" sub="Aggiungi nel catalogo gli extra con i TUOI prezzi (e conferma quelli di esempio): le proposte compariranno qui in automatico." />
-          <div className="pb-5 text-center"><button onClick={goCatalog} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white max-sm:min-h-10" style={{ backgroundColor: "var(--focus)" }}>Vai al catalogo</button></div>
+          <div className="pb-5 text-center"><button onClick={goCatalog} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-on-focus max-sm:min-h-10" style={{ backgroundColor: "var(--focus)" }}>Vai al catalogo</button></div>
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-surface"><EmptyState title={candidates.length === 0 ? `Nessun arrivo o ospite in casa nei prossimi ${windowDays} giorni` : "Nessuna prenotazione con proposte"} sub={candidates.length === 0 ? "Quando ci saranno prenotazioni confermate in arrivo, le proposte appariranno qui." : `${hiddenCount} prenotazioni non hanno extra proponibili (già venduti, fuori stagione, camera non libera…). Attiva "mostra anche senza proposte" per vedere il perché.`} /></div>

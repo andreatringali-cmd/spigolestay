@@ -92,17 +92,17 @@ export default function AccountDetailPage() {
         <StatCard label="Stato" value={a.subStatus || "—"} color={a.subStatus === "active" ? "var(--ok)" : a.subStatus === "trialing" ? "var(--warn)" : undefined} />
         <StatCard label="Scadenza" value={dmy(a.periodEnd)} hint={a.cancelAtPeriodEnd ? "in disdetta" : undefined} />
         <StatCard label="Canone" value={a.monthlyAmount != null ? `${eur(a.monthlyAmount, a.currency || "EUR")}` : "—"} hint="al mese" />
-        <StatCard label="Dovuto" value={a.amountDue != null && a.amountDue > 0 ? eur(a.amountDue, a.currency || "EUR") : "—"} color={a.amountDue && a.amountDue > 0 ? "var(--bad,#dc2626)" : undefined} />
+        <StatCard label="Dovuto" value={a.amountDue != null && a.amountDue > 0 ? eur(a.amountDue, a.currency || "EUR") : "—"} color={a.amountDue && a.amountDue > 0 ? "var(--err)" : undefined} />
         <StatCard label="Pagato finora" value={a.totalPaid != null ? eur(a.totalPaid, a.currency || "EUR") : "—"} color="var(--ok)" />
       </div>
 
       {/* Anagrafica */}
       <Card className="mb-4">
         <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <div><div className="text-[11px] uppercase tracking-wide text-faint">Telefono</div><div className="font-medium text-txt">{a.phone || "—"}</div></div>
-          <div><div className="text-[11px] uppercase tracking-wide text-faint">Registrato</div><div className="font-medium text-txt">{dmy(a.createdAt)}</div></div>
-          <div><div className="text-[11px] uppercase tracking-wide text-faint">Ultimo accesso</div><div className="font-medium text-txt">{dmy(a.lastActive)}</div></div>
-          <div><div className="text-[11px] uppercase tracking-wide text-faint">Email confermata</div><div className="font-medium text-txt">{a.emailConfirmed ? "Sì" : "No"}</div></div>
+          <div><div className="text-[11px] uppercase tracking-wide text-dim">Telefono</div><div className="font-medium text-txt">{a.phone || "—"}</div></div>
+          <div><div className="text-[11px] uppercase tracking-wide text-dim">Registrato</div><div className="font-medium text-txt">{dmy(a.createdAt)}</div></div>
+          <div><div className="text-[11px] uppercase tracking-wide text-dim">Ultimo accesso</div><div className="font-medium text-txt">{dmy(a.lastActive)}</div></div>
+          <div><div className="text-[11px] uppercase tracking-wide text-dim">Email confermata</div><div className="font-medium text-txt">{a.emailConfirmed ? "Sì" : "No"}</div></div>
         </div>
       </Card>
 
@@ -122,7 +122,7 @@ export default function AccountDetailPage() {
             {s.rooms.length > 0 && (
               <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full min-w-[440px] text-sm">
-                  <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-1.5 font-semibold">Camera</th><th className="px-3 py-1.5 font-semibold">Tipologia</th><th className="px-3 py-1.5 font-semibold text-right">Letti</th><th className="px-3 py-1.5 font-semibold">Configurazione</th><th className="px-3 py-1.5 font-semibold text-right">mq</th></tr></thead>
+                  <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-1.5 font-semibold">Camera</th><th className="px-3 py-1.5 font-semibold">Tipologia</th><th className="px-3 py-1.5 font-semibold text-right">Letti</th><th className="px-3 py-1.5 font-semibold">Configurazione</th><th className="px-3 py-1.5 font-semibold text-right">mq</th></tr></thead>
                   <tbody>
                     {s.rooms.map((r, i) => (
                       <tr key={i} className="border-b border-line/60">
@@ -140,7 +140,7 @@ export default function AccountDetailPage() {
 
             {s.members.length > 0 && (
               <div className="mt-3">
-                <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Membri di questa struttura</div>
+                <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">Membri di questa struttura</div>
                 <div className="space-y-1.5">
                   {s.members.map((m) => (
                     <div key={m.id} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2">
@@ -157,7 +157,7 @@ export default function AccountDetailPage() {
 
       {d.membersOther.length > 0 && (
         <Card className="mb-4">
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Altri collaboratori</div>
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">Altri collaboratori</div>
           <div className="space-y-1.5">
             {d.membersOther.map((m) => (
               <div key={m.id} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2">
@@ -174,7 +174,7 @@ export default function AccountDetailPage() {
         <div className="mb-2 text-sm font-semibold text-txt">Storico pagamenti / fatture</div>
         {!a.stripeCustomerId ? <div className="text-[12px] text-faint">Nessun cliente Stripe collegato.</div> : d.invoices.length === 0 ? <div className="text-[12px] text-faint">Nessun pagamento registrato.</div> : (
           <table className="w-full min-w-[520px] text-sm">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-2 py-1.5 font-semibold">Data</th><th className="px-2 py-1.5 font-semibold">Descrizione</th><th className="px-2 py-1.5 font-semibold text-right">Importo</th><th className="px-2 py-1.5 font-semibold">Stato</th><th className="px-2 py-1.5 font-semibold">Fattura</th></tr></thead>
+            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-2 py-1.5 font-semibold">Data</th><th className="px-2 py-1.5 font-semibold">Descrizione</th><th className="px-2 py-1.5 font-semibold text-right">Importo</th><th className="px-2 py-1.5 font-semibold">Stato</th><th className="px-2 py-1.5 font-semibold">Fattura</th></tr></thead>
             <tbody>
               {d.invoices.map((inv) => (
                 <tr key={inv.id} className="border-b border-line/60">
@@ -195,7 +195,7 @@ export default function AccountDetailPage() {
         <div className="mb-1.5 text-sm font-semibold text-txt">Note interne (private)</div>
         <textarea value={note} onChange={(e) => { setNote(e.target.value); setNoteState({}); }} rows={4} placeholder="Appunti su questo cliente: contatti, accordi, promemoria…" className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
         <div className="mt-2 flex items-center gap-2">
-          <button onClick={saveNote} disabled={noteState.saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{noteState.saving ? "Salvo…" : "Salva nota"}</button>
+          <button onClick={saveNote} disabled={noteState.saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{noteState.saving ? "Salvo…" : "Salva nota"}</button>
           {noteState.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
         </div>
       </Card>

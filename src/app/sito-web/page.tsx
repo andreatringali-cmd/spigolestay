@@ -16,6 +16,7 @@ import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
 import { amenityIcon } from "@/lib/amenities";
 import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw } from "@/lib/publicdata";
 import { inScope } from "@/lib/scope";
+import { GUEST_DEFAULT_ACCENT } from "@/lib/guest-brand";
 
 const toISO = (d: Date) => ymdRome(d); // giorno di calendario italiano (non UTC)
 const addDays = addDaysYmd; // aritmetica di calendario: dopo il cambio dell'ora legale "arrivo + 1" resta il giorno giusto
@@ -95,10 +96,13 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "Informativa privacy": { en: "Privacy notice", fr: "Politique de confidentialité", de: "Datenschutzerklärung", es: "Política de privacidad" },
   "Accetta": { en: "Accept", fr: "Accepter", de: "Akzeptieren", es: "Aceptar" },
   "Culla": { en: "Cot", fr: "Lit bébé", de: "Babybett", es: "Cuna" },
+  "Precedente": { en: "Previous", fr: "Précédent", de: "Zurück", es: "Anterior" },
+  "Successiva": { en: "Next", fr: "Suivant", de: "Weiter", es: "Siguiente" },
+  "Chiudi": { en: "Close", fr: "Fermer", de: "Schließen", es: "Cerrar" },
 };
 
 interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
-const DEFCFG: Cfg = { nome: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true };
+const DEFCFG: Cfg = { nome: "", tagline: "", accent: GUEST_DEFAULT_ACCENT, heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true };
 
 
 
@@ -317,7 +321,7 @@ export function Site() {
     } finally { setRevBusy(false); }
   };
 
-  const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const field = "min-h-11 rounded-lg border border-line bg-paper px-3 py-2 text-base text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:text-sm"; // 16 px su telefono: iOS non ingrandisce la pagina
 
   // Dati strutturati (schema.org) per Google: aiuta a mostrare il sito diretto con risultati ricchi e a posizionarlo.
   const minPrice = types.length ? Math.min(...types.map((rt) => effectiveBase(rt, roomTypes))) : undefined;
@@ -353,10 +357,10 @@ export function Site() {
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
           <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : name.slice(0, 2).toUpperCase()}</div>
-          <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenosite</span></div>
+          <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-xs font-normal text-dim">· Xenosite</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
-            <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs max-sm:min-h-10" title="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
+            <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-base outline-none focus-visible:ring-2 focus-visible:ring-focus/40 max-sm:min-h-11 sm:text-xs" title="Lingua / Language" aria-label="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
           </div>
         </div>
       </div>
@@ -368,22 +372,22 @@ export function Site() {
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
             <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
-              <label className="block text-[11px] font-medium text-dim">{T("Arrivo")}<DateField lang={lang} value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
-              <label className="block text-[11px] font-medium text-dim">{T("Partenza")}<DateField lang={lang} value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
-              <label className="block text-[11px] font-medium text-dim">{T("Adulti")}<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
-              <label className="block text-[11px] font-medium text-dim">{T("Bambini")}<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
-              <button onClick={() => go()} className="mt-auto rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Verifica disponibilità")}</button>
+              <label className="block text-xs font-medium text-dim">{T("Arrivo")}<DateField lang={lang} value={ci} min={today} onChange={(v) => { setCi(v); if (v >= co) setCo(addDays(v, 1)); }} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-xs font-medium text-dim">{T("Partenza")}<DateField lang={lang} value={co} min={addDays(ci, 1)} onChange={(v) => setCo(v)} className={`${field} mt-0.5 w-full text-left`} /></label>
+              <label className="block text-xs font-medium text-dim">{T("Adulti")}<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
+              <label className="block text-xs font-medium text-dim">{T("Bambini")}<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
+              <button onClick={() => go()} className="mt-auto min-h-11 rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Verifica disponibilità")}</button>
             </div>
             {ch > 0 && (
               <div className="mt-2 w-full rounded-2xl bg-white/95 p-3 shadow-lg">
-                <div className="mb-1 text-[11px] font-medium text-dim">{T("Età dei bambini")}{lang === "it" && <> <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></>}</div>
+                <div className="mb-1 text-xs font-medium text-dim">{T("Età dei bambini")}{lang === "it" && <> <span className="font-normal">(per la tassa di soggiorno e la sistemazione)</span></>}</div>
                 <div className="flex flex-wrap items-center gap-2">
                   {childAges.map((age, i) => (
                     <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">{T("Bimbo")} {i + 1}
-                      <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus max-sm:py-1.5" />
+                      <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="min-h-11 w-16 rounded border border-line bg-surface px-1.5 py-0.5 text-base text-txt outline-none focus:border-focus focus-visible:ring-2 focus-visible:ring-focus/40 sm:min-h-0 sm:w-14 sm:text-sm" />
                     </label>
                   ))}
-                  <label className="ml-1 flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {T("Culla")} <span className="text-faint">({T("gratuita, su richiesta")})</span></label>
+                  <label className="ml-1 flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-5 w-5 accent-[color:var(--focus)]" /> {T("Culla")} <span className="text-dim">({T("gratuita, su richiesta")})</span></label>
                 </div>
               </div>
             )}
@@ -462,7 +466,7 @@ export function Site() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map(([l, v]) => (
                   <div key={l} className="rounded-xl border border-line bg-surface p-3">
-                    <div className="text-[11px] uppercase tracking-wide text-faint">{l}</div>
+                    <div className="text-xs uppercase tracking-wide text-dim">{l}</div>
                     <div className="mt-0.5 text-sm font-medium text-txt">{v}</div>
                   </div>
                 ))}
@@ -483,9 +487,9 @@ export function Site() {
                 <h2 className="font-display text-xl font-bold text-txt">{T("Galleria")}</h2>
                 {galLabels.length > 1 && (
                   <div className="flex flex-wrap gap-1.5">
-                    <button onClick={() => { setGalFilter("all"); setGi(0); }} className="rounded-full border px-3 py-1 text-xs font-medium transition" style={galFilter === "all" ? { backgroundColor: accent, borderColor: accent, color: "#fff" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{T("Tutte")}</button>
+                    <button onClick={() => { setGalFilter("all"); setGi(0); }} className="rounded-full border px-3 py-1 text-xs font-medium transition max-sm:min-h-11" style={galFilter === "all" ? { backgroundColor: accent, borderColor: accent, color: "#fff" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{T("Tutte")}</button>
                     {galLabels.map((l) => (
-                      <button key={l} onClick={() => { setGalFilter(l); setGi(0); }} className="rounded-full border px-3 py-1 text-xs font-medium transition" style={galFilter === l ? { backgroundColor: accent, borderColor: accent, color: "#fff" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{l}</button>
+                      <button key={l} onClick={() => { setGalFilter(l); setGi(0); }} className="rounded-full border px-3 py-1 text-xs font-medium transition max-sm:min-h-11" style={galFilter === l ? { backgroundColor: accent, borderColor: accent, color: "#fff" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{l}</button>
                     ))}
                   </div>
                 )}
@@ -494,13 +498,13 @@ export function Site() {
                 <MediaImg src={cur.src} alt={cur.label} onClick={() => setLightbox(cur.src)} className="h-[300px] w-full cursor-zoom-in object-cover sm:h-[440px]" />
                 {len > 1 && (
                   <>
-                    <button onClick={() => setGi((g) => (g - 1 + len) % len)} className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">‹</button>
-                    <button onClick={() => setGi((g) => (g + 1) % len)} className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">›</button>
+                    <button onClick={() => setGi((g) => (g - 1 + len) % len)} aria-label={T("Precedente")} className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">‹</button>
+                    <button onClick={() => setGi((g) => (g + 1) % len)} aria-label={T("Successiva")} className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">›</button>
                   </>
                 )}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent p-4">
                   <span className="rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-txt">{cur.label}</span>
-                  <span className="text-[11px] font-medium text-white/90">{idx + 1} / {len}</span>
+                  <span className="text-xs font-medium text-white/90">{idx + 1} / {len}</span>
                 </div>
               </div>
               {len > 1 && (
@@ -525,9 +529,9 @@ export function Site() {
                   {p.description && <p className="mt-1.5 text-sm text-dim">{p.description}</p>}
                   {(p.features ?? []).length > 0 && <ul className="mt-2 flex-1 space-y-1 text-[13px] text-dim">{(p.features ?? []).map((f, i) => <li key={i} className="flex items-start gap-1.5"><span style={{ color: accent }}>✓</span>{f}</li>)}</ul>}
                   <div className="mt-2 text-xs text-dim">{T("Codice")}: <b className="font-mono text-txt">{p.code}</b></div>
-                  {(p.validFrom || p.validTo) && <div className="mt-1 text-[11px] text-faint">{T("Valida per soggiorni")}{p.validFrom ? ` ${T("dal")} ${fmtDate(p.validFrom)}` : ""}{p.validTo ? ` ${T("al")} ${fmtDate(p.validTo)}` : ""}</div>}
-                  {p.validUntil && <div className="text-[11px] text-faint">{T("Prenota entro il")} {fmtDate(p.validUntil)}</div>}
-                  <button onClick={() => go(p.code ? `&promo=${encodeURIComponent(p.code)}` : "")} className="group mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>{T("Prenota")} <span className="transition-transform group-hover:translate-x-0.5">→</span></button>
+                  {(p.validFrom || p.validTo) && <div className="mt-1 text-xs text-dim">{T("Valida per soggiorni")}{p.validFrom ? ` ${T("dal")} ${fmtDate(p.validFrom)}` : ""}{p.validTo ? ` ${T("al")} ${fmtDate(p.validTo)}` : ""}</div>}
+                  {p.validUntil && <div className="text-xs text-dim">{T("Prenota entro il")} {fmtDate(p.validUntil)}</div>}
+                  <button onClick={() => go(p.code ? `&promo=${encodeURIComponent(p.code)}` : "")} className="group mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: accent }}>{T("Prenota")} <span className="transition-transform group-hover:translate-x-0.5">→</span></button>
                 </div>
               ))}
             </div>
@@ -541,14 +545,14 @@ export function Site() {
             <h3 className="font-display text-lg font-bold text-txt">{T("Iscriviti alla newsletter")}</h3>
             <p className="mt-1 text-sm text-dim">{T("Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.")}</p>
             {nlDone ? (
-              <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-center text-sm font-medium text-[color:var(--ok)]">✓ {T("Grazie! Ti terremo aggiornato sulle offerte.")}</div>
+              <div role="status" className="mt-3 rounded-lg border border-line bg-paper p-3 text-center text-sm font-medium text-txt" style={{ boxShadow: "inset 3px 0 0 var(--ok)" }}>✓ {T("Grazie! Ti terremo aggiornato sulle offerte.")}</div>
             ) : (
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <input value={nl.firstName} onChange={(e) => setNl({ ...nl, firstName: e.target.value })} placeholder={T("Nome")} className={field} />
-                <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder={T("Cognome")} className={field} />
-                <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" className={`${field} col-span-2`} />
-                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder={`${T("Telefono")} *`} className={`${field} col-span-2`} />
-                <button onClick={nlSubmit} disabled={!nlValid} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
+                <input value={nl.firstName} onChange={(e) => setNl({ ...nl, firstName: e.target.value })} placeholder={T("Nome")} aria-label={T("Nome")} className={field} />
+                <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder={T("Cognome")} aria-label={T("Cognome")} className={field} />
+                <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" type="email" inputMode="email" autoComplete="email" aria-label="Email" className={`${field} col-span-2`} />
+                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder={`${T("Telefono")} *`} type="tel" inputMode="tel" autoComplete="tel" aria-label={T("Telefono")} className={`${field} col-span-2`} />
+                <button onClick={nlSubmit} disabled={!nlValid} className="col-span-2 min-h-11 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
               </div>
             )}
           </div>
@@ -561,7 +565,7 @@ export function Site() {
               <div className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-center justify-between gap-2 p-4">
                   <h3 className="font-display text-lg font-bold text-txt">{T("Dove siamo")}</h3>
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="text-sm font-medium" style={{ color: accent }}>{T("Apri su Google Maps")} ↗</a>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-sm font-medium underline-offset-2 hover:underline" style={{ color: accent }}>{T("Apri su Google Maps")} ↗</a>
                 </div>
                 <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-56 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
               </div>
@@ -572,7 +576,7 @@ export function Site() {
         <div className="mt-12 flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface p-6 text-center">
           <div className="font-display text-lg font-bold text-txt">{T("Prenota direttamente e risparmia")}</div>
           <p className="max-w-md text-sm text-dim">{T("Prenotando da qui eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.")}</p>
-          <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Verifica disponibilità")}</button>
+          <button onClick={() => go()} className="min-h-11 rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Verifica disponibilità")}</button>
         </div>
 
         {/* Recensioni: UNA sola sezione "Dicono di noi" — recensioni degli ospiti
@@ -594,7 +598,7 @@ export function Site() {
                   <div key={r.id} className="rounded-xl border border-line bg-surface p-4">
                     <div className="text-sm" style={{ color: "#E0A21C" }}>{"★".repeat(Math.round(r.rating / 2))}</div>
                     <p className="mt-1 text-sm text-txt">“{r.text}”</p>
-                    <div className="mt-2 text-xs text-faint">— {r.name}</div>
+                    <div className="mt-2 text-xs text-dim">— {r.name}</div>
                   </div>
                 ))}
               </div>
@@ -614,10 +618,10 @@ export function Site() {
               </div>
               {gReviews && !gReviews.loading && gTotal > 0 && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2 shadow-sm">
-                  <span className="font-display text-2xl font-bold text-txt">{gAvg.toFixed(1)}<span className="text-sm font-normal text-faint">/10</span></span>
+                  <span className="font-display text-2xl font-bold text-txt">{gAvg.toFixed(1)}<span className="text-sm font-normal text-dim">/10</span></span>
                   <span className="flex flex-col leading-tight">
                     <span className="text-sm" style={{ color: "#E0A21C" }}>{gStars(gAvg)}</span>
-                    <span className="text-[11px] text-faint">{gTotal} {T("recensioni")} · Google</span>
+                    <span className="text-xs text-dim">{gTotal} {T("recensioni")} · Google</span>
                   </span>
                 </div>
               )}
@@ -641,7 +645,7 @@ export function Site() {
                     <figure key={r.id} className="flex flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm" style={{ color: "#E0A21C" }}>{gStars(r.rating)}</span>
-                        {r.date && <span className="text-[11px] text-faint">{gDate(r.date)}</span>}
+                        {r.date && <span className="text-xs text-dim">{gDate(r.date)}</span>}
                       </div>
                       {r.text && <blockquote className="mt-2 flex-1 text-sm leading-relaxed text-txt">“{r.text}”</blockquote>}
                       <figcaption className="mt-3 flex items-center gap-2 border-t border-line pt-2.5">
@@ -685,7 +689,7 @@ export function Site() {
                   <figure key={r.id} className="flex flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm" style={{ color: "#E0A21C" }}>{gStars(r.rating)}</span>
-                      {r.date && <span className="text-[11px] text-faint">{gDate(r.date)}</span>}
+                      {r.date && <span className="text-xs text-dim">{gDate(r.date)}</span>}
                     </div>
                     {r.text && <blockquote className="mt-2 flex-1 text-sm leading-relaxed text-txt">“{r.text}”</blockquote>}
                     <figcaption className="mt-3 flex items-center gap-2 border-t border-line pt-2.5">
@@ -694,7 +698,7 @@ export function Site() {
                     </figcaption>
                     {r.reply && r.reply.trim() && (
                       <div className="mt-2.5 rounded-lg bg-wash p-2.5">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{T("Risposta della struttura")}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-dim">{T("Risposta della struttura")}</div>
                         <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-dim">{r.reply}</p>
                       </div>
                     )}
@@ -709,24 +713,24 @@ export function Site() {
               <p className="mt-1 text-sm text-dim">{T("Hai soggiornato da noi? Raccontaci com'è andata.")}</p>
               {revDone ? (
                 <div className="mt-3 rounded-lg border border-line bg-paper p-4 text-center">
-                  <div className="text-sm font-semibold text-[color:var(--ok)]">✓ {T("Grazie per la tua recensione!")}</div>
+                  <div role="status" className="text-sm font-semibold text-txt"><span style={{ color: "var(--ok)" }} aria-hidden>✓</span> {T("Grazie per la tua recensione!")}</div>
                   <div className="mt-0.5 text-xs text-dim">{T("La pubblicheremo a breve.")}</div>
                 </div>
               ) : (
                 <div className="mt-3 grid gap-3">
                   <label className="block">
-                    <span className="mb-1 block text-[11px] font-medium text-dim">{T("La tua valutazione")}</span>
+                    <span className="mb-1 block text-xs font-medium text-dim">{T("La tua valutazione")}</span>
                     <div className="flex items-center gap-1" onMouseLeave={() => setRevHover(0)}>
                       {[1, 2, 3, 4, 5].map((n) => (
-                        <button key={n} type="button" onClick={() => setRev((f) => ({ ...f, rating: n }))} onMouseEnter={() => setRevHover(n)} aria-label={`${n}/5`} className="px-1 text-2xl leading-none transition-transform hover:scale-110 max-sm:px-2 max-sm:py-2" style={{ color: n <= (revHover || rev.rating) ? "#E0A21C" : "var(--line)" }}>★</button>
+                        <button key={n} type="button" onClick={() => setRev((f) => ({ ...f, rating: n }))} onMouseEnter={() => setRevHover(n)} aria-label={`${n}/5`} className="px-1 text-2xl leading-none transition-transform hover:scale-110 max-sm:min-h-11 max-sm:min-w-11 max-sm:px-2 max-sm:py-2" style={{ color: n <= (revHover || rev.rating) ? "#E0A21C" : "var(--line)" }}>★</button>
                       ))}
                       <span className="ml-2 text-sm font-semibold text-dim">{rev.rating}/5</span>
                     </div>
                   </label>
-                  <input value={rev.name} onChange={(e) => setRev((f) => ({ ...f, name: e.target.value }))} placeholder={T("Il tuo nome")} className={field} />
-                  <textarea value={rev.text} onChange={(e) => setRev((f) => ({ ...f, text: e.target.value }))} rows={3} placeholder={T("Racconta la tua esperienza…")} className={`${field} resize-y`} />
-                  {revErr && <div role="alert" className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-xs font-medium text-[color:var(--err)]">{T(revErr)}</div>}
-                  <button onClick={revSubmit} disabled={!revValid || revBusy} className="rounded-lg py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Invia recensione")}</button>
+                  <input value={rev.name} onChange={(e) => setRev((f) => ({ ...f, name: e.target.value }))} placeholder={T("Il tuo nome")} aria-label={T("Il tuo nome")} autoComplete="name" className={field} />
+                  <textarea value={rev.text} onChange={(e) => setRev((f) => ({ ...f, text: e.target.value }))} rows={3} placeholder={T("Racconta la tua esperienza…")} aria-label={T("Racconta la tua esperienza…")} className={`${field} resize-y`} />
+                  {revErr && <div role="alert" className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-medium text-txt">{T(revErr)}</div>}
+                  <button onClick={revSubmit} disabled={!revValid || revBusy} className="min-h-11 rounded-lg py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Invia recensione")}</button>
                 </div>
               )}
             </div>
@@ -738,7 +742,7 @@ export function Site() {
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
           <MediaImg src={lightbox} alt="" className="max-h-[90dvh] max-w-full rounded-lg object-contain" />
-          <button onClick={() => setLightbox(null)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white max-sm:h-11 max-sm:w-11">✕</button>
+          <button onClick={() => setLightbox(null)} aria-label={T("Chiudi")} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white max-sm:h-11 max-sm:w-11">✕</button>
         </div>
       )}
 
@@ -749,21 +753,21 @@ export function Site() {
               <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full bg-white object-contain" /> : name.slice(0, 2).toUpperCase()}</span>
               {name}
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
-              {structure?.email && <a href={`mailto:${structure.email}`} className="hover:text-dim">{structure.email}</a>}
-              {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dim">
+              {structure?.email && <a href={`mailto:${structure.email}`} className="inline-flex min-h-11 items-center hover:text-txt sm:min-h-0">{structure.email}</a>}
+              {structure?.phone && <a href={`tel:${structure.phone}`} className="inline-flex min-h-11 items-center hover:text-txt sm:min-h-0">{structure.phone}</a>}
               {structure?.cin && <span>CIN {structure.cin}</span>}
               <div className="flex items-center gap-2">
-                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
-                {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
-                {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
-                {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" title="Sito" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-10 max-sm:w-10" style={{ color: accent }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg></a>}
+                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" aria-label="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-11 max-sm:w-11" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
+                {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" aria-label="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-11 max-sm:w-11" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
+                {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" aria-label="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-11 max-sm:w-11" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
+                {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" title="Sito" aria-label="Sito" className="grid h-7 w-7 place-items-center rounded-full bg-wash transition hover:opacity-80 max-sm:h-11 max-sm:w-11" style={{ color: accent }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg></a>}
               </div>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
-            <span>© {new Date().getFullYear()} {name}. {T("Tutti i diritti riservati.")} · <button onClick={() => setShowPrivacy(true)} className="underline hover:text-dim">Privacy</button></span>
-            <span>{T("Sito creato dal gruppo")} <b className="text-dim">Xenora</b> · {T("Prenotazione online sicura")}</span>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs text-dim">
+            <span>© {new Date().getFullYear()} {name}. {T("Tutti i diritti riservati.")} · <button onClick={() => setShowPrivacy(true)} className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-txt sm:min-h-0 sm:min-w-0">Privacy</button></span>
+            <span>{T("Sito creato dal gruppo")} <b className="text-txt">Xenora</b> · {T("Prenotazione online sicura")}</span>
           </div>
         </div>
       </footer>
@@ -777,15 +781,15 @@ export function Site() {
 
       {/* Barra Prenota fissa (solo telefono) */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accent }}>{T("Prenota")}</button>
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="min-h-11 w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accent }}>{T("Prenota")}</button>
       </div>
 
       {/* Cookie banner */}
       {!cookieOk && (
-        <div className="fixed inset-x-0 bottom-16 z-50 mx-auto max-w-3xl px-4 md:bottom-4">
+        <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-3xl px-4 md:bottom-4" role="region" aria-label="Cookie">
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-xl">
-            <span className="min-w-0 flex-1 text-xs text-dim">{T("Usiamo solo cookie tecnici necessari al funzionamento del sito.")} <button onClick={() => setShowPrivacy(true)} className="font-semibold underline" style={{ color: accent }}>{T("Informativa privacy")}</button>.</span>
-            <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white max-sm:py-3" style={{ backgroundColor: accent }}>{T("Accetta")}</button>
+            <span className="min-w-0 flex-1 text-xs text-dim">{T("Usiamo solo cookie tecnici necessari al funzionamento del sito.")} <button onClick={() => setShowPrivacy(true)} className="inline-flex min-h-11 items-center font-semibold underline sm:min-h-0" style={{ color: accent }}>{T("Informativa privacy")}</button>.</span>
+            <button onClick={acceptCookie} className="min-h-11 shrink-0 rounded-lg px-5 py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Accetta")}</button>
           </div>
         </div>
       )}
@@ -793,8 +797,8 @@ export function Site() {
       {/* Informativa privacy */}
       {showPrivacy && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPrivacy(false)}>
-          <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between"><h3 className="font-display text-lg font-bold text-txt">Informativa sulla privacy</h3><button onClick={() => setShowPrivacy(false)} aria-label="Chiudi" className="grid h-8 w-8 place-items-center text-faint hover:text-txt max-sm:h-10 max-sm:w-10">✕</button></div>
+          <div role="dialog" aria-modal="true" aria-labelledby="privacy-title" className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between"><h3 id="privacy-title" className="font-display text-lg font-bold text-txt">Informativa sulla privacy</h3><button onClick={() => setShowPrivacy(false)} aria-label={T("Chiudi")} className="grid h-8 w-8 place-items-center text-dim hover:text-txt max-sm:h-11 max-sm:w-11">✕</button></div>
             <div className="space-y-2.5 text-xs leading-relaxed text-dim">
               <p><b className="text-txt">Titolare del trattamento.</b> {name}{structure?.email ? ` · ${structure.email}` : ""}{structure?.phone ? ` · ${structure.phone}` : ""}.</p>
               <p><b className="text-txt">Dati raccolti.</b> Quando prenoti o ti iscrivi alla newsletter raccogliamo i dati che ci fornisci: nome, cognome, email, telefono ed eventuali richieste. Non raccogliamo dati di pagamento su questo sito.</p>
@@ -802,7 +806,6 @@ export function Site() {
               <p><b className="text-txt">Conservazione.</b> Conserviamo i dati per il tempo necessario alle finalità indicate e agli obblighi di legge, poi li cancelliamo o anonimizziamo.</p>
               <p><b className="text-txt">I tuoi diritti.</b> Puoi chiedere accesso, rettifica, cancellazione, limitazione o portabilità dei dati e revocare il consenso, scrivendo ai contatti del titolare qui sopra.</p>
               <p><b className="text-txt">Cookie.</b> Il sito usa solo cookie tecnici necessari al funzionamento; nessun cookie di profilazione di terze parti.</p>
-              <p className="text-faint">Modello base: fai verificare l&apos;informativa definitiva a un consulente prima della pubblicazione ufficiale.</p>
             </div>
           </div>
         </div>

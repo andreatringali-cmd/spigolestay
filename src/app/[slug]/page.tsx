@@ -33,14 +33,14 @@ export default function PublicSitePage() {
 
   if (state === "notfound") {
     return (
-      <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#fff", color: "#1c1917", padding: 24, textAlign: "center", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3.5 bg-surface p-6 text-center text-txt">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/xenora-mark.png" alt="Xenora" width={56} height={56} style={{ width: 56, height: 56, objectFit: "contain" }} />
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Sito non trovato</h1>
-        <p style={{ fontSize: 15, color: "#78716c", margin: 0, maxWidth: 420 }}>
-          Nessuna struttura pubblicata all&apos;indirizzo <b style={{ color: "#1c1917" }}>/{slug}</b>.
+        <h1 className="font-display text-2xl font-bold">Sito non trovato</h1>
+        <p className="max-w-md text-[15px] text-dim">
+          Nessuna struttura pubblicata all&apos;indirizzo <b className="text-txt">/{slug}</b>.
         </p>
-        <a href="https://xenora.it" style={{ marginTop: 6, borderRadius: 10, background: "#4F46E5", color: "#fff", padding: "10px 18px", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>Vai su Xenora →</a>
+        <a href="https://xenora.it" className="mt-1.5 inline-flex min-h-11 items-center rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">Vai su Xenora →</a>
       </div>
     );
   }

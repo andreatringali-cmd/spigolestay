@@ -79,12 +79,12 @@ export default function IstatSettingsModal({ sid, onClose }: { sid: string; onCl
             </div>
           </label>
           <label className="block"><span className={lbl}>Elabora i dati a partire dal</span><DateField value={s.start_from?.slice(0, 10) ?? ""} onChange={(v) => set({ start_from: v })} className={inp} /></label>
-          <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
+          <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-dim">Opzioni</div>
           <label className="flex items-center justify-between"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => setAuto(e.target.checked)} disabled={!!busy} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
           <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: il movimento viene chiuso e inviato ogni giorno in automatico." : "Spento: chiudi e invii tu con «Invia / chiudi»."}</span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
+          <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
         </div>
         {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
         <div className="mt-3 border-t border-line pt-3 text-sm">

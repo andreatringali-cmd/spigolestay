@@ -323,9 +323,9 @@ export default function ForniturePage() {
 
   const reorderable = activeProds.filter((p) => p.consumption_per_arrival > 0 || p.consumption_per_guest_night > 0);
   const catChips = (<>
-    <button onClick={() => setCatFilter("")} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${!catFilter ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>Tutte</button>
+    <button onClick={() => setCatFilter("")} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${!catFilter ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>Tutte</button>
     {cats.filter((cat) => activeProds.some((p) => p.category_id === cat.id)).map((cat) => (
-      <button key={cat.id} onClick={() => setCatFilter(cat.id)} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${catFilter === cat.id ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{cat.name}</button>
+      <button key={cat.id} onClick={() => setCatFilter(cat.id)} className={`rounded-full px-3 py-1 max-sm:py-2 text-xs font-semibold ${catFilter === cat.id ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{cat.name}</button>
     ))}
   </>);
   const stockFilters = (<>
@@ -354,7 +354,7 @@ export default function ForniturePage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 max-sm:mb-3 max-sm:gap-2">
         <div className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:flex max-sm:w-full">
           {(["catalogo", "scorte", "riordino", "ordini"] as const).map((tk) => (
-            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:py-2.5 max-sm:text-[13px] text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--warn)", color: "#fff" }}>{lowRows.length}</span>}</button>
+            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:py-2.5 max-sm:text-[13px] text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold text-on-warn" style={{ backgroundColor: "var(--warn)" }}>{lowRows.length}</span>}</button>
           ))}
         </div>
         {activeStructureId === "all" && (
@@ -382,7 +382,7 @@ export default function ForniturePage() {
                       <div className="relative aspect-[4/3] w-full overflow-hidden bg-wash">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={productImage(p, cat.slug)} alt={p.name} className="h-full w-full object-cover transition group-hover:scale-[1.03]" loading="lazy" />
-                        {p.customizable && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">Personalizzabile</span>}
+                        {p.customizable && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">Personalizzabile</span>}
                       </div>
                       <div className="p-3">
                         <div className="text-sm font-bold text-txt">{p.name}</div>
@@ -402,7 +402,7 @@ export default function ForniturePage() {
           {/* carrello */}
           <div>
             <Card className="sticky top-4">
-              <div className="flex items-center gap-2 text-sm font-bold text-txt"><Icon name="box" size={16} /> Carrello {cartLines.length > 0 && <span className="ml-auto rounded-full bg-focus px-2 py-0.5 text-[11px] text-white">{cartLines.length}</span>}</div>
+              <div className="flex items-center gap-2 text-sm font-bold text-txt"><Icon name="box" size={16} /> Carrello {cartLines.length > 0 && <span className="ml-auto rounded-full bg-focus px-2 py-0.5 text-[11px] text-on-focus">{cartLines.length}</span>}</div>
               {cartLines.length === 0 ? (
                 <div className="mt-3 text-xs text-dim">Apri un prodotto e aggiungilo al carrello.</div>
               ) : (
@@ -422,7 +422,7 @@ export default function ForniturePage() {
                     <div className="flex justify-between text-dim"><span>IVA 22%</span><span className="font-mono">{c(cartTotals.vat)}</span></div>
                     <div className="mt-1 flex justify-between text-sm font-bold text-txt"><span>Totale</span><span className="font-mono">{c(cartTotals.tot)}</span></div>
                   </div>
-                  <button onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 max-sm:py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Paga con Stripe</button>
+                  <button onClick={() => checkout(true)} disabled={busy} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 max-sm:py-3 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Paga con Stripe</button>
                   <button onClick={() => checkout(false)} disabled={busy} className="w-full rounded-lg border border-line px-3 py-2 max-sm:py-3 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">Salva come bozza</button>
                 </div>
               )}
@@ -439,7 +439,7 @@ export default function ForniturePage() {
               <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[["Prodotti monitorati", String(stockInfo.filter((r) => r.state !== "none").length), "var(--txt)"], ["Sotto soglia", String(stockInfo.filter((r) => r.state === "low").length), lowRows.some((r) => r.state === "low") ? "var(--warn)" : "var(--ok)"], ["Esauriti", String(stockInfo.filter((r) => r.state === "out").length), stockInfo.some((r) => r.state === "out") ? "var(--err)" : "var(--ok)"], ["Valore giacenza stimata", c(Math.round(stockInfo.reduce((a, r) => a + r.estimated * (r.p.sale_price_cents / Math.max(1, r.p.pack_size)), 0))), "var(--dim)"]].map(([l, v, col]) => (
                   <div key={l} className="flex min-h-[78px] flex-col justify-center rounded-xl border border-line bg-surface p-3 shadow-sm">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{l}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{l}</div>
                     <div className="mt-1 font-mono text-xl font-bold tabular-nums" style={{ color: col }}>{v}</div>
                   </div>
                 ))}
@@ -447,7 +447,7 @@ export default function ForniturePage() {
               <div className="mb-3 flex flex-wrap items-center gap-3 max-sm:flex-nowrap max-sm:gap-2">
                 <div className="contents max-sm:hidden">{stockFilters}</div>
                 <FilterSheet count={(onlyLow ? 1 : 0) + (horizon !== 30 ? 1 : 0)} onReset={() => { setOnlyLow(false); setHorizon(30); }}>{stockFilters}</FilterSheet>
-                <button onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:ml-0 max-sm:min-h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-1.5 max-sm:text-xs max-sm:leading-tight">Aggiungi i sotto soglia al carrello ({lowRows.length})</button>
+                <button onClick={addLowToCart} disabled={lowRows.length === 0} className="ml-auto rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:ml-0 max-sm:min-h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-1.5 max-sm:text-xs max-sm:leading-tight">Aggiungi i sotto soglia al carrello ({lowRows.length})</button>
               </div>
               <Card className="mb-3 !p-0 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">
@@ -464,9 +464,9 @@ export default function ForniturePage() {
                           <td className="px-3 py-2"><div className="font-semibold text-txt">{r.p.name}</div><div className="text-[11px] text-faint">{catName(r.p.category_id)} · conf. {r.p.pack_size} {r.p.unit || "pz"}</div></td>
                           <td className="px-3 py-2 text-right">
                             <input key={`q-${r.p.id}-${r.counted}`} type="number" min={0} step="any" defaultValue={stockRows[r.p.id] ? r.counted : ""} placeholder="—" onBlur={(e) => { const v = e.target.value.trim(); if (v === "") return; const n = Math.max(0, Number(v.replace(",", "."))); if (Number.isFinite(n) && (!stockRows[r.p.id] || n !== r.counted)) saveStock(r.p, n); }} className="w-20 rounded border border-line bg-surface px-1.5 py-1 text-right font-mono text-xs" />
-                            {r.at && <div className="mt-0.5 text-[10px] text-faint">al {fmtDate(r.at)}</div>}
+                            {r.at && <div className="mt-0.5 text-[11px] text-faint">al {fmtDate(r.at)}</div>}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs">{stockRows[r.p.id] ? <><span className="font-bold text-txt">{r.estimated}</span>{r.consumed > 0 && <div className="text-[10px] text-faint">−{r.consumed} dal conteggio</div>}</> : "—"}</td>
+                          <td className="px-3 py-2 text-right font-mono text-xs">{stockRows[r.p.id] ? <><span className="font-bold text-txt">{r.estimated}</span>{r.consumed > 0 && <div className="text-[11px] text-faint">−{r.consumed} dal conteggio</div>}</> : "—"}</td>
                           <td className="px-3 py-2 text-right">
                             <input key={`m-${r.p.id}-${r.min}`} type="number" min={0} step="any" defaultValue={r.min || ""} placeholder="0" onBlur={(e) => { const n = Math.max(0, Number((e.target.value || "0").replace(",", "."))); if (Number.isFinite(n) && n !== r.min) saveMin(r.p, n); }} className="w-20 rounded border border-line bg-surface px-1.5 py-1 text-right font-mono text-xs" />
                           </td>
@@ -525,7 +525,7 @@ export default function ForniturePage() {
             </table>
           </Card>
 
-          <button onClick={createSuggested} disabled={busy || !reorderLines.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">
+          <button onClick={createSuggested} disabled={busy || !reorderLines.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">
             Crea ordine suggerito ({reorderLines.length} prodotti)
           </button>
         </div>
@@ -536,7 +536,7 @@ export default function ForniturePage() {
           <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[["Speso nell'anno", c(orderStats.spent), "var(--txt)"], ["In corso", String(orderStats.open), "var(--dim)"], ["Da pagare", String(orderStats.pending), orderStats.pending > 0 ? "var(--warn)" : "var(--dim)"], ["Bozze", String(orderStats.drafts), "var(--dim)"]].map(([l, v, col]) => (
               <div key={l} className="flex min-h-[78px] flex-col justify-center rounded-xl border border-line bg-surface p-3 shadow-sm">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{l}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{l}</div>
                 <div className="mt-1 font-mono text-xl font-bold tabular-nums" style={{ color: col }}>{v}</div>
               </div>
             ))}
@@ -562,7 +562,7 @@ export default function ForniturePage() {
                       <td className="px-3 py-2 text-xs">{fmtDate(new Date(o.created_at))}</td>
                       <td className="px-3 py-2 text-xs">{structOf(o.structure_id)}</td>
                       <td className="px-3 py-2 text-xs">{o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale"}</td>
-                      <td className="px-3 py-2 text-xs"><span className="rounded-full bg-wash px-2 py-0.5 font-semibold text-dim">{STATUS_LABEL[o.status] ?? o.status}</span>{o.delivery_date && o.status === "delivered" && <span className="ml-2 text-[10px] text-faint">il {fmtDate(o.delivery_date)}</span>}</td>
+                      <td className="px-3 py-2 text-xs"><span className="rounded-full bg-wash px-2 py-0.5 font-semibold text-dim">{STATUS_LABEL[o.status] ?? o.status}</span>{o.delivery_date && o.status === "delivered" && <span className="ml-2 text-[11px] text-faint">il {fmtDate(o.delivery_date)}</span>}</td>
                       <td className="px-3 py-2 text-right font-mono font-bold text-txt">{c(o.total_cents)}</td>
                     </tr>
                     {openOrder === o.id && (
@@ -582,7 +582,7 @@ export default function ForniturePage() {
                           )}
                           <div className="flex flex-wrap items-center gap-2">
                             <button onClick={() => orderToCart(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Riordina (riporta nel carrello)</button>
-                            {ORDER_OPEN.includes(o.status) && <button onClick={() => receiveOrder(o)} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Segna consegnato e carica a magazzino</button>}
+                            {ORDER_OPEN.includes(o.status) && <button onClick={() => receiveOrder(o)} disabled={busy} className="rounded-lg bg-focus px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">Segna consegnato e carica a magazzino</button>}
                             {["paid", "processing", "shipped", "delivered"].includes(o.status) && (invoiced[docNumberOf(o)]
                               ? <span className="text-xs text-faint">Registrato in Fatture passive ({docNumberOf(o)})</span>
                               : <button onClick={() => orderToInvoice(o)} className="rounded-lg border border-line bg-surface px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Registra in Fatture passive</button>)}

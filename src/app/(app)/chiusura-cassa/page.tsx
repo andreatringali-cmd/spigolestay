@@ -176,11 +176,11 @@ export default function ChiusuraCassaPage() {
             <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold"><span>Saldo teorico {contoLabel(conto).toLowerCase()}</span><span className="shrink-0 whitespace-nowrap font-mono">{eur(expected)}</span></div>
             {balance.since && <div className="text-[11px] text-faint">Calcolato dal saldo di partenza del {fmtDate(balance.since)}: contano solo i movimenti successivi.</div>}
           </div>
-          <label className={`${lbl} mt-3 block`}>Contato in cassa €<input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" className={inp} placeholder="0,00" /></label>
+          <label className={`${lbl} mt-3 block`}>Conteggio in cassa €<input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" className={inp} placeholder="0,00" /></label>
           {countedBad && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">Importo non valido: scrivi un numero, per esempio 1234,56.</p>}
           {countedVal !== null && <div className="mt-2 flex justify-between rounded-lg px-3 py-2 text-sm font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${Math.abs(diff) < 0.005 ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: Math.abs(diff) < 0.005 ? "var(--ok)" : "var(--err)" }}><span>Differenza</span><span className="font-mono">{diff >= 0 ? "+" : ""}{eur(diff)}</span></div>}
           <label className={`${lbl} mt-2 block`}>Note<input value={note} onChange={(e) => setNote(e.target.value)} className={inp} /></label>
-          <button onClick={save} disabled={countedVal === null} className="mt-3 rounded-lg bg-focus px-4 py-2 max-sm:w-full max-sm:py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Chiudi giornata</button>
+          <button onClick={save} disabled={countedVal === null} className="mt-3 rounded-lg bg-focus px-4 py-2 max-sm:w-full max-sm:py-3 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Chiudi giornata</button>
           {msg && <p className="mt-2 text-[12px] font-medium text-dim">{msg}</p>}
         </Card>
 

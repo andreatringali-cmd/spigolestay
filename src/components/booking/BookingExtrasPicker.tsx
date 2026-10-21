@@ -61,7 +61,7 @@ export default function BookingExtrasPicker({ entries, onChange, catalog, stay, 
             <div className="flex shrink-0 items-center gap-1.5">
               <button type="button" disabled={q <= 0} onClick={() => onChange(setExtraQty(entries, e, q - 1, stay))} aria-label={`${t("Meno")} ${e.name}`} className={`${stepBtn} border-line text-dim hover:bg-wash`}>−</button>
               <span className="w-5 text-center font-mono text-sm tabular-nums text-txt">{q}</span>
-              <button type="button" disabled={q >= max} onClick={() => onChange(setExtraQty(entries, e, q + 1, stay))} aria-label={`${t("Più")} ${e.name}`} className={`${stepBtn} ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+              <button type="button" disabled={q >= max} onClick={() => onChange(setExtraQty(entries, e, q + 1, stay))} aria-label={`${t("Più")} ${e.name}`} className={`${stepBtn} ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
               {q > 0 && hit && (
                 <span className="flex items-center gap-1 text-xs text-dim">€<NumInput value={hit.price} onChange={(v) => setLinePrice(e, v ?? 0)} className={`${inp} w-20 text-right font-mono`} aria-label={`${t("Importo")} ${e.name}`} /></span>
               )}
@@ -72,7 +72,7 @@ export default function BookingExtrasPicker({ entries, onChange, catalog, stay, 
 
       {free.length > 0 && (
         <div className="mt-0.5 flex flex-col gap-1">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Altre voci")}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Altre voci")}</div>
           {free.map(({ entry, index }) => (
             <div key={index} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate text-[13px] text-txt">{entry.name || t("Extra")}</span>
@@ -86,7 +86,7 @@ export default function BookingExtrasPicker({ entries, onChange, catalog, stay, 
       <div className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line p-2">
         <input value={freeName} onChange={(e) => setFreeName(e.target.value)} placeholder={t("Altra voce (es. Transfer)")} className={`${inp} min-w-[140px] flex-1`} />
         <span className="flex items-center gap-1 text-xs text-dim">€<NumInput value={freePrice} allowNull onChange={setFreePrice} className={`${inp} w-20 text-right font-mono`} placeholder="0" aria-label={t("Importo")} /></span>
-        <button type="button" onClick={addFree} disabled={!freeName.trim() || !freePrice} className="rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+        <button type="button" onClick={addFree} disabled={!freeName.trim() || !freePrice} className="rounded-md bg-focus px-3 py-1 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-faint">

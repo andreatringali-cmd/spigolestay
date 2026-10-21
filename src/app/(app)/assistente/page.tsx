@@ -450,7 +450,7 @@ export default function AssistentePage() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`inline-block h-1.5 w-1.5 rounded-full ${state === "idle" ? "" : "animate-pulse"}`} style={{ backgroundColor: statusTone }} />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">Assistente Xenora · {statusLabel}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dim">Assistente Xenora · {statusLabel}</span>
         </div>
         <button onClick={toggleVoice} title={voiceOn ? "Voce attiva — tocca per spegnere" : "Voce spenta — tocca per attivare"} aria-pressed={voiceOn} className="grid h-8 w-8 place-items-center rounded-full border text-sm transition" style={voiceOn ? { borderColor: "transparent", background: focusTint(12) } : { borderColor: "var(--line)" }}>{voiceOn ? "🔊" : "🔇"}</button>
       </div>
@@ -467,10 +467,10 @@ export default function AssistentePage() {
       {/* ─────────── Barra di richiesta: il "centro comandi" ─────────── */}
       <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex max-w-3xl items-center gap-2 rounded-full border bg-surface p-1.5 pl-2 shadow-sm transition" style={{ borderColor: focused ? "var(--focus)" : "var(--line)", boxShadow: focused ? `0 0 0 3px ${focusTint(14)}` : undefined }}>
         {micAvailable && (
-          <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition active:scale-95" style={listening ? { backgroundColor: "var(--err)", color: "#fff" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
+          <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition active:scale-95 ${listening ? "text-on-err" : ""}`} style={listening ? { backgroundColor: "var(--err)" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
         )}
         <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Chiedimi qualsiasi cosa…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] text-txt outline-none placeholder:text-faint" />
-        <button type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
+        <button type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-on-focus shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
         </button>
       </form>
@@ -487,7 +487,7 @@ export default function AssistentePage() {
       {ans && (
         <div className="anim-pop relative mt-6 max-w-3xl overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-sm">
           <span className="absolute inset-y-0 left-0 w-[3px]" style={{ backgroundColor: "var(--focus)" }} aria-hidden />
-          {sent && <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">Hai chiesto · «{sent}»</div>}
+          {sent && <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-dim">Hai chiesto · «{sent}»</div>}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-txt">{ans.title}</div>
@@ -499,7 +499,7 @@ export default function AssistentePage() {
 
           {ans.list && ans.list.length > 0 && (
             <div className="mt-4 flex flex-col gap-1.5">
-              <button onClick={() => readAllList(ans.list!)} className="mb-0.5 inline-flex items-center justify-center gap-1.5 self-start rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={13} /> Leggimi tutti</button>
+              <button onClick={() => readAllList(ans.list!)} className="mb-0.5 inline-flex items-center justify-center gap-1.5 self-start rounded-full px-3.5 py-1.5 text-xs font-semibold text-on-focus shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={13} /> Leggimi tutti</button>
               {ans.list.map((it) => (
                 <button key={it.id} onClick={() => pickBooking(it.id)} className="group flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-left transition hover:border-focus hover:bg-wash">
                   <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>

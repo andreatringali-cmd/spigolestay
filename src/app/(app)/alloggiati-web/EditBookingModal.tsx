@@ -133,8 +133,8 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
             <div key={i} className="mt-3 rounded-lg border border-line bg-paper p-2.5">
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-xs font-semibold text-dim">Ospite {i + 2}</span>
-                <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-dim">{roleLabel(roleFor(i + 1))}</span>
-                <span className="text-[10px] text-faint">(familiare/membro: documento non obbligatorio)</span>
+                <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{roleLabel(roleFor(i + 1))}</span>
+                <span className="text-[11px] text-faint">(familiare/membro: documento non obbligatorio)</span>
                 <div className="ml-auto flex items-center gap-2">
                   <DocBtn id={`${b.id}-${i}`} withDoc={false} apply={(p) => setCo(i, p as Partial<Co>)} />
                   <button onClick={() => delCo(i)} className="text-faint hover:text-[color:var(--err)]" title="Rimuovi">✕</button>
@@ -156,7 +156,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
 
         <div className="flex items-center justify-between gap-2 border-t border-line p-4">
           <span className="text-[11px] text-faint">Le modifiche si salvano da sole. Chiudendo, le schedine vengono rigenerate.</span>
-          <button onClick={onClose} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Fatto</button>
+          <button onClick={onClose} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Fatto</button>
         </div>
       </div>
     </div>

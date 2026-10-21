@@ -18,7 +18,7 @@ export default function LanguageSwitcher() {
         <Flag code={cur.code} className="h-4 w-6" />
       </button>
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={176} label="Lingua">
-          <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Lingua</div>
+          <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">Lingua</div>
           {LANGS.map((l) => (
             <button key={l.code} onClick={() => { setLang(l.code); setOpen(false); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-wash ${l.code === lang ? "bg-wash" : ""}`}>
               <Flag code={l.code} className="h-3.5 w-5" />

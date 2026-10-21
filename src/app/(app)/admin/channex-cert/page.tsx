@@ -244,7 +244,7 @@ export default function ChannexCertPage() {
           <button
             onClick={loadContext}
             disabled={loadingCtx}
-            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-on-focus disabled:opacity-60"
             style={{ backgroundColor: "var(--focus)" }}
           >
             {loadingCtx ? "Leggo…" : "Mostra ID Channex"}
@@ -319,7 +319,7 @@ export default function ChannexCertPage() {
           <button
             onClick={setupTestProperty}
             disabled={settingUp}
-            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-on-focus disabled:opacity-60"
             style={{ backgroundColor: "var(--focus)" }}
           >
             {settingUp ? "Creo…" : "Crea property di test certificazione"}
@@ -407,7 +407,7 @@ export default function ChannexCertPage() {
                 <button
                   onClick={() => run(s.id)}
                   disabled={busy}
-                  className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-on-focus disabled:opacity-60"
                   style={{ backgroundColor: "var(--focus)" }}
                 >
                   {busy ? "Eseguo…" : "Esegui"}
@@ -485,7 +485,7 @@ export default function ChannexCertPage() {
               <button
                 onClick={ackBookings}
                 disabled={acking}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-on-focus disabled:opacity-60"
                 style={{ backgroundColor: "var(--focus)" }}
                 title="Fa l'ACK di tutte le revision della property di test (necessario per superare il Test 11)"
               >

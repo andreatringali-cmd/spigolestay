@@ -204,7 +204,7 @@ export default function AbbonamentoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: planKey, interval: annual ? "year" : "month", email: user?.email, userId: user?.id }),
       });
-      if (res.status === 503) { choose(planKey); setNotice("Stripe non è ancora collegato: piano impostato in modalità demo. Aggiungi la chiave Stripe per i pagamenti reali."); return; }
+      if (res.status === 503) { choose(planKey); setNotice("Il pagamento online non è disponibile in questo momento: il piano è stato impostato senza addebito. Per completare l'attivazione contatta il supporto."); return; }
       const d = await res.json().catch(() => ({}));
       if (d?.url) { window.location.href = d.url; return; }
       setNotice("Non è stato possibile avviare il pagamento. Riprova.");
@@ -253,8 +253,8 @@ export default function AbbonamentoPage() {
           <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span> · {t("Prova gratuita 5 giorni · nessun costo di attivazione · disdici quando vuoi")}
         </p>
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface p-0.5 text-sm">
-          <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition max-sm:min-h-10 ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
-          <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition max-sm:min-h-10 ${annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[10px] font-bold text-[color:var(--ok)]">−20%</span></button>
+          <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition max-sm:min-h-10 ${!annual ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
+          <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition max-sm:min-h-10 ${annual ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[11px] font-bold text-[color:var(--ok)]">−20%</span></button>
         </div>
       </div>
 
@@ -273,8 +273,8 @@ export default function AbbonamentoPage() {
             <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "xn-active border-focus bg-surface ring-2 ring-[color:var(--focus)]" : "border-line"}`} style={on ? undefined : { boxShadow: tierShadow }}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display text-lg font-bold text-txt">{tr.name}</span>
-                {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{hasRealSub ? t("Attivo") : t("Selezionato")}</span>
-                  : tr.key === suggested ? <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold uppercase text-dim">{t("Consigliato")}</span> : null}
+                {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[11px] font-bold uppercase text-focus">{hasRealSub ? t("Attivo") : t("Selezionato")}</span>
+                  : tr.key === suggested ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-bold uppercase text-dim">{t("Consigliato")}</span> : null}
               </div>
               <div className="mt-0.5 text-xs text-dim">{t(tr.tagline)}</div>
               <div className="mt-3 font-mono text-3xl font-bold text-txt">{eur(price)}<span className="text-xs font-normal text-dim">{t("/mese")}</span></div>
@@ -286,7 +286,7 @@ export default function AbbonamentoPage() {
                   <li key={m.key} className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{t(m.name)}</li>
                 ))}
               </ul>
-              <button onClick={() => setPendingTier(tr.key)} disabled={on && hasRealSub} className={`mt-4 rounded-lg py-2 text-sm font-semibold transition ${on && hasRealSub ? "cursor-default border border-line text-dim" : "bg-focus text-white hover:opacity-90"}`}>{on && hasRealSub ? t("Piano attivo") : on ? `${t("Attiva")} ${tr.name}` : `${t("Scegli")} ${tr.name}`}</button>
+              <button onClick={() => setPendingTier(tr.key)} disabled={on && hasRealSub} className={`mt-4 rounded-lg py-2 text-sm font-semibold transition ${on && hasRealSub ? "cursor-default border border-line text-dim" : "bg-focus text-on-focus hover:opacity-90"}`}>{on && hasRealSub ? t("Piano attivo") : on ? `${t("Attiva")} ${tr.name}` : `${t("Scegli")} ${tr.name}`}</button>
             </div>
           );
         })}
@@ -316,7 +316,7 @@ export default function AbbonamentoPage() {
               <div className="relative hidden flex-col justify-between overflow-hidden p-6 text-white md:flex" style={{ background: "linear-gradient(155deg, var(--focus) 0%, color-mix(in srgb, var(--focus) 62%, #0b1220) 100%)" }}>
                 <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
                 <div className="relative">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/70">Xenora · {t("Su misura")}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/70">Xenora · {t("Su misura")}</div>
                   <h2 className="mt-2 font-display text-2xl font-bold leading-tight">{t("Costruito per catene e gruppi")}</h2>
                   <p className="mt-2 text-sm leading-relaxed text-white/85">{t("Il channel manager più avanzato, configurato sulle tue esigenze. Un partner, non solo un software.")}</p>
                   <ul className="mt-5 space-y-2.5 text-sm">
@@ -333,16 +333,16 @@ export default function AbbonamentoPage() {
               {/* Form */}
               <div className="p-6">
                 <div className="mb-4">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-focus md:hidden">Xenora · {t("Su misura")}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-focus md:hidden">Xenora · {t("Su misura")}</div>
                   <h3 className="mt-1 font-display text-xl font-bold text-txt">{t("Parla con noi")}</h3>
                   <p className="mt-0.5 text-xs text-dim">{t("Compila e ti prepariamo una proposta su misura.")}</p>
                 </div>
                 {contactState === "sent" ? (
                   <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-wash p-8 text-center">
-                    <div className="grid h-12 w-12 place-items-center rounded-full text-xl text-white" style={{ background: "var(--ok)" }}>✓</div>
+                    <div className="grid h-12 w-12 place-items-center rounded-full text-xl text-on-ok" style={{ background: "var(--ok)" }}>✓</div>
                     <div className="mt-3 text-base font-bold text-txt">{t("Richiesta inviata!")}</div>
                     <div className="mt-1 text-sm text-dim">{t("Grazie. Ti ricontattiamo entro 24 ore.")}</div>
-                    <button onClick={() => setContactOpen(false)} className="mt-4 rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Chiudi")}</button>
+                    <button onClick={() => setContactOpen(false)} className="mt-4 rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-on-focus hover:opacity-90">{t("Chiudi")}</button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -359,7 +359,7 @@ export default function AbbonamentoPage() {
                     <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Come possiamo aiutarti?")}</span><textarea rows={3} value={contact.note} onChange={(e) => setContact((p) => ({ ...p, note: e.target.value }))} className={`${cinp} resize-y`} placeholder={t("Raccontaci il tuo progetto: quante strutture, quali OTA, cosa ti serve…")} /></label>
                     <label className="flex items-start gap-2 text-[12px] text-dim"><input type="checkbox" checked={contact.privacy} onChange={(e) => setContact((p) => ({ ...p, privacy: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /><span>{t("Acconsento al trattamento dei dati per essere ricontattato.")} *</span></label>
                     {contactState === "err" && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{t("Compila Nome, Email, Telefono e il consenso. Se persiste, riprova.")}</p>}
-                    <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-xl bg-focus py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
+                    <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-xl bg-focus py-2.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
                     <p className="text-center text-[11px] text-faint">{t("Nessun impegno · Risposta entro 24 ore")}</p>
                   </div>
                 )}
@@ -376,7 +376,7 @@ export default function AbbonamentoPage() {
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                 <th className="px-2 py-2 font-semibold">{t("Modulo")}</th>
                 {TIERS.map((tr) => <th key={tr.key} className="px-2 py-2 text-center font-semibold">{tr.name}</th>)}
               </tr>
@@ -416,7 +416,7 @@ export default function AbbonamentoPage() {
                     <div className="text-[11px] text-faint">{t(m.desc)}</div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[m.key] || 0)}<span className="text-[10px] font-normal text-faint">{t("/mese")}</span></div>
+                    <div className="font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[m.key] || 0)}<span className="text-[11px] font-normal text-faint">{t("/mese")}</span></div>
                   </div>
                   <button onClick={() => setPendingAddon(m.key)} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${on ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "border border-line text-txt hover:bg-wash"}`}>{on ? `${t("Attivo")} ✓` : t("Aggiungi")}</button>
                 </div>
@@ -438,7 +438,7 @@ export default function AbbonamentoPage() {
             <p className="mt-1.5 max-w-sm text-sm text-dim">{t("Il mese gratis scatta quando l'amico, finita la prova, si abbona col tuo codice.")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</a>
-              <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex items-center gap-1.5 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90">✉ Email</button>
+              <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex items-center gap-1.5 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-on-focus transition hover:opacity-90">✉ Email</button>
               <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-txt transition hover:bg-wash">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
             </div>
           </div>
@@ -446,11 +446,11 @@ export default function AbbonamentoPage() {
           <div className="shrink-0 text-center">
             {refQr && <img src={refQr} alt="QR" title={t("Fai scansionare questo QR all'amico")} className="mx-auto h-28 w-28 rounded-xl border border-line bg-white p-2 shadow-sm" />}
             <div className="mt-2 inline-block rounded-lg border border-focus bg-surface px-3 py-1 text-center ring-1 ring-[color:var(--focus)]">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Codice")} </span><span className="font-mono text-sm font-bold text-txt">{refCode}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Codice")} </span><span className="font-mono text-sm font-bold text-txt">{refCode}</span>
             </div>
             <div className="mt-3 flex justify-center gap-2">
-              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold text-txt">{refStats.friends}</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Amici")}</div></div>
-              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold" style={{ color: "var(--focus)" }}>{refStats.freeMonths}</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Mesi gratis")}</div></div>
+              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold text-txt">{refStats.friends}</div><div className="text-[10px] uppercase tracking-wide text-dim">{t("Amici")}</div></div>
+              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold" style={{ color: "var(--focus)" }}>{refStats.freeMonths}</div><div className="text-[10px] uppercase tracking-wide text-dim">{t("Mesi gratis")}</div></div>
             </div>
           </div>
         </div>
@@ -471,14 +471,14 @@ export default function AbbonamentoPage() {
         <Card className="h-full">
           <SectionTitle>{t("Il tuo abbonamento")}</SectionTitle>
           <div className="mb-3 rounded-lg border border-line bg-wash p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Piano attivo")}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Piano attivo")}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-display text-base font-bold text-txt">{tier.name}{isCustom ? ` ${t("personalizzato")}` : ""}{annual ? ` · ${t("annuale")}` : ` · ${t("mensile")}`}</span>
-              {isCustom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
+              {isCustom && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
               {/* Una data di rinnovo calcolata a mano sarebbe inventata: durante la prova si mostra la data della prima fattura, con un abbonamento reale il rinnovo è nel portale pagamenti. */}
               {trial?.inTrial ? <span className="text-[11px] text-dim">· {t("Prima fattura")}: <b className="font-semibold text-txt">{fmtDate(trial.firstInvoice)}</b></span> : hasRealSub ? <span className="text-[11px] text-dim">· {t("Data di rinnovo: nel portale pagamenti")}</span> : null}
             </div>
-            {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
+            {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[11px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
           </div>
           <div className="flex justify-between text-sm"><span className="text-dim">{t("Piano")} {tier.name}</span><span className="font-mono text-txt">{eur(annual ? Math.round(tier.price * (1 - ANNUAL_OFF)) : tier.price)}</span></div>
           {addonsTotal > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="font-semibold text-[color:var(--focus)]">{t("Moduli aggiuntivi")} ({addedModules.length}) <span className="font-normal text-faint">· {t("non inclusi nel piano")}</span></span><span className="font-mono font-semibold text-[color:var(--focus)]">{eur(annual ? Math.round(addonsTotal * (1 - ANNUAL_OFF)) : addonsTotal)}</span></div>}
@@ -515,13 +515,13 @@ export default function AbbonamentoPage() {
                 <div className="flex justify-between"><span className="text-dim">{t("Strutture")}</span><span className="text-txt">{pt.structures === 1 ? t("1 struttura") : `${t("fino a")} ${pt.structures}`}</span></div>
               </div>
               <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
-                <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
+                <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-on-focus" style={{ backgroundColor: "var(--focus)" }}>i</span>
                 <span>{hasRealSub ? t("Hai già un abbonamento attivo: il cambio di piano non è automatico, perché l'addebito si modifica solo su Stripe. Contatta il supporto (sales@xenora.app) indicando il piano desiderato, oppure gestisci l'abbonamento dal portale pagamenti. Finché non è confermato, i moduli del tuo piano non cambiano.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
               {!hasRealSub && <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>}
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</button>
+                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</button>
               </div>
             </div>
           </div>
@@ -539,12 +539,12 @@ export default function AbbonamentoPage() {
               <div className="mt-3 rounded-lg border border-line bg-wash p-3">
                 <div className="text-sm font-semibold text-txt">{t(m.name)}</div>
                 <div className="text-[11px] text-faint">{t(m.desc)}</div>
-                {!on && <div className="mt-2 font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[pendingAddon] || 0)}<span className="text-[10px] font-normal text-faint">{t("/mese")}</span></div>}
+                {!on && <div className="mt-2 font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[pendingAddon] || 0)}<span className="text-[11px] font-normal text-faint">{t("/mese")}</span></div>}
               </div>
               <p className="mt-2 text-[11px] text-faint">{on ? t("Il modulo verrà disattivato e tolto dal totale mensile.") : t("Il modulo verrà aggiunto al tuo piano e al totale mensile.")}</p>
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingAddon(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }} className={`flex-1 rounded-lg py-2 text-sm font-semibold text-white hover:opacity-90`} style={{ backgroundColor: on ? "var(--err)" : "var(--focus)" }}>{on ? t("Rimuovi") : t("Attiva")}</button>
+                <button onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }} className={`flex-1 rounded-lg py-2 text-sm font-semibold hover:opacity-90 ${on ? "text-on-err" : "text-on-focus"}`} style={{ backgroundColor: on ? "var(--err)" : "var(--focus)" }}>{on ? t("Rimuovi") : t("Attiva")}</button>
               </div>
             </div>
           </div>

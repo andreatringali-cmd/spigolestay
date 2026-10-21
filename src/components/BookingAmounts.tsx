@@ -29,7 +29,7 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
   }
   const Row = ({ k, v, color, strong, title }: { k: string; v: string; color?: string; strong?: boolean; title?: string }) => (
     <div className="flex items-baseline justify-between gap-2 whitespace-nowrap" title={title}>
-      <span className={`min-w-0 truncate ${strong ? "font-semibold text-txt" : "text-faint"}`}>{k}</span>
+      <span className={`min-w-0 truncate ${strong ? "font-semibold text-txt" : "text-dim"}`}>{k}</span>
       <span className={`shrink-0 font-mono tabular-nums ${strong ? "font-semibold" : ""}`} style={{ color: color ?? "var(--dim)" }}>{v}</span>
     </div>
   );

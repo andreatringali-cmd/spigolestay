@@ -74,7 +74,7 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
           <div className="truncate text-sm font-bold leading-tight">{unitName ?? <span className="italic">Da assegnare</span>}</div>
           <div className="truncate text-[11px] opacity-90">{roomType?.name ?? typeLabel ?? ""}</div>
         </div>
-        {showStructure && structure && <span className="absolute left-2 top-2 max-w-[90%] truncate rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">{structure.name}</span>}
+        {showStructure && structure && <span className="absolute left-2 top-2 max-w-[90%] truncate rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">{structure.name}</span>}
       </div>
 
       {/* Ospite, date, avvisi e passaggi */}
@@ -82,9 +82,9 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <h3 className="min-w-0 truncate text-base font-bold text-txt">{guestName}</h3>
           <span className="shrink-0"><BookingChannelWordmark booking={b} structure={structure} height={18} title={CHANNELS[b.channel].label} /></span>
-          {code && <span className="shrink-0 font-mono text-[11px] text-faint">{code}</span>}
-          {(groupSize ?? 0) > 1 && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo · {groupSize} camere</span>}
-          {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
+          {code && <span className="shrink-0 font-mono text-[11px] text-dim">{code}</span>}
+          {(groupSize ?? 0) > 1 && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">Gruppo · {groupSize} camere</span>}
+          {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--warn)]">Opzione</span>}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-dim">
           <span className="font-medium capitalize text-txt">{dayLabel(b.checkIn)}</span><span className="text-faint">→</span><span className="font-medium capitalize text-txt">{dayLabel(b.checkOut)}</span>
@@ -148,7 +148,7 @@ function StepButton({ s, onStep, structureId }: { s: JourneyStep; onStep: (s: Jo
     <button disabled={s.locked} onClick={(e) => { e.stopPropagation(); if (!s.locked) onStep(s); }} title={s.locked ? `${label}: ${s.detail} · parte da sola dal check-in online` : `${label}: ${s.detail}`} className={`flex min-w-0 items-start gap-2 rounded-lg text-left transition max-sm:min-h-10 ${s.locked ? "cursor-default" : "hover:bg-wash"}`}>
       <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: col, border: `1.5px solid ${col}`, background: s.state === "done" ? `color-mix(in srgb, ${col} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
       <span className="min-w-0">
-        <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate text-xs font-semibold text-txt">{label}</span>{sentTag && <span className="shrink-0 text-[10px] font-semibold" style={{ color: s.state === "done" ? col : "var(--warn)" }}>{sentTag}</span>}</span>
+        <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate text-xs font-semibold text-txt">{label}</span>{sentTag && <span className="shrink-0 text-[11px] font-semibold" style={{ color: s.state === "done" ? col : "var(--warn)" }}>{sentTag}</span>}</span>
         <span className="block truncate text-[11px]" style={{ color: s.state === "late" ? (s.sent ? "var(--warn)" : "var(--err)") : "var(--faint)" }}>{detail}</span>
         {s.auto && <span className="block truncate text-[11px] font-medium" title={s.auto.text} style={{ color: s.auto.tone === "warn" ? "var(--warn)" : "var(--focus)" }}>⏱ {s.auto.text}</span>}
       </span>

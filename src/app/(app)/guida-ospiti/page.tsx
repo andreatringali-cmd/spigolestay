@@ -1006,7 +1006,7 @@ export default function GuidaOspitiPage() {
                   <div className="text-[11px] leading-snug text-faint">Si copiano testi, foto e traduzioni. Indirizzo, contatti, WiFi, orari, link e codici restano quelli di questa struttura.</div>
                   <div className="flex justify-end gap-1.5">
                     <button onClick={() => setCopyOpen(false)} className="rounded-lg border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash">Annulla</button>
-                    <button onClick={copyFromOther} disabled={!copySrc || !guideHasText(all[copySrc]?.content)} className="rounded-lg bg-[color:var(--focus)] px-2.5 py-1 font-bold text-white hover:opacity-90 disabled:opacity-40">Copia</button>
+                    <button onClick={copyFromOther} disabled={!copySrc || !guideHasText(all[copySrc]?.content)} className="rounded-lg bg-[color:var(--focus)] px-2.5 py-1 font-bold text-on-focus hover:opacity-90 disabled:opacity-40">Copia</button>
                   </div>
                 </div>
               </Popover>
@@ -1047,7 +1047,7 @@ export default function GuidaOspitiPage() {
                 <div className="text-sm font-semibold text-txt">La guida è ancora vuota</div>
                 <div className="text-xs text-dim">Parti dall&apos;esempio: ti copia i testi già pronti (arrivo, Wi-Fi, colazione, dintorni, domande frequenti) e cambi solo quello che serve. I tuoi dati (indirizzo, telefoni, Wi-Fi, orari) non vengono toccati.</div>
               </div>
-              <button onClick={loadDemo} className="shrink-0 rounded-lg bg-[color:var(--focus)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90">✨ Parti dall&apos;esempio</button>
+              <button onClick={loadDemo} className="shrink-0 rounded-lg bg-[color:var(--focus)] px-3 py-1.5 text-xs font-bold text-on-focus hover:opacity-90">✨ Parti dall&apos;esempio</button>
             </div>
           )}
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
@@ -1103,7 +1103,7 @@ export default function GuidaOspitiPage() {
               <F label="Instagram"><input value={guide.social.instagram} disabled readOnly className={fldRO} /></F>
               <F label="Facebook"><input value={guide.social.facebook} disabled readOnly className={fldRO} /></F>
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
-              <a href={`/strutture/${sid}`} className="flex items-center justify-center gap-1.5 self-end rounded-lg px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>✎ Modifica i dati della struttura →</a>
+              <a href={`/strutture/${sid}`} className="flex items-center justify-center gap-1.5 self-end rounded-lg px-3 py-2.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>✎ Modifica i dati della struttura →</a>
               </div>
             )}
           </div>
@@ -1141,7 +1141,7 @@ export default function GuidaOspitiPage() {
                   <div>
                     <div className="mb-1 text-xs font-medium text-dim">{isCheckin ? "Foto della camera" : "Galleria foto"} <span className="font-normal text-faint">{isCheckin ? "· mostrate dopo i passaggi" : "· scorrono in alto nella sezione"}</span></div>
                     <div className="flex flex-wrap gap-2">
-                      {s.photos.map((ph, pi) => (<div key={pi} className="relative"><img src={ph} alt="" className="h-16 w-24 rounded border border-line object-cover" /><button onClick={() => removePhoto(si, pi)} className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full text-[10px] text-white" style={{ backgroundColor: "var(--err)" }}>✕</button></div>))}
+                      {s.photos.map((ph, pi) => (<div key={pi} className="relative"><img src={ph} alt="" className="h-16 w-24 rounded border border-line object-cover" /><button onClick={() => removePhoto(si, pi)} className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full text-[10px] text-on-err" style={{ backgroundColor: "var(--err)" }}>✕</button></div>))}
                       <label className="grid h-16 w-24 cursor-pointer place-items-center rounded border border-dashed border-line text-xs text-dim hover:bg-wash">+ Foto<input type="file" accept="image/*" className="hidden" onChange={(e) => onSecPhoto(si, e.target.files?.[0])} /></label>
                     </div>
                     <input placeholder="…o incolla un URL foto e premi Invio" onKeyDown={(e) => { if (e.key === "Enter") { addPhoto(si, (e.target as HTMLInputElement).value.trim()); (e.target as HTMLInputElement).value = ""; } }} className={`${fld} mt-2`} />
@@ -1360,7 +1360,7 @@ export default function GuidaOspitiPage() {
                 ); })()}
             </div>
           ); })}
-          <button onClick={addSection} className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi sezione</button>
+          <button onClick={addSection} className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi sezione</button>
         </>)}
         </div>
 
@@ -1378,7 +1378,7 @@ export default function GuidaOspitiPage() {
                 <div key={ph.lab} className="min-w-0 flex-1 max-sm:w-full max-sm:max-w-[360px] max-sm:flex-none">
                   <div className="mb-2 flex items-center justify-center gap-1.5">
                     <span className={`text-xs font-semibold ${ph.live ? "text-focus" : "text-faint"}`}>{ph.lab}</span>
-                    {ph.live && savedThis && <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--ok)" }}><span className="inline-block h-1.5 w-1.5 rounded-full bg-white" /> Live</span>}
+                    {ph.live && savedThis && <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-on-ok" style={{ backgroundColor: "var(--ok)" }}><span className="inline-block h-1.5 w-1.5 rounded-full bg-white" /> Live</span>}
                   </div>
                   <div className="relative mx-auto rounded-[2rem] border border-line bg-[#111318] px-1.5 pb-1.5 pt-4 shadow-xl">
                     <div className="absolute left-1/2 top-1.5 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-white/25" />
@@ -1395,7 +1395,7 @@ export default function GuidaOspitiPage() {
               </div>
               <div className="mx-auto mt-1 h-3 w-10 bg-[#111318]" style={{ clipPath: "polygon(30% 0,70% 0,100% 100%,0 100%)" }} />
               <div className="mx-auto h-1 w-28 rounded-full bg-[#111318]" />
-              <p className="mt-2 text-center text-[11px] font-medium text-faint">Smart TV in camera · usa “Schermo intero” per la demo</p>
+              <p className="mt-2 text-center text-[11px] font-medium text-faint">Smart TV in camera · usa “Schermo intero” per vederla a tutto schermo</p>
             </div>
           )}
         </div>
@@ -1439,7 +1439,7 @@ export default function GuidaOspitiPage() {
                   </div>
                   <button onClick={add} className="mt-2 text-xs font-semibold text-focus hover:underline">+ Aggiungi codice</button>
                   {codes.length > 3 && <p className="mt-2 text-[11px]" style={{ color: "var(--warn)" }}>Nota: nella guida arrivano i primi 3 codici (il motore ne mostra fino a 3 sotto i passaggi di check-in).</p>}
-                  <button onClick={() => setCodesUnit(null)} className="mt-4 w-full rounded-lg py-2.5 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Fatto</button>
+                  <button onClick={() => setCodesUnit(null)} className="mt-4 w-full rounded-lg py-2.5 text-sm font-semibold text-on-focus transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Fatto</button>
                 </div>
               </div>
             );

@@ -823,13 +823,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         </div>
         <div className="flex items-center gap-1.5 border-b border-line px-2.5 py-2" role="group" aria-label={t("Filtra conversazioni")}>
           <button type="button" onClick={() => setOnlyUnread(false)} aria-pressed={!onlyUnread} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${!onlyUnread ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Tutte")}</button>
-          <button type="button" onClick={() => setOnlyUnread(true)} aria-pressed={onlyUnread} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${onlyUnread ? "border-[color:var(--ok)] bg-[color:color-mix(in_srgb,var(--ok)_14%,transparent)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>{t("Da leggere")}{toReadCount > 0 && <span className="rounded-full px-1.5 text-[10px] font-bold text-white" style={{ backgroundColor: "var(--ok)" }}>{toReadCount}</span>}</button>
+          <button type="button" onClick={() => setOnlyUnread(true)} aria-pressed={onlyUnread} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${onlyUnread ? "border-[color:var(--ok)] bg-[color:color-mix(in_srgb,var(--ok)_14%,transparent)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>{t("Da leggere")}{toReadCount > 0 && <span className="rounded-full px-1.5 text-[11px] font-bold text-on-ok" style={{ backgroundColor: "var(--ok)" }}>{toReadCount}</span>}</button>
         </div>
         {(showArchived || archivedCount > 0) && (
           <button onClick={() => setShowArchived((v) => !v)} className="flex w-full items-center gap-2 border-b border-line px-3 py-2 text-left text-xs font-semibold text-dim hover:bg-wash">
             <span>{showArchived ? "←" : "🗄"}</span>
             <span className="flex-1">{showArchived ? t("Torna alle conversazioni") : t("Archiviate")}</span>
-            {!showArchived && archivedCount > 0 && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{archivedCount}</span>}
+            {!showArchived && archivedCount > 0 && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[11px] font-semibold text-dim">{archivedCount}</span>}
           </button>
         )}
         <div className="flex-1 overflow-y-auto">
@@ -846,7 +846,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 : (p.isReturning && p.lastPastStay ? `↩ ${t("Ospite di ritorno")} · ${t("ultimo soggiorno")} ${fmtD(p.lastPastStay.date)}` : t("Nessuna prenotazione")));
             return (
               <div key={p.id}>
-                {showPinHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">📌 {t("Fissate")}</div>}
+                {showPinHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-dim">📌 {t("Fissate")}</div>}
                 
                 <div className={`group relative flex w-full items-center border-b border-[color:color-mix(in_srgb,var(--line)_55%,transparent)] pr-1 transition-colors ${isSelected ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "hover:bg-wash"}`}>
                   {isSelected && <span className="absolute inset-y-1 left-0 w-[3px] rounded-full" style={{ backgroundColor: "var(--focus)" }} />}
@@ -857,8 +857,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span className="flex min-w-0 items-center gap-1.5"><span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-semibold"}`}>{p.name}</span>{activeStructureId === "all" && p.struct && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint" title={p.struct}>{p.struct}</span>}</span>
-                        <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[10px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-faint"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--ok)", backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)" }}>{t("Da leggere")}</span>}</span>
+                        <span className="flex min-w-0 items-center gap-1.5"><span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-semibold"}`}>{p.name}</span>{activeStructureId === "all" && p.struct && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-dim" title={p.struct}>{p.struct}</span>}</span>
+                        <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[11px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-dim"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--ok)", backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)" }}>{t("Da leggere")}</span>}</span>
                       </span>
                       <span className={`mt-0.5 block truncate text-xs ${needsReply ? "font-medium text-txt" : "text-dim"}`}>{sub}</span>
                     </span>
@@ -893,7 +893,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             <div className="mb-3 flex items-center gap-2">
               <button onClick={() => setShowInvii(false)} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">← {t("Indietro")}</button>
               <div className="min-w-0 flex-1 text-sm font-semibold text-txt">{t("Invii programmati")}</div>
-              <button onClick={sendAllToday} disabled={todayQueue.length === 0 || sendingAll} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Invia oggi")}{todayQueue.length ? ` (${todayQueue.length})` : ""}</button>
+              <button onClick={sendAllToday} disabled={todayQueue.length === 0 || sendingAll} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Invia oggi")}{todayQueue.length ? ` (${todayQueue.length})` : ""}</button>
             </div>
             {queue.length === 0 ? (
               <p className="text-sm text-faint">{t("Nessun invio in coda. Crea un modello automatico in «Modelli & automazioni», poi qui lo invii e lo tracci.")}</p>
@@ -901,24 +901,24 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {queue.map((x) => (
                   <div key={x.key} className="flex items-center gap-3 py-2">
-                    <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{fmtDM(x.date)}</div><div className="text-[10px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
+                    <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{fmtDM(x.date)}</div><div className="text-[11px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
                     <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{x.tpl.name}</b> → {gName(x.g)}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
                     {isSent(x) ? (
                       <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("Inviato")} ✓</span>
-                    ) : (() => { const l = sendLinkFor(x.tpl, x.b, x.g); return l ? <button onClick={() => sendScheduled(x)} className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: l.kind === "wa" ? "#25D366" : "var(--focus)" }}>{t("Invia ora")}</button> : <span className="shrink-0 text-[11px] text-faint">{t("no contatto")}</span>; })()}
+                    ) : (() => { const l = sendLinkFor(x.tpl, x.b, x.g); return l ? <button onClick={() => sendScheduled(x)} className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold hover:opacity-90 ${l.kind === "wa" ? "text-white" : "text-on-focus"}`} style={{ backgroundColor: l.kind === "wa" ? "#25D366" : "var(--focus)" }}>{t("Invia ora")}</button> : <span className="shrink-0 text-[11px] text-faint">{t("no contatto")}</span>; })()}
                   </div>
                 ))}
               </div>
             )}
             {sent.length > 0 && (
               <div className="mt-5">
-                <div className="mb-2 flex items-center justify-between"><div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Registro invii")}</div><button onClick={() => saveSent([])} className="text-[11px] font-medium text-dim hover:text-txt">{t("Pulisci")}</button></div>
+                <div className="mb-2 flex items-center justify-between"><div className="text-xs font-semibold uppercase tracking-wide text-dim">{t("Registro invii")}</div><button onClick={() => saveSent([])} className="text-[11px] font-medium text-dim hover:text-txt">{t("Pulisci")}</button></div>
                 <div className="flex flex-col divide-y divide-[color:var(--line)]">
                   {sent.slice(0, 12).map((s) => (
                     <div key={s.key} className="flex items-center gap-2.5 py-1.5 text-sm">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] text-white" style={{ backgroundColor: "var(--ok)" }}>✓</span>
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] text-on-ok" style={{ backgroundColor: "var(--ok)" }}>✓</span>
                       <span className="flex-1 truncate text-txt"><b>{s.tpl}</b> → {s.guest}</span>
-                      <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{s.via}</span>
+                      <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{s.via}</span>
                       <span className="shrink-0 text-[11px] text-faint">{relTime(s.ts, t)}</span>
                     </div>
                   ))}
@@ -948,13 +948,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                     <button ref={queueBtnRef} onClick={() => setQueueOpen((o) => !o)} aria-expanded={queueOpen} title={t("Invii automatici in arrivo")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${queueOpen ? "border-focus text-focus" : "border-line text-dim"}`}>⏱ {guestQueue.length} {t("in arrivo")}</button>
                     <Popover open={queueOpen} anchorRef={queueBtnRef} onClose={() => setQueueOpen(false)} align="end" width={288} label={t("Invii automatici in arrivo")}>
                       <div className="p-1">
-                        <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Invii automatici in arrivo")}</div>
+                        <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Invii automatici in arrivo")}</div>
                         <div className="flex flex-col gap-1.5">
                           {guestQueue.slice(0, 5).map((x) => (
                             <div key={x.key} className="flex items-center gap-2 text-xs">
-                              <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{fmtDM(x.date)}</span>
+                              <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[11px] text-dim">{fmtDM(x.date)}</span>
                               <span className="min-w-0 flex-1 truncate text-txt">{x.tpl.name}</span>
-                              <button onClick={() => { sendScheduled(x); setQueueOpen(false); }} className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: (x.g.phone ? "#25D366" : "var(--focus)") }}>{t("Invia ora")}</button>
+                              <button onClick={() => { sendScheduled(x); setQueueOpen(false); }} className={`shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold hover:opacity-90 ${x.g.phone ? "text-white" : "text-on-focus"}`} style={{ backgroundColor: (x.g.phone ? "#25D366" : "var(--focus)") }}>{t("Invia ora")}</button>
                             </div>
                           ))}
                         </div>
@@ -1015,11 +1015,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 if (m.sys === "payment") {
                   return (
                     <div key={m.id}>
-                      {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
+                      {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
                       <div className="my-2 flex justify-center">
                         <div className="max-w-[88%] rounded-xl px-3.5 py-2 text-center text-xs font-semibold leading-relaxed" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                          <div className="mt-0.5 text-[10px] font-normal text-faint">{hhmm}</div>
+                          <div className="mt-0.5 text-[11px] font-normal text-faint">{hhmm}</div>
                         </div>
                       </div>
                     </div>
@@ -1027,11 +1027,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 }
                 return (
                   <div key={m.id}>
-                    {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
+                    {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
                     <div className={`flex ${groupEnd ? "mb-2.5" : "mb-0.5"} ${out ? "justify-end" : "justify-start"}`}>
                       <div className={`flex min-w-0 max-w-[min(78%,34rem)] flex-col ${out ? "items-end" : "items-start"}`}>
                         <div
-                          className={`relative min-w-0 max-w-full rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${out ? `text-white ${groupEnd ? "rounded-br-sm" : ""}` : `border border-line bg-surface text-txt ${groupEnd ? "rounded-bl-sm" : ""}`}`}
+                          className={`relative min-w-0 max-w-full rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${out ? `text-on-focus ${groupEnd ? "rounded-br-sm" : ""}` : `border border-line bg-surface text-txt ${groupEnd ? "rounded-bl-sm" : ""}`}`}
                           style={out ? { backgroundColor: "var(--focus)" } : undefined}
                         >
                           {groupEnd && (
@@ -1039,7 +1039,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                               ? <span className="absolute -right-1 bottom-0 h-3 w-3 [clip-path:polygon(0_0,0_100%,100%_100%)]" style={{ backgroundColor: "var(--focus)" }} />
                               : <span className="absolute -left-1 bottom-0 h-3 w-3 border-b border-l border-line bg-surface [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
                           )}
-                          {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">🤖 {t("Risposta automatica")}</div>}
+                          {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">🤖 {t("Risposta automatica")}</div>}
                           {m.media?.kind === "audio" && <VoiceNote mediaId={m.media.id} transcribed={m.media.transcribed} />}
                           <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.text}</div>
                           {/* Allegati dalle OTA (Channex): solo link, il file resta su Channex; le immagini hanno un'anteprima piccola che sparisce se non si carica. */}
@@ -1051,7 +1051,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           ))}
                           <LinkPreview text={m.text} />
                         </div>
-                        {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}{out && m.st && (
+                        {groupEnd && <div className="mt-1 px-1 text-[11px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}{out && m.st && (
                           <span
                             className="ml-1 font-bold"
                             style={{ color: m.st === "read" ? "#34B7F1" : m.st === "failed" ? "var(--err)" : "var(--faint)" }}
@@ -1096,7 +1096,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           <span className="text-sm text-dim">€</span>
                           <input value={payAmount} onChange={(e) => { setPayAmount(e.target.value); setPayErr(""); }} inputMode="decimal" className="w-28 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold text-txt outline-none focus:border-focus" aria-label={t("Importo")} />
                           <span className="text-[11px] text-faint">{t("Residuo")} {fmtEur(ctx.balanceCents)}{payKind === "tassa" ? ` · ${t("tassa")} ${fmtEur(ctx.cityTaxCents)}` : ctx.cityTaxCents > 0 && !ctx.cityTaxExempt && !ctx.cityTaxPaid ? ` (${t("tassa di soggiorno inclusa")} ${fmtEur(ctx.cityTaxCents)})` : ""} · {t("massimo")} {fmtEur(maxC)}</span>
-                          <button onClick={createPayLink} disabled={payBusy} className="ml-auto rounded-full bg-focus px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50">{payBusy ? t("Creo il link…") : t("Crea link e inseriscilo nel messaggio")}</button>
+                          <button onClick={createPayLink} disabled={payBusy} className="ml-auto rounded-full bg-focus px-3.5 py-1.5 text-xs font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-50">{payBusy ? t("Creo il link…") : t("Crea link e inseriscilo nel messaggio")}</button>
                         </div>
                         <p className="mt-1.5 text-[11px] text-faint">{t("Il link si inserisce nella bozza: poi lo invii tu col normale invio. Quando l'ospite paga, l'incasso si registra da solo sulla prenotazione e qui compare «Pagamento ricevuto».")}</p>
                       </>
@@ -1117,7 +1117,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {current.b && <button onClick={openPay} title={t("Crea un link per far pagare all'ospite il saldo (o la tassa di soggiorno) con carta: il pagamento si registra da solo")} className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:bg-wash" style={payOpen ? { borderColor: "var(--focus)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : { borderColor: "var(--line)", color: "var(--dim)" }}>💳 {t("Link di pagamento")}</button>}
                 {!current.b && current.isReturning && <button onClick={insertLoyaltyOffer} title={t("Inserisce una proposta di sconto fedeltà per il prossimo soggiorno")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">🎁 {t("Proponi sconto fedeltà")}</button>}
                 {aiUnavailable ? (
-                  <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-medium text-faint" title={t("La risposta assistita dall'AI sarà attivata a breve")}>✨ {t("Bozza con AI")} · {t("disponibile a breve")}</span>
+                  <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-medium text-faint" title={t("La risposta assistita dall'AI non è attiva: chiedi al supporto di abilitarla")}>✨ {t("Bozza con AI")} · {t("non attiva")}</span>
                 ) : (
                   <button onClick={draftWithAi} disabled={aiBusy} title={t("Proponi una bozza di risposta nella lingua dell'ospite (da rivedere prima di inviare)")} className="rounded-full border px-3 py-1 text-xs font-semibold transition disabled:opacity-50" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, transparent)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" }}>{aiBusy ? `✨ ${t("Scrivo…")}` : `✨ ${t("Bozza con AI")}`}</button>
                 )}
@@ -1127,11 +1127,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (!touchKb && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={touchKb ? t("Scrivi un messaggio…") : t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim() || sending} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
-                  <button onClick={sendMail} disabled={!draft.trim() || !current.email || sending} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
-                  {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 {otaName} <span className="text-[9px] font-normal opacity-75">beta</span></button>}
+                  <button onClick={sendMail} disabled={!draft.trim() || !current.email || sending} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
+                  {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 {otaName} <span className="text-[10px] font-normal opacity-75">beta</span></button>}
                   {chxBookingId && <>
                     <input ref={attachRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={(e) => { sendChxFile(e.target.files?.[0]); e.target.value = ""; }} />
-                    <button onClick={() => attachRef.current?.click()} title={t("Sperimentale: invia una foto o un PDF (max ~3 MB) nel thread di Booking.com/Airbnb/Expedia — non tutte le OTA accettano allegati")} className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt">📎 {t("Allegato")} <span className="text-[9px] font-normal opacity-75">beta</span></button>
+                    <button onClick={() => attachRef.current?.click()} title={t("Sperimentale: invia una foto o un PDF (max ~3 MB) nel thread di Booking.com/Airbnb/Expedia — non tutte le OTA accettano allegati")} className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt">📎 {t("Allegato")} <span className="text-[10px] font-normal opacity-75">beta</span></button>
                   </>}
                   <span className="text-[11px] text-faint">{t("Con Invio rispondi su")} <b className="text-dim">{replyOta ? otaName : "WhatsApp"}</b>{chxBookingId && !replyOta ? ` · ${t("per rispondere su")} ${otaName} ${t("usa il pulsante blu")}` : ""}</span>
                   <button onClick={logIn} className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
@@ -1155,7 +1155,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {WA_EMBEDDED_AVAILABLE ? (
-          <button onClick={waEmbedStart} disabled={waEmbedBusy || !fbReady} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+          <button onClick={waEmbedStart} disabled={waEmbedBusy || !fbReady} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">
             {waEmbedBusy ? t("Collegamento…") : t("Collega con Meta")}
           </button>
         ) : (
@@ -1172,7 +1172,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
           <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
           <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
+          <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
           <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
         </div>
       )}

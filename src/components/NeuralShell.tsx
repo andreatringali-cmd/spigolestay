@@ -196,7 +196,7 @@ export default function NeuralShell({ inputs, state = "idle", onInput }: {
       {/* barra di tono a sinistra (identità cromatica del dato) */}
       <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-[3px] rounded-l-xl opacity-70 transition-opacity duration-300 group-hover:opacity-100" style={{ backgroundColor: it.tone }} />
       <div className="pl-1.5">
-        <div className="font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.14em]" style={{ color: light ? "rgba(114,109,100,.9)" : "rgba(200,194,184,.6)" }}>{it.label}</div>
+        <div className="font-mono text-[10px] font-semibold uppercase leading-none tracking-[0.14em]" style={{ color: light ? "rgba(114,109,100,.9)" : "rgba(200,194,184,.6)" }}>{it.label}</div>
         <div className="mt-1.5 font-mono text-[21px] font-bold leading-none tabular-nums" style={{ color: it.tone, textShadow: light ? "none" : `0 0 16px ${it.tone}40` }}>{it.value}</div>
         {it.spark && it.spark.length > 1 && (() => {
           const max = Math.max(1, ...it.spark!); const n = it.spark!.length; const w = n * 4;
@@ -228,14 +228,14 @@ export default function NeuralShell({ inputs, state = "idle", onInput }: {
 
       {/* Intestazione tipo console */}
       <div className="relative flex items-center justify-between px-4 py-3 sm:px-5">
-        <span className="inline-flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: light ? "rgba(90,85,76,.9)" : "rgba(210,200,188,.75)" }}>
+        <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: light ? "rgba(90,85,76,.9)" : "rgba(210,200,188,.75)" }}>
           <span aria-hidden className="inline-flex gap-1">
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: light ? "#B65C3C" : "#E08A5B" }} />
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: light ? "rgba(199,149,68,.8)" : "#E7B968" }} />
           </span>
           XENORA · CENTRO DI COMANDO
         </span>
-        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: light ? "#A0632F" : "#E7B968" }}>
+        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: light ? "#A0632F" : "#E7B968" }}>
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: light ? "#B65C3C" : "#E08A5B", boxShadow: light ? "0 0 8px rgba(182,92,60,.5)" : "0 0 8px rgba(224,138,91,.8)" }} />
           {state === "listen" ? "ASCOLTO" : state === "speak" ? "RISPOSTA" : "LIVE"}
         </span>

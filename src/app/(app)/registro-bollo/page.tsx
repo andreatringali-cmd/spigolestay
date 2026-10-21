@@ -88,13 +88,13 @@ export default function RegistroBolloPage() {
         <SectionTitle>Versamento (F24) — riferimento indicativo</SectionTitle>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-sm">
-            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1.5 pr-2 font-semibold">Trimestre</th><th className="py-1.5 pr-2 font-semibold">Codice tributo</th><th className="py-1.5 pr-2 font-semibold">Scadenza</th><th className="py-1.5 pr-2 text-right font-semibold">Importo</th><th className="py-1.5 pl-2 font-semibold">Nota</th></tr></thead>
+            <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="py-1.5 pr-2 font-semibold">Trimestre</th><th className="py-1.5 pr-2 font-semibold">Codice tributo</th><th className="py-1.5 pr-2 font-semibold">Scadenza</th><th className="py-1.5 pr-2 text-right font-semibold">Importo</th><th className="py-1.5 pl-2 font-semibold">Nota</th></tr></thead>
             <tbody>
               {quarters.map((q) => (
                 <tr key={q.q} className="border-b border-line last:border-0">
                   <td className="py-2 pr-2 text-txt">{q.q}º</td>
                   <td className="py-2 pr-2 font-mono text-dim">{q.tributo}</td>
-                  <td className="whitespace-nowrap py-2 pr-2 text-dim">{dmy(q.dueDate)}{q.cents > 0 && q.dueDate < today && <span className="ml-1 text-[10px] font-semibold text-[color:var(--err)]">scaduta</span>}</td>
+                  <td className="whitespace-nowrap py-2 pr-2 text-dim">{dmy(q.dueDate)}{q.cents > 0 && q.dueDate < today && <span className="ml-1 text-[11px] font-semibold text-[color:var(--err)]">scaduta</span>}</td>
                   <td className="py-2 pr-2 text-right font-mono text-txt">{eur(cents(q.cents))}</td>
                   <td className="py-2 pl-2 text-[12px] text-dim">{q.postponable ? "Importo ≤ 250 €: il versamento è rinviabile alla scadenza successiva (verifica)." : ""}</td>
                 </tr>
@@ -107,7 +107,7 @@ export default function RegistroBolloPage() {
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
         <table className="w-full min-w-[720px] text-sm">
-          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2 font-semibold">Trim.</th><th className="px-3 py-2 font-semibold">Struttura</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Bollo</th></tr></thead>
+          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2 font-semibold">Trim.</th><th className="px-3 py-2 font-semibold">Struttura</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Bollo</th></tr></thead>
           <tbody>
             {shown.map((r) => {
               const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" };

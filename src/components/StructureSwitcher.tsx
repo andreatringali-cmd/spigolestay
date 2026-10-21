@@ -75,7 +75,7 @@ function Item({ checked, onClick, name, sub, onOnly, onlyLabel }: { checked: boo
   return (
     <div className="group flex items-center rounded-lg transition hover:bg-wash" style={checked ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : undefined}>
       <button onClick={onClick} role="checkbox" aria-checked={checked} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-sm max-sm:min-h-11">
-        <span className="grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] font-bold leading-none text-white" style={{ borderColor: checked ? "var(--focus)" : "var(--line)", background: checked ? "var(--focus)" : "transparent" }}>{checked ? "✓" : ""}</span>
+        <span className="grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] font-bold leading-none text-on-focus" style={{ borderColor: checked ? "var(--focus)" : "var(--line)", background: checked ? "var(--focus)" : "transparent" }}>{checked ? "✓" : ""}</span>
         <span className="min-w-0 flex-1 truncate font-medium text-txt">{name}</span>
         {sub && <span className="text-[11px] text-faint">{sub}</span>}
       </button>

@@ -139,7 +139,7 @@ export default function OspitiPage() {
   const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" ? "asc" : "desc" }));
   const Th = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
     <th className={`whitespace-nowrap px-3 py-2 font-semibold ${right ? "text-right" : "text-left"}`}>
-      <button onClick={() => toggleSort(k)} className={`inline-flex items-center gap-1 hover:text-txt ${sort.key === k ? "text-txt" : ""}`}>{children}{sort.key === k && <span className="text-[9px]">{sort.dir === "asc" ? "▲" : "▼"}</span>}</button>
+      <button onClick={() => toggleSort(k)} className={`inline-flex items-center gap-1 hover:text-txt ${sort.key === k ? "text-txt" : ""}`}>{children}{sort.key === k && <span className="text-[10px]">{sort.dir === "asc" ? "▲" : "▼"}</span>}</button>
     </th>
   );
 
@@ -244,17 +244,17 @@ export default function OspitiPage() {
     const lim = regLim[lead ? "nl" : "ospiti"];
     const shown = list.slice(0, lim);
     const clearBtn = onClear && list.length > 0 && (
-      <button onClick={onClear} className={`ml-2 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition ${confirmClearNl ? "border-[color:var(--err)] bg-[color:var(--err)] text-white" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}>
+      <button onClick={onClear} className={`ml-2 rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide transition ${confirmClearNl ? "border-[color:var(--err)] bg-[color:var(--err)] text-on-err" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}>
         {confirmClearNl ? t("Conferma svuota") : `🗑 ${t("Svuota")}`}
       </button>
     );
     const allR = ids.length > 0 && ids.every((id) => sel.has(id));
     const toggleAllR = () => setSel((prev) => { const n = new Set(prev); if (allR) ids.forEach((id) => n.delete(id)); else ids.forEach((id) => n.add(id)); return n; });
     const nameCell = (guest: typeof list[number]["guest"]) => (
-      <span className="flex min-w-0 items-center gap-1.5 truncate font-medium text-txt">{guest.fullName ?? ""}
-        {guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
-        {repeatIds.has(guest.id) && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}
-        {guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}
+      <span className="flex min-w-0 items-center gap-1.5 font-medium text-txt"><span className="min-w-0 truncate">{guest.fullName ?? ""}</span>
+        {guest.vip && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
+        {repeatIds.has(guest.id) && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}
+        {guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}
       </span>
     );
     return (
@@ -263,9 +263,9 @@ export default function OspitiPage() {
         <div className="md:hidden">
           <div className="mb-2 flex items-center px-1 text-sm font-bold uppercase tracking-wide text-txt">
             <button onClick={onToggle} className="flex items-center gap-1.5 py-2.5 hover:text-focus">
-              <span className="text-[10px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
+              <span className="text-[11px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
             </button>
-            {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
+            {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[11px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
           </div>
           {open && <div className="flex flex-col gap-2">
             {shown.map(({ guest, stays, nightsTot, spent, last, topCh, topB }) => (
@@ -299,14 +299,14 @@ export default function OspitiPage() {
         <div className="hidden rounded-xl border border-line bg-surface shadow-sm md:block">
           <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-txt">
             <button onClick={onToggle} className="flex items-center gap-1.5 hover:text-focus">
-              <span className="text-[10px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
+              <span className="text-[11px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
             </button>
-            {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
+            {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="text-[11px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
           </div>
           {open && <div className="max-h-[62dvh] overflow-auto">
           <table className={`w-full ${lead ? "min-w-[560px]" : "min-w-[980px]"} text-sm`}>
             <thead className="sticky top-0 z-10 bg-wash">
-              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-dim">
                 <th className="w-8 px-3 py-2"><input type="checkbox" checked={allR} onChange={toggleAllR} style={{ accentColor: "var(--focus)" }} /></th>
                 <Th k="name">{t("Ospite")}</Th>
                 <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Telefono")}</th>
@@ -377,7 +377,7 @@ export default function OspitiPage() {
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
           <span className="text-sm font-semibold text-txt">{dupCount} {t("possibili doppioni")}</span>
           <span className="text-xs text-dim">{t("Stessa persona con più schede: controlla l'anteprima e conferma, nulla viene unito da solo.")}</span>
-          <button onClick={() => { setMergeSkip(new Set()); setMergeOpen(true); }} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Rivedi e unisci")}</button>
+          <button onClick={() => { setMergeSkip(new Set()); setMergeOpen(true); }} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">{t("Rivedi e unisci")}</button>
         </div>
       )}
 
@@ -399,7 +399,7 @@ export default function OspitiPage() {
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 max-sm:contents sm:col-span-3">
           <div className="contents max-sm:hidden">{segChips}{segSelectBtn}</div>
           <div className="ml-auto flex items-center gap-2 max-sm:contents">
-            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]">+ {t("Nuovo ospite")}</button>
+            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]">+ {t("Nuovo ospite")}</button>
             <button onClick={() => router.push("/promozioni")} aria-label={t("Promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:hidden"><Icon name="tag" size={14} /> <span>{t("Promozioni")}</span></button>
             <button onClick={() => setExportPick(true)} aria-label="Excel" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:hidden"><Icon name="fileText" size={14} /> <span>Excel</span></button>
           </div>
@@ -412,7 +412,7 @@ export default function OspitiPage() {
           <span className="text-xs text-faint">· {selEmails.length} {t("contattabili via email")}{selExcluded > 0 ? ` · ${selExcluded} ${t("esclusi (senza consenso marketing o con email di inoltro)")}` : ""}</span>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setSel(new Set())} className="rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Deseleziona")}</button>
-            <button onClick={() => setPickPromo(true)} disabled={selEmails.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">✉ {t("Invia promo")} ({selEmails.length})</button>
+            <button onClick={() => setPickPromo(true)} disabled={selEmails.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">✉ {t("Invia promo")} ({selEmails.length})</button>
           </div>
         </div>
       )}
@@ -438,7 +438,7 @@ export default function OspitiPage() {
                     <div className="flex flex-col gap-1">
                       {[p.keeper, ...p.dropped].map((g) => (
                         <div key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-                          <span className={`w-16 shrink-0 rounded-full px-2 py-0.5 text-center text-[10px] font-bold uppercase ${g.id === p.keepId ? "bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] text-[color:var(--ok)]" : "bg-wash text-faint"}`}>{g.id === p.keepId ? t("resta") : t("si unisce")}</span>
+                          <span className={`w-16 shrink-0 rounded-full px-2 py-0.5 text-center text-[11px] font-bold uppercase ${g.id === p.keepId ? "bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] text-[color:var(--ok)]" : "bg-wash text-dim"}`}>{g.id === p.keepId ? t("resta") : t("si unisce")}</span>
                           <b className="text-txt">{g.fullName || [g.firstName, g.lastName].filter(Boolean).join(" ") || "—"}</b>
                           <span className="text-dim">{g.email || "—"}</span>
                           <span className="text-dim">{g.phone ? phoneShown(g) : "—"}</span>
@@ -454,7 +454,7 @@ export default function OspitiPage() {
             </div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setMergeOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={doMerge} disabled={mergePlans.every((p) => mergeSkip.has(p.keepId))} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Unisci")} ({mergePlans.filter((p) => !mergeSkip.has(p.keepId)).length})</button>
+              <button onClick={doMerge} disabled={mergePlans.every((p) => mergeSkip.has(p.keepId))} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Unisci")} ({mergePlans.filter((p) => !mergeSkip.has(p.keepId)).length})</button>
             </div>
           </div>
         </div>
@@ -479,7 +479,7 @@ export default function OspitiPage() {
                 <button onClick={() => setExportCols(new Set(EXPORT_COLUMNS.map((c) => c.key)))} className="font-semibold text-focus hover:underline">{t("Tutte")}</button>
                 <button onClick={() => setExportCols(new Set())} className="font-semibold text-dim hover:underline">{t("Nessuna")}</button>
               </div>
-              <button onClick={doExportExcel} disabled={exportCols.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">⬇ {t("Esporta")}</button>
+              <button onClick={doExportExcel} disabled={exportCols.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">⬇ {t("Esporta")}</button>
             </div>
           </div>
         </div>
@@ -498,7 +498,7 @@ export default function OspitiPage() {
                 {promos.map((p) => (
                   <button key={p.id} onClick={() => sendPromoTo(p)} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-left hover:border-focus hover:bg-wash">
                     <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div></div>
-                    {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
+                    {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
                   </button>
                 ))}
               </div>

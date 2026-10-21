@@ -113,25 +113,25 @@ export default function TariffeDerivatePage() {
           </select>
         )}
         <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line">
-          <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+          <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "map" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}
           </button>
-          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "table" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10 ${view === "table" ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
           </button>
         </div>
         <span className="h-4 w-px bg-line max-sm:hidden" />
-        <span className="font-semibold uppercase tracking-wide text-faint max-sm:hidden">{t("Legenda")}</span>
+        <span className="font-semibold uppercase tracking-wide text-dim max-sm:hidden">{t("Legenda")}</span>
         {/* Legenda: da sm in su tre elementi flex come prima (contents); su telefono un unico testo che scorre su 2 righe */}
         <div className="contents max-sm:order-5 max-sm:block max-sm:w-full max-sm:text-[10.5px] max-sm:leading-5">
-          <span className="flex items-center gap-1.5 max-sm:mr-2 max-sm:inline"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
+          <span className="flex items-center gap-1.5 max-sm:mr-2 max-sm:inline"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
           <span className="flex items-center gap-1.5 max-sm:mr-2 max-sm:inline"><span className="text-focus max-sm:inline-block max-sm:align-middle"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
-          <span className="flex items-center gap-1.5 max-sm:inline"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
+          <span className="flex items-center gap-1.5 max-sm:inline"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
         </div>
         <button
           onClick={() => setDerivModal({ structureIds: scoped.map((s) => s.id) })}
           disabled={!scoped.some((s) => roomTypes.some((rt) => rt.structureId === s.id && !rt.deriveFrom))}
-          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:w-full max-sm:py-0 max-sm:text-[13px]"
+          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40 max-sm:order-3 max-sm:ml-0 max-sm:h-9 max-sm:w-full max-sm:py-0 max-sm:text-[13px]"
         >＋ {t("Crea tariffa derivata")}</button>
       </div>
 
@@ -176,7 +176,7 @@ export default function TariffeDerivatePage() {
                         <col style={{ width: "7%" }} />
                       </colgroup>
                       <thead>
-                        <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                        <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-dim">
                           <th className="px-3 py-2.5 font-semibold">{t("Nome")}</th>
                           <th className="px-3 py-2.5 text-center font-semibold">{t("Camere")}</th>
                           <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
@@ -208,12 +208,12 @@ export default function TariffeDerivatePage() {
                                     ) : <span className="inline-block w-3 shrink-0" />}
                                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                                     <span className="truncate font-semibold text-txt">{rt.name}</span>
-                                    <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>
+                                    <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim">master</span>
                                   </div>
                                 </td>
                                 <td className="px-3 py-2.5 text-center font-mono text-dim">{nCam}</td>
                                 <td className="px-3 py-2.5 text-center"><Occ n={rt.maxOccupancy ?? rt.beds} /></td>
-                                <td className="px-3 py-2.5 font-mono text-dim">{eur(effectiveBase(rt, roomTypes))}<span className="text-[10px] text-faint">{t("/notte")}</span></td>
+                                <td className="px-3 py-2.5 font-mono text-dim">{eur(effectiveBase(rt, roomTypes))}<span className="text-[11px] text-faint">{t("/notte")}</span></td>
                                 <td className="px-3 py-2.5 text-xs text-faint">—</td>
                                 <td className="px-3 py-2.5 text-center font-mono text-dim">{Math.max(1, mMin || 1)}</td>
                                 <td className="px-3 py-2.5">{mClosed
@@ -242,13 +242,13 @@ export default function TariffeDerivatePage() {
                                   <td className="px-3 py-2.5">{k.ratePlan ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{k.ratePlan}</span> : <span className="text-xs text-faint">—</span>}</td>
                                   <td className="px-3 py-2.5 text-center">
                                     <span className="font-mono text-dim">{Math.max(1, kMin || 1)}</span>
-                                    {k.restrictionsInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[9px] font-medium text-faint" title={t("Valore ereditato dalla tipologia madre")}>{t("da madre")}</span>}
+                                    {k.restrictionsInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[10px] font-medium text-faint" title={t("Valore ereditato dalla tipologia madre")}>{t("da madre")}</span>}
                                   </td>
                                   <td className="px-3 py-2.5">
                                     {kClosed
                                       ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>{t("Chiusa")}</span>
                                       : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}
-                                    {k.deriveInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[9px] font-medium text-faint" title={t("Disponibilità ereditata dalla tipologia madre")}>{t("da madre")}</span>}
+                                    {k.deriveInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[10px] font-medium text-faint" title={t("Disponibilità ereditata dalla tipologia madre")}>{t("da madre")}</span>}
                                   </td>
                                   <td className="px-3 py-2.5 text-right text-faint">›</td>
                                 </tr>
@@ -308,13 +308,13 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
             <div className="mt-1 truncate text-sm font-bold text-txt" title={rt.name}>{rt.name}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
               <span className="font-mono text-sm font-semibold text-txt">{eur(effectiveBase(rt, roomTypes))}</span>
-              {derived && rt.ratePlan && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] text-dim">{rt.ratePlan}</span>}
-              {!derived && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
+              {derived && rt.ratePlan && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[11px] text-dim">{rt.ratePlan}</span>}
+              {!derived && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim">master</span>}
             </div>
           </div>
           <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs max-sm:py-0">
             <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline max-sm:py-3">＋ {t("Derivata")}</button>
-            {derived && rt.personPlan && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={t("Inviata ai portali come prezzo per 1 ospite")}>✓ 👤1 {t("portali")}</span>}
+            {derived && rt.personPlan && <span className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={t("Inviata ai portali come prezzo per 1 ospite")}>✓ 👤1 {t("portali")}</span>}
             {derived ? (
               <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline max-sm:py-3">{t("Modifica")}</button>
             ) : (
@@ -336,7 +336,7 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
                       {!single && <div className="absolute top-0" style={{ height: 3, backgroundColor: CONN, left: first ? "50%" : "-0.75rem", right: last ? "50%" : "-0.75rem" }} />}
                       <div className="absolute top-0 left-1/2 h-4 -translate-x-1/2" style={{ width: 3, backgroundColor: CONN }} />
                     </div>
-                    <span className="relative z-10 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
+                    <span className={`relative z-10 rounded-full px-2 py-0.5 text-[11px] font-bold shadow-sm ${(k.deriveValue ?? 0) >= 0 ? "text-on-ok" : "text-on-err"}`} style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
                     <div className="h-2" style={{ width: 3, backgroundColor: CONN }} />
                     <Node rt={k} seen={ns} />
                   </div>
@@ -511,7 +511,7 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
           <div className="mt-4 flex items-center gap-2">
             {editing && <button onClick={async () => { if (await blockedByBookings(ask, t, editing.id, editing.name, roomTypes, units, bookings)) return; if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${editing.name}"? ${roomTypeCascadeIds(editing.id, roomTypes).length > 1 ? `${t("Verranno eliminate anche le sue tariffe derivate")} (${roomTypeCascadeIds(editing.id, roomTypes).length - 1}).` : ""}`, danger: true, confirmLabel: t("Elimina") })) { deleteRoomType(editing.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-            <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{editing ? t("Salva") : t("Crea derivata")}</button>
+            <button onClick={save} disabled={!canSave} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{editing ? t("Salva") : t("Crea derivata")}</button>
           </div>
         </>
       )}
