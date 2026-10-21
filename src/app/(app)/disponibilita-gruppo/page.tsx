@@ -3,6 +3,7 @@
 // Gruppo: si scelgono le strutture del gruppo, Xenora riconosce le tipologie e per ciascuna si indica il numero di camere reali.
 // Le tipologie con lo stesso nome dividono le stesse camere; la disponibilità resta sincronizzata tra le strutture (portali, calendario, sito diretto).
 // Logica in src/lib/inventory-pool.ts.
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { allLoaded, ensureLoaded, useStructLoad } from "@/lib/struct-load";
@@ -22,7 +23,7 @@ function Dot({ name, color, logo, size = 22 }: { name: string; color?: string; l
     <img src={logo} alt="" aria-hidden className="shrink-0 rounded-full border border-line bg-white object-contain" style={{ width: size, height: size }} />
   );
   return (
-    <span className="grid shrink-0 place-items-center rounded-full font-bold text-white" style={{ width: size, height: size, fontSize: Math.round(size * 0.46), backgroundColor: color ?? "var(--focus)" }} aria-hidden>
+    <span className={`grid shrink-0 place-items-center rounded-full font-bold ${onSolid(color ?? "var(--focus)")}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.46), backgroundColor: solidBg(color ?? "var(--focus)") }} aria-hidden>
       {(name || "?")[0]?.toUpperCase()}
     </span>
   );

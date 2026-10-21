@@ -1,5 +1,6 @@
 "use client";
 
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -66,7 +67,7 @@ export default function StrutturePage() {
       <tr key={s.id} tabIndex={0} onClick={() => router.push(`/strutture/${s.id}`)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); router.push(`/strutture/${s.id}`); } }} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
+            <div className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold ${onSolid(color)}`} style={{ backgroundColor: solidBg(color) }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
             <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div>{s.orgId && orgInfo[s.orgId] && orgInfo[s.orgId].role !== "owner" && orgInfo[s.orgId].ownerEmail && <div className="truncate text-[11px] text-faint">{t("Proprietario")}: {orgInfo[s.orgId].ownerEmail}</div>}</div>
           </div>
         </td>

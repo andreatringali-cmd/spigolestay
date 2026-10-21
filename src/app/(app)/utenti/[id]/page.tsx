@@ -26,7 +26,7 @@ import { runInvite, shareStructures, profileOf, markInvited } from "@/lib/invite
 import { friendlyError } from "@/lib/friendly-error";
 import { PASSWORD_MIN } from "@/components/PublicUi";
 
-import { onSolid } from "@/lib/on-solid";
+import { onSolid, solidBg } from "@/lib/on-solid";
 import Toggle from "@/components/Toggle";
 // --- Micro-componenti ---------------------------------------------------------
 function Info({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "warn" }) {
@@ -200,7 +200,7 @@ export default function UserSchedaPage() {
 
   const fullName = `${u.firstName} ${u.lastName}`.trim() || t("Nuovo utente");
   const avatar = (size: number) => (
-    <div className="grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-white" style={{ width: size, height: size, backgroundColor: u.avatarColor, fontSize: size * 0.36 }}>
+    <div className={`grid shrink-0 place-items-center overflow-hidden rounded-full font-bold ${onSolid(u.avatarColor)}`} style={{ width: size, height: size, backgroundColor: solidBg(u.avatarColor), fontSize: size * 0.36 }}>
       {u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}
     </div>
   );

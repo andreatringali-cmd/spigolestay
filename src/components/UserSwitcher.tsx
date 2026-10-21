@@ -7,7 +7,7 @@ import { playSound } from "@/lib/sound";
 import { useAuth } from "@/lib/authsync";
 import Popover from "./Popover";
 
-import { onSolid } from "@/lib/on-solid";
+import { onSolid, solidBg } from "@/lib/on-solid";
 const roleLabel = (k: string) => (k === "custom" ? "Personalizzato" : PERM_TEMPLATES.find((t) => t.key === k)?.label ?? "—");
 
 // Utente "collegato": in produzione arriva dall'autenticazione. Qui puoi cambiarlo per provare i ruoli.
@@ -21,13 +21,13 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
   return (
     <div className="relative">
       <button ref={btnRef} onClick={() => setOpen((o) => !o)} className={`flex items-center gap-2 rounded-lg border border-line hover:bg-wash ${sidebar ? `w-full ${collapsed ? "justify-center px-1.5 py-1.5" : "px-2 py-1.5"}` : "px-2 py-1"}`} title="Utente collegato">
-        <span className={`grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[11px] font-bold ${onSolid(user.avatarColor)}`} style={{ backgroundColor: user.avatarColor }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
+        <span className={`grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[11px] font-bold ${onSolid(user.avatarColor)}`} style={{ backgroundColor: solidBg(user.avatarColor) }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
         {!(sidebar && collapsed) && <span className={`text-left leading-tight ${sidebar ? "block min-w-0 flex-1" : "hidden sm:block"}`}><span className="block truncate text-xs font-semibold text-txt">{user.firstName} {user.lastName}</span><span className="block text-[11px] text-faint">{roleLabel(user.templateKey)}</span></span>}
       </button>
       {/* Nella barra laterale (in basso) la tendina si apre sopra il pulsante da sola, se sotto non c'è spazio. */}
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align={sidebar ? "start" : "end"} width={256} label="Utente collegato">
           <div className="flex items-center gap-2 px-2 py-2">
-            <span className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold ${onSolid(user.avatarColor)}`} style={{ backgroundColor: user.avatarColor }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
+            <span className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold ${onSolid(user.avatarColor)}`} style={{ backgroundColor: solidBg(user.avatarColor) }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-txt">{user.firstName} {user.lastName}</span>
               <span className="block text-[11px] text-dim">{roleLabel(user.templateKey)}</span>

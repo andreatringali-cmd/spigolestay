@@ -1,5 +1,6 @@
 "use client";
 
+import { onSolid, solidBg } from "@/lib/on-solid";
 import { useState, useRef } from "react";
 import { withSplitNames } from "@/lib/guest-key";
 import { useParams, useRouter } from "next/navigation";
@@ -162,7 +163,7 @@ export default function OspiteSchedaPage() {
       {/* Intestazione ospite + statistiche */}
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white" style={{ backgroundColor: color }}>{initials(g.firstName, g.lastName) || "?"}</div>
+          <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold ${onSolid(color)}`} style={{ backgroundColor: solidBg(color) }}>{initials(g.firstName, g.lastName) || "?"}</div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
             <div className="break-words text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
