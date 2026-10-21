@@ -19,9 +19,10 @@ import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { guideHasText } from "@/lib/guide-copy";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
-  addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, buildSetupSteps, buildTodo, greetingFor, isLive,
+  addDaysISO, adempimentiHealth, buildAdempimenti, buildControlli, buildSetupSteps, buildTodo, greetingFor, isLive,
   monthStats, occupancyOutlook, occupancyStrip, plural, splitDay, stayNights, unassignedArrivals,
 } from "@/lib/dashboard";
+import { useAdempimentiOggi } from "@/lib/use-adempimenti-oggi";
 import { useAuth } from "@/lib/authsync";
 import { useAccess } from "@/lib/access";
 import { loadChannelColor } from "@/lib/channelOverrides";
@@ -103,7 +104,9 @@ export default function Dashboard() {
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [live, today, dati.schedBy, dati.istatPendingIds, dati.threads, dati.questuraErrors, remLog, structMap, guestMap]);
-  const stato = adempimentiStato(items);
+  // Il numero «Adempimenti oggi» NON si calcola qui: è lo stesso della pagina Adempimenti e del badge laterale (lib/adempimenti-oggi.ts).
+  const ade = useAdempimentiOggi();
+  const adeCounts = ade.result.counts;
   const health = useMemo(() => adempimentiHealth(live, today, (b) => stepsOf(b)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [live, today, dati.schedBy, dati.istatPendingIds, dati.threads, remLog, structMap, guestMap]);
@@ -253,8 +256,8 @@ export default function Dashboard() {
       sub: payItem?.amount || taxToday > 0 ? [payItem?.amount ? `saldi ${eur(payItem.amount)}` : "", taxToday > 0 ? `tassa di soggiorno ${eur(taxToday)} (check-out oggi)` : ""].filter(Boolean).join(" · ") : "Niente da incassare oggi",
     },
     {
-      key: "ade", label: "Adempimenti oggi", value: String(stato.today), href: "/adempimenti", loading: loadingAdem, tone: stato.today > 0 && stato.urgent > 0 ? "err" : undefined,
-      sub: stato.backlog > 0 ? `+ ${stato.backlog} ${plural(stato.backlog, "arretrato", "arretrati")}` : stato.today > 0 ? "Da fare oggi" : "Niente in scadenza",
+      key: "ade", label: "Adempimenti oggi", value: String(adeCounts.total), href: "/adempimenti", loading: !ade.ready, tone: adeCounts.urgent > 0 ? "err" : undefined,
+      sub: adeCounts.urgent > 0 ? `${adeCounts.urgent} ${plural(adeCounts.urgent, "urgente", "urgenti")}` : adeCounts.total > 0 ? "Da fare oggi" : "Niente da fare",
     },
   ];
 

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { Alert, Button, Modal } from "./ui/index";
 
 // Finestra di conferma per azioni definitive/irreversibili (es. invio alla Questura/Osservatorio).
+// Costruita sul <Modal> del design system: role=dialog, Esc, trappola del focus, ritorno del focus, blocco scroll.
+// Focus iniziale: su «Annulla» quando l'azione è distruttiva (tone = var(--err)), altrimenti sul pulsante di conferma.
 export default function ConfirmDialog({ title, message, warning, confirmLabel = "Conferma", cancelLabel = "Annulla", tone = "var(--focus)", busy, disabled, onConfirm, onClose }: {
   title: string;
   message?: React.ReactNode;
@@ -15,23 +17,30 @@ export default function ConfirmDialog({ title, message, warning, confirmLabel = 
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose, busy]);
+  const danger = tone === "var(--err)";
+  const custom = !danger && tone !== "var(--focus)"; // warn/ok: colore pieno scelto dal chiamante
+  const onTone = tone === "var(--warn)" ? "var(--on-warn)" : tone === "var(--ok)" ? "var(--on-ok)" : "var(--on-focus)";
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => { if (!busy) onClose(); }}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-base font-semibold text-txt">{title}</h2>
-        {message && <div className="mt-2 text-sm text-dim">{message}</div>}
-        {warning && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-[13px] font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>
-            <span aria-hidden>⚠️</span><span>{warning}</span>
-          </div>
-        )}
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button onClick={onClose} disabled={busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{cancelLabel}</button>
-          <button onClick={onConfirm} disabled={busy || disabled} className={`rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50 ${tone === "var(--err)" ? "text-on-err" : tone === "var(--warn)" ? "text-on-warn" : tone === "var(--ok)" ? "text-on-ok" : "text-on-focus"}`} style={{ backgroundColor: tone }}>{busy ? "Invio…" : confirmLabel}</button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={title}
+      size="md"
+      busy={busy}
+      layer="top"
+      footer={<>
+        <Button variant="secondary" onClick={onClose} disabled={busy} data-autofocus={danger ? "" : undefined}>{cancelLabel}</Button>
+        <Button
+          variant={danger ? "danger" : "primary"}
+          onClick={onConfirm}
+          disabled={busy || disabled}
+          data-autofocus={danger ? undefined : ""}
+          style={custom ? { backgroundColor: tone, color: onTone } : undefined}
+        >{busy ? "Invio…" : confirmLabel}</Button>
+      </>}
+    >
+      {message && <div className="text-dim">{message}</div>}
+      {warning && <Alert tone="warn" className="mt-3">{warning}</Alert>}
+    </Modal>
   );
 }

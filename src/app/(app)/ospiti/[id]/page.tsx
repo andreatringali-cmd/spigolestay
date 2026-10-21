@@ -20,12 +20,10 @@ import { useEffect } from "react";
 import MediaImg from "@/components/MediaImg";
 import MediaLink from "@/components/MediaLink";
 import { DIAL_CODES, parsePhone, combinePhone } from "../_phone";
+import Toggle from "@/components/Toggle";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
-function Toggle({ on, onClick, color = "var(--focus)", label }: { on: boolean; onClick?: () => void; color?: string; label?: string }) {
-  return <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
-}
 const nights = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
 
 // Esito del controllo sotto il campo: cosa non va, o conferma che va bene. "Usa…" applica la correzione proposta.

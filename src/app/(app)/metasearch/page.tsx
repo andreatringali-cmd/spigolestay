@@ -183,7 +183,7 @@ export default function MetaSearchPage() {
                         <option value="cpc">{t("Costo per clic")}</option>
                         <option value="commission">{t("Commissione")}</option>
                       </select>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Math.max(0, Number(e.target.value) || 0) })} className="w-14 bg-transparent text-center font-semibold text-txt outline-none" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Math.max(0, Number(e.target.value) || 0) })} className="w-14 bg-transparent text-center font-semibold text-txt" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
                     </div>
                   </div>
                 )}

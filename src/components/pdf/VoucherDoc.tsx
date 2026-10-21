@@ -12,6 +12,8 @@ export interface VoucherDocProps {
   roomType: string; unitName?: string; checkIn: string; checkOut: string; checkInFrom?: string; checkOutBy?: string;
   adults: number; children: number; nights: number; ratePlan?: string;
   total?: string; cancelText: string;
+  /** Soggiorno (senza tassa) e tassa di soggiorno: se c'è la tassa, `total` è il totale CON tassa e il voucher lo dice (stessa regola di lib/booking-totals.ts). */
+  stayTotal?: string; tax?: string;
 }
 
 export default function VoucherDoc(p: VoucherDocProps) {
@@ -56,14 +58,25 @@ export default function VoucherDoc(p: VoucherDocProps) {
           <div style={row}><span>Ospiti</span><span>{p.adults} adulti{p.children ? ` · ${p.children} bambini` : ""}</span></div>
           {p.ratePlan && <div style={row}><span>Tariffa</span><span>{p.ratePlan}</span></div>}
 
+          {p.total && p.tax && p.stayTotal && (
+            <div style={{ marginTop: 14 }}>
+              <div style={row}><span>Soggiorno</span><span>{p.stayTotal}</span></div>
+              <div style={row}><span>Tassa di soggiorno</span><span>{p.tax}</span></div>
+            </div>
+          )}
           {p.total && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 18px", marginTop: 14, background: tintWhite(p.accent, 0.09), borderRadius: 10 }}>
-              <b style={{ fontSize: 13.5, letterSpacing: ".04em" }}>TOTALE SOGGIORNO</b><b style={{ fontSize: 22, color: p.accent }}>{p.total}</b>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 18px", marginTop: p.tax ? 8 : 14, background: tintWhite(p.accent, 0.09), borderRadius: 10 }}>
+              <b style={{ fontSize: 13.5, letterSpacing: ".04em" }}>{p.tax && p.stayTotal ? "TOTALE CON TASSA DI SOGGIORNO" : "TOTALE SOGGIORNO"}</b><b style={{ fontSize: 22, color: p.accent }}>{p.total}</b>
             </div>
           )}
 
-          <div style={{ fontSize: 11.5, letterSpacing: ".1em", color: muted, textTransform: "uppercase", fontWeight: 700, margin: "22px 0 6px" }}>Condizioni di cancellazione</div>
-          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: muted }}>{p.cancelText}</p>
+          {/* Senza una politica di cancellazione la sezione non c'è (prima restava il titolo con sotto il vuoto). */}
+          {p.cancelText.trim() && (
+            <>
+              <div style={{ fontSize: 11.5, letterSpacing: ".1em", color: muted, textTransform: "uppercase", fontWeight: 700, margin: "22px 0 6px" }}>Condizioni di cancellazione</div>
+              <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: muted }}>{p.cancelText}</p>
+            </>
+          )}
         </div>
 
         {/* Piè di pagina fissato in fondo al foglio A4, come nel preventivo */}

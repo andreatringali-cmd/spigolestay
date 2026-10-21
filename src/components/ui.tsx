@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import PageHelp from "./PageHelp";
 
+// Ponte verso il design system: i componenti base (Button, Field, Input, Select, Textarea, Badge, Modal, Tabs, Switch, DataTable, Alert…)
+// vivono in components/ui/ e si importano anche da qui. Le regole d'uso sono in docs/DESIGN-SYSTEM.md.
+export * from "./ui/index";
+
 export function PageHeader({ title, subtitle, actions, hideHelp }: { title: string; subtitle?: string; actions?: ReactNode; hideHelp?: boolean }) {
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -20,9 +24,11 @@ export function PageHeader({ title, subtitle, actions, hideHelp }: { title: stri
   );
 }
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+// Card unica. Di base è statica (bordo + ombra leggera): l'alzata al passaggio (hover) c'è SOLO con `interactive`, per non far sembrare cliccabile ciò che non lo è.
+// `animate={false}` toglie l'animazione d'entrata (card dentro finestre/elenchi lunghi); `padding="none"` per tabelle a filo.
+export function Card({ children, className = "", interactive = false, animate = true, padding = "md" }: { children: ReactNode; className?: string; interactive?: boolean; animate?: boolean; padding?: "none" | "sm" | "md" }) {
   return (
-    <div className={`anim-in rounded-xl border border-line bg-surface p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5 ${className}`}>{children}</div>
+    <div className={`${animate ? "anim-in " : ""}rounded-xl border border-line bg-surface shadow-sm ${padding === "none" ? "" : padding === "sm" ? "p-3" : "p-4 sm:p-5"} ${interactive ? "transition-shadow hover:shadow-md" : ""} ${className}`}>{children}</div>
   );
 }
 

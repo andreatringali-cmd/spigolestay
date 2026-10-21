@@ -11,6 +11,7 @@ import { nights, parseISO, toISO, fmtDate } from "@/lib/dates";
 import { titleCaseName } from "@/lib/names";
 import { eur } from "@/lib/format";
 import { balanceDue, otaCoveredAmount } from "@/lib/incassi";
+import { TOTAL_STAY_LABEL, TOTAL_STAY_HINT } from "@/lib/booking-totals";
 import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionIsEstimate, COMMISSION_ESTIMATE_HINT, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
 import { otaGroupName, MIXED_OTA_LABEL } from "@/lib/channel-name";
@@ -37,6 +38,7 @@ import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { StatoProvider, StatoCell } from "./_stato";
+import { keyActivate } from "@/lib/a11y";
 
 const fmt = (iso: string) => fmtDate(iso);
 
@@ -399,7 +401,7 @@ export default function PrenotazioniPage() {
     { key: "total", label: "Soggiorno €", default: false, get: (b) => b.total ?? 0 },
     { key: "cleaning", label: "Pulizia €", default: false, get: (b) => b.cleaningFee ?? 0 },
     { key: "cityTax", label: "Tassa di soggiorno €", default: false, get: (b) => cityTaxOfBooking(getStructure(b.structureId), b) },
-    { key: "grandTotal", label: "Totale €", get: (b) => grand(b) },
+    { key: "grandTotal", label: "Totale soggiorno €", get: (b) => grand(b) },
     { key: "commissionEur", label: "Commissione €", get: (b) => commissionOf(b) },
     { key: "commissionPct", label: "Commissione %", default: false, get: (b) => commissionShareOf(b) },
     { key: "netto", label: "Netto €", get: (b) => nettoOf(b) },
@@ -440,7 +442,7 @@ export default function PrenotazioniPage() {
             {channelOptions.map((o) => (<option key={o.key} value={o.key}>{o.label} ({o.count})</option>))}
           </Select>
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
-          <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+          <button aria-label={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
       </>
   );
 
@@ -584,7 +586,7 @@ export default function PrenotazioniPage() {
               <Th k="checkIn" sort={sort} onSort={toggleSort}>{t("Check-in")}</Th>
               <Th k="checkOut" sort={sort} onSort={toggleSort}>{t("Check-out")}</Th>
               <Th k="notti" sort={sort} onSort={toggleSort}>{t("Notti")}</Th>
-              <Th k="totale" sort={sort} onSort={toggleSort}>{t("Totale")}</Th>
+              <Th k="totale" sort={sort} onSort={toggleSort}><span title={t(TOTAL_STAY_HINT)}>{t(TOTAL_STAY_LABEL)}</span></Th>
               <Th k="commissioni" sort={sort} onSort={toggleSort}>{t("Commissioni")}</Th>
               <Th k="netto" sort={sort} onSort={toggleSort}>{t("Netto")}</Th>
               <Th>{t("Stato")}</Th>
@@ -594,13 +596,13 @@ export default function PrenotazioniPage() {
             {shownList.map((item) => {
               if (item.kind === "single") {
                 const b = item.b;
-                return <tr key={b.id} onClick={() => openBooking(b.id)} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${freshSet.has(b.id) ? NEW_ROW : ""} ${rowDim(b)}`}>{renderCells(b)}</tr>;
+                return <tr key={b.id} onClick={() => openBooking(b.id)} {...keyActivate(() => openBooking(b.id))} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${freshSet.has(b.id) ? NEW_ROW : ""} ${rowDim(b)}`}>{renderCells(b)}</tr>;
               }
               const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
               const colSpan = activeStructureId === "all" ? 14 : 13;
               return (
                 <Fragment key={gid}>
-                  <tr onClick={() => toggleGroup(gid)} className={`cursor-pointer border-b border-line hover:bg-wash ${members.some((m) => freshSet.has(m.id)) ? NEW_ROW : "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]"}`}>
+                  <tr onClick={() => toggleGroup(gid)} {...keyActivate(() => toggleGroup(gid))} className={`cursor-pointer border-b border-line hover:bg-wash ${members.some((m) => freshSet.has(m.id)) ? NEW_ROW : "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]"}`}>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
@@ -617,7 +619,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-on-focus" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
                   {open && members.map((m) => (
-                    <tr key={m.id} onClick={() => openBooking(m.id)} className={`cursor-pointer border-b border-line hover:bg-wash ${freshSet.has(m.id) ? NEW_ROW : "bg-wash/40"} ${rowDim(m)}`}>{renderCells(m, true)}</tr>
+                    <tr key={m.id} onClick={() => openBooking(m.id)} {...keyActivate(() => openBooking(m.id))} className={`cursor-pointer border-b border-line hover:bg-wash ${freshSet.has(m.id) ? NEW_ROW : "bg-wash/40"} ${rowDim(m)}`}>{renderCells(m, true)}</tr>
                   ))}
                   {open && <tr className="border-b border-line"><td colSpan={colSpan} className="px-3 py-0.5" /></tr>}
                 </Fragment>

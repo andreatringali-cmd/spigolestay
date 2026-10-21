@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtDMY } from "@/lib/dates";
 import Popover from "./Popover";
+import { useFieldControl } from "./ui/Field";
 
 // Campo data con calendario personalizzato (tendina ancorata al campo: sotto, o sopra se sotto non c'è spazio; mai fuori dallo schermo, anche a 320px).
 // Testi del calendario nelle lingue dell'ospite (it · en · fr · de · es); `lang` assente = italiano, come prima.
@@ -40,6 +41,7 @@ export default function DateField({
   required?: boolean;
   lang?: string; // it · en · fr · de · es: mesi, giorni e pulsanti del calendario nella lingua dell'ospite (assente = italiano)
 }) {
+  const fc = useFieldControl(); // dentro un <Field label="…"> prende l'id (etichetta collegata) e gli attributi aria
   const cal = CAL[(lang || "it").slice(0, 2).toLowerCase()] ?? CAL.it;
   const MONTHS = cal.months, DOW = cal.dow;
   const [open, setOpen] = useState(false);
@@ -64,7 +66,7 @@ export default function DateField({
 
   return (
     <div className="relative">
-      <button ref={btnRef} type="button" id={id} aria-required={required || undefined} disabled={disabled} onClick={() => setOpen((o) => !o)} title={title} className={`flex items-center gap-1.5 ${className}`}>
+      <button ref={btnRef} type="button" id={id ?? fc.id} aria-describedby={fc["aria-describedby"]} aria-invalid={fc["aria-invalid"]} aria-required={required || fc.required || undefined} disabled={disabled} onClick={() => setOpen((o) => !o)} title={title} className={`flex items-center gap-1.5 ${className}`}>
         <span className={value ? "text-txt" : "text-faint"}>{display}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto shrink-0 text-dim"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
       </button>

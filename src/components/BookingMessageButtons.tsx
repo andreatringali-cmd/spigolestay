@@ -10,6 +10,7 @@ import { fillTemplateForBooking } from "@/lib/template-fill";
 import { guestLangOf } from "@/lib/guest-lang";
 import { waDigits } from "@/lib/contacts-check";
 import { recordOutgoing } from "@/lib/guest-messages";
+import { templateLabel } from "@/lib/msg-templates";
 import { waSendUrl } from "@/lib/wa-link";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
@@ -60,10 +61,10 @@ export default function BookingMessageButtons({ booking, guest: guestProp, struc
       {templates.map((tpl) => (
         <button
           key={tpl.id} type="button" disabled={!digits} onClick={() => void send(tpl)}
-          title={digits ? `Apri WhatsApp con «${tpl.name}»` : "Manca il numero di telefono dell'ospite: scrivilo nella prenotazione"}
+          title={digits ? `Apri WhatsApp con «${templateLabel(tpl.name)}»` : "Manca il numero di telefono dell'ospite: scrivilo nella prenotazione"}
           className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-txt transition hover:border-focus hover:text-focus disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span aria-hidden>💬</span>{tpl.name}
+          <span aria-hidden>💬</span>{templateLabel(tpl.name)}
         </button>
       ))}
       {!digits && <span className="text-[11px] text-faint">Manca il telefono dell&apos;ospite</span>}

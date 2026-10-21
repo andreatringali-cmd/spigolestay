@@ -814,7 +814,7 @@ export default function GuidaOspitiPage() {
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <a href={wa ? `https://wa.me/${wa}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> Invia</a>
-          <button onClick={() => navigator.clipboard?.writeText(link)} title="Copia link" className="rounded-lg border border-line px-2 py-2 text-xs font-medium text-dim hover:bg-wash"><Icon name="copy" size={14} /></button>
+          <button aria-label="Copia link" onClick={() => navigator.clipboard?.writeText(link)} title="Copia link" className="rounded-lg border border-line px-2 py-2 text-xs font-medium text-dim hover:bg-wash"><Icon name="copy" size={14} /></button>
           <button onClick={() => printCard(link, room)} title="Stampa QR per la camera" className="rounded-lg border border-line px-2 py-2 text-xs font-medium text-dim hover:bg-wash">🖨️</button>
         </div>
       </div>
@@ -1127,7 +1127,7 @@ export default function GuidaOspitiPage() {
                   <span className="text-[16px] leading-none" style={{ filter: s.hidden ? "grayscale(1)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
                   <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
                 </button>
-                {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
+                {custom && <button aria-label="Elimina sezione personalizzata" onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
                 <Toggle on={!s.hidden} active={secReady(s)} onClick={(e) => { e.stopPropagation(); toggleHidden(si); }} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} />
               </div>
               {open && (() => {
@@ -1138,7 +1138,7 @@ export default function GuidaOspitiPage() {
                   <div>
                     <div className="mb-1 text-xs font-medium text-dim">{isCheckin ? "Foto della camera" : "Galleria foto"} <span className="font-normal text-faint">{isCheckin ? "· mostrate dopo i passaggi" : "· scorrono in alto nella sezione"}</span></div>
                     <div className="flex flex-wrap gap-2">
-                      {s.photos.map((ph, pi) => (<div key={pi} className="relative"><img src={ph} alt="" className="h-16 w-24 rounded border border-line object-cover" /><button onClick={() => removePhoto(si, pi)} className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full text-[10px] text-on-err" style={{ backgroundColor: "var(--err)" }}>✕</button></div>))}
+                      {s.photos.map((ph, pi) => (<div key={pi} className="relative"><img src={ph} alt="" className="h-16 w-24 rounded border border-line object-cover" /><button aria-label="Rimuovi la foto" onClick={() => removePhoto(si, pi)} className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full text-[10px] text-on-err" style={{ backgroundColor: "var(--err)" }}>✕</button></div>))}
                       <label className="grid h-16 w-24 cursor-pointer place-items-center rounded border border-dashed border-line text-xs text-dim hover:bg-wash">+ Foto<input type="file" accept="image/*" className="hidden" onChange={(e) => onSecPhoto(si, e.target.files?.[0])} /></label>
                     </div>
                     <input placeholder="…o incolla un URL foto e premi Invio" onKeyDown={(e) => { if (e.key === "Enter") { addPhoto(si, (e.target as HTMLInputElement).value.trim()); (e.target as HTMLInputElement).value = ""; } }} className={`${fld} mt-2`} />
@@ -1212,9 +1212,9 @@ export default function GuidaOspitiPage() {
                             <div className="flex items-center gap-2">
                               <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-wash text-[10px] font-bold text-dim">{ki + 1}</span>
                               <input value={st.h} maxLength={LIM.h} onChange={(e) => updStep(si, ki, { h: e.target.value })} placeholder="Titolo del passaggio" className="flex-1 rounded border border-line bg-surface px-2 py-1 text-sm font-semibold text-txt outline-none focus:border-focus" />
-                              <button onClick={() => moveStep(si, ki, -1)} title="Su" className="px-1 text-faint hover:text-txt">↑</button>
-                              <button onClick={() => moveStep(si, ki, 1)} title="Giù" className="px-1 text-faint hover:text-txt">↓</button>
-                              <button onClick={() => removeStep(si, ki)} className="text-faint hover:text-[color:var(--err)]">✕</button>
+                              <button aria-label="Su" onClick={() => moveStep(si, ki, -1)} title="Su" className="px-1 text-faint hover:text-txt">↑</button>
+                              <button aria-label="Giù" onClick={() => moveStep(si, ki, 1)} title="Giù" className="px-1 text-faint hover:text-txt">↓</button>
+                              <button aria-label="Rimuovi il passaggio" onClick={() => removeStep(si, ki)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                             </div>
                             <textarea value={st.p} maxLength={LIM.p} onChange={(e) => updStep(si, ki, { p: e.target.value })} rows={5} placeholder="Descrizione…  ([[evidenziato]] · [i]corsivo[/i])" className="mt-1 min-h-[9rem] w-full resize-y rounded border border-line bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-txt outline-none focus:border-focus" />
                                                           <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -1256,7 +1256,7 @@ export default function GuidaOspitiPage() {
                                   <input value={a.label} maxLength={LIM.alabel} onChange={(e) => updStepAction(si, ki, ai, { label: e.target.value })} placeholder="Etichetta pulsante" className="w-32 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
                                   <input value={a.href} onChange={(e) => updStepAction(si, ki, ai, { href: e.target.value })} placeholder="link · numero · URL mappa" className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
                                   <select value={kindOf(a)} onChange={(e) => setStepActionKind(si, ki, ai, e.target.value)} className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus">{ACT_KINDS.map((k) => <option key={k.k} value={k.k}>{k.label}</option>)}</select>
-                                  <button onClick={() => removeStepAction(si, ki, ai)} className="text-faint hover:text-[color:var(--err)]">✕</button>
+                                  <button aria-label="Rimuovi l'azione" onClick={() => removeStepAction(si, ki, ai)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                                 </div>
                               ))}
                               <button onClick={() => addStepAction(si, ki)} className="text-[11px] font-semibold text-focus hover:underline">+ Pulsante</button>
@@ -1302,7 +1302,7 @@ export default function GuidaOspitiPage() {
                           <div key={ai} className="flex items-center gap-1 rounded-lg border border-line bg-paper py-1 pl-1 pr-1.5">
                             <select value={a.icon} onChange={(e) => updAmen(si, ai, { icon: e.target.value })} className="rounded border border-line bg-surface px-1 py-1 text-xs text-txt outline-none focus:border-focus">{AMENITY_ICONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}</select>
                             <input value={a.label} maxLength={30} onChange={(e) => updAmen(si, ai, { label: e.target.value })} placeholder="Servizio" className="w-28 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
-                            <button onClick={() => removeAmen(si, ai)} className="text-faint hover:text-[color:var(--err)]">✕</button>
+                            <button aria-label="Rimuovi il servizio" onClick={() => removeAmen(si, ai)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                           </div>
                         ))}
                       </div>
@@ -1316,7 +1316,7 @@ export default function GuidaOspitiPage() {
                       <div className="space-y-2">
                         {s.items.map((it, ii) => { const hasList = isList || (it.list?.length ?? 0) > 0; return (
                           <div key={ii} className="rounded-lg border border-line bg-paper p-2">
-                            <div className="flex items-center gap-2"><input value={it.h} maxLength={LIM.h} onChange={(e) => updItem(si, ii, { h: e.target.value })} placeholder={SEC_BLOCKS[s.id]?.hPh || "Titolo blocco"} className="flex-1 rounded border border-line bg-surface px-2 py-1 text-sm font-semibold text-txt outline-none focus:border-focus" />{!hasList && <span className="text-[10px] text-faint">{it.p.length}/{LIM.p}</span>}<button onClick={() => removeItem(si, ii)} className="text-faint hover:text-[color:var(--err)]">✕</button></div>
+                            <div className="flex items-center gap-2"><input value={it.h} maxLength={LIM.h} onChange={(e) => updItem(si, ii, { h: e.target.value })} placeholder={SEC_BLOCKS[s.id]?.hPh || "Titolo blocco"} className="flex-1 rounded border border-line bg-surface px-2 py-1 text-sm font-semibold text-txt outline-none focus:border-focus" />{!hasList && <span className="text-[10px] text-faint">{it.p.length}/{LIM.p}</span>}<button aria-label="Rimuovi la voce" onClick={() => removeItem(si, ii)} className="text-faint hover:text-[color:var(--err)]">✕</button></div>
                             {/* Descrizione: nascosta nelle sezioni a elenco puro salvo testo già presente */}
                             {(!hasList || it.p) && <textarea value={it.p} maxLength={LIM.p} onChange={(e) => updItem(si, ii, { p: e.target.value })} rows={hasList ? 1 : 5} placeholder={hasList ? "Nota breve (facoltativa)…" : "Descrizione…  ([[evidenziato]] · [i]corsivo[/i] · [u]sottolineato[/u])"} className={`mt-1 w-full resize-y rounded border border-line bg-surface text-txt outline-none focus:border-focus ${hasList ? "px-2 py-1 text-sm" : "min-h-[9rem] px-2.5 py-2 text-[15px] leading-relaxed"}`} />}
                             {/* Elenco voci (nome · indirizzo · tel): solo sezioni directory o item con elenco */}
@@ -1327,7 +1327,7 @@ export default function GuidaOspitiPage() {
                                     <input value={r.n} maxLength={LIM.ln} onChange={(e) => updRow(si, ii, ri, { n: e.target.value })} placeholder="Nome" className="w-32 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
                                     <input value={r.sub} maxLength={LIM.lsub} onChange={(e) => updRow(si, ii, ri, { sub: e.target.value })} placeholder="Indirizzo / note" className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
                                     <input value={r.tel ?? ""} maxLength={LIM.ltel} onChange={(e) => updRow(si, ii, ri, { tel: e.target.value })} placeholder="Tel" className="w-24 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
-                                    <button onClick={() => removeRow(si, ii, ri)} className="text-faint hover:text-[color:var(--err)]">✕</button>
+                                    <button aria-label="Rimuovi la riga" onClick={() => removeRow(si, ii, ri)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                                   </div>
                                 ))}
                                 <button onClick={() => addRow(si, ii)} className="text-[11px] font-semibold text-focus hover:underline">+ Voce</button>
@@ -1340,7 +1340,7 @@ export default function GuidaOspitiPage() {
                                   <input value={a.label} maxLength={LIM.alabel} onChange={(e) => updAction(si, ii, ai, { label: e.target.value })} placeholder="Etichetta pulsante" className="w-32 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
                                   <input value={a.href} onChange={(e) => updAction(si, ii, ai, { href: e.target.value })} placeholder="link · numero · URL mappa" className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" />
                                   <select value={kindOf(a)} onChange={(e) => setActionKind(si, ii, ai, e.target.value)} className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus">{ACT_KINDS.map((k) => <option key={k.k} value={k.k}>{k.label}</option>)}</select>
-                                  <button onClick={() => removeAction(si, ii, ai)} className="text-faint hover:text-[color:var(--err)]">✕</button>
+                                  <button aria-label="Rimuovi l'azione" onClick={() => removeAction(si, ii, ai)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                                 </div>
                               ))}
                               <div className="flex gap-3">
@@ -1412,7 +1412,7 @@ export default function GuidaOspitiPage() {
                       <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{u.code || (u.name || "?").slice(0, 2)}</div>
                       <div className="text-base font-semibold text-txt">{u.name}</div>
                     </div>
-                    <button onClick={() => setCodesUnit(null)} className="text-lg text-faint hover:text-txt">✕</button>
+                    <button aria-label="Chiudi" onClick={() => setCodesUnit(null)} className="text-lg text-faint hover:text-txt">✕</button>
                   </div>
                   <p className="mb-3 text-[11px] text-faint">Dai un nome a ogni codice (Cancello, Portone, Porta…) e scrivi il valore. Entrano in automatico nel link dell&apos;ospite; non vengono mai salvati nella guida pubblica.</p>
                   <div className="space-y-2">
@@ -1421,7 +1421,7 @@ export default function GuidaOspitiPage() {
                         <div className="flex items-center gap-2">
                           <input value={c.label} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Nome" className="w-28 shrink-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm font-medium text-txt outline-none focus:border-focus" />
                           <input value={c.value} onChange={(e) => upd(i, { value: e.target.value })} placeholder="Codice" className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-txt outline-none focus:border-focus" />
-                          <button onClick={() => rm(i)} title="Rimuovi" className="shrink-0 rounded-lg p-1.5 text-faint transition hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                          <button aria-label="Rimuovi" onClick={() => rm(i)} title="Rimuovi" className="shrink-0 rounded-lg p-1.5 text-faint transition hover:bg-wash hover:text-[color:var(--err)]">✕</button>
                         </div>
                         <div className="mt-1.5 flex items-center gap-2">
                           <span className="text-[11px] text-faint">Quando inviare:</span>

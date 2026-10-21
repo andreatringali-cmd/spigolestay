@@ -17,6 +17,7 @@ import Icon from "@/components/Icon";
 import Popover from "@/components/Popover";
 import DateField from "@/components/DateField";
 import { type Listing, stars, ListingImage } from "@/lib/xenorabook/data";
+import { keyActivate } from "@/lib/a11y";
 
 type Stats = { structures: number; cities: number; reviews: number };
 
@@ -243,7 +244,7 @@ export default function XenoraBookPublicPage() {
         <div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {results.map((l) => (
-              <article key={l.slug} onMouseEnter={() => setHovered(l.slug)} onMouseLeave={() => setHovered("")} onClick={() => go(l.slug)}
+              <article key={l.slug} onMouseEnter={() => setHovered(l.slug)} onMouseLeave={() => setHovered("")} onClick={() => go(l.slug)} {...keyActivate(() => go(l.slug))}
                 className={`group cursor-pointer overflow-hidden rounded-2xl border bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${hovered === l.slug ? "border-focus" : "border-line"}`}>
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-wash">
                   <ListingImage src={l.images[0]} hue={l.hue} initial={l.name[0] || "X"} />

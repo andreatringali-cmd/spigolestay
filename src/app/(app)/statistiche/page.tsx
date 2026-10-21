@@ -360,7 +360,7 @@ export default function StatistichePage() {
       </>)}
       <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim max-sm:h-9 max-sm:py-0" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto (solo le KPI card, non la tabella)")}>
         {t("Ricavi")}:
-        <select value={basis} onChange={(e) => setBasis(e.target.value as "notte" | "arrivo" | "incasso")} className="min-w-0 rounded-full border-none bg-transparent py-0.5 max-sm:py-2 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
+        <select value={basis} onChange={(e) => setBasis(e.target.value as "notte" | "arrivo" | "incasso")} className="min-w-0 rounded-full border-none bg-transparent py-0.5 max-sm:py-2 pl-1 pr-5 text-xs font-semibold text-txt">
           <option value="notte">{t("Per notte (competenza)")}</option>
           <option value="arrivo">{t("Per data di arrivo")}</option>
           <option value="incasso">{t("All'incasso")}</option>
@@ -369,7 +369,7 @@ export default function StatistichePage() {
       {showMonth && (
         <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim max-sm:h-9 max-sm:py-0" title={t("Con cosa confrontare le KPI del mese")}>
           {t("Confronta con")}:
-          <select value={cmpMode} onChange={(e) => setCmpMode(e.target.value as "prev" | "yoy")} className="min-w-0 rounded-full border-none bg-transparent py-0.5 max-sm:py-2 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
+          <select value={cmpMode} onChange={(e) => setCmpMode(e.target.value as "prev" | "yoy")} className="min-w-0 rounded-full border-none bg-transparent py-0.5 max-sm:py-2 pl-1 pr-5 text-xs font-semibold text-txt">
             <option value="prev">{t("mese precedente")}</option>
             <option value="yoy">{t("stesso mese anno scorso")}</option>
           </select>
@@ -382,11 +382,11 @@ export default function StatistichePage() {
       <div className="contents max-sm:hidden">{controls}</div>
       <div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
         {(() => { const on = showMonth ? chartsOn : chartsOnY; const tog = showMonth ? toggleCharts : toggleChartsY; return (
-          <button onClick={tog} title={on ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 max-sm:order-3 max-sm:ml-auto max-sm:shrink-0 place-items-center rounded-lg border transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+          <button aria-label={on ? t("Nascondi i grafici") : t("Mostra i grafici")} onClick={tog} title={on ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 max-sm:order-3 max-sm:ml-auto max-sm:shrink-0 place-items-center rounded-lg border transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
         ); })()}
-        <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm max-sm:order-1 max-sm:shrink-0">
+        <div role="tablist" aria-label="Report" className="inline-flex rounded-lg bg-wash p-0.5 text-sm max-sm:order-1 max-sm:shrink-0">
           {([["produzione", t("Mensile")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
-            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 max-sm:h-8 max-sm:py-0 font-semibold transition ${report === k ? "bg-focus text-on-focus shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+            <button key={k} role="tab" aria-selected={report === k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 max-sm:h-8 max-sm:py-0 font-semibold transition ${report === k ? "bg-focus text-on-focus shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
           ))}
         </div>
         <FilterSheet count={filtersActive} onReset={resetFilters} className="max-sm:order-2">{controls}</FilterSheet>

@@ -37,6 +37,7 @@ import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
 import OtaReportMenu from "@/components/booking/OtaReportMenu";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
 import Icon from "@/components/Icon";
@@ -103,6 +104,7 @@ export default function BookingDrawer() {
 
   const router = useRouter();
   const ask = useConfirm();
+  const toast = useToast();
   const { t, lang } = useLang();
   const { moduleOn } = useAccess();
   const adW = (n: number) => (n === 1 && lang === "it" ? "adulto" : t("adulti")); const chW = (n: number) => (n === 1 && lang === "it" ? "bambino" : t("bambini")); // singolare in italiano ("1 adulto · 1 bambino")
@@ -302,7 +304,7 @@ export default function BookingDrawer() {
   };
 
   const printReceipt = () => {
-    if (noPrice) { window.alert(t("Prezzo mancante: imposta l'importo del soggiorno prima di stampare la ricevuta.")); return; }
+    if (noPrice) { toast(t("Prezzo mancante: imposta l'importo del soggiorno prima di stampare la ricevuta."), "error"); return; }
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
     const money = eur;
@@ -647,7 +649,7 @@ export default function BookingDrawer() {
         <Row label={t("Pulizia")} value={eur(cleanV)} mono />
         {extrasList.map((e, i) => (
           <div key={i} className="flex items-baseline justify-between gap-4">
-            <span className="text-sm text-dim">{e.name} <button onClick={() => removeExtra(i)} className="ml-1 text-faint hover:text-[color:var(--err)]" title={t("Rimuovi")}>✕</button></span>
+            <span className="text-sm text-dim">{e.name} <button aria-label={t("Rimuovi")} onClick={() => removeExtra(i)} className="ml-1 text-faint hover:text-[color:var(--err)]" title={t("Rimuovi")}>✕</button></span>
             <span className="text-right font-mono text-sm text-txt">{eur(e.price)}</span>
           </div>
         ))}
@@ -812,7 +814,7 @@ export default function BookingDrawer() {
             if (guest) { recordOutgoing(guest.id, gText, "WhatsApp (link)", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); }
           };
           const sendGuideEmail = async () => {
-            if (!guest?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
+            if (!guest?.email) { toast(t("L'ospite non ha un'email."), "error"); return; }
             if (!sendOnce(`guideemail:${booking.id}`)) return;
             const to = guest.email;
             const short = await shortenGuideLink(gLink);
@@ -820,7 +822,7 @@ export default function BookingDrawer() {
             try {
               const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", lang: guestLangOf(guest), to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
               const j = await r.json().catch(() => ({}));
-              if (r.ok && j?.ok) { if (guest) { recordOutgoing(guest.id, msg, "Email", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); } window.alert(`${t("Guida inviata a")} ${to}`); }
+              if (r.ok && j?.ok) { if (guest) { recordOutgoing(guest.id, msg, "Email", undefined, { bid: booking.id, rem: "guide" }); markReminder(booking.id, "guide"); } toast(`${t("Guida inviata a")} ${to}`, "error"); }
               else window.open(gmailGuide(msg), "_blank");
             } catch { window.open(gmailGuide(msg), "_blank"); }
           };
@@ -917,6 +919,8 @@ export default function BookingDrawer() {
                 roomType={vp.roomType || ""} unitName={vp.unitName} checkIn={fmtLong(vp.checkIn)} checkOut={fmtLong(vp.checkOut)}
                 checkInFrom={vp.checkInFrom} checkOutBy={vp.checkOutBy} adults={vp.adults ?? 1} children={vp.children ?? 0}
                 nights={vp.nights} ratePlan={vp.ratePlanName} total={typeof vp.grandTotal === "number" ? eur(vp.grandTotal, vp.currency || "€") : undefined}
+                stayTotal={typeof vp.grandTotal === "number" && (vp.cityTaxAmount ?? 0) > 0 ? eur(vp.grandTotal - (vp.cityTaxAmount ?? 0), vp.currency || "€") : undefined}
+                tax={(vp.cityTaxAmount ?? 0) > 0 ? eur(vp.cityTaxAmount ?? 0, vp.currency || "€") : undefined}
                 cancelText={vp.cancelPolicy || ""}
               />
             );

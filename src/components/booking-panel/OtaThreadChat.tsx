@@ -410,7 +410,7 @@ function Chat({ thread, title, subtitle, guestName, compact = false, onBack, act
                 onChange={(e) => { setDraft(e.target.value); setPreview(null); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void send(); } }}
                 placeholder={t("Inserisci il messaggio")} aria-label={`${t("Messaggio per")} ${name}`} aria-describedby={`${uid}-hint`}
-                className="w-full resize-none bg-transparent px-1.5 py-1 text-base text-txt outline-none disabled:opacity-60 sm:text-sm"
+                className="w-full resize-none bg-transparent px-1.5 py-1 text-base text-txt disabled:opacity-60 sm:text-sm"
               />
               {lang !== "it" && (
                 <label className="flex cursor-pointer items-center gap-2 px-1.5 py-1 text-xs text-txt max-sm:min-h-10">

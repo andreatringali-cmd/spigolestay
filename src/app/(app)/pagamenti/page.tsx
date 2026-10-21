@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, fmtDate } from "@/lib/dates";
 import { amountPaid, paymentStatus, totalDue } from "@/lib/incassi";
+import { bookingTotals, TOTAL_WITH_TAX_LABEL } from "@/lib/booking-totals";
 import { eur } from "@/lib/format";
 import { NUM_TYPING_RE, formatDecimalIT, parseDecimalIT, roundDecimals } from "@/lib/num-it";
 import { exportExcel, exportPdf } from "@/lib/export";
@@ -40,7 +41,8 @@ export default function PagamentiPage() {
     const balance = Math.max(0, due - paid);
     const overdue = balance > 0 && b.checkOut < todayISO;
     const status = paymentStatus(b, structure);
-    return { b, due, paid, balance, overdue, status };
+    const tot = bookingTotals(b, structure); // soggiorno / tassa / totale con tassa: regola unica (lib/booking-totals.ts)
+    return { b, due, paid, balance, overdue, status, tot };
   });
 
   const term = q.trim().toLowerCase();
@@ -55,7 +57,7 @@ export default function PagamentiPage() {
   const sumOverdue = enrich.filter((r) => r.overdue).reduce((a, r) => a + r.balance, 0);
   const pct = sumDue > 0 ? Math.round((sumPaid / sumDue) * 100) : 100;
 
-  const doExcel = () => exportExcel("pagamenti", [t("Ospite"), t("Struttura"), t("Camera"), t("Check-in"), t("Totale"), t("Incassato"), t("Saldo"), t("Stato")], rows.map((r) => [guestName(r.b.guestId), getStructure(r.b.structureId)?.name ?? "", getUnit(r.b.unitId)?.name ?? t("Da assegnare"), r.b.checkIn, r.due, r.paid, r.balance, r.overdue ? t("Scaduto") : t(STATUS[r.status].label)]));
+  const doExcel = () => exportExcel("pagamenti", [t("Ospite"), t("Struttura"), t("Camera"), t("Check-in"), t(TOTAL_WITH_TAX_LABEL), t("Incassato"), t("Saldo"), t("Stato")], rows.map((r) => [guestName(r.b.guestId), getStructure(r.b.structureId)?.name ?? "", getUnit(r.b.unitId)?.name ?? t("Da assegnare"), r.b.checkIn, r.due, r.paid, r.balance, r.overdue ? t("Scaduto") : t(STATUS[r.status].label)]));
 
   return (
     <div>
@@ -63,7 +65,7 @@ export default function PagamentiPage() {
 
       {/* KPI */}
       <div className="mb-5 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 lg:grid-cols-4">
-        <Kpi label={t("Totale atteso")} value={eur(sumDue)} color="var(--txt)" />
+        <Kpi label={t("Totale atteso (con tassa)")} value={eur(sumDue)} color="var(--txt)" />
         <Card className="!p-4 max-sm:!p-3">
           <div className="text-xs font-medium uppercase tracking-wide text-dim">{t("Incassato")}</div>
           <div className="mt-1 font-mono text-base min-[400px]:text-xl sm:text-2xl font-bold tabular-nums" style={{ color: "var(--ok)" }}>{eur(sumPaid)}</div>
@@ -99,7 +101,7 @@ export default function PagamentiPage() {
               <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
               <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
               <th className="px-3 py-2 font-semibold">{t("Check-in")}</th>
-              <th className="px-3 py-2 text-right font-semibold">{t("Totale")}</th>
+              <th className="px-3 py-2 text-right font-semibold">{t(TOTAL_WITH_TAX_LABEL)}</th>
               <th className="px-3 py-2 text-right font-semibold">{t("Incassato")}</th>
               <th className="px-3 py-2 text-right font-semibold">{t("Saldo")}</th>
               <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
@@ -107,12 +109,12 @@ export default function PagamentiPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ b, due, paid, balance, overdue, status }) => (
+            {rows.map(({ b, due, paid, balance, overdue, status, tot }) => (
               <tr key={b.id} className="border-b border-line last:border-0 hover:bg-wash/50">
                 <td className="px-3 py-2 font-medium text-txt"><button onClick={() => openBooking(b.id)} className="hover:text-focus hover:underline">{guestName(b.guestId)}</button></td>
                 <td className="px-3 py-2 text-dim">{getStructure(b.structureId)?.name} · {getUnit(b.unitId)?.name ?? t("Da assegnare")}</td>
                 <td className={`px-3 py-2 font-mono text-xs ${b.checkIn < todayISO ? "text-faint" : "text-dim"}`}>{fmt(b.checkIn)}</td>
-                <td className="px-3 py-2 text-right font-mono text-dim">{eur(due)}</td>
+                <td className="px-3 py-2 text-right font-mono text-dim">{eur(due)}{tot.tax > 0 && <div className="font-sans text-[10px] text-faint">{Math.abs(tot.withTax - due) < 0.005 ? `${t("soggiorno")} ${eur(tot.stay)} + ${t("tassa")} ${eur(tot.tax)}` : `${t("tassa")} ${eur(tot.tax)} ${t("già incassata a parte")}`}</div>}</td>
                 <td className="px-3 py-2 text-right">
                   <PaidCell key={`${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} />
                 </td>
@@ -135,7 +137,7 @@ export default function PagamentiPage() {
       </div>
       {/* Telefono: una scheda per prenotazione (la tabella sopra serve da tablet in su) */}
       <div className="flex flex-col gap-2 md:hidden">
-        {rows.map(({ b, due, paid, balance, overdue, status }) => (
+        {rows.map(({ b, due, paid, balance, overdue, status, tot }) => (
           <div key={b.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -149,7 +151,7 @@ export default function PagamentiPage() {
               )}
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-              <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Totale")}</div><div className="font-mono text-dim">{eur(due)}</div></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-dim">{t(TOTAL_WITH_TAX_LABEL)}</div><div className="font-mono text-dim">{eur(due)}</div>{tot.tax > 0 && <div className="text-[10px] text-faint">{Math.abs(tot.withTax - due) < 0.005 ? `${t("soggiorno")} ${eur(tot.stay)} + ${t("tassa")} ${eur(tot.tax)}` : `${t("tassa")} ${eur(tot.tax)} ${t("già incassata a parte")}`}</div>}</div>
               <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Saldo")}</div><div className={`font-mono font-semibold ${balance > 0 ? "text-[color:var(--err)]" : "text-[color:var(--ok)]"}`}>{eur(balance)}</div></div>
               <div><div className="text-[11px] uppercase tracking-wide text-dim">{t("Incassato")}</div><PaidCell key={`m-${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} className="mt-0.5 w-full" /></div>
             </div>

@@ -17,9 +17,10 @@
 // fiscali della struttura.
 
 import { supabase } from "./supabase";
-import { kvGet } from "./bigstore";
+import { kvGet, initBigStore } from "./bigstore";
 import { cleanStructure, cleanUnit, cleanBookings } from "./publicsanitize";
 import { publicizeMediaRefsInJson } from "./media-walk";
+import { realPromos } from "./promo-example";
 
 export const DATA_KEY = "spigolestay:data:v1";
 export const AUX_KEYS = [
@@ -35,7 +36,7 @@ export const AUX_KEYS = [
 // coincidere con questi, altrimenti il sito verrebbe "coperto" dalla pagina interna.
 export const RESERVED_SLUGS = new Set<string>([
   // route al root
-  "accetta-invito", "api", "checkin", "g", "invito", "login", "og", "prenota", "preventivo", "sito-web",
+  "accetta-invito", "api", "checkin", "g", "invito", "login", "og", "prenota", "preventivo", "prezzi", "sito-web",
   // route dell'app (gruppo)
   "abbonamento", "admin", "alloggiati", "assistente-ricavi", "calendario", "camere", "canali", "cassa",
   "guida-ospiti", "importa", "impostazioni", "mercato", "messaggi", "metasearch", "nettare", "ospiti",
@@ -128,6 +129,36 @@ export function lsGet(key: string): string | null {
   try { return kvGet(key); } catch { return null; }
 }
 
+// ---- Anteprima del titolare (/sito-web?s=<id>) --------------------------------
+//
+// L'anteprima si apre in una scheda nuova, dove lo store non conosce ancora i dati: il blocco grande (strutture, camere,
+// prenotazioni) vive in IndexedDB e viene caricato in memoria solo da initBigStore(). Senza quel passaggio la pagina vedeva
+// uno store vuoto («Xenora», nessuna camera). Qui si carica l'archivio e si costruisce LO STESSO snapshot sanificato che
+// finirebbe online: l'anteprima mostra esattamente ciò che vedrebbe un visitatore, in sola lettura (la modalità pubblica
+// non scrive mai nel browser) e senza dati privati.
+
+/** Pura: struttura da mostrare nell'anteprima. `wanted` (da ?s=) deve esistere; senza `wanted` si prende la prima. null = niente da mostrare. */
+export function pickPreviewStructureId(structures: { id: string }[], wanted?: string | null): string | null {
+  if (!structures.length) return null;
+  if (wanted) return structures.some((s) => s.id === wanted) ? wanted : null;
+  return structures[0].id;
+}
+
+/** Prepara l'anteprima del titolare: ritorna l'id della struttura mostrata, oppure null se i dati non sono disponibili su questo dispositivo. */
+export async function enterOwnerPreview(wanted?: string | null): Promise<string | null> {
+  try {
+    await initBigStore();
+    let structures: { id: string }[] = [];
+    try { structures = (JSON.parse(kvGet(DATA_KEY) || "{}").structures ?? []) as { id: string }[]; } catch { return null; }
+    const sid = pickPreviewStructureId(structures, wanted);
+    if (!sid) return null;
+    const snap = buildPublishData(sid);
+    if (!snap) return null;
+    setPublicSnapshot(snap, null);
+    return sid;
+  } catch { return null; }
+}
+
 // Costruisce il dizionario da pubblicare per UNA struttura, a partire dal
 // localStorage del proprietario. Ritorna null se la struttura non esiste.
 export function buildPublishData(structureId: string): Record<string, string> | null {
@@ -192,7 +223,12 @@ export function buildPublishData(structureId: string): Record<string, string> | 
       // Promo e piani tariffari: SOLO quelli di questa struttura (+ "per tutte", senza structureId).
       if (v != null && (k === "spigolestay:promos" || k === "spigolestay:rateplans")) {
         const arr = JSON.parse(v);
-        if (Array.isArray(arr)) v = JSON.stringify(arr.filter((x: { structureId?: string }) => !x?.structureId || x.structureId === structureId));
+        if (Array.isArray(arr)) {
+          let mine = arr.filter((x: { structureId?: string }) => !x?.structureId || x.structureId === structureId);
+          // Promo di esempio (modelli precaricati): mai nei dati pubblicati.
+          if (k === "spigolestay:promos") mine = realPromos(mine);
+          v = JSON.stringify(mine);
+        }
       }
       // Regole prezzo: il default + la regola di questa struttura (mai quelle delle altre).
       if (v != null && k === "spigolestay:pricerules") {

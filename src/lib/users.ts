@@ -193,6 +193,9 @@ export interface User {
   internalNote?: string;
   // Stato
   status: "Attivo" | "Invitato";
+  // Invito di accesso (Utenti → nuovo collaboratore): quando è partita l'email e se non è partita. Assenti = nessun invito registrato.
+  invitedAt?: string;
+  inviteMailFailed?: boolean;
   lastLogin?: { at: string; ip: string };
   createdAt: string;
 }

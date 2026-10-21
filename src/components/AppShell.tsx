@@ -63,6 +63,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <PendingInvite />
         <StyleLoader />
         <div className="relative min-h-dvh bg-paper text-txt">
+          {/* Salta-al-contenuto: invisibile finché non prende il focus con Tab (primo elemento della pagina) */}
+          <a href="#contenuto" className="no-print sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[1200] focus:rounded-lg focus:bg-focus focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-on-focus focus:shadow-lg">Vai al contenuto</a>
           <div className="relative z-10 flex min-h-dvh">
           <Sidebar
             pathname={pathname}
@@ -90,7 +92,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <StructureSwitcher />
               </div>
             </header>
-            <main className="w-full flex-1 px-4 py-6 md:px-6"><AccessGate>{children}</AccessGate></main>
+            <main id="contenuto" tabIndex={-1} className="w-full flex-1 px-4 py-6 outline-none md:px-6"><AccessGate>{children}</AccessGate></main>
             <AppFooter />
           </div>
           </div>

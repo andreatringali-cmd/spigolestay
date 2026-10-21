@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Icon from "./Icon";
 import Popover from "./Popover";
+import { Button, Modal } from "./ui/index";
 import { useLang } from "@/lib/i18n";
 
 // Icone file Excel/PDF: documento con angolo piegato, colore di brand, senza testo
@@ -38,8 +39,6 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   const [open, setOpen] = useState(false);
   const [picker, setPicker] = useState<Set<string> | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const pickerOpen = picker !== null;
-  useEffect(() => { if (!pickerOpen) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setPicker(null); }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k); }, [pickerOpen]); // Esc chiude la scelta dei dati
   const openExcel = () => {
     setOpen(false);
     if (!excelFields) { onExcel(); return; }
@@ -49,14 +48,14 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   return (
     <div className="relative">
       {!onPdf && (
-        <button onClick={openExcel} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0" title="Excel" aria-label="Excel">
+        <Button variant="secondary" size="sm" onClick={openExcel} title="Excel" aria-label="Excel" className="font-medium">
           <ExcelIcon /> <span className="max-sm:sr-only">Excel</span>
-        </button>
+        </Button>
       )}
       {onPdf && (<>
-      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0">
+      <Button ref={btnRef} variant="secondary" size="sm" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} aria-label={t("Esporta")} className="font-medium">
         <span className="max-sm:sr-only">{t("Esporta")}</span> <Icon name="chevron" size={14} />
-      </button>
+      </Button>
       <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)} align="end" width={160} label={t("Esporta")}>
           <button onClick={openExcel} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-txt hover:bg-wash">
             <ExcelIcon /> Excel
@@ -67,32 +66,30 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
       </Popover>
       </>)}
       {picker && excelFields && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
-          <button aria-label={t("Chiudi")} onClick={() => setPicker(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="font-display text-lg font-bold text-txt">{t("Cosa esportare")}</span>
-              <button onClick={() => setPicker(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-            </div>
-            <p className="mb-3 text-xs text-dim">{t("Scegli i dati da includere nel file Excel — anche quelli visibili solo dentro la scheda della prenotazione.")}</p>
-            <div className="flex items-center gap-3 border-b border-line pb-2 text-xs font-semibold text-focus">
-              <button onClick={() => setPicker(new Set(excelFields.map((f) => f.key)))} className="hover:underline">{t("Tutti")}</button>
-              <button onClick={() => setPicker(new Set())} className="hover:underline">{t("Nessuno")}</button>
-            </div>
-            <div className="mt-2 grid max-h-72 grid-cols-2 gap-x-3 gap-y-1.5 overflow-y-auto pr-1">
-              {excelFields.map((f) => (
-                <label key={f.key} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-txt hover:bg-wash">
-                  <input type="checkbox" checked={picker.has(f.key)} onChange={() => toggleField(f.key)} />
-                  {t(f.label)}
-                </label>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <button onClick={() => setPicker(null)} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
-              <button onClick={() => { onExcel([...picker]); setPicker(null); }} disabled={!picker.size} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Esporta")}</button>
-            </div>
+        <Modal
+          open
+          onClose={() => setPicker(null)}
+          title={t("Cosa esportare")}
+          description={t("Scegli i dati da includere nel file Excel — anche quelli visibili solo dentro la scheda della prenotazione.")}
+          size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setPicker(null)}>{t("Annulla")}</Button>
+            <Button onClick={() => { onExcel([...picker]); setPicker(null); }} disabled={!picker.size}>{t("Esporta")}</Button>
+          </>}
+        >
+          <div className="flex items-center gap-3 border-b border-line pb-2 text-xs font-semibold text-focus">
+            <button onClick={() => setPicker(new Set(excelFields.map((f) => f.key)))} className="py-1 hover:underline">{t("Tutti")}</button>
+            <button onClick={() => setPicker(new Set())} className="py-1 hover:underline">{t("Nessuno")}</button>
           </div>
-        </div>
+          <div className="mt-2 grid max-h-72 grid-cols-2 gap-x-3 gap-y-1.5 overflow-y-auto pr-1">
+            {excelFields.map((f) => (
+              <label key={f.key} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-txt hover:bg-wash">
+                <input type="checkbox" checked={picker.has(f.key)} onChange={() => toggleField(f.key)} />
+                {t(f.label)}
+              </label>
+            ))}
+          </div>
+        </Modal>
       )}
     </div>
   );

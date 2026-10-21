@@ -54,7 +54,7 @@ export default function Sidebar({
   const toggleGroup = (g: string) => setOpen((o) => (o[g] ? {} : { [g]: true }));
   return (
     <>
-      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onCloseMobile} />}
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" aria-hidden="true" onClick={onCloseMobile} />}
       <aside
         className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(16rem,85vw)] max-w-full" : "hidden"} flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-dvh ${collapsed ? "md:w-[70px]" : "md:w-64"}`}
       >
@@ -71,7 +71,7 @@ export default function Sidebar({
               <span aria-hidden="true" className="font-display text-xl font-bold leading-none" style={{ color: "var(--txt)" }}>enora</span>
             </div>
           )}
-          <button
+          <button aria-label={collapsed ? "Espandi" : "Comprimi"}
             onClick={onToggleCollapse}
             title={collapsed ? "Espandi" : "Comprimi"}
             className={`hidden rounded-lg p-1.5 text-dim hover:bg-wash hover:text-txt md:block ${collapsed ? "mx-auto" : "ml-auto"}`}
@@ -81,7 +81,7 @@ export default function Sidebar({
         </div>
 
         {/* Navigazione */}
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
+        <nav aria-label="Menu principale" className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
           {collapsed ? (
             // Modalità compatta: solo icone
             visible.map((n) => {
@@ -92,6 +92,7 @@ export default function Sidebar({
                 <Link
                   key={n.href}
                   href={n.href}
+                  aria-current={active ? "page" : undefined}
                   onClick={onCloseMobile}
                   title={isLk ? `${t(n.label)} · ${t("attiva nel piano")}` : t(n.label)}
                   className={`relative flex items-center justify-center rounded-lg p-2.5 transition ${active ? "" : "text-dim hover:bg-wash hover:text-[color:var(--hovc)]"} ${isLk && !active ? "opacity-55" : ""}`}
@@ -114,6 +115,7 @@ export default function Sidebar({
                     <Link
                       key={n.href}
                       href={n.href}
+                      aria-current={active ? "page" : undefined}
                       onClick={onCloseMobile}
                       className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-10 ${active ? "" : "hover:bg-wash"}`}
                       style={active ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 } : { color: "var(--txt)" }}
@@ -133,6 +135,7 @@ export default function Sidebar({
                 <div key={group}>
                   <button
                     onClick={() => toggleGroup(group)}
+                    aria-expanded={!!isOpen}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash"
                     style={{ color: isOpen ? "var(--focus)" : "var(--dim)", backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
@@ -149,6 +152,7 @@ export default function Sidebar({
                           <Link
                             key={n.href}
                             href={n.href}
+                            aria-current={active ? "page" : undefined}
                             onClick={onCloseMobile}
                             className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition max-md:min-h-10 ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={

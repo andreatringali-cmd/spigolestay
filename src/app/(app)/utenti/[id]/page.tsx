@@ -21,21 +21,14 @@ import NumInput from "@/components/NumInput";
 import { fmtDateTime } from "@/lib/dates";
 import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
-import { isValidEmail, structuresToShare, humanInviteError } from "@/lib/user-access";
+import { isValidEmail, structuresToShare } from "@/lib/user-access";
+import { runInvite, shareStructures, profileOf, markInvited } from "@/lib/invite-client";
 import { friendlyError } from "@/lib/friendly-error";
 import { PASSWORD_MIN } from "@/components/PublicUi";
 
 import { onSolid } from "@/lib/on-solid";
+import Toggle from "@/components/Toggle";
 // --- Micro-componenti ---------------------------------------------------------
-function Toggle({ on, onClick, disabled, color = "var(--focus)", label }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string; label?: string }) {
-  return (
-    <button type="button" disabled={disabled} onClick={onClick} aria-pressed={on} aria-label={label}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
-      style={{ backgroundColor: on ? color : "var(--line)" }}>
-      <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} />
-    </button>
-  );
-}
 function Info({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "warn" }) {
   const c = tone === "warn" ? "var(--warn)" : "var(--focus)";
   return (
@@ -154,20 +147,7 @@ export default function UserSchedaPage() {
   const valid = errs.length === 0;
 
   // Condivide le strutture del profilo con l'email della persona (invito silenzioso: lei le trova al primo accesso). Idempotente.
-  const shareProfileStructures = async (usr: User, token: string): Promise<number> => {
-    let ok = 0;
-    const targets = structuresToShare(structures, usr);
-    if (targets.length === 0 && (usr.allStructures === false || (usr.structureIds ?? []).length > 0)) toast(t("Nessuna delle strutture assegnate è stata trovata nel tuo account: ricarica la pagina e riprova."), "error");
-    for (const st of targets) {
-      try {
-        const rs = await fetch("/api/org/invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: st.id, email: usr.email.trim(), silent: true }) });
-        const sj = await rs.json().catch(() => ({}));
-        if (sj?.ok) { ok += 1; if (sj.orgId) updateStructure(st.id, { orgId: String(sj.orgId) }); }
-        else toast(`${st.name}: ${humanInviteError(String(sj?.error ?? ""), String(sj?.message ?? ""))}`, "error"); // prima l'errore restava nascosto
-      } catch { toast(`${st.name}: ${t("rete non disponibile")}`, "error"); }
-    }
-    return ok;
-  };
+  const applyShare = (orgIds: Record<string, string>) => { for (const [sid, oid] of Object.entries(orgIds)) updateStructure(sid, { orgId: oid }); };
   const autoShare = async (usr: User) => {
     if (!isValidEmail(usr.email) || (authUser?.email && authUser.email.trim().toLowerCase() === usr.email.trim().toLowerCase())) return;
     if (usr.id === "u-owner") return;
@@ -175,25 +155,26 @@ export default function UserSchedaPage() {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
       if (!token) return;
       // il profilo aggiornato raggiunge la sua scheda (nessuna email)
-      await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), profileOnly: true, profile: { id: usr.id, firstName: usr.firstName, lastName: usr.lastName, username: usr.username, phone: usr.phone, language: usr.language, avatarColor: usr.avatarColor, templateKey: usr.templateKey, perms: usr.perms, allStructures: usr.allStructures, structureIds: usr.structureIds } }) }).catch(() => null);
-      const n = await shareProfileStructures(usr, token);
-      if (n > 0) toast(`${n} ${t("strutture condivise con")} ${usr.email}`, "success");
+      await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), profileOnly: true, profile: profileOf(usr) }) }).catch(() => null);
+      if (structuresToShare(structures, usr).length === 0 && (usr.allStructures === false || (usr.structureIds ?? []).length > 0)) toast(t("Nessuna delle strutture assegnate è stata trovata nel tuo account: ricarica la pagina e riprova."), "error");
+      const r = await shareStructures(token, usr, structures);
+      applyShare(r.orgIds);
+      for (const w of r.warnings) toast(w, "error"); // prima l'errore restava nascosto
+      if (r.shared > 0) toast(`${r.shared} ${t("strutture condivise con")} ${usr.email}`, "success");
     } catch { /* silenzioso */ }
   };
+  // Nuovo utente: abilita l'indirizzo, condivide le strutture e manda l'email d'invito. Funziona per il titolare dell'account
+  // (non solo per l'amministratore di piattaforma): le regole le applica il server.
   const autoInvite = async (usr: User) => {
     if (!isValidEmail(usr.email) || (authUser?.email && authUser.email.trim().toLowerCase() === usr.email.trim().toLowerCase())) return;
-    try {
-      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-      if (!token) return;
-      const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim(), kind: "collaboratore", profile: { id: usr.id, firstName: usr.firstName, lastName: usr.lastName, username: usr.username, phone: usr.phone, language: usr.language, avatarColor: usr.avatarColor, templateKey: usr.templateKey, perms: usr.perms, allStructures: usr.allStructures, structureIds: usr.structureIds } }) });
-      const j = await r.json().catch(() => ({}));
-      // Un solo passaggio: dopo l'abilitazione si condividono subito le strutture del profilo (la persona le trova al primo accesso).
-      const shared = j?.ok ? await shareProfileStructures(usr, token) : 0;
-      if (r.status === 403) toast(t("Utente creato. L'invito può partire solo dal titolare dell'account."), "error");
-      else if (j?.ok && j.notified) toast(shared ? `${t("Invito inviato a")} ${usr.email} · ${shared} ${t("strutture condivise")}` : `${t("Invito inviato a")} ${usr.email}`, "success");
-      else if (j?.ok) toast(`${usr.email} ${t("è abilitata ma l'email non è partita: apri la scheda e copia il link.")}`, "error");
-      else toast(t("Utente creato, ma l'invito non è partito."), "error");
-    } catch { toast(t("Utente creato, ma l'invito non è partito."), "error"); }
+    const r = await runInvite(usr, structures.map((x) => ({ id: x.id, name: x.name })));
+    applyShare(r.orgIds);
+    for (const w of r.warnings) toast(w, "error");
+    if (!r.ok) { toast(`${t("Utente creato, ma l'invito non è partito.")} ${r.message}`, "error"); markInvited(usr.id, null); return; }
+    markInvited(usr.id, { invitedAt: r.sentAt ?? new Date().toISOString(), ...(r.notified ? {} : { inviteMailFailed: true }) });
+    if (r.notified) toast(r.shared ? `${t("Invito inviato a")} ${usr.email} · ${r.shared} ${t("strutture condivise")}` : `${t("Invito inviato a")} ${usr.email}`, "success");
+    else toast(r.message, "error");
+    if (r.deferred > 0) toast(t("Le strutture le condividerà il titolare dell'account appena apre Xenora."), "info");
   };
 
   const save = () => {
@@ -336,7 +317,7 @@ export default function UserSchedaPage() {
                       <div className="flex items-center gap-1.5 text-sm text-txt">{s.device}{s.current && <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("questa sessione")}</span>}</div>
                       <div className="text-[11px] text-faint"><span className="font-mono">{s.ip}</span> · {fmtDateTime(s.lastActive)}</div>
                     </div>
-                    {!s.current && <button onClick={() => set("sessions", (u.sessions ?? []).filter((x) => x.id !== s.id))} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]" title={t("Termina sessione")}>✕</button>}
+                    {!s.current && <button aria-label={t("Termina sessione")} onClick={() => set("sessions", (u.sessions ?? []).filter((x) => x.id !== s.id))} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]" title={t("Termina sessione")}>✕</button>}
                   </div>
                 ))}
               </div>
@@ -409,7 +390,7 @@ export default function UserSchedaPage() {
                   {/* Disponibili */}
                   <div className="rounded-lg border border-line">
                     <div className="border-b border-line px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Disponibili")} ({available.length})</div>
-                    <input value={q1} onChange={(e) => setQ1(e.target.value)} placeholder={t("Cerca…")} className="w-full border-b border-line bg-paper px-2 py-1.5 text-xs outline-none" />
+                    <input value={q1} onChange={(e) => setQ1(e.target.value)} placeholder={t("Cerca…")} className="w-full border-b border-line bg-paper px-2 py-1.5 text-xs" />
                     <div className="max-h-44 overflow-y-auto p-1">
                       {fA.length === 0 ? <div className="px-2 py-3 text-center text-[11px] text-faint">—</div> : fA.map((s) => (
                         <button key={s.id} onClick={() => togglePick(setPickA, s.id)} className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${pickA.has(s.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] text-focus" : "text-txt hover:bg-wash"}`}>
@@ -420,15 +401,15 @@ export default function UserSchedaPage() {
                   </div>
                   {/* Frecce */}
                   <div className="flex flex-col items-center justify-center gap-1.5">
-                    <button onClick={moveRight} disabled={pickA.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta selezionate")}>›</button>
-                    <button onClick={moveAllRight} disabled={available.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta tutte")}>»</button>
-                    <button onClick={moveLeft} disabled={pickS.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi selezionate")}>‹</button>
-                    <button onClick={moveAllLeft} disabled={selected.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi tutte")}>«</button>
+                    <button aria-label={t("Sposta selezionate")} onClick={moveRight} disabled={pickA.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta selezionate")}>›</button>
+                    <button aria-label={t("Sposta tutte")} onClick={moveAllRight} disabled={available.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Sposta tutte")}>»</button>
+                    <button aria-label={t("Rimuovi selezionate")} onClick={moveLeft} disabled={pickS.size === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi selezionate")}>‹</button>
+                    <button aria-label={t("Rimuovi tutte")} onClick={moveAllLeft} disabled={selected.length === 0} className="grid h-8 w-8 place-items-center rounded-md border border-line text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10" title={t("Rimuovi tutte")}>«</button>
                   </div>
                   {/* Selezionate */}
                   <div className="rounded-lg border border-line">
                     <div className="border-b border-line px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Selezionate")} ({selected.length})</div>
-                    <input value={q2} onChange={(e) => setQ2(e.target.value)} placeholder={t("Cerca…")} className="w-full border-b border-line bg-paper px-2 py-1.5 text-xs outline-none" />
+                    <input value={q2} onChange={(e) => setQ2(e.target.value)} placeholder={t("Cerca…")} className="w-full border-b border-line bg-paper px-2 py-1.5 text-xs" />
                     <div className="max-h-44 overflow-y-auto p-1">
                       {fS.length === 0 ? <div className="px-2 py-3 text-center text-[11px] text-faint">{t("Nessuna struttura")}</div> : fS.map((s) => (
                         <button key={s.id} onClick={() => togglePick(setPickS, s.id)} className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${pickS.has(s.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] text-focus" : "text-txt hover:bg-wash"}`}>

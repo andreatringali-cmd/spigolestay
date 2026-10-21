@@ -8,7 +8,7 @@ import { EmptyRow, HeadLink, Panel } from "./_kit";
 
 const WD_INITIAL = ["D", "L", "M", "M", "G", "V", "S"];
 const WD_SHORT = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
-const label = (c: DayCell) => `${WD_SHORT[c.dow]} ${fmtDM(c.iso)}${c.isToday ? " (oggi)" : ""}: ${c.pct}% (${c.occupied} su ${c.total} camere), ${c.arrivals} arrivi, ${c.departures} partenze`;
+const label = (c: DayCell) => `${WD_SHORT[c.dow]} ${fmtDM(c.iso)}${c.isToday ? " (oggi)" : ""}: ${c.pct}% (${c.occupied} su ${c.total} camere), ${c.arrivals} ${c.arrivals === 1 ? "arrivo" : "arrivi"}, ${c.departures} ${c.departures === 1 ? "partenza" : "partenze"}`; // singolare/plurale corretto (era "1 arrivi")
 
 export default function Occupazione({ cells, outlook }: { cells: DayCell[]; outlook: OccupancyOutlook }) {
   const hasRooms = cells.some((c) => c.total > 0);

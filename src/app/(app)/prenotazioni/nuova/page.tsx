@@ -19,6 +19,7 @@ import { selectableExtras, extraUnitAmount, maxQtyOf } from "@/lib/booking-extra
 import { Card } from "@/components/ui";
 import Icon from "@/components/Icon";
 import QRCode from "qrcode";
+import Toggle from "@/components/Toggle";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 // Normalizza il telefono in formato internazionale (default +39) così WhatsApp funziona sempre.
@@ -334,9 +335,6 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
     w.focus();
   };
 
-  const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
-    <button type="button" onClick={onClick} className={`relative h-6 w-11 rounded-full transition ${on ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>
-  );
 
   return (
     <div>
@@ -405,9 +403,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                   </div>
                 ))}
                 <span className="ml-2 flex items-center gap-2 text-sm text-dim">Culle
-                  <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-9 max-sm:w-9">−</button>
+                  <button aria-label="Diminuisci le culle" onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-9 max-sm:w-9">−</button>
                   <span className="w-4 text-center text-sm font-semibold tabular-nums text-txt">{cribs}</span>
-                  <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-on-focus hover:opacity-90 disabled:opacity-30 max-sm:h-9 max-sm:w-9">+</button>
+                  <button aria-label="Aumenta le culle" onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-on-focus hover:opacity-90 disabled:opacity-30 max-sm:h-9 max-sm:w-9">+</button>
                 </span>
               </div>
             </div>
@@ -481,9 +479,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                               <td className="px-3 py-3 text-right max-md:p-0 max-md:text-left"><span className="text-base font-extrabold text-txt">{eur(stayPrice(rt))}</span><div className="text-[11px] text-faint">{nightsN} {nightsN === 1 ? "notte" : "notti"}</div></td>
                               <td className="px-4 py-3 max-md:p-0">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-md:h-10 max-md:w-10">−</button>
+                                  <button aria-label="Diminuisci il numero di camere" disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-md:h-10 max-md:w-10">−</button>
                                   <span className={`w-6 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                                  <button disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 max-md:h-10 max-md:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                                  <button aria-label="Aumenta il numero di camere" disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 max-md:h-10 max-md:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                                 </div>
                               </td>
                             </tr>
@@ -557,7 +555,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                             <td className="px-3 py-2.5 text-center font-bold text-txt">{qty[rt.id]}</td>
                             <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <NumInput value={linePrice(rt)} onChange={(v) => setPriceOv((o) => ({ ...o, [rt.id]: v ?? 0 }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
                             <td className="px-4 py-2.5 text-right font-bold text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td>
-                            <td className="px-3 py-2.5 text-right"><button onClick={() => { setQ(rt.id, 0); if (totalRooms - (qty[rt.id] ?? 0) < 1) setPhase("rooms"); }} title="Rimuovi" className="px-2 py-1 text-faint hover:text-[color:var(--err)] max-sm:px-3 max-sm:py-2.5">✕</button></td>
+                            <td className="px-3 py-2.5 text-right"><button aria-label="Rimuovi" onClick={() => { setQ(rt.id, 0); if (totalRooms - (qty[rt.id] ?? 0) < 1) setPhase("rooms"); }} title="Rimuovi" className="px-2 py-1 text-faint hover:text-[color:var(--err)] max-sm:px-3 max-sm:py-2.5">✕</button></td>
                           </tr>
                         );
                       })}
@@ -576,9 +574,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                       <div key={e.id} className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${q > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]" : "border-line"}`}>
                         <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}<div className="text-[11px] text-faint">{e.free ? "gratis" : eur(e.price)}</div></div>
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
+                          <button aria-label="Diminuisci la quantità" disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
                           <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                          <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                          <button aria-label="Aumenta la quantità" onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                         </div>
                       </div>
                     ); })}
@@ -695,6 +693,8 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               checkInFrom={pdfVp.checkInFrom} checkOutBy={pdfVp.checkOutBy} adults={pdfVp.adults ?? 1} children={pdfVp.children ?? 0}
               nights={pdfVp.nights} ratePlan={pdfVp.ratePlanName}
               total={typeof pdfVp.grandTotal === "number" ? eur(pdfVp.grandTotal, pdfVp.currency || "€") : undefined}
+              stayTotal={typeof pdfVp.grandTotal === "number" && (pdfVp.cityTaxAmount ?? 0) > 0 ? eur(pdfVp.grandTotal - (pdfVp.cityTaxAmount ?? 0), pdfVp.currency || "€") : undefined}
+              tax={(pdfVp.cityTaxAmount ?? 0) > 0 ? eur(pdfVp.cityTaxAmount ?? 0, pdfVp.currency || "€") : undefined}
               cancelText={pdfVp.cancelPolicy || ""}
             />
           </div>

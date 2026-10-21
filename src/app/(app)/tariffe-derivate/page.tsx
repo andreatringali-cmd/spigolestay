@@ -15,6 +15,9 @@ import { useToast } from "@/components/ToastProvider";
 import { personPlanMother, publishSingleOccupancy } from "@/lib/person-plan-client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
 import { unregisterPersonPlan } from "@/lib/person-plan";
+import { keyActivate } from "@/lib/a11y";
+import Toggle from "@/components/Toggle";
+import { Modal as UiModal } from "@/components/ui/index";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -66,22 +69,10 @@ function Catena() {
 }
 
 // Modale creazione/modifica tariffa derivata (stile Octorate)
+// Finestra: adattatore sul <Modal> del design system (role=dialog, Esc, trappola e ritorno del focus, blocco scroll, sheet su telefono)
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
-  // Esc chiude la finestra (come le altre modali dell'app).
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
-      <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
-        {children}
-      </div>
-    </div>
-  );
-}
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
+  return <UiModal open onClose={onClose} title={title} size="md" closeLabel={t("Chiudi")}>{children}</UiModal>;
 }
 
 export default function TariffeDerivatePage() {
@@ -191,11 +182,11 @@ export default function TariffeDerivatePage() {
                           const mClosed = effectiveClosed(rt, roomTypes);
                           return (
                             <Fragment key={rt.id}>
-                              <tr onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                              <tr onClick={() => router.push(`/camere/tipologia/${rt.id}`)} {...keyActivate(() => router.push(`/camere/tipologia/${rt.id}`))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                                 <td className="px-3 py-2.5">
                                   <div className="flex min-w-0 items-center gap-2">
                                     {kids.length > 0 ? (
-                                      <button onClick={(e) => { e.stopPropagation(); toggleDeriv(rt.id); }} className="shrink-0 text-faint hover:text-txt" title={open ? t("Comprimi") : t("Espandi")}>
+                                      <button aria-label={open ? t("Comprimi") : t("Espandi")} onClick={(e) => { e.stopPropagation(); toggleDeriv(rt.id); }} className="shrink-0 text-faint hover:text-txt" title={open ? t("Comprimi") : t("Espandi")}>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>
                                       </button>
                                     ) : <span className="inline-block w-3 shrink-0" />}
@@ -219,7 +210,7 @@ export default function TariffeDerivatePage() {
                                 </td>
                               </tr>
                               {open && descOf(rt.id).map(({ k, depth }) => { const kMin = effectiveMinStay(k, roomTypes); const kClosed = effectiveClosed(k, roomTypes); return (
-                                <tr key={k.id} onClick={() => setDerivModal({ structureIds: [s.id], editId: k.id })} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_9%,transparent)]">
+                                <tr key={k.id} onClick={() => setDerivModal({ structureIds: [s.id], editId: k.id })} {...keyActivate(() => setDerivModal({ structureIds: [s.id], editId: k.id }))} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_9%,transparent)]">
                                   <td className="px-3 py-2.5">
                                     <div className="flex min-w-0 items-center gap-2 pl-6" style={depth > 1 ? { paddingLeft: `${depth * 1.5}rem` } : undefined}>
                                       <span className="shrink-0 text-focus" title={t("Condivide le camere della tipologia madre")}><Catena /></span>

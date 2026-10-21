@@ -7,7 +7,7 @@ import { eur } from "@/lib/format";
 import { plural } from "@/lib/plural";
 import { csvSafe } from "@/lib/invoicing/csv";
 import { useLang } from "@/lib/i18n";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button, Input, Select } from "@/components/ui";
 import FilterSheet from "@/components/FilterSheet";
 import { cityTaxForBooking, cityTaxRulesOf, DEFAULT_CITY_TAX_RULES } from "@/lib/citytax";
 
@@ -164,11 +164,11 @@ export default function TassaSoggiornoPage() {
 
   const periodControls = (<>
     {mode === "mese" ? (
-      <label className="text-xs text-dim max-sm:flex max-sm:items-center max-sm:gap-2">{t("Mese")}<select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={sel}>{MONTHS.map((m, i) => (<option key={m} value={i}>{t(m)}</option>))}</select></label>
+      <Select label={t("Mese")} value={month} onChange={(e) => setMonth(Number(e.target.value))}>{MONTHS.map((m, i) => (<option key={m} value={i}>{t(m)}</option>))}</Select>
     ) : (
-      <label className="text-xs text-dim max-sm:flex max-sm:items-center max-sm:gap-2">{t("Trimestre")}<select value={quarter} onChange={(e) => setQuarter(Number(e.target.value))} className={sel}>{[1, 2, 3, 4].map((q) => (<option key={q} value={q}>{q}º {t("trimestre")}</option>))}</select></label>
+      <Select label={t("Trimestre")} value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>{[1, 2, 3, 4].map((q) => (<option key={q} value={q}>{q}º {t("trimestre")}</option>))}</Select>
     )}
-    <label className="text-xs text-dim max-sm:flex max-sm:items-center max-sm:gap-2">{t("Anno")}<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{years.map((y) => (<option key={y} value={y}>{y}</option>))}</select></label>
+    <Select label={t("Anno")} value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => (<option key={y} value={y}>{y}</option>))}</Select>
   </>);
   const nowD = new Date();
   const filtersActive = (year !== nowD.getFullYear() ? 1 : 0) + (mode === "mese" ? (month !== nowD.getMonth() ? 1 : 0) : (quarter !== Math.floor(nowD.getMonth() / 3) + 1 ? 1 : 0));
@@ -179,7 +179,7 @@ export default function TassaSoggiornoPage() {
       <PageHeader
         title={t("Tassa di soggiorno")}
         subtitle={t("Partita di giro · esclusa da ricavi e statistiche")}
-        actions={<button onClick={stampaDichiarazione} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus max-sm:hidden">{t("Stampa dichiarazione")}</button>}
+        actions={<Button size="sm" onClick={stampaDichiarazione} className="max-sm:hidden">{t("Stampa dichiarazione")}</Button>}
       />
 
       {/* Periodo */}
@@ -193,7 +193,7 @@ export default function TassaSoggiornoPage() {
           <FilterSheet count={filtersActive} onReset={resetFilters}>{periodControls}</FilterSheet>
           <div className="contents max-sm:hidden">{periodControls}</div>
           <div className="ml-auto text-right max-sm:flex max-sm:w-full max-sm:items-center max-sm:justify-between max-sm:gap-3">
-            <button onClick={stampaDichiarazione} className="h-9 shrink-0 rounded-lg bg-focus px-3 text-[13px] font-semibold text-on-focus sm:hidden">{t("Stampa dichiarazione")}</button>
+            <Button size="sm" onClick={stampaDichiarazione} className="sm:hidden">{t("Stampa dichiarazione")}</Button>
             <div>
               <div className="text-xs text-dim">{t("Imposta da versare")} · {label}</div>
               <div className="font-mono text-2xl font-bold text-txt max-sm:text-xl">{eur(total)}</div>
@@ -215,14 +215,14 @@ export default function TassaSoggiornoPage() {
           </div>
           {taxMode === "percentuale" ? (
             <>
-              <Field label={t("% del pernottamento")}><input type="number" step="0.5" value={pct} onChange={(e) => setPct(Number(e.target.value))} className={inp} /></Field>
-              <Field label={t("Tetto € persona/notte")}><input type="number" step="0.5" value={cap} onChange={(e) => setCap(Number(e.target.value))} className={inp} /></Field>
+              <Input label={t("% del pernottamento")} fieldClassName="w-28" type="number" step="0.5" value={pct} onChange={(e) => setPct(Number(e.target.value))} />
+              <Input label={t("Tetto € persona/notte")} fieldClassName="w-28" type="number" step="0.5" value={cap} onChange={(e) => setCap(Number(e.target.value))} />
             </>
           ) : (
-            <Field label={t("€ per persona/notte")}><input type="number" step="0.5" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className={inp} /></Field>
+            <Input label={t("€ per persona/notte")} fieldClassName="w-28" type="number" step="0.5" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
           )}
-          <Field label={t("Max notti tassabili")}><input type="number" value={maxNights} onChange={(e) => setMaxNights(Number(e.target.value))} className={inp} /></Field>
-          <Field label={t("Esenti sotto i (anni)")}><input type="number" value={exemptAge} onChange={(e) => setExemptAge(Number(e.target.value))} className={inp} /></Field>
+          <Input label={t("Max notti tassabili")} fieldClassName="w-28" type="number" value={maxNights} onChange={(e) => setMaxNights(Number(e.target.value))} />
+          <Input label={t("Esenti sotto i (anni)")} fieldClassName="w-28" type="number" value={exemptAge} onChange={(e) => setExemptAge(Number(e.target.value))} />
           <label className="flex items-center gap-2 pb-2 text-sm text-dim">
             <input type="checkbox" checked={childrenExempt} onChange={(e) => setChildrenExempt(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />
             {t("Minori esenti (senza età)")}
@@ -237,7 +237,7 @@ export default function TassaSoggiornoPage() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>{t("Dettaglio imposta")} ({rows.length})</SectionTitle>
-            <button onClick={exportImpostaCsv} disabled={!rows.length} className="rounded-lg border border-line px-2.5 py-1 max-sm:py-2 text-xs font-medium text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{t("Esporta CSV")}</button>
+            <Button variant="secondary" size="sm" onClick={exportImpostaCsv} disabled={!rows.length}>{t("Esporta CSV")}</Button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
@@ -268,7 +268,7 @@ export default function TassaSoggiornoPage() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>{t("Movimento turistico (ISTAT)")} — {label}</SectionTitle>
-            <button onClick={exportIstatCsv} disabled={!istat.length} className="rounded-lg border border-line px-2.5 py-1 max-sm:py-2 text-xs font-medium text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{t("Esporta ISTAT (CSV)")}</button>
+            <Button variant="secondary" size="sm" onClick={exportIstatCsv} disabled={!istat.length}>{t("Esporta ISTAT (CSV)")}</Button>
           </div>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
@@ -307,12 +307,6 @@ export default function TassaSoggiornoPage() {
   );
 }
 
-const inp = "w-28 rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
-const sel = "mt-1 block rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:mt-0 max-sm:h-9 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="text-xs text-dim">{label}<div className="mt-1">{children}</div></label>;
-}
 function Toggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${active ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{children}</button>;
+  return <button onClick={onClick} aria-pressed={active} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-medium transition ${active ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{children}</button>;
 }

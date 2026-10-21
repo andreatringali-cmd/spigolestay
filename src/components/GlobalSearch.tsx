@@ -65,7 +65,7 @@ export default function GlobalSearch() {
           <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-txt">
               <Icon name="search" size={18} />
-              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca prenotazioni, ospiti, camere, pagine…")} className="w-full bg-transparent text-sm outline-none placeholder:text-faint" />
+              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca prenotazioni, ospiti, camere, pagine…")} className="w-full bg-transparent text-sm placeholder:text-faint" />
               <button onClick={close} className="text-dim hover:text-txt">Esc</button>
             </div>
             <div className="max-h-[60dvh] overflow-y-auto p-2">

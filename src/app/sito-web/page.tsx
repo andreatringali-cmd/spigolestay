@@ -8,13 +8,13 @@ import { getImages } from "@/lib/images";
 import MediaImg from "@/components/MediaImg";
 import { cssBgUrl } from "@/lib/media-client";
 import { toExternalUrl } from "@/lib/media";
-import { loadPromos } from "@/lib/promos";
+import { loadRealPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import DateField from "@/components/DateField";
 import { fmtDate } from "@/lib/dates";
 import { addDaysYmd, ymdRome } from "@/lib/dates-rome";
 import { amenityIcon } from "@/lib/amenities";
-import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw } from "@/lib/publicdata";
+import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw, enterOwnerPreview } from "@/lib/publicdata";
 import { inScope } from "@/lib/scope";
 import { GUEST_DEFAULT_ACCENT } from "@/lib/guest-brand";
 
@@ -107,10 +107,31 @@ const DEFCFG: Cfg = { nome: "", tagline: "", accent: GUEST_DEFAULT_ACCENT, heroB
 
 
 export default function SitoWebPage() {
-  return <DataProvider><Site /></DataProvider>;
+  // Anteprima del titolare (Xenosite → «Anteprima»): prima di montare lo store si caricano i dati dell'archivio locale e si agganciano
+  // nella stessa forma sanificata che andrebbe online (vedi enterOwnerPreview). Sola lettura: non scrive nulla nel browser.
+  const [state, setState] = useState<"loading" | "ok" | "none">(isPublicMode() ? "ok" : "loading");
+  useEffect(() => {
+    if (isPublicMode()) return;
+    let alive = true;
+    let wanted: string | null = null;
+    try { wanted = new URLSearchParams(window.location.search).get("s"); } catch {}
+    enterOwnerPreview(wanted).then((id) => { if (alive) setState(id ? "ok" : "none"); });
+    return () => { alive = false; };
+  }, []);
+  if (state === "loading") return <div className="min-h-dvh bg-wash" aria-busy="true" />;
+  if (state === "none") {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-surface p-6 text-center text-txt">
+        <h1 className="font-display text-2xl font-bold">Anteprima non disponibile</h1>
+        <p className="max-w-md text-[15px] text-dim">Su questo dispositivo non ci sono i dati della struttura. Torna in Xenora, apri <b className="text-txt">Xenosite</b> e premi di nuovo «Anteprima», oppure pubblica il sito e aprilo dal suo indirizzo.</p>
+        <a href="/sito" className="mt-1.5 inline-flex min-h-11 items-center rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus hover:opacity-90">Vai a Xenosite</a>
+      </div>
+    );
+  }
+  return <DataProvider><Site preview /></DataProvider>;
 }
 
-export function Site() {
+export function Site({ preview = false }: { preview?: boolean } = {}) {
   const { structures, roomTypes, units, bookings, getStructure, addGuest } = useData();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
@@ -123,6 +144,7 @@ export function Site() {
   const nlValid = !!nl.email.trim() && !!nl.phone.trim() && (!!nl.firstName.trim() || !!nl.lastName.trim());
   const nlSubmit = () => {
     if (!nlValid) return;
+    if (preview) { setNlDone(true); return; } // anteprima: nessun contatto viene salvato
     if (isPublicMode() && publicSlug()) {
       // Sito pubblico: il contatto va salvato tra gli ospiti del proprietario (server).
       fetch("/api/public-lead", {
@@ -201,7 +223,8 @@ export function Site() {
   // Home: solo le camere "madri". Le tariffe derivate (es. uso singola) compaiono come opzioni in "Verifica disponibilità".
   const types = roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom);
   const siteQ = isPublicMode() && publicSlug() ? `&site=${encodeURIComponent(publicSlug()!)}` : "";
-  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${wantsCot ? "&cot=1" : ""}${siteQ}${extra}`; };
+  const [previewHint, setPreviewHint] = useState(false);
+  const go = (extra = "") => { if (preview) { setPreviewHint(true); return; } window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${wantsCot ? "&cot=1" : ""}${siteQ}${extra}`; };
 
   // Galleria: foto delle tipologie + foto delle singole camere, con etichetta della tipologia.
   const gallery = useMemo(() => {
@@ -224,7 +247,7 @@ export function Site() {
   }, [galItems.length]);
 
   // Offerte attive (modulo Promozioni).
-  const offers = useMemo(() => { try { const t = ymdRome(new Date()); return loadPromos().filter((p) => inScope(p.structureId, sid) && p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, [sid]);
+  const offers = useMemo(() => { try { const t = ymdRome(new Date()); return loadRealPromos().filter((p) => inScope(p.structureId, sid) && p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, [sid]);
 
   // Recensioni REALI soltanto: lette dallo store recensioni (spigolestay:sitereviews),
   // una lista scritta dal proprietario/importata. Nessun testo inventato: se non ci
@@ -349,8 +372,26 @@ export function Site() {
     ...(structure?.checkOutBy ? { checkoutTime: structure.checkOutBy } : {}),
   };
 
+  // Finché la struttura non è caricata non si mostra nulla (prima compariva un sito con titolo «Xenora» e senza camere).
+  const [late, setLate] = useState(false);
+  useEffect(() => { const tm = window.setTimeout(() => setLate(true), 4000); return () => window.clearTimeout(tm); }, []);
+  if (!structure) {
+    return late ? (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-2 bg-surface p-6 text-center text-txt">
+        <h1 className="font-display text-xl font-bold">Sito non disponibile</h1>
+        <p className="max-w-md text-sm text-dim">Non riusciamo a caricare i dati di questa struttura.</p>
+      </div>
+    ) : <div className="min-h-dvh bg-wash" aria-busy="true" />;
+  }
+
   return (
     <div className="flex min-h-full flex-col bg-wash pb-16 md:pb-0">
+      {preview && (
+        <div role="status" className="sticky top-0 z-[70] border-b border-line bg-surface px-4 py-2 text-xs text-txt" style={{ boxShadow: "inset 4px 0 0 var(--warn, #b7791f)" }}>
+          <b>Anteprima.</b> Così vedrebbe il sito chi lo visita, con i dati di adesso: non è online finché non premi «Pubblica» o «Aggiorna» in Xenosite. Qui prenotazioni e iscrizioni sono disattivate.
+          {previewHint && <span className="ml-1 font-semibold">La prenotazione si prova solo sul sito pubblicato.</span>}
+        </div>
+      )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`.xreveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}.xreveal.xin{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.xreveal{opacity:1;transform:none;transition:none}}`}</style>
       {/* Top bar */}
@@ -405,7 +446,10 @@ export function Site() {
         )}
 
         {/* Camere */}
-        {cfg.camere && (
+        {preview && cfg.camere && types.length === 0 && (
+          <section className="mt-10 rounded-xl border border-dashed border-line bg-surface p-4 text-sm text-dim">Anteprima: non ci sono ancora camere da mostrare. Aggiungile in <b className="text-txt">Camere</b>: compariranno qui con foto e prezzi.</section>
+        )}
+        {cfg.camere && types.length > 0 && (
           <section className="mt-10">
             <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Le nostre camere")}</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

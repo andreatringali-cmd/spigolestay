@@ -22,6 +22,7 @@ import { simulateImpact } from "@/lib/revenue-impact";
 import { buildChanges, recordBatches } from "@/lib/revenue-history";
 import { fetchCityPulse, computeMarketSignal, pulseHasDemo, type MarketPulse } from "@/lib/market";
 import StructureRequired from "@/components/StructureRequired";
+import Toggle from "@/components/Toggle";
 
 const WINDOW = 90;
 const FUTURE = 30;
@@ -293,7 +294,7 @@ export default function NettarePage() {
                   <label key={m} className="rounded-xl border border-line p-2 text-center" style={{ background: v > 0 ? "color-mix(in srgb,var(--ok) 8%,var(--surface))" : v < 0 ? "color-mix(in srgb,var(--focus) 8%,var(--surface))" : "var(--surface)" }}>
                     <div className="text-[11px] font-bold uppercase tracking-wide text-dim">{t(m)}</div>
                     <div className="mx-auto my-1 flex h-8 w-2 flex-col justify-end overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><div style={{ height: `${Math.min(100, Math.abs(v) * 2)}%`, background: v >= 0 ? "var(--ok)" : "var(--focus)", borderRadius: 4 }} /></div>
-                    <div className="flex items-center justify-center"><input type="number" inputMode="numeric" value={v || ""} placeholder="0" onChange={(e) => { const s = [...strat.season]; s[i] = e.target.value === "" ? 0 : Number(e.target.value); upd({ season: s }); }} className="w-10 bg-transparent text-right font-mono text-xs outline-none" style={{ color: "var(--txt)" }} /><span className="text-[11px] text-dim">%</span></div>
+                    <div className="flex items-center justify-center"><input type="number" inputMode="numeric" value={v || ""} placeholder="0" onChange={(e) => { const s = [...strat.season]; s[i] = e.target.value === "" ? 0 : Number(e.target.value); upd({ season: s }); }} className="w-10 bg-transparent text-right font-mono text-xs" style={{ color: "var(--txt)" }} /><span className="text-[11px] text-dim">%</span></div>
                   </label>
                 );
               })}
@@ -628,8 +629,8 @@ function CellPanel({ c, rtName, published, floor, t, onClose, onSave, onReset }:
               <Field icon="↓" label={t("Prezzo minimo")} tint="var(--ok)"><input type="number" inputMode="numeric" placeholder="—" value={m.min ?? ""} onChange={(e) => setM({ ...m, min: num(e.target.value) })} className={inputCls} style={{ color: "var(--txt)" }} /><span className="text-xs text-dim">€</span></Field>
               <Field icon="⇅" label={t("Aumenta / diminuisci")} tint="var(--err)">
                 <div className="flex shrink-0 overflow-hidden rounded-md border border-line text-xs font-bold">
-                  <button onClick={() => setSign(1)} className="px-2 py-1" style={{ background: sign === 1 ? "var(--txt)" : "transparent", color: sign === 1 ? "var(--surface)" : "var(--dim)" }}>+</button>
-                  <button onClick={() => setSign(-1)} className="px-2 py-1" style={{ background: sign === -1 ? "var(--txt)" : "transparent", color: sign === -1 ? "var(--surface)" : "var(--dim)" }}>−</button>
+                  <button aria-label="Aumento (segno più)" onClick={() => setSign(1)} className="px-2 py-1" style={{ background: sign === 1 ? "var(--txt)" : "transparent", color: sign === 1 ? "var(--surface)" : "var(--dim)" }}>+</button>
+                  <button aria-label="Riduzione (segno meno)" onClick={() => setSign(-1)} className="px-2 py-1" style={{ background: sign === -1 ? "var(--txt)" : "transparent", color: sign === -1 ? "var(--surface)" : "var(--dim)" }}>−</button>
                 </div>
                 <input type="number" inputMode="numeric" min={0} placeholder="—" value={m.adj != null ? Math.abs(m.adj) : ""} onChange={(e) => setM({ ...m, adj: num(e.target.value) })} className={inputCls} style={{ color: "var(--txt)" }} />
                 <div className="flex shrink-0 overflow-hidden rounded-md border border-line text-xs font-bold">
@@ -678,14 +679,14 @@ function GoalBtn({ on, onClick, label, desc }: { on: boolean; onClick: () => voi
 }
 
 function Seg({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
-  return <button onClick={onClick} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10" style={{ background: on ? "var(--focus)" : "transparent", color: on ? "#fff" : "var(--dim)" }}>{children}</button>;
+  return <button onClick={onClick} aria-pressed={on} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-10" style={{ background: on ? "var(--focus)" : "transparent", color: on ? "#fff" : "var(--dim)" }}>{children}</button>;
 }
 
 function Tgl({ on, onClick, label, hint }: { on: boolean; onClick: () => void; label: string; hint: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
       <div><div className="text-sm font-medium text-txt">{label}</div><div className="text-[11px] text-faint">{hint}</div></div>
-      <button onClick={onClick} aria-pressed={on} aria-label={label} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all" style={{ left: on ? 22 : 2 }} /></button>
+      <Toggle on={on} onClick={onClick} color="var(--ok)" label={label} />
     </div>
   );
 }

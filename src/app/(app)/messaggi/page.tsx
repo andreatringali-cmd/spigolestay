@@ -30,10 +30,12 @@ function MessaggiInner() {
     <div>
       <PageHeader title={t("Messaggi")} subtitle={active.hint} />
 
-      <div className="mb-4 flex w-full gap-3 max-sm:mb-3 max-sm:gap-2">
+      <div role="tablist" aria-label="Sezioni dei messaggi" className="mb-4 flex w-full gap-3 max-sm:mb-3 max-sm:gap-2">
         {TABS.map((x) => (
           <button
             key={x.id}
+            role="tab"
+            aria-selected={tab === x.id}
             onClick={() => setTab(x.id)}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-center text-xs font-semibold shadow-sm transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${tab === x.id ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line bg-surface text-dim hover:bg-wash hover:text-txt"}`}
           >

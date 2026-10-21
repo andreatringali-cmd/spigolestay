@@ -135,7 +135,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
         <div className="mb-1 flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3 py-2.5">
           <span className="text-sm font-medium text-txt">{t("Non prima delle")}</span>
           <input
-            type="time"
+            type="time" aria-label={t("Non prima delle")}
             value={cfg.time}
             onChange={(e) => setCfg((c) => ({ ...c, time: e.target.value || "08:00" }))}
             className="rounded-lg border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus"
@@ -144,21 +144,28 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
         <p className="mb-3 px-1 text-[11px] text-faint">{t("Un solo invio al giorno, all'orario scelto (entro 10 minuti).")}</p>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2.5">
-            <input type="checkbox" checked={cfg.email} onChange={(e) => setCfg((c) => ({ ...c, email: e.target.checked }))} className="h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
-            <MailIcon size={16} />
+          <div className="rounded-xl border border-line bg-paper px-3 py-2.5">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-txt">
+              <input type="checkbox" checked={cfg.email} onChange={(e) => setCfg((c) => ({ ...c, email: e.target.checked }))} className="h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
+              <MailIcon size={16} />
+              {t("Invia il planning per email")}
+            </label>
+            <label htmlFor="autoshare-email-to" className="mt-2 block text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Indirizzo email a cui inviare")}</label>
             <input
-              type="email"
+              id="autoshare-email-to"
+              type="email" inputMode="email" autoComplete="email"
               value={cfg.emailTo}
               onChange={(e) => setCfg((c) => ({ ...c, emailTo: e.target.value }))}
-              placeholder={t("indirizzo email")}
-              className="min-w-0 flex-1 bg-transparent text-sm text-txt outline-none placeholder:text-faint"
+              placeholder="nome@esempio.it"
+              className="mt-1 w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus"
             />
+            <p className="mt-1 text-[11px] text-faint">{t("Di solito chi si occupa delle pulizie: riceve il planning di oggi all'orario scelto.")}</p>
           </div>
 
           {/* In copia: altri indirizzi che ricevono la stessa email */}
           <div className="rounded-xl border border-line bg-paper px-3 py-2.5">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("In copia")}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{t("In copia")}</div>
+            <p className="mb-1.5 text-[11px] text-faint">{t("Facoltativo: altre persone che ricevono la stessa email.")}</p>
             <div className="flex flex-wrap items-center gap-1.5">
               {(cfg.emailCc ?? []).map((a) => (
                 <span key={a} className="inline-flex items-center gap-1 rounded-full border border-line bg-surface py-0.5 pl-2.5 pr-1 text-xs text-txt">
@@ -172,7 +179,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === "," || e.key === " " || e.key === ";") { e.preventDefault(); commitCc(); } }}
                 onBlur={commitCc}
                 placeholder={(cfg.emailCc ?? []).length ? t("aggiungi un altro indirizzo") : t("aggiungi un indirizzo in copia")}
-                className="min-w-[10rem] flex-1 bg-transparent py-1 text-sm text-txt outline-none placeholder:text-faint"
+                className="min-w-[10rem] flex-1 bg-transparent py-1 text-sm text-txt placeholder:text-faint"
               />
             </div>
             {ccErr && <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--err)" }}>{ccErr}</p>}

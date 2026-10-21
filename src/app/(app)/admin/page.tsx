@@ -16,6 +16,8 @@ import { PageHeader, Card, StatCard } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { TIERS, ROOMS_PER_STRUCT } from "@/lib/plans";
+import { keyActivate } from "@/lib/a11y";
+import { useToast } from "@/components/ToastProvider";
 
 interface Row {
   id: string; email: string | null; name: string; phone: string | null; createdAt: string | null;
@@ -77,12 +79,12 @@ function Pager({ total, page, pageSize, onPage, onPageSize }: { total: number; p
     <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2 text-[13px]">
       <span className="text-dim">{from}–{to} di {total}</span>
       <div className="ml-auto flex items-center gap-2">
-        <select value={pageSize} onChange={(e) => { onPageSize(Number(e.target.value)); onPage(0); }} className="rounded-md border border-line bg-paper px-2 py-1 text-[13px] text-txt outline-none">
+        <select value={pageSize} onChange={(e) => { onPageSize(Number(e.target.value)); onPage(0); }} className="rounded-md border border-line bg-paper px-2 py-1 text-[13px] text-txt">
           <option value={25}>25 / pag.</option><option value={50}>50 / pag.</option><option value={100}>100 / pag.</option>
         </select>
-        <button disabled={cur <= 0} onClick={() => onPage(cur - 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">←</button>
+        <button aria-label="Pagina precedente" disabled={cur <= 0} onClick={() => onPage(cur - 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">←</button>
         <span className="text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{cur + 1}/{pages}</span>
-        <button disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">→</button>
+        <button aria-label="Pagina successiva" disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">→</button>
       </div>
     </div>
   );
@@ -90,6 +92,7 @@ function Pager({ total, page, pageSize, onPage, onPageSize }: { total: number; p
 
 export default function AdminPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -174,13 +177,13 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/backfill-subs", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert(`Aggiornamento da Stripe completato.\nControllati: ${d.scanned ?? 0}\nAggiornati: ${d.updated ?? 0}${d.errors?.length ? `\nErrori: ${d.errors.length}` : ""}`);
+        toast(`Aggiornamento da Stripe completato.\nControllati: ${d.scanned ?? 0}\nAggiornati: ${d.updated ?? 0}${d.errors?.length ? `\nErrori: ${d.errors.length}` : ""}`, d.errors?.length ? "error" : "success");
         await load();
         if (view === "accounts") await loadAccounts();
       } else {
-        alert(`Aggiornamento non riuscito: ${d.error || res.status}`);
+        toast(`Aggiornamento non riuscito: ${d.error || res.status}`, "error");
       }
-    } catch { alert("Aggiornamento non riuscito: errore di rete."); }
+    } catch { toast("Aggiornamento non riuscito: errore di rete.", "error"); }
     setBackfilling(false);
   };
 
@@ -441,7 +444,7 @@ export default function AdminPage() {
                   const topAlert = al.find((a) => a.tone === "red") || al.find((a) => a.tone === "amber");
                   return (
                     <Fragment key={r.id}>
-                      <tr className="cursor-pointer border-b border-line/60 hover:bg-wash/40" onClick={() => openDetail(acc)} title="Apri scheda">
+                      <tr className="cursor-pointer border-b border-line/60 hover:bg-wash/40" onClick={() => openDetail(acc)} {...keyActivate(() => openDetail(acc))} title="Apri scheda">
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
                             <span className="shrink-0 text-faint">›</span>

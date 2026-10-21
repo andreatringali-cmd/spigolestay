@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
-import { PageHeader, StatCard, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, StatCard, Card, SectionTitle, Button, Select, Badge, Alert, DataTable, type BadgeTone } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import FilterSheet from "@/components/FilterSheet";
 import { eur } from "@/lib/format";
@@ -17,9 +17,12 @@ import { bolloQuarters, quarterOf } from "@/lib/invoicing/bollo";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { todayLocalISO } from "@/lib/invoicing/receivables";
 import { friendlyError } from "@/lib/friendly-error";
+import { keyActivate } from "@/lib/a11y";
 
 interface Row { id: string; number_label: string | null; issue_date: string | null; bollo_cents: number; counterpart: { name?: string; lastName?: string } | null; structure_id: string | null; stato: string; doc_kind: string; regime: string | null }
 const dmy = (iso: string) => fmtDate(iso);
+// Colore dello stato del documento (token CSS) -> tono del Badge
+const toneOf = (color: string): BadgeTone => (color.includes("--ok") ? "ok" : color.includes("--warn") ? "warn" : color.includes("--err") ? "err" : color.includes("--focus") ? "info" : "neutral");
 
 export default function RegistroBolloPage() {
   const router = useRouter();
@@ -46,7 +49,6 @@ export default function RegistroBolloPage() {
   const rejected = ofYear.filter((r) => r.stato === "scartata");
   const cents = (c: number) => c / 100;
   const today = todayLocalISO();
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:shrink-0 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
   const structName = (id: string | null) => allStructures.find((s) => s.id === id)?.name ?? "—";
   const cpName = (r: Row) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
 
@@ -57,8 +59,8 @@ export default function RegistroBolloPage() {
   };
 
   const filterControls = (<>
-    <select value={String(quarter)} onChange={(e) => setQuarter(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutto l&apos;anno</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>{q}º trimestre</option>)}</select>
-    <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{[...new Set([String(year), ...years])].map((y) => <option key={y} value={y}>{y}</option>)}</select>
+    <Select aria-label="Trimestre" value={String(quarter)} onChange={(e) => setQuarter(e.target.value === "all" ? "all" : Number(e.target.value))}><option value="all">Tutto l&apos;anno</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>{q}º trimestre</option>)}</Select>
+    <Select aria-label="Anno" value={year} onChange={(e) => setYear(Number(e.target.value))}>{[...new Set([String(year), ...years])].map((y) => <option key={y} value={y}>{y}</option>)}</Select>
   </>);
   const filtersActive = (quarter !== "all" ? 1 : 0) + (year !== new Date().getFullYear() ? 1 : 0);
   const resetFilters = () => { setQuarter("all"); setYear(new Date().getFullYear()); };
@@ -70,10 +72,10 @@ export default function RegistroBolloPage() {
           {/* Telefono: i due filtri stanno dietro il pulsante «Filtri»; dal tablet in su restano inline come prima */}
           <div className="contents max-sm:hidden">{filterControls}</div>
           <FilterSheet count={filtersActive} onReset={resetFilters}>{filterControls}</FilterSheet>
-          <button onClick={exportCsv} disabled={shown.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50 max-sm:h-9 max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-0 max-sm:text-[13px]">Esporta CSV</button>
+          <Button variant="secondary" size="sm" onClick={exportCsv} disabled={shown.length === 0} className="whitespace-nowrap">Esporta CSV</Button>
         </div>} />
 
-      {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
+      {err && <Alert tone="err" className="mb-4">{err}</Alert>}
 
       <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3 max-sm:gap-2 sm:grid-cols-5">
         {quarters.map((q) => <StatCard key={q.q} label={`${q.q}º trimestre`} value={eur(cents(q.cents))} hint={`${q.count} doc.`} onClick={() => setQuarter(quarter === q.q ? "all" : q.q)} active={quarter === q.q} />)}
@@ -81,7 +83,7 @@ export default function RegistroBolloPage() {
       </div>
 
       {rejected.length > 0 && (
-        <Card className="mb-4"><p className="text-sm text-[color:var(--warn)]">{rejected.length} document{rejected.length === 1 ? "o" : "i"} con bollo {rejected.length === 1 ? "risulta scartato" : "risultano scartati"} dallo SdI ({eur(cents(rejected.reduce((a, r) => a + r.bollo_cents, 0)))}): sono inclusi nei totali. Verifica con il commercialista come trattarli se non vengono corretti e reinviati.</p></Card>
+        <Alert tone="warn" className="mb-4">{rejected.length} document{rejected.length === 1 ? "o" : "i"} con bollo {rejected.length === 1 ? "risulta scartato" : "risultano scartati"} dallo SdI ({eur(cents(rejected.reduce((a, r) => a + r.bollo_cents, 0)))}): sono inclusi nei totali. Verifica con il commercialista come trattarli se non vengono corretti e reinviati.</Alert>
       )}
 
       <Card className="mb-4">
@@ -105,28 +107,23 @@ export default function RegistroBolloPage() {
         <p className="mt-2 text-[11px] text-faint">Date, codici tributo e soglia dei 250 € sono un promemoria: confermali sempre con il commercialista. Xenora non registra se il versamento è stato effettuato.</p>
       </Card>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2 font-semibold">Trim.</th><th className="px-3 py-2 font-semibold">Struttura</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Cliente</th><th className="px-3 py-2 font-semibold">Stato</th><th className="px-3 py-2 text-right font-semibold">Bollo</th></tr></thead>
-          <tbody>
-            {shown.map((r) => {
-              const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" };
-              return (
-                <tr key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                  <td className="px-3 py-2.5 text-dim">{r.issue_date ? fmtDate(r.issue_date) : "—"}</td>
-                  <td className="px-3 py-2.5 text-dim">{quarterOf(r.issue_date)}º</td>
-                  <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>
-                  <td className="px-3 py-2.5 font-mono text-txt">{r.number_label}</td>
-                  <td className="px-3 py-2.5 text-dim">{cpName(r) || "—"}</td>
-                  <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></td>
-                  <td className="px-3 py-2.5 text-right font-mono text-txt">{eur(cents(r.bollo_cents))}</td>
-                </tr>
-              );
-            })}
-            {!loading && shown.length === 0 && <tr><td colSpan={7}><EmptyState title="Nessun bollo nel periodo" sub="Il bollo compare sui documenti emessi in regime forfettario oltre 77,47 €." /></td></tr>}
-          </tbody>
-          {shown.length > 0 && <tfoot><tr><td colSpan={6} className="px-3 py-2 text-right text-xs font-semibold text-dim">Totale periodo</td><td className="px-3 py-2 text-right font-mono font-bold text-txt">{eur(cents(shown.reduce((a, r) => a + r.bollo_cents, 0)))}</td></tr></tfoot>}
-        </table>
+      <div className="max-md:hidden">
+        <DataTable
+          caption="Documenti con bollo"
+          rows={shown} rowKey={(r) => r.id} loading={loading}
+          onRowClick={(r) => router.push(`/documenti/${r.id}`)}
+          empty={<EmptyState title="Nessun bollo nel periodo" sub="Il bollo compare sui documenti emessi in regime forfettario oltre 77,47 €." />}
+          columns={[
+            { key: "d", header: "Data", cell: (r) => <span className="text-dim">{r.issue_date ? fmtDate(r.issue_date) : "—"}</span> },
+            { key: "q", header: "Trim.", cell: (r) => <span className="text-dim">{quarterOf(r.issue_date)}º</span> },
+            { key: "s", header: "Struttura", cell: (r) => <span className="text-dim">{structName(r.structure_id)}</span> },
+            { key: "n", header: "Numero", cell: (r) => <span className="font-mono">{r.number_label}</span> },
+            { key: "c", header: "Cliente", cell: (r) => <span className="text-dim">{cpName(r) || "—"}</span> },
+            { key: "t", header: "Stato", cell: (r) => { const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" }; return <Badge tone={toneOf(st.color)}>{st.label}</Badge>; } },
+            { key: "b", header: "Bollo", align: "right", cell: (r) => <span className="font-mono">{eur(cents(r.bollo_cents))}</span> },
+          ]}
+        />
+        {shown.length > 0 && <div className="mt-2 flex items-center justify-between rounded-xl border border-line bg-wash px-3 py-2 text-sm font-semibold"><span className="text-dim">Totale periodo</span><span className="font-mono text-txt">{eur(cents(shown.reduce((a, r) => a + r.bollo_cents, 0)))}</span></div>}
       </div>
 
       {/* Telefono: una scheda per documento (la tabella serve da tablet in su) */}
@@ -134,14 +131,14 @@ export default function RegistroBolloPage() {
         {shown.map((r) => {
           const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" };
           return (
-            <div key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
+            <div key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} {...keyActivate(() => router.push(`/documenti/${r.id}`))} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate font-medium text-txt">{cpName(r) || "—"}</div>
                   <div className="truncate text-xs text-dim"><span className="font-mono">{r.number_label}</span> · {r.issue_date ? fmtDate(r.issue_date) : "—"} · {quarterOf(r.issue_date)}º trim.</div>
                   <div className="truncate text-[11px] text-faint">{structName(r.structure_id)}</div>
                 </div>
-                <div className="shrink-0 text-right"><div className="font-mono text-sm font-semibold text-txt">{eur(cents(r.bollo_cents))}</div><span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></div>
+                <div className="shrink-0 text-right"><div className="font-mono text-sm font-semibold text-txt">{eur(cents(r.bollo_cents))}</div><Badge tone={toneOf(st.color)} className="mt-1">{st.label}</Badge></div>
               </div>
             </div>
           );

@@ -23,11 +23,13 @@ import { linkedTemplate, templateRawFor } from "@/lib/template-fill";
 import { guestLangOf } from "@/lib/guest-lang";
 import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
-import { mergeSeedTemplates } from "@/lib/msg-templates";
+import { mergeSeedTemplates, templateLabel } from "@/lib/msg-templates";
 import { waDigits } from "@/lib/contacts-check";
 import { todayRome, addDaysYmd } from "@/lib/dates-rome";
 import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewDecision, reviewLinksFor, reviewTokens, usesReviewLinks } from "@/lib/auto-review";
 import { structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
+import { useToast } from "@/components/ToastProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { apiPost } from "@/lib/invoicing/client";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
@@ -108,6 +110,8 @@ const GUIDE_BASE = "https://spigole-guest-guide.vercel.app";
 export default function ConversazioniPanel({ onManageTemplates }: { onManageTemplates?: () => void }) {
   const { bookings, guests, getStructure, getUnit, getRoomType, activeStructureId } = useData();
   const { t } = useLang();
+  const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isOwner = !!user?.email && OWNER_EMAILS.includes(user.email.toLowerCase());
   const [webhookCopied, setWebhookCopied] = useState(false);
@@ -405,13 +409,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [sending, setSending] = useState(false);
   const waSave = async () => {
     setWaBusy("save");
-    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "save", token: waTok || undefined, phoneId: wa.phoneId }); window.alert(r.message || "Salvato"); setWaTok(""); const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }); setWa({ connected: !!st.connected, phoneId: st.phoneId || "" }); }
-    catch (e) { window.alert(e instanceof Error ? e.message : "Errore"); } finally { setWaBusy(""); }
+    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "save", token: waTok || undefined, phoneId: wa.phoneId }); toast(r.message || "Salvato", "error"); setWaTok(""); const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }); setWa({ connected: !!st.connected, phoneId: st.phoneId || "" }); }
+    catch (e) { toast(e instanceof Error ? e.message : "Errore", "error"); } finally { setWaBusy(""); }
   };
   const waTest = async () => {
     setWaBusy("test");
-    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "test" }); window.alert(r.message || (r.ok ? "OK" : "Errore")); }
-    catch (e) { window.alert(e instanceof Error ? e.message : "Errore"); } finally { setWaBusy(""); }
+    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "test" }); toast(r.message || (r.ok ? "OK" : "Errore"), r.ok ? "success" : "error"); }
+    catch (e) { toast(e instanceof Error ? e.message : "Errore", "error"); } finally { setWaBusy(""); }
   };
 
   // WhatsApp Embedded Signup: popup Meta che restituisce un `code` (via FB.login) e,
@@ -456,18 +460,18 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       await new Promise((r) => setTimeout(r, 500));
     }
     const { wabaId, phoneNumberId } = waIdsRef.current;
-    if (!wabaId || !phoneNumberId) { window.alert(t("Non ho ricevuto i dati del numero da Meta. Riprova.")); setWaEmbedBusy(false); return; }
+    if (!wabaId || !phoneNumberId) { toast(t("Non ho ricevuto i dati del numero da Meta. Riprova."), "error"); setWaEmbedBusy(false); return; }
     try {
       const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/embedded-signup", { code, wabaId, phoneNumberId });
-      window.alert(r.message || (r.ok ? "OK" : "Errore"));
+      toast(r.message || (r.ok ? "OK" : "Errore"), r.ok ? "success" : "error");
       const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" });
       setWa({ connected: !!st.connected, phoneId: st.phoneId || "" });
-    } catch (e) { window.alert(e instanceof Error ? e.message : "Errore collegamento"); }
+    } catch (e) { toast(e instanceof Error ? e.message : "Errore collegamento", "error"); }
     finally { setWaEmbedBusy(false); waIdsRef.current = {}; }
   };
 
   const waEmbedStart = () => {
-    if (!window.FB) { window.alert(t("SDK Meta non pronto, riprova tra qualche secondo.")); return; }
+    if (!window.FB) { toast(t("SDK Meta non pronto, riprova tra qualche secondo."), "error"); return; }
     waIdsRef.current = {};
     setWaEmbedBusy(true);
     window.FB.login((response) => {
@@ -481,7 +485,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const digits = waDigits(current?.phone, current ? guests.find((x) => x.id === current.id)?.country : undefined);
   const sendWa = async () => {
     if (!draft.trim()) return;
-    if (!digits) { window.alert(t("L'ospite non ha un numero di telefono.")); return; }
+    if (!digits) { toast(t("L'ospite non ha un numero di telefono."), "error"); return; }
     const text = draft; const gid = sel;
     if (!waOn) {
       // Senza WhatsApp collegato: wa.me si apre SUBITO (prima di qualsiasi await, altrimenti Safari lo blocca) e il testo va in chat.
@@ -496,10 +500,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       if (!r.ok) {
         // Motivo vero del rifiuto (es. testo libero fuori dalla finestra di 24 h) e ripiego manuale su wa.me, scelto dall'host.
         const why = r.message ? `\n\n${r.message}` : "";
-        if (window.confirm(`${t("Invio WhatsApp non riuscito: il messaggio NON è stato inviato.")}${why}\n\n${t("Aprire WhatsApp per inviarlo a mano?")}`)) {
+        if (await confirm({ title: t("Invio WhatsApp non riuscito"), message: `${t("Il messaggio NON è stato inviato.")}${why}
+${t("Aprire WhatsApp per inviarlo a mano?")}`, confirmLabel: t("Apri WhatsApp"), cancelLabel: t("Non aprire") })) {
           const w = window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank");
           if (w) { add("out", text, "WhatsApp"); setDraft((d) => (d === text ? "" : d)); }
-          else window.alert(t("Il browser ha bloccato l'apertura di WhatsApp: il messaggio NON è stato inviato."));
+          else toast(t("Il browser ha bloccato l'apertura di WhatsApp: il messaggio NON è stato inviato."), "error");
         }
         return;
       }
@@ -510,7 +515,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   };
   const sendMail = async () => {
     if (!draft.trim()) return;
-    if (!current?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
+    if (!current?.email) { toast(t("L'ospite non ha un'email."), "error"); return; }
     if (chatBusyRef.current) return;
     chatBusyRef.current = true; setSending(true);
     try {
@@ -528,7 +533,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       if (!ok) {
         // Il ripiego si apre dopo un await: se il browser (Safari) lo blocca, si avvisa e non si registra nulla come inviato.
         const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`, "_blank");
-        if (!w) { window.alert(t("Invio email non riuscito: il messaggio NON è stato inviato.")); return; }
+        if (!w) { toast(t("Invio email non riuscito: il messaggio NON è stato inviato."), "error"); return; }
       }
       if (gid) addTo(gid, "out", text, "Email");
       setDraft((d) => (d === text ? "" : d));
@@ -547,7 +552,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     if (!draft.trim() || !chxBookingId) return;
     const text = draft; add("out", text, otaName); setDraft("");
     try { await apiPost<{ ok: boolean }>("channex/messages", { action: "send", bookingId: chxBookingId, text }); }
-    catch (e) { window.alert(t("Non risulta inviato su Booking.com: ") + (e instanceof Error ? e.message : "errore") + ". " + t("Il messaggio resta qui in chat ma potrebbe NON essere arrivato all'ospite.")); }
+    catch (e) { toast(t("Non risulta inviato su Booking.com: ") + (e instanceof Error ? e.message : "errore") + ". " + t("Il messaggio resta qui in chat ma potrebbe NON essere arrivato all'ospite."), "error"); }
   };
 
   // Allegato (foto/PDF) nella chat della OTA: Channex lo vuole in due passi (carica in base64, poi invia l'id) e senza testo insieme.
@@ -555,13 +560,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const attachRef = useRef<HTMLInputElement>(null);
   const sendChxFile = (file: File | undefined) => {
     if (!file || !chxBookingId) return;
-    if (file.size > 3 * 1024 * 1024) { window.alert(t("File troppo grande (massimo circa 3 MB).")); return; }
+    if (file.size > 3 * 1024 * 1024) { toast(t("File troppo grande (massimo circa 3 MB)."), "error"); return; }
     const rd = new FileReader();
     rd.onload = async () => {
       try {
         await apiPost<{ ok: boolean }>("channex/messages", { action: "send_attachment", bookingId: chxBookingId, base64: String(rd.result || ""), name: file.name, type: file.type });
         add("out", "📎 Allegato", otaName);
-      } catch (e) { window.alert(t("Allegato non inviato: ") + (e instanceof Error ? e.message : "errore")); }
+      } catch (e) { toast(t("Allegato non inviato: ") + (e instanceof Error ? e.message : "errore"), "error"); }
     };
     rd.readAsDataURL(file);
   };
@@ -752,7 +757,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const body = fillFor(tpl.texts[langOf(g)] || tpl.texts.it || "", b, g);
     const dg = waDigits(g.phone, g.country);
     if (dg) return { href: `https://wa.me/${dg}?text=${encodeURIComponent(body)}`, kind: "wa" };
-    if (g.email) return { href: `mailto:${g.email}?subject=${encodeURIComponent(tpl.name)}&body=${encodeURIComponent(body)}`, kind: "email" };
+    if (g.email) return { href: `mailto:${g.email}?subject=${encodeURIComponent(templateLabel(tpl.name))}&body=${encodeURIComponent(body)}`, kind: "email" };
     return null;
   };
   const sentKey = (x: { tpl: MsgTemplate; b: Booking; date: string }) => `${x.tpl.srcId || x.tpl.id}-${x.b.id}-${x.date}`;
@@ -786,11 +791,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         if (opts?.bulk) return false; // niente raffica di schede wa.me/mailto: questi si inviano uno alla volta con "Invia ora"
         // fallback: apre wa.me/mailto se l'invio reale non è possibile; se il browser lo blocca non si registra come inviato
         const w = window.open(l.href, "_blank");
-        if (w) { try { w.opener = null; } catch { /* niente */ } } else { window.alert(t("Il browser ha bloccato l'apertura: il messaggio NON risulta inviato.")); return false; }
+        if (w) { try { w.opener = null; } catch { /* niente */ } } else { toast(t("Il browser ha bloccato l'apertura: il messaggio NON risulta inviato."), "error"); return false; }
       }
       const mid = addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
       if (mid && wid) markSent(x.g.id, mid, wid);
-      addSent({ key, guest: gName(x.g), tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() });
+      addSent({ key, guest: gName(x.g), tpl: templateLabel(x.tpl.name), via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() });
       return true;
     } finally { sendingRef.current.delete(key); }
   };
@@ -801,7 +806,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     let skipped = 0;
     try { for (const x of todayQueue) { if (!(await sendScheduled(x, { bulk: true }))) skipped++; } }
     finally { setSendingAll(false); }
-    if (skipped > 0) window.alert(`${skipped} ${t("invii non partiti in automatico (WhatsApp non collegato o invio non riuscito): usa «Invia ora» sulla singola riga.")}`);
+    if (skipped > 0) toast(`${skipped} ${t("invii non partiti in automatico (WhatsApp non collegato o invio non riuscito): usa «Invia ora» sulla singola riga.")}`, "error");
   };
   // "Invia oggi" copre ciò che il cron manderebbe oggi (giorno previsto = oggi o recupero last-minute) e non risulta ancora inviato.
   const todayQueue = queue.filter((x) => x.dueNow && !isSent(x));
@@ -902,7 +907,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {queue.map((x) => (
                   <div key={x.key} className="flex items-center gap-3 py-2">
                     <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{fmtDM(x.date)}</div><div className="text-[11px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
-                    <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{x.tpl.name}</b> → {gName(x.g)}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
+                    <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{templateLabel(x.tpl.name)}</b> → {gName(x.g)}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
                     {isSent(x) ? (
                       <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("Inviato")} ✓</span>
                     ) : (() => { const l = sendLinkFor(x.tpl, x.b, x.g); return l ? <button onClick={() => sendScheduled(x)} className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold hover:opacity-90 ${l.kind === "wa" ? "text-white" : "text-on-focus"}`} style={{ backgroundColor: l.kind === "wa" ? "#25D366" : "var(--focus)" }}>{t("Invia ora")}</button> : <span className="shrink-0 text-[11px] text-faint">{t("no contatto")}</span>; })()}
@@ -931,7 +936,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
           <>
             <div className="border-b border-line bg-surface px-4 py-3">
               <div className="flex items-center gap-3">
-                <button onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-dim hover:bg-wash lg:hidden">←</button>
+                <button aria-label={t("Torna alle conversazioni")} onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-dim hover:bg-wash lg:hidden">←</button>
                 <span className="relative shrink-0">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(current.name) }}>{initials(current.name)}</span>
                   {current.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><BookingChannelLogo booking={current.b} size={12} /></span>}
@@ -953,7 +958,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           {guestQueue.slice(0, 5).map((x) => (
                             <div key={x.key} className="flex items-center gap-2 text-xs">
                               <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[11px] text-dim">{fmtDM(x.date)}</span>
-                              <span className="min-w-0 flex-1 truncate text-txt">{x.tpl.name}</span>
+                              <span className="min-w-0 flex-1 truncate text-txt">{templateLabel(x.tpl.name)}</span>
                               <button onClick={() => { sendScheduled(x); setQueueOpen(false); }} className={`shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold hover:opacity-90 ${x.g.phone ? "text-white" : "text-on-focus"}`} style={{ backgroundColor: (x.g.phone ? "#25D366" : "var(--focus)") }}>{t("Invia ora")}</button>
                             </div>
                           ))}
@@ -1078,7 +1083,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   <div className="mb-2 rounded-xl border border-line bg-paper p-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold text-txt">💳 {t("Link di pagamento per")} {current.name}</span>
-                      <button onClick={() => setPayFor(null)} className="text-xs text-faint hover:text-txt" title={t("Chiudi")}>✕</button>
+                      <button aria-label={t("Chiudi")} onClick={() => setPayFor(null)} className="text-xs text-faint hover:text-txt" title={t("Chiudi")}>✕</button>
                     </div>
                     {blockedErr ? (
                       <div className="text-xs font-medium" style={{ color: blockedErr.error === "already_paid" || blockedErr.error === "tax_already_paid" ? "var(--ok)" : "var(--warn)" }}>
@@ -1108,7 +1113,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 <select onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v === "__manage__") { if (onManageTemplates) onManageTemplates(); else router.push("/modelli"); } else if (v) insertTemplate(v); }} defaultValue="" className="rounded-full border border-line bg-paper px-3 py-1 text-xs text-dim outline-none transition hover:bg-wash focus:border-focus">
                   <option value="">{t("Inserisci un modello…")}</option>
-                  {templates.filter((tp) => !tp.structureIds?.length || tp.structureIds.includes(current?.b?.structureId ?? activeStructureId)).map((tp) => (<option key={tp.id} value={tp.id}>{tp.name}</option>))}
+                  {templates.filter((tp) => !tp.structureIds?.length || tp.structureIds.includes(current?.b?.structureId ?? activeStructureId)).map((tp) => (<option key={tp.id} value={tp.id}>{templateLabel(tp.name)}</option>))}
                   {templates.length > 0 && <option disabled>──────────</option>}
                   <option value="__manage__">✎ {t("Gestisci modelli…")}</option>
                 </select>
@@ -1124,7 +1129,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {aiErr && <span className="text-[11px] text-[color:var(--err)]">{t("Non sono riuscito a generare la bozza. Riprova.")}</span>}
               </div>
               <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (!touchKb && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={touchKb ? t("Scrivi un messaggio…") : t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (!touchKb && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={touchKb ? t("Scrivi un messaggio…") : t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim() || sending} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
                   <button onClick={sendMail} disabled={!draft.trim() || !current.email || sending} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>

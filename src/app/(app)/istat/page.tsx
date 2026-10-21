@@ -172,9 +172,9 @@ export default function IstatPage() {
       {(() => { const fc = (<>
         <span className="text-[11px] font-medium text-dim">Data corrente soggiorni:</span>
         <div className="inline-flex items-center overflow-hidden rounded-lg border border-line">
-          <button onClick={() => shiftDay(-1)} className="px-2 py-1.5 max-sm:h-9 max-sm:px-3 max-sm:py-0 text-dim hover:bg-wash" title="Giorno precedente">‹</button>
-          <DateField value={filterDate || todayIso} onChange={(v) => setFilterDate(v)} className="border-x border-line bg-paper px-2 py-1.5 max-sm:h-9 max-sm:py-0 text-sm text-txt outline-none" />
-          <button onClick={() => shiftDay(1)} className="px-2 py-1.5 max-sm:h-9 max-sm:px-3 max-sm:py-0 text-dim hover:bg-wash" title="Giorno successivo">›</button>
+          <button aria-label="Giorno precedente" onClick={() => shiftDay(-1)} className="px-2 py-1.5 max-sm:h-9 max-sm:px-3 max-sm:py-0 text-dim hover:bg-wash" title="Giorno precedente">‹</button>
+          <DateField value={filterDate || todayIso} onChange={(v) => setFilterDate(v)} className="border-x border-line bg-paper px-2 py-1.5 max-sm:h-9 max-sm:py-0 text-sm text-txt" />
+          <button aria-label="Giorno successivo" onClick={() => shiftDay(1)} className="px-2 py-1.5 max-sm:h-9 max-sm:px-3 max-sm:py-0 text-dim hover:bg-wash" title="Giorno successivo">›</button>
         </div>
         <button onClick={() => setFilterDate(todayIso)} className={`${fieldCls} font-semibold hover:bg-wash`}>Oggi</button>
         <button onClick={() => setFilterDate("")} className={`${fieldCls} hover:bg-wash ${filterDate ? "" : "opacity-40"}`} title="Mostra tutto il movimento">Tutte</button>

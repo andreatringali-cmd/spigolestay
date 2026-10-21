@@ -15,13 +15,14 @@ import { inScope, newItemStructureId } from "@/lib/scope";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
+import { isExamplePromo } from "@/lib/promo-example";
 
 // Canali OTA (a commissione): sono i candidati da riportare al diretto.
 const OTA_CHANNELS: Channel[] = ["booking", "airbnb", "expedia"];
 const isOta = (c: Channel) => OTA_CHANNELS.includes(c);
 // Promo preimpostata "Riprenota diretto": per gli ex ospiti OTA → prenotare senza commissioni.
 const RIPRENOTA_PROMO: Promo = {
-  id: "promo-riprenota", name: "Riprenota diretto", subject: "Torna a trovarci — prezzo diretto, senza intermediari",
+  id: "promo-riprenota", example: true, name: "Riprenota diretto", subject: "Torna a trovarci — prezzo diretto, senza intermediari",
   description: "Per gli ex ospiti arrivati da OTA: riprenotano diretto e tu risparmi la commissione.",
   discountPct: 10, code: "RITORNO10",
   features: ["Miglior prezzo prenotando diretto", "Nessun intermediario", "Self check-in", "Assistenza diretta con noi"],
@@ -100,13 +101,13 @@ export default function PromozioniPage() {
   const resetEditor = () => { setEditId(null); setPromoStructure(newItemStructureId(activeStructureId) ?? ""); setName(""); setSubject(empty.subject); setDiscount(empty.discount); setCode(empty.code); setValidUntil(""); setValidFrom(""); setValidTo(""); setBody(empty.body); };
   const savePromo = () => {
     if (!name.trim() && !subject.trim()) return;
-    const data = { name: name.trim() || subject.trim(), subject: subject.trim(), body, discountPct: discount || undefined, code: code.trim() || undefined, validUntil: validUntil || undefined, validFrom: validFrom || undefined, validTo: validTo || undefined, structureId: promoStructure || undefined };
+    const data = { name: name.trim() || subject.trim(), subject: subject.trim(), body, discountPct: discount || undefined, code: code.trim() || undefined, validUntil: validUntil || undefined, validFrom: validFrom || undefined, validTo: validTo || undefined, structureId: promoStructure || undefined, example: false }; // salvata dal titolare: da qui è una promo vera
     if (editId) persistPromos(allPromos.map((p) => (p.id === editId ? { ...p, ...data } : p)));
     else persistPromos([{ id: newPromoId(), ...data, createdAt: today }, ...allPromos]);
     resetEditor();
   };
   const editPromo = (p: Promo) => { setEditId(p.id); setName(p.name); setSubject(p.subject); setDiscount(p.discountPct ?? 0); setCode(p.code ?? ""); setValidUntil(p.validUntil ?? ""); setValidFrom(p.validFrom ?? ""); setValidTo(p.validTo ?? ""); setBody(p.body); setPromoStructure(p.structureId ?? ""); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const dupPromo = (p: Promo) => persistPromos([{ ...p, id: newPromoId(), name: `${p.name} (copia)`, createdAt: today }, ...allPromos]);
+  const dupPromo = (p: Promo) => persistPromos([{ ...p, id: newPromoId(), name: `${p.name} (copia)`, createdAt: today, example: false }, ...allPromos]);
   const delPromo = async (id: string) => {
     const p = promos.find((x) => x.id === id);
     if (!(await ask({ title: "Elimina promo", message: `Eliminare la promo${p ? ` "${p.name}"` : ""}? L'operazione non è reversibile.`, danger: true, confirmLabel: "Elimina" }))) return;
@@ -214,7 +215,7 @@ export default function PromozioniPage() {
             node: (
               <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-3 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0"><div className="truncate font-bold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div></div>
+                  <div className="min-w-0"><div className="truncate font-bold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div>{isExamplePromo(p) && <div className="mt-1"><span className="inline-block rounded-full border border-line bg-wash px-2 py-0.5 text-[10px] font-semibold text-dim" title="Modello di esempio: non compare sul sito, nel motore di prenotazione né nei dati pubblicati finché non lo modifichi e lo salvi.">Esempio · non pubblicata</span></div>}</div>
                   {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
                 </div>
                 {p.description && <p className="mt-1 text-xs text-dim">{p.description}</p>}
@@ -222,8 +223,8 @@ export default function PromozioniPage() {
                 <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
                   <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-on-focus hover:opacity-90 max-sm:min-h-10"><Icon name="mail" size={13} /> Invia</button>
                   <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash max-sm:min-h-10">Modifica</button>
-                  <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash max-sm:min-h-10"><Icon name="copy" size={13} /></button>
-                  <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)] max-sm:min-h-10">✕</button>
+                  <button aria-label="Duplica" onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash max-sm:min-h-10"><Icon name="copy" size={13} /></button>
+                  <button aria-label="Elimina" onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)] max-sm:min-h-10">✕</button>
                 </div>
               </div>
             ),
@@ -281,7 +282,7 @@ export default function PromozioniPage() {
                   <td className="px-3 py-2 text-dim">{segMeta(l.segment)?.label ?? l.segment}</td>
                   <td className="px-3 py-2 font-mono text-txt">{l.recipients}</td>
                   <td className="px-3 py-2 text-dim">{fmtD(l.date)}</td>
-                  <td className="px-3 py-2 text-right"><button onClick={() => removeLog(l.id)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>
+                  <td className="px-3 py-2 text-right"><button aria-label="Rimuovi dallo storico degli invii" onClick={() => removeLog(l.id)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -294,7 +295,7 @@ export default function PromozioniPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setSending(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">Invia «{sending.name}»</span><button onClick={() => setSending(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">Invia «{sending.name}»</span><button aria-label="Chiudi" onClick={() => setSending(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             {limitReached && <div className="mb-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)", color: "var(--warn)" }}>Hai già inviato 4 promo quest'anno. Meglio non sovraccaricare gli ospiti.</div>}
             <label className="block text-xs font-medium text-dim">Destinatari<select value={segment} onChange={(e) => setSegment(e.target.value as Segment)} className={`${inp} mt-1`}>
               <optgroup label="Segmenti">{SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>

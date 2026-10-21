@@ -7,6 +7,7 @@ import { useData } from "./store";
 import { supabase } from "./supabase";
 import { inScope } from "./scope";
 import { toISO } from "./dates";
+import { useAdempimentiOggi } from "./use-adempimenti-oggi";
 
 export type NavBadges = Record<string, number>; // href → numero (assente o 0 = nessun badge)
 
@@ -77,6 +78,7 @@ export function useNavBadges(pathname: string): NavBadges {
   const [remoteReady, setRemoteReady] = useState(false);
   const [bkNew, setBkNew] = useState(0);
   const today = toISO(new Date());
+  const ade = useAdempimentiOggi(); // lo STESSO conteggio della pagina «Adempimenti oggi» e della Dashboard (lib/adempimenti-oggi.ts)
 
   // Ricalcolo su sync, messaggi, ritorno sulla scheda e quando una conversazione viene letta.
   useEffect(() => {
@@ -147,19 +149,15 @@ export function useNavBadges(pathname: string): NavBadges {
     return () => clearInterval(id);
   }, [loadRemote]);
 
-  // Check-in da completare per gli arrivi di oggi (dati già in memoria)
-  const checkinToday = useMemo(() => bookings.filter((b) => b.checkIn === today && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && inScope(b.structureId, activeStructureId)
-    && !(b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber))).length, [bookings, today, activeStructureId]);
-
   // Adempimenti: il numero avvisa solo delle novità. Aprendo la pagina si azzera; ricompare solo se gli elementi da fare AUMENTANO rispetto all'ultima volta che l'hai aperta.
   const raw = useMemo<NavBadges>(() => ({
-    "/adempimenti": checkinToday + remote.schedine + remote.istat,
+    "/adempimenti": ade.result.counts.total, // stessa regola della pagina e della Dashboard
     "/alloggiati-web": remote.schedine,
     "/istat": remote.istat,
-  }), [checkinToday, remote]);
+  }), [ade.result.counts.total, remote]);
   const [ack, setAck] = useState<Record<string, number>>({});
   useEffect(() => {
-    if (!remoteReady) return; // finché i conteggi del server non sono arrivati non si può fissare il punto di partenza
+    if (!remoteReady || !ade.ready) return; // finché i conteggi del server non sono arrivati non si può fissare il punto di partenza
     const stored = readJson<Record<string, number> | null>(ACK_KEY, null);
     const cur: Record<string, number> = { ...(stored ?? {}), ...ackMem };
     let changed = stored === null;
@@ -171,8 +169,8 @@ export function useNavBadges(pathname: string): NavBadges {
     }
     if (changed) writeJson(ACK_KEY, cur);
     setAck(cur);
-  }, [raw, remoteReady, pathname]);
-  const fresh = (href: string): number => (remoteReady ? Math.max(0, (raw[href] ?? 0) - (ack[href] ?? raw[href] ?? 0)) : 0);
+  }, [raw, remoteReady, ade.ready, pathname]);
+  const fresh = (href: string): number => (remoteReady && ade.ready ? Math.max(0, (raw[href] ?? 0) - (ack[href] ?? raw[href] ?? 0)) : 0);
 
   return useMemo(() => ({
     "/prenotazioni": bkNew,
@@ -182,5 +180,5 @@ export function useNavBadges(pathname: string): NavBadges {
     "/documenti": remote.scartate,
     "/pulizie": issues,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [bkNew, raw, ack, remoteReady, remote.scartate, issues]);
+  }), [bkNew, raw, ack, remoteReady, ade.ready, remote.scartate, issues]);
 }

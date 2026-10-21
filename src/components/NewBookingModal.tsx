@@ -239,9 +239,9 @@ export default function NewBookingModal() {
                               <div className="text-[11px] text-faint">{nightsN} {nightsN === 1 ? t("notte") : t("notti")}</div>
                             </div>
                             <div className="flex shrink-0 items-center gap-1.5 max-sm:ml-auto">
-                              <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
+                              <button aria-label="Diminuisci il numero di camere" disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
                               <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                              <button disabled={q >= av} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-full border text-lg leading-none disabled:opacity-30 max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                              <button aria-label="Aumenta il numero di camere" disabled={q >= av} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-full border text-lg leading-none disabled:opacity-30 max-sm:h-10 max-sm:w-10 ${q > 0 ? "border-focus bg-focus text-on-focus hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                             </div>
                           </div>
                         );
@@ -268,7 +268,7 @@ export default function NewBookingModal() {
                         <span className="shrink-0 rounded bg-focus px-1.5 py-0.5 text-[11px] font-bold text-on-focus">×{qty[rt.id]}</span>
                         <span className="min-w-0 flex-1 truncate text-txt">{rt.name} <span className="text-faint">· {st?.name}</span></span>
                         <span className="flex shrink-0 items-center gap-1 text-xs text-dim">€ <input type="number" min={0} value={linePrice(rt)} onChange={(e) => setPriceOv((o) => ({ ...o, [rt.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /><span className="text-faint">/cam</span></span>
-                        <button onClick={() => setQ(rt.id, 0)} title={t("Rimuovi")} className="shrink-0 px-1 text-faint hover:text-[color:var(--err)] max-sm:px-2.5 max-sm:py-2">✕</button>
+                        <button aria-label={t("Rimuovi")} onClick={() => setQ(rt.id, 0)} title={t("Rimuovi")} className="shrink-0 px-1 text-faint hover:text-[color:var(--err)] max-sm:px-2.5 max-sm:py-2">✕</button>
                       </div>
                     );
                   })}
@@ -329,9 +329,9 @@ function Stepper({ label, sub, value, min, onChange, icon }: { label: string; su
         <div><div className="text-sm font-semibold text-txt">{label}</div><div className="text-[11px] text-faint">{sub}</div></div>
       </div>
       <div className="flex items-center gap-2">
-        <button onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
+        <button aria-label={`Diminuisci: ${label}`} onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30 max-sm:h-10 max-sm:w-10">−</button>
         <span className="w-5 text-center text-base font-bold tabular-nums text-txt">{value}</span>
-        <button onClick={() => onChange(value + 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-focus bg-focus text-lg leading-none text-on-focus hover:opacity-90 max-sm:h-10 max-sm:w-10">+</button>
+        <button aria-label={`Aumenta: ${label}`} onClick={() => onChange(value + 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-focus bg-focus text-lg leading-none text-on-focus hover:opacity-90 max-sm:h-10 max-sm:w-10">+</button>
       </div>
     </div>
   );

@@ -423,7 +423,7 @@ export default function DocumentoPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[80dvh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Collega una prenotazione</span><button onClick={() => setBookingPicker(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Collega una prenotazione</span><button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <input value={bq} onChange={(e) => setBq(e.target.value)} placeholder="Cerca ospite o codice…" className={inp} autoFocus />
             <div className="mt-2 flex-1 overflow-y-auto">
               {bookingList.map((b) => (
@@ -459,7 +459,7 @@ export default function DocumentoPage() {
                 <div className="mt-1 flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{link.bookingCode ?? "nessuna"}</span>
                   <button type="button" onClick={() => { setBq(""); setBookingPicker(true); }} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Collega</button>
-                  {link.bookingId && <button type="button" onClick={() => setLink({ bookingId: null, bookingCode: null })} className="shrink-0 text-faint hover:text-[color:var(--err)]">✕</button>}
+                  {link.bookingId && <button aria-label="Scollega la prenotazione" type="button" onClick={() => setLink({ bookingId: null, bookingCode: null })} className="shrink-0 text-faint hover:text-[color:var(--err)]">✕</button>}
                 </div>
               </div>
               <label className={lbl}>Tipologia<select value={f.doc_kind} onChange={(e) => setF({ ...f, doc_kind: e.target.value })} className={inp}><option value="fattura">Fattura</option><option value="nota_di_credito">Nota di credito</option><option value="ricevuta_non_fiscale">Ricevuta</option></select></label>
@@ -528,7 +528,7 @@ export default function DocumentoPage() {
                     {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{eur(l.unitEur)}</td> : <td className="py-1 px-1"><NumInput value={l.unitEur} min={-1000000} onChange={(v) => setLine(i, { unitEur: v ?? 0 })} className="w-20 rounded border border-line bg-paper px-1 py-1 text-right text-sm" aria-label="Prezzo unitario" /></td>}
                     {frozen ? <td className="py-2 px-1 text-dim">{l.vat === "N1" || l.vat === "N2.2" ? l.vat : l.vat + "%"}</td> : <td className="py-1 px-1"><select value={l.vat} onChange={(e) => setLine(i, { vat: e.target.value })} className="rounded border border-line bg-paper px-1 py-1 text-sm">{VAT_OPTS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></td>}
                     <td className="py-1 pl-1 text-right font-mono text-txt">{eur(l.unitEur * (l.qty || 0))}</td>
-                    {!frozen && <td className="py-1 pl-1 text-right"><button onClick={() => delLine(i)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>}
+                    {!frozen && <td className="py-1 pl-1 text-right"><button aria-label="Rimuovi la riga" onClick={() => delLine(i)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>}
                   </tr>
                 ))}
                 {lines.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-sm text-faint">Nessuna voce.</td></tr>}

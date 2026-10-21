@@ -24,6 +24,7 @@ import { useTenantId } from "@/lib/tenant";
 import { parseDecimalIT, formatDecimalIT } from "@/lib/num-it";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { friendlyError } from "@/lib/friendly-error";
+import { keyActivate } from "@/lib/a11y";
 
 // Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
 const OTA_META: Record<string, { name: string; country: string }> = {
@@ -409,9 +410,9 @@ export default function FatturePassivePage() {
             {filtersActive ? <button onClick={resetFilters} className="text-xs font-semibold text-focus hover:underline">Azzera filtri</button> : null}
           </div>
         <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:basis-full max-sm:flex-nowrap max-sm:justify-between sm:col-span-4">
-          <div className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:shrink-0">
+          <div role="tablist" aria-label="Vista" className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:shrink-0">
             {(["elenco", "riepiloghi"] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition max-sm:py-2 ${view === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{v}</button>
+              <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition max-sm:py-2 ${view === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{v}</button>
             ))}
           </div>
           <span className="text-xs text-faint max-sm:shrink-0 max-sm:whitespace-nowrap">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
@@ -425,14 +426,14 @@ export default function FatturePassivePage() {
       </Card>
 
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
-      {info && <div className="mb-4 flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-sm font-medium text-txt"><span className="flex-1">{info}</span><button onClick={() => setInfo("")} className="rounded px-2 text-dim hover:bg-surface">✕</button></div>}
+      {info && <div className="mb-4 flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-sm font-medium text-txt"><span className="flex-1">{info}</span><button aria-label="Chiudi messaggio" onClick={() => setInfo("")} className="rounded px-2 text-dim hover:bg-surface">✕</button></div>}
 
       {view === "riepiloghi" && (
         <Card className="mb-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+            <div role="tablist" aria-label="Raggruppa" className="inline-flex rounded-lg border border-line bg-surface p-0.5">
               {([["supplier", "Per fornitore"], ["category", "Per categoria"], ["month", "Per mese"]] as const).map(([k, l]) => (
-                <button key={k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{l}</button>
+                <button key={k} role="tab" aria-selected={sumBy === k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 max-sm:py-2.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{l}</button>
               ))}
             </div>
             <span className="text-xs text-faint">Sui documenti che corrispondono ai filtri qui sopra; le note di credito sono sottratte.</span>
@@ -448,7 +449,7 @@ export default function FatturePassivePage() {
                   const label = sumBy === "month" && /^\d{4}-\d{2}$/.test(r.key) ? new Date(Number(r.key.slice(0, 4)), Number(r.key.slice(5, 7)) - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }) : r.key;
                   const clickable = sumBy !== "month" && r.key !== "Senza fornitore";
                   return (
-                    <tr key={r.key} className={`border-b border-line last:border-0 ${clickable ? "cursor-pointer hover:bg-wash" : ""}`} onClick={clickable ? () => { if (sumBy === "supplier") setSupF(r.key); else setCatF(r.key === "Senza categoria" ? "none" : r.key); setView("elenco"); } : undefined}>
+                    <tr key={r.key} className={`border-b border-line last:border-0 ${clickable ? "cursor-pointer hover:bg-wash" : ""}`} onClick={clickable ? () => { if (sumBy === "supplier") setSupF(r.key); else setCatF(r.key === "Senza categoria" ? "none" : r.key); setView("elenco"); } : undefined} {...keyActivate(clickable ? () => { if (sumBy === "supplier") setSupF(r.key); else setCatF(r.key === "Senza categoria" ? "none" : r.key); setView("elenco"); } : undefined)}>
                       <td className="px-3 py-2 font-medium capitalize text-txt">{label}</td>
                       <td className="px-3 py-2 text-right font-mono text-dim">{r.count}</td>
                       <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-dim">{eur(cents(r.taxable))}</td>
@@ -482,7 +483,7 @@ export default function FatturePassivePage() {
           const overdue = r.due_date && r.due_date < t && !r.paid && r.doc_type !== "nota_credito";
           const credit = r.doc_type === "nota_credito";
           return (
-            <div key={r.id} onClick={() => openEdit(r)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
+            <div key={r.id} onClick={() => openEdit(r)} {...keyActivate(() => openEdit(r))} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
               <div className="flex items-start gap-3">
                 <label className="-m-2 grid shrink-0 place-items-center p-2" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="h-5 w-5" aria-label="Seleziona" checked={sel.has(r.id)} onChange={(e) => setSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} /></label>
                 <div className="min-w-0 flex-1">
@@ -521,7 +522,7 @@ export default function FatturePassivePage() {
               const overdue = r.due_date && r.due_date < t && !r.paid && r.doc_type !== "nota_credito";
               const credit = r.doc_type === "nota_credito";
               return (
-                <tr key={r.id} onClick={() => openEdit(r)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                <tr key={r.id} onClick={() => openEdit(r)} {...keyActivate(() => openEdit(r))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label="Seleziona" checked={sel.has(r.id)} onChange={(e) => setSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} /></td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.doc_date ? fmtDate(r.doc_date) : "—"}</td>
                   {!single && <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>}
@@ -551,7 +552,7 @@ export default function FatturePassivePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setFic(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button onClick={() => setFic(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button aria-label="Chiudi" onClick={() => setFic(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-3 text-[11px] text-faint">Legge le fatture e le spese dei fornitori che Fatture in Cloud ha ricevuto (anche dal cassetto fiscale). Sola lettura: su Fatture in Cloud non viene modificato nulla.</p>
             <div className="flex flex-wrap items-end gap-2">
               <label className={lbl}>Dal<DateField value={fic.from} max={fic.to} onChange={(v) => setFic({ ...fic, from: v, items: null })} className={inp} /></label>
@@ -610,7 +611,7 @@ export default function FatturePassivePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setOta(false)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button onClick={() => setOta(false)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button aria-label="Chiudi" onClick={() => setOta(false)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
               <label className={lbl}>Mese<input type="month" value={otaMonth} max={monthNow()} onChange={(e) => setOtaMonth(e.target.value)} className={inp} /></label>
@@ -643,7 +644,7 @@ export default function FatturePassivePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button aria-label="Chiudi" onClick={() => setEdit(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               {single ? (
                 <div className="sm:col-span-2"><span className={lbl}>Struttura</span><div className="mt-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{structName(activeStructureId)}</div></div>

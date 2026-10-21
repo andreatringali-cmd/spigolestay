@@ -416,7 +416,7 @@ export default function PageHelp() {
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-on-focus">?</span>
                 <h2 className="font-display text-lg font-bold text-txt">Guida · {guide.title}</h2>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setOpen(false)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             {guide.intro && <p className="mb-4 text-sm text-dim">{guide.intro}</p>}
             <div className="flex flex-col gap-4">

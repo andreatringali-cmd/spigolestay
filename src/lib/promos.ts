@@ -2,6 +2,7 @@
 import { lsGet } from "./publicdata";
 import { fmtDMY } from "./dates";
 import { realEmail } from "./guest-key";
+import { realPromos } from "./promo-example";
 
 export interface Promo {
   id: string;
@@ -17,6 +18,7 @@ export interface Promo {
   validTo?: string;    // periodo di validità: ultimo giorno di soggiorno coperto (ISO)
   createdAt?: string;
   structureId?: string; // struttura a cui appartiene la promo (assente = vale per tutte le strutture)
+  example?: boolean; // true = promo di esempio precaricata (modello da adattare): mai sul sito pubblico né nel motore di prenotazione. false = salvata dal titolare.
 }
 
 const KEY = "spigolestay:promos";
@@ -24,21 +26,21 @@ const KEY = "spigolestay:promos";
 // Promo di esempio, caricate in automatico alla prima apertura di «Promozioni».
 export const DEFAULT_PROMOS: Promo[] = [
   {
-    id: "promo-pasqua", name: "Weekend Pasqua", subject: "Weekend di Pasqua — offerta speciale",
+    id: "promo-pasqua", example: true, name: "Weekend Pasqua", subject: "Weekend di Pasqua — offerta speciale",
     description: "Offerta speciale per il weekend di Pasqua.",
     discountPct: 15, code: "PASQUA15",
     features: ["Convenzione con ristorante per il pranzo di Pasqua", "Self check-in", "Minimo 2 notti", "Deluxe o Family Room", "Colazione inclusa", "Parcheggio gratuito *", "Wi-Fi"],
     body: "Ciao {nome},\n\nper il weekend di Pasqua ti riserviamo il {sconto}% di sconto con il codice {codice}.\n\n- Convenzione con ristorante per il pranzo di Pasqua\n- Self check-in\n- Minimo 2 notti\n- Deluxe o Family Room\n- Colazione inclusa\n- Parcheggio gratuito*\n- Wi-Fi\n\nPrenota direttamente su {struttura}. {contatti}",
   },
   {
-    id: "promo-nottegratis", name: "Notte Gratis", subject: "6 notti + 1 in omaggio",
+    id: "promo-nottegratis", example: true, name: "Notte Gratis", subject: "6 notti + 1 in omaggio",
     description: "Soggiorna 6 notti, la settima è in omaggio.",
     discountPct: 100, code: "FREENIGHT",
     features: ["6 notti + 1 in omaggio", "Self check-in", "Deluxe Room con bagno privato", "Prenotazione anticipata", "Cancellazione gratuita fino a 7 giorni prima", "Colazione inclusa", "Parcheggio gratuito *", "Wi-Fi"],
     body: "Ciao {nome},\n\nprenota 6 notti e la settima è in omaggio (codice {codice}).\n\n- 6 notti + 1 in omaggio\n- Self check-in\n- Deluxe Room con bagno privato\n- Prenotazione anticipata\n- Cancellazione gratuita fino a 7 giorni prima\n- Colazione inclusa\n- Parcheggio gratuito*\n- Wi-Fi\n\nPrenota su {struttura}. {contatti}",
   },
   {
-    id: "promo-lastminute", name: "Last Minute", subject: "Offerta Last Minute",
+    id: "promo-lastminute", example: true, name: "Last Minute", subject: "Offerta Last Minute",
     description: "Parti a breve e risparmia con il last minute.",
     discountPct: 10, code: "LASTMIN10",
     features: ["Prenotazione entro 1 giorno prima", "Self check-in", "Minimo 2 notti", "Deluxe Room con bagno privato", "Colazione inclusa", "Parcheggio gratuito *", "Wi-Fi"],
@@ -48,6 +50,10 @@ export const DEFAULT_PROMOS: Promo[] = [
 
 export function loadPromos(): Promo[] {
   try { const r = lsGet(KEY); return r ? JSON.parse(r) : []; } catch { return []; }
+}
+// Solo le promozioni VERE della struttura (senza i modelli di esempio): è l'elenco da usare per sito pubblico, motore di prenotazione e conteggi.
+export function loadRealPromos(): Promo[] {
+  return realPromos(loadPromos());
 }
 // Promo visibili con la struttura selezionata ("all" = tutte): quelle della struttura + quelle per tutte.
 export function promosForStructure(list: Promo[], structureId: string): Promo[] {

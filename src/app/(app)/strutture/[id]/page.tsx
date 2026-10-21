@@ -726,7 +726,7 @@ export default function StrutturaSchedaPage() {
                                 {CO_LEVELS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
                               </select>
                               <button onClick={() => setMember(m.userId, { active: !m.active })} title={m.active ? t("Metti in pausa") : t("Riattiva")} className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">{m.active ? "⏸" : "▶"}</button>
-                              <button onClick={async () => { if (await ask({ title: t("Rimuovi co-gestore"), message: t("Rimuovere questo co-gestore? Perderà l'accesso alla struttura."), danger: true, confirmLabel: t("Rimuovi") })) setMember(m.userId, { remove: true }); }} title={t("Rimuovi")} className="rounded-lg border border-line px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
+                              <button aria-label={t("Rimuovi")} onClick={async () => { if (await ask({ title: t("Rimuovi co-gestore"), message: t("Rimuovere questo co-gestore? Perderà l'accesso alla struttura."), danger: true, confirmLabel: t("Rimuovi") })) setMember(m.userId, { remove: true }); }} title={t("Rimuovi")} className="rounded-lg border border-line px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
                             </div>
                           </div>
                           <div className="mt-1 text-[11px] text-faint">{CO_LEVELS.find((l) => l.key === levelOf(m.permissions))?.desc}</div>
@@ -759,7 +759,7 @@ export default function StrutturaSchedaPage() {
                             {iv.status === "accepted"
                               ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("Accettato")}</span>
                               : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${days >= 3 ? "var(--err)" : "var(--warn)"} 15%, transparent)`, color: days >= 3 ? "var(--err)" : "var(--warn)" }}>{t("In attesa")}</span>}
-                            {pending && <button onClick={() => revokeInvite(iv.code)} title={t("Elimina invito")} className="text-faint hover:text-[color:var(--err)]">✕</button>}
+                            {pending && <button aria-label={t("Elimina invito")} onClick={() => revokeInvite(iv.code)} title={t("Elimina invito")} className="text-faint hover:text-[color:var(--err)]">✕</button>}
                           </div>
                         </div>
                       );

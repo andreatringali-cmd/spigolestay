@@ -207,7 +207,7 @@ export default function OtaMessagesPanel() {
                 {k === "active" && counts.unread > 0 && <span className="ml-1.5 inline-block h-2 w-2 rounded-full align-middle" role="img" style={{ backgroundColor: "var(--focus)" }} aria-label={`${counts.unread} da leggere`} title={`${counts.unread} da leggere`} />}
               </button>
             ))}
-            <button type="button" onClick={() => void loadList(true)} disabled={refreshing} className={`ml-auto rounded-lg px-2 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60 max-sm:min-h-11 ${focusRing}`} title={timeLabel ? `Ultimo aggiornamento alle ${timeLabel}` : "Aggiorna l'elenco"}>
+            <button type="button" onClick={() => void loadList(true)} disabled={refreshing} className={`ml-auto min-h-9 rounded-lg px-2 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60 max-sm:min-h-11 ${focusRing}`} title={timeLabel ? `Ultimo aggiornamento alle ${timeLabel}` : "Aggiorna l'elenco"}>
               <span aria-hidden className={refreshing ? "inline-block animate-spin" : ""}>↻</span> {refreshing ? "Aggiorno…" : "Aggiorna"}
             </button>
           </div>

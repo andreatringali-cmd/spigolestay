@@ -33,6 +33,33 @@ export function unmarkSeedDeleted(id: string): void {
   } catch { /* niente */ }
 }
 
+// ---- Etichette leggibili dei modelli ------------------------------------------------------------------------------------------------
+// Alcuni modelli sono stati salvati con un nome TECNICO (es. «checkin_online», «benvenuto_guida», i nomi dei modelli WhatsApp/Meta). Il nome salvato non si
+// tocca (i dati dei clienti restano com'erano); dove il nome si MOSTRA all'utente si usa templateLabel(), l'unico punto di traduzione.
+const TEMPLATE_LABELS: Record<string, string> = {
+  checkin_online: "Richiesta check-in online",
+  benvenuto_guida: "Benvenuto e guida",
+  benvenuto_pre_arrivo: "Benvenuto pre-arrivo",
+  istruzioni_checkin: "Istruzioni check-in",
+  istruzioni_check_in: "Istruzioni check-in",
+  richiesta_recensione: "Richiesta recensione",
+  pagamento_saldo: "Pagamento",
+  tassa_soggiorno: "Tassa di soggiorno",
+  tassa_di_soggiorno: "Tassa di soggiorno",
+  checkout_recensione: "Check-out e recensione",
+  check_out_recensione: "Check-out e recensione",
+};
+/** Nome del modello come si mostra all'utente. Un nome normale resta com'è; un nome tecnico (minuscolo con underscore) diventa un'etichetta leggibile. */
+export function templateLabel(name: string | null | undefined): string {
+  const raw = (name ?? "").trim();
+  if (!raw) return "";
+  if (/^[a-z0-9]+(_[a-z0-9]+)*$/.test(raw)) { // nome tecnico: minuscolo, parole separate da underscore
+    if (TEMPLATE_LABELS[raw]) return TEMPLATE_LABELS[raw];
+    if (raw.includes("_")) { const w = raw.replace(/_/g, " "); return w.charAt(0).toUpperCase() + w.slice(1); }
+  }
+  return raw;
+}
+
 export interface MsgTemplateSeed {
   id: string;
   name: string;
@@ -149,6 +176,9 @@ const norm = (s: unknown) => (typeof s === "string" ? s.replace(/\r\n/g, "\n").t
  * (srcId) se ne aggiunge uno con un testo di partenza, che il titolare può riscrivere. Segnaposto speciali per i pagamenti: {importo} e {link_pagamento}.
  */
 export const MANDATORY_TEMPLATES: (MsgTemplateSeed & { srcId: string })[] = [
+  // Check-in online e Benvenuto/guida: stessi id e testi dei modelli storici (seed-*), così i testi approvati (APPROVED_IT) li riconoscono. Nascono spenti come gli altri.
+  { ...DEFAULT_TEMPLATES.find((d) => d.id === "seed-checkin-online")!, srcId: "selfcheckin", name: "Richiesta check-in online", active: false },
+  { ...DEFAULT_TEMPLATES.find((d) => d.id === "seed-benvenuto-guida")!, srcId: "guida", name: "Benvenuto e guida", active: false },
   {
     id: "mand-pay", srcId: "pay", name: "Pagamento", trigger: "manual", days: 0, time: "10:00", active: false,
     texts: {

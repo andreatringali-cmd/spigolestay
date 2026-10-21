@@ -814,9 +814,9 @@ function Engine() {
                         <div className="text-xs text-dim">{eur(extraUnit(e))}{e.per === "night" ? ` · ${nightsN} ${nightsN === 1 ? t("notte") : t("notti")}` : e.per === "person" ? ` · ${t("a persona")}` : ""}</div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-11 max-sm:w-11">−</button>
+                        <button aria-label="Diminuisci la quantità" type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-11 max-sm:w-11">−</button>
                         <span className="w-5 text-center font-mono text-sm">{qy}</span>
-                        <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-11 max-sm:w-11">+</button>
+                        <button aria-label="Aumenta la quantità" type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash max-sm:h-11 max-sm:w-11">+</button>
                       </div>
                     </div>
                   );

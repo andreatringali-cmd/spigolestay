@@ -32,7 +32,7 @@ export default function DayNotes() {
       </div>
       <div className="mb-2 flex gap-1.5">
         <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("Aggiungi un promemoria…")} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button onClick={add} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">+</button>
+        <button aria-label="Aggiungi la nota" onClick={add} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-on-focus hover:opacity-90">+</button>
       </div>
       {notes.length === 0 ? (
         <div className="py-2 text-sm text-faint">{t("Nessun promemoria.")}</div>
@@ -42,7 +42,7 @@ export default function DayNotes() {
             <div key={n.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-wash">
               <input type="checkbox" checked={n.done} onChange={() => toggle(n.id)} className="h-4 w-4 accent-[color:var(--ok)]" />
               <span className={`min-w-0 flex-1 truncate text-sm ${n.done ? "text-faint line-through" : "text-txt"}`}>{n.text}</span>
-              <button onClick={() => remove(n.id)} className="shrink-0 text-faint opacity-0 transition group-hover:opacity-100 hover:text-[color:var(--err)]" title={t("Elimina")}><Icon name="eyeOff" size={14} /></button>
+              <button aria-label={t("Elimina")} onClick={() => remove(n.id)} className="shrink-0 text-faint opacity-0 transition group-hover:opacity-100 hover:text-[color:var(--err)]" title={t("Elimina")}><Icon name="eyeOff" size={14} /></button>
             </div>
           ))}
         </div>

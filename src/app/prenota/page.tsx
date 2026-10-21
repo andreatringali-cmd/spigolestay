@@ -11,7 +11,7 @@ import { effectiveClosed, rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { cityTaxOfBookingRaw } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
-import { loadPromos } from "@/lib/promos";
+import { loadRealPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import AdsConsent from "@/components/AdsConsent";
@@ -105,7 +105,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
   // % weekend di default (0 se l'host ha spento la maggiorazione); le regole per struttura le applica rateForDay.
   const weekendPct = useMemo(() => loadWeekendPct(), []);
-  const allPromos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
+  const allPromos = useMemo(() => { try { return loadRealPromos(); } catch { return []; } }, []); // solo promo vere: i modelli di esempio non valgono come codici
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
   // Deep link dai comparatori (Meta Search): ?rt=<id>&checkin=&checkout=. Se manca la

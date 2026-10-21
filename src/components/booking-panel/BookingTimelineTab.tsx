@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
+import { templateLabel } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
 import { buildTimeline, fmtEventAt, isDateOnly, type ServerEvent, type TimelineClient, type TimelineEvent, type TimelineTone } from "@/lib/booking-timeline";
 import { diffRevisions, type RevisionView } from "@/lib/booking-revisions";
@@ -38,7 +39,7 @@ function useBrowserSources() {
     const msgsent = readJson<unknown[]>(SENT_KEY, []);
     const tpls = readJson<{ id?: string; srcId?: string; name?: string }[]>(TPL_KEY, []);
     const templateNames: Record<string, string> = {};
-    if (Array.isArray(tpls)) for (const t of tpls) if (t?.name) { if (t.id) templateNames[t.id] = t.name; if (t.srcId) templateNames[t.srcId] = t.name; }
+    if (Array.isArray(tpls)) for (const t of tpls) if (t?.name) { if (t.id) templateNames[t.id] = templateLabel(t.name); if (t.srcId) templateNames[t.srcId] = templateLabel(t.name); }
     return { threads: threads as TimelineClient["threads"], msgsent: (Array.isArray(msgsent) ? msgsent : []) as TimelineClient["msgsent"], templateNames };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);

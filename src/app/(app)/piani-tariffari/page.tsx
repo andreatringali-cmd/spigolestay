@@ -10,6 +10,9 @@ import { useLang } from "@/lib/i18n";
 import { fmtDate } from "@/lib/dates";
 import DateField from "@/components/DateField";
 import { inScope, newItemStructureId } from "@/lib/scope";
+import { keyActivate } from "@/lib/a11y";
+import Toggle from "@/components/Toggle";
+import { Modal as UiModal } from "@/components/ui/index";
 
 const BOARDS = ["Solo pernottamento", "Colazione", "Mezza pensione", "Pensione completa"];
 const DEPOSITS = [
@@ -52,22 +55,10 @@ const fmtRange = (p: RatePlan, t: (s: string) => string) => {
   return `${d(p.dateFrom)} → ${d(p.dateTo)}`;
 };
 
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
-}
+// Finestra: adattatore sul <Modal> del design system (role=dialog, Esc, trappola e ritorno del focus, blocco scroll, sheet su telefono)
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
-  // Esc chiude la finestra (come le altre modali dell'app).
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[5dvh]">
-      <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-w-xl rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
-        {children}
-      </div>
-    </div>
-  );
+  return <UiModal open onClose={onClose} title={title} size="lg" closeLabel={t("Chiudi")}>{children}</UiModal>;
 }
 
 export default function PianiTariffariPage() {
@@ -171,7 +162,7 @@ export default function PianiTariffariPage() {
                   const on = p.enabled !== false;
                   const nRooms = p.roomTypeIds?.length;
                   return (
-                    <tr key={p.id} onClick={() => setEditId(p.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                    <tr key={p.id} onClick={() => setEditId(p.id)} {...keyActivate(() => setEditId(p.id))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="px-3 py-2.5">
                         <div className="font-semibold text-txt">{p.name}</div>
                         <div className="text-[11px] text-faint">{fmtRange(p, t)}{structures.length > 1 ? ` · ${structName(p.structureId)}` : ""}</div>

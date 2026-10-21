@@ -10,6 +10,7 @@
 import type { Booking, Guest, Structure } from "./types";
 import { eur } from "./format";
 import { spiegaErroreWa } from "./invii-log";
+import { templateLabel } from "./msg-templates";
 
 const TZ = "Europe/Rome";
 
@@ -376,7 +377,7 @@ function invioEvent(s: Extract<ServerEvent, { src: "invii_log" }>): TimelineEven
   }
   if (s.job !== "messaggi") return null;
   const [tplRaw, rest = ""] = raw.split(/\s→\s/, 2);
-  const tpl = cut(tplRaw, 60);
+  const tpl = cut(templateLabel(tplRaw), 60);
   if (s.ok) return { at: s.at, kind: "msg_auto", title: `Messaggio automatico${tpl ? ` «${tpl}»` : ""} inviato (${ch})`, detail: cut(rest, 100) || undefined, tone: "ok", source: "Messaggi", msg: { rank: 1, channels, ok: true } };
   const colon = rest.indexOf(": ");
   const reason = colon >= 0 ? rest.slice(colon + 2) : "";

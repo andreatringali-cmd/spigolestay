@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NUM_TYPING_RE, formatDecimalIT, parseDecimalIT, roundDecimals } from "@/lib/num-it";
+import { useFieldControl } from "./ui/Field";
 
 interface Props {
   value: number | null;
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export default function NumInput({ value, onChange, allowNull, min = 0, max, decimals = 2, className, placeholder, disabled, id, "aria-label": ariaLabel }: Props) {
+  const fc = useFieldControl(); // dentro un <Field label="…"> prende id e attributi aria
   const [draft, setDraft] = useState<string>(() => formatDecimalIT(value, decimals));
   const focused = useRef(false);
 
@@ -49,7 +51,9 @@ export default function NumInput({ value, onChange, allowNull, min = 0, max, dec
 
   return (
     <input
-      id={id}
+      id={id ?? fc.id}
+      aria-describedby={fc["aria-describedby"]}
+      aria-invalid={fc["aria-invalid"]}
       type="text"
       inputMode="decimal"
       autoComplete="off"

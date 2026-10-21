@@ -23,23 +23,17 @@ import { sortRoomTypes, byUnitName } from "@/lib/sortUnits";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
 import Toggle from "@/components/Toggle";
+import { keyActivate } from "@/lib/a11y";
+import { Modal as UiModal } from "@/components/ui/index";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
 const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLORS.length];
 
+// Finestra: adattatore sul <Modal> del design system (role=dialog, Esc, trappola e ritorno del focus, blocco scroll, sheet su telefono)
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k); }, [onClose]); // Esc chiude la finestra
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
-      <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash max-sm:px-3 max-sm:py-2.5">✕</button></div>
-        {children}
-      </div>
-    </div>
-  );
+  return <UiModal open onClose={onClose} title={title} size="md" closeLabel={t("Chiudi")}>{children}</UiModal>;
 }
 
 // Telefono: pulsante unico «+ Aggiungi» con tendina (Camera / Tipologia), ancorato al pulsante. Da sm in su non c'è (restano i due pulsanti nella barra).
@@ -49,7 +43,7 @@ function AddMenu({ onRoom, onType }: { onRoom: () => void; onType: () => void })
   const ref = useRef<HTMLButtonElement>(null);
   return (
     <div className="sm:hidden">
-      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-focus px-3 text-sm font-semibold text-on-focus hover:opacity-90">+ {t("Aggiungi")}</button>
+      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-focus px-3 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:h-11">+ {t("Aggiungi")}</button>
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align="end" width={200} label={t("Aggiungi")}>
         <button type="button" onClick={() => { setOpen(false); onRoom(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Camera")}</button>
         <button type="button" onClick={() => { setOpen(false); onType(); }} className="flex h-12 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-txt hover:bg-wash">{t("Tipologia")}</button>
@@ -212,7 +206,7 @@ export default function CamerePage() {
                 onDragOver={(e) => { if (dragId && dragId !== u.id) e.preventDefault(); }}
                 onDrop={(e) => { e.preventDefault(); if (group) reorderUnit(group, u.id); }}
                 onDragEnd={() => setDragId(null)}
-                onClick={() => setRoomModal({ structureId: s.id, unit: u })}
+                onClick={() => setRoomModal({ structureId: s.id, unit: u })} {...keyActivate(() => setRoomModal({ structureId: s.id, unit: u }))}
                 className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${dragId === u.id ? "opacity-40" : ""} ${sel.has(u.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
                 <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} className="h-4 w-4 accent-[color:var(--focus)]" /></td>
                 <td className="px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><span className="shrink-0 cursor-grab text-faint active:cursor-grabbing" title={t("Trascina per riordinare")} aria-hidden><svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="4" cy="4" r="1.3" /><circle cx="8" cy="4" r="1.3" /><circle cx="4" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="4" cy="12" r="1.3" /><circle cx="8" cy="12" r="1.3" /></svg></span><span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className={`truncate font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span></div></td>
@@ -310,7 +304,7 @@ export default function CamerePage() {
                             <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{g.length} {g.length === 1 ? t("camera") : t("camere")}</span>
                             <span className="hidden shrink-0 text-[11px] text-faint sm:inline">{rt.beds} {rt.beds === 1 ? t("letto") : t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
                           </button>
-                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="shrink-0 whitespace-nowrap text-[11px] font-medium text-focus hover:underline max-sm:-my-2 max-sm:ml-auto max-sm:py-2.5 max-sm:pl-2">{t("Apri tipologia")} →</button>
+                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="-my-2.5 shrink-0 whitespace-nowrap py-3 pl-2 text-[11px] font-medium text-focus hover:underline max-sm:ml-auto">{t("Apri tipologia")} →</button>
                         </div>
                         {open && (
                           <div className="overflow-x-auto">
@@ -480,7 +474,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
             {(f.photos ?? []).map((src, i) => (
               <div key={i} className="group relative h-20 w-28 overflow-hidden rounded-lg border border-line">
                 <MediaImg src={src} alt="" className="h-full w-full object-cover" />
-                <button type="button" onClick={() => removePhoto(i)} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/55 text-xs text-white opacity-0 transition group-hover:opacity-100" title={t("Rimuovi")}>✕</button>
+                <button aria-label={t("Rimuovi")} type="button" onClick={() => removePhoto(i)} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/55 text-xs text-white opacity-0 transition group-hover:opacity-100" title={t("Rimuovi")}>✕</button>
               </div>
             ))}
           </div>

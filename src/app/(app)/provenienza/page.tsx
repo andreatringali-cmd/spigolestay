@@ -3,7 +3,7 @@
 // Provenienza viaggiatori: arrivi e presenze per provenienza (nazione/provincia).
 import { useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Select } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { nights } from "@/lib/dates";
 
@@ -48,12 +48,11 @@ export default function ProvenienzaPage() {
   );
   const maxC = Math.max(1, ...byCountry.map(([, v]) => v.presenze));
   const maxP = Math.max(1, ...byProvince.map(([, v]) => v.presenze));
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
   return (
     <div>
       <PageHeader title="Provenienza viaggiatori" subtitle="Arrivi e presenze per provenienza (movimento turistico)"
-        actions={<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</select>} />
+        actions={<Select aria-label="Anno" value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</Select>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3 max-sm:mb-3">
         <StatCard label={`Arrivi ${year}`} value={totals.arrivi} />

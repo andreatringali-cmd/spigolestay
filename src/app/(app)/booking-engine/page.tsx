@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
-import { loadPromos, promosForStructure } from "@/lib/promos";
+import { loadRealPromos, promosForStructure } from "@/lib/promos";
 import { getSiteConfigRaw } from "@/lib/publicdata";
 import Icon from "@/components/Icon";
 import StructureRequired from "@/components/StructureRequired";
@@ -24,7 +24,7 @@ export default function BookingEngineHub() {
 
   useEffect(() => {
     // Offerte della struttura in vista (+ quelle valide per tutte); con "Tutte" si contano tutte.
-    try { setPromoCount(promosForStructure(loadPromos(), activeStructureId).filter((p) => p.discountPct && p.code).length); } catch {}
+    try { setPromoCount(promosForStructure(loadRealPromos(), activeStructureId).filter((p) => p.discountPct && p.code).length); } catch {}
     try {
       // Config del mini-sito SCOPED per struttura (vedi src/lib/publicdata.ts): il
       // tagline mostrato qui deve seguire la struttura attiva, non una chiave globale.

@@ -20,6 +20,7 @@ import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { waDigits } from "@/lib/contacts-check";
 import { et as etMail } from "@/lib/email-i18n";
+import { nextQuoteNumber } from "@/lib/quote-number";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
 const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]];
@@ -315,7 +316,7 @@ export default function PreventiviPage() {
   // non "il prossimo": altrimenti dopo il salvataggio documento, PDF e link di pagamento uscirebbero con un numero diverso dall'archivio.
   const [editingId, setEditingId] = useState<string | null>(null);
   const curYear = new Date().getFullYear();
-  const nextNumber = saved.filter((p) => new Date(p.createdAt).getFullYear() === curYear).reduce((m, p) => Math.max(m, p.number ?? 0), 0) + 1;
+  const nextNumber = nextQuoteNumber(saved, structureId, curYear); // progressivo per struttura e anno (lib/quote-number.ts)
   const dupOfLast = !!(saved[0] && saved[0].name === name.trim() && saved[0].checkIn === checkIn && saved[0].checkOut === checkOut && saved[0].total === total);
   const quoteHome = (editingId ? saved.find((p) => p.id === editingId) : undefined) ?? (dupOfLast ? saved[0] : undefined);
   const quoteRef = quoteHome?.number ? `${quoteHome.number}/${new Date(quoteHome.createdAt).getFullYear()}` : `${nextNumber}/${curYear}`;
@@ -442,7 +443,7 @@ export default function PreventiviPage() {
   const payRefundable = activePlan ? !!activePlan.refundable : true;
   const payCancelDays = activePlan ? (activePlan.refundable ? Math.max(0, Math.round(activePlan.cancelDays ?? 0)) : 0) : 7;
   // validUntil: il preventivo non ha ancora una data di scadenza propria (solo una nota libera), quindi non si salva.
-  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: mergedLines.map((l) => ({ name: `${l.qty > 1 ? l.qty + " × " : ""}${roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera"}`, rt: l.roomTypeId, qty: l.qty, amount: Math.round(l.price * n * l.qty * 100) / 100 })), lines: mergedLines.map((l) => ({ rt: l.roomTypeId, qty: l.qty, price: l.price })), refundable: payRefundable, cancelDays: payCancelDays, lang, tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "", uid: user?.id ?? "", logo: structure?.logo ?? "", accent: structure?.photoColor ?? "", extras: structExtras.map((e) => ({ id: e.id, name: e.name, desc: e.desc, price: e.price, per: e.per })) };
+  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: mergedLines.map((l) => ({ name: `${l.qty > 1 ? l.qty + " × " : ""}${roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera"}`, rt: l.roomTypeId, qty: l.qty, amount: Math.round(l.price * n * l.qty * 100) / 100 })), lines: mergedLines.map((l) => ({ rt: l.roomTypeId, qty: l.qty, price: l.price })), refundable: payRefundable, cancelDays: payCancelDays, lang, tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", op: structure?.whatsapp || structure?.phone || "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "", uid: user?.id ?? "", logo: structure?.logo ?? "", accent: structure?.photoColor ?? "", extras: structExtras.map((e) => ({ id: e.id, name: e.name, desc: e.desc, price: e.price, per: e.per })) };
   const payUrl = (() => { try { return `${typeof window !== "undefined" ? window.location.origin : ""}/preventivo?q=${btoa(encodeURIComponent(JSON.stringify(payData)))}`; } catch { return ""; } })();
   // Accorcia il link (Supabase short_links → /g/<code>) per non mandare URL lunghissimi.
   const payShortRef = useRef<Record<string, string>>({});
@@ -557,7 +558,7 @@ export default function PreventiviPage() {
     }
     const dup = dupOfLast;
     if (dup) { setEditingId(saved[0].id); return; }
-    const num = saved.filter((p) => new Date(p.createdAt).getFullYear() === curYear).reduce((m, p) => Math.max(m, p.number ?? 0), 0) + 1;
+    const num = nextQuoteNumber(saved, structureId, curYear);
     addActivity("quote", `Preventivo n. ${num} ${asDraft ? "salvato" : "inviato"} — ${name.trim()}`);
     const newId = crypto.randomUUID();
     setEditingId(newId); // da qui in poi "Salva" e "Invia" aggiornano questo stesso preventivo, senza doppioni
@@ -849,7 +850,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                       <label className="w-24 text-[11px] font-medium text-dim">{t("€/notte")}
                         <input type="number" min={0} value={l.price} onChange={(e) => updateLine(i, { price: Math.max(0, Number(e.target.value)) })} className="mt-1 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                       </label>
-                      {roomLines.length > 1 && <button type="button" onClick={() => removeLine(i)} title={t("Rimuovi")} className="pb-1.5 text-faint hover:text-[color:var(--err)]">✕</button>}
+                      {roomLines.length > 1 && <button aria-label={t("Rimuovi")} type="button" onClick={() => removeLine(i)} title={t("Rimuovi")} className="pb-1.5 text-faint hover:text-[color:var(--err)]">✕</button>}
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
                       {av === null ? <span className="text-faint">{t("Imposta le date per vedere la disponibilità")}</span>
@@ -930,9 +931,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </div>
               {(extrasPage && structExtras.length > 0) && (
                 <div className="flex items-center gap-1 rounded-lg border border-line bg-paper p-0.5">
-                  <button onClick={() => flipTo(0)} disabled={previewPage === 0} title={t("Pagina precedente")} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-wash disabled:opacity-30">‹</button>
+                  <button aria-label={t("Pagina precedente")} onClick={() => flipTo(0)} disabled={previewPage === 0} title={t("Pagina precedente")} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-wash disabled:opacity-30">‹</button>
                   <span className="px-1 text-xs font-semibold text-txt">{t("Pag.")} {previewPage + 1}<span className="text-faint">/2</span></span>
-                  <button onClick={() => flipTo(1)} disabled={previewPage === 1} title={t("Pagina successiva")} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-wash disabled:opacity-30">›</button>
+                  <button aria-label={t("Pagina successiva")} onClick={() => flipTo(1)} disabled={previewPage === 1} title={t("Pagina successiva")} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-wash disabled:opacity-30">›</button>
                 </div>
               )}
             </div>
@@ -1072,7 +1073,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-display text-lg font-bold text-txt">{t("Conferma prenotazione")}</span>
-                <button onClick={() => setConfirming(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash hover:text-txt">✕</button>
+                <button aria-label="Chiudi" onClick={() => setConfirming(null)} className="rounded px-2 py-1 max-sm:px-3 max-sm:py-2 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="mb-3 text-sm text-dim">{q.name} · {q.structure} · <span className="font-mono">{fmt(q.checkIn)} → {fmt(q.checkOut)}</span> · <b className="text-txt">{eur(q.total)}</b></div>
 

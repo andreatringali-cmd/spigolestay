@@ -119,7 +119,7 @@ export default function AbbonamentoPage() {
       contact.note ? `Note: ${contact.note}` : "",
     ].filter(Boolean).join("\n");
     try {
-      const r = await fetch("/api/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "quote", to: "sales@xenora.app", subject: `Su misura — ${contact.firstName} ${contact.lastName}`.trim(), text, replyTo: contact.email }) });
+      const r = await fetch("/api/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "quote", to: "info@xenora.it", subject: `Su misura — ${contact.firstName} ${contact.lastName}`.trim(), text, replyTo: contact.email }) });
       const j = await r.json().catch(() => ({}));
       setContactState(r.ok && j?.ok ? "sent" : "err");
     } catch { setContactState("err"); }
@@ -243,7 +243,7 @@ export default function AbbonamentoPage() {
       {notice && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-line px-4 py-3 text-sm text-txt" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" }}>
           <span>{notice}</span>
-          <button onClick={() => setNotice(null)} className="shrink-0 text-faint hover:text-txt">✕</button>
+          <button aria-label="Chiudi avviso" onClick={() => setNotice(null)} className="shrink-0 text-faint hover:text-txt">✕</button>
         </div>
       )}
 

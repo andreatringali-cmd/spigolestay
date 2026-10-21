@@ -31,6 +31,7 @@ import { useSyncedList } from "@/components/pulizie/useSyncedList";
 import { KEY_ORDERS, type PulizieOrder } from "@/lib/pulizie-addetta";
 import { receiptsByMovement } from "@/lib/pulizie-purchase";
 import { openReceipt } from "@/lib/pulizie-purchase-client";
+import { keyActivate } from "@/lib/a11y";
 
 // ---- Conti cassa ------------------------------------------------------------
 
@@ -662,7 +663,7 @@ export default function CassaPage() {
   const filtersCount = (preset !== "future" ? 1 : 0) + (tipo !== "all" ? 1 : 0) + (catF ? 1 : 0);
   const resetFilters = () => { applyPreset("future"); setTipo("all"); setCatF(""); };
   const chartsBtn = (
-    <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 max-sm:h-9 max-sm:w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+    <button aria-label={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 max-sm:h-9 max-sm:w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
   );
   const payBtn = (
     <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 max-sm:h-9 max-sm:w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
@@ -785,7 +786,7 @@ export default function CassaPage() {
                     const stName = r.structureId ? structNameOf(r.structureId) : "";
                     return (
                       <div key={r.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra i conti")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap py-2.5 hover:bg-wash/60">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} {...keyActivate(() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; }))} title={open ? t("Chiudi il dettaglio") : t("Mostra i conti")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap py-2.5 hover:bg-wash/60">
                           <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(r.date)}</span>
                           <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-wash text-dim"><Icon name="coins" size={13} /></span>
@@ -817,7 +818,7 @@ export default function CassaPage() {
                     const ch = r.channel as Channel;
                     return (
                       <div key={r.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} {...keyActivate(() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; }))} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
                           <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(r.date)}</span>
                           <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
@@ -863,7 +864,7 @@ export default function CassaPage() {
                     const pctOf = (c: number, l: number) => (l > 0 ? String(Math.round((c / l) * 1000) / 10).replace(".", ",") + "%" : "");
                     return (
                       <div key={m.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni incluse in queste commissioni")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} {...keyActivate(() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; }))} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni incluse in queste commissioni")} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
                           <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(m.date)}</span>
                           <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
@@ -916,7 +917,7 @@ export default function CassaPage() {
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
                     <div key={isBooking ? "b-" + r.id : m.id}>
-                    <div onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                    <div onClick={rowClick} {...keyActivate(rowClick)} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim max-md:col-start-1 max-md:row-start-1">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2 max-md:col-start-1 max-md:row-start-2">
                         {bk ? <BookingChannelLogo booking={bk} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
@@ -956,7 +957,7 @@ export default function CassaPage() {
                 const oggiOpen = openPayouts.has("oggi");
                 const oggiNode = (k: string) => (
                         <div key={k}>
-                          <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer flex-wrap items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
+                          <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} {...keyActivate(() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; }))} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer flex-wrap items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
                             <span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[11px] uppercase tracking-wide text-on-warn">{t("Oggi")}</span><span>{fmtDMY(today)}</span><span className="text-faint">{oggiOpen ? "▾" : "▸"}</span>
                             {hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}
                           </div>
@@ -1082,7 +1083,7 @@ export default function CassaPage() {
                           <div className="flex items-center gap-1.5">
                             <button type="button" onClick={() => makePrincipal(s.id, c.key)} title={c.key === pr ? t("Conto principale: qui arrivano i soldi delle prenotazioni") : t("Imposta come conto principale (dove arrivano i soldi delle prenotazioni)")} aria-label={`${t("Conto principale")} ${c.label}`} className={`shrink-0 rounded p-0.5 text-sm leading-none ${c.key === pr ? "text-[color:var(--warn)]" : "text-faint hover:text-[color:var(--warn)]"}`}>{c.key === pr ? "★" : "☆"}</button>
                             {renaming?.key === c.key
-                              ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-32 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
+                              ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-32 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt" />
                               : <span className="w-32 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
                             <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={amountOf(s.id, c.key)} onBlur={(e) => { const v = parseDecimalIT(e.target.value); if (v !== null) setAmount(s.id, c.key, formatDecimalIT(v)); }} onChange={(e) => setAmount(s.id, c.key, e.target.value)} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
                             <span className="text-xs text-faint">€</span>
@@ -1129,7 +1130,7 @@ export default function CassaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
           <button aria-label={t("Chiudi")} onClick={() => setPayoutModal(false)} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button aria-label="Chiudi" onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento.")}</p>
             {scopeStructs.length > 1 ? (
               <p className="rounded-xl border border-line bg-wash px-3 py-6 text-center text-sm text-dim">{t("Scegli una struttura in alto a destra: le impostazioni degli incassi sono separate per struttura.")}</p>
@@ -1181,7 +1182,7 @@ export default function CassaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
           <button aria-label={t("Chiudi")} onClick={resetForm} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : editingMov === OCC_MOV ? t("Modifica scadenza") : t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : editingMov === OCC_MOV ? t("Modifica scadenza") : t("Modifica movimento")}</h2><button aria-label="Chiudi" onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             {editingMov === NEW_MOV && (
               <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-wash p-1">
                 {([["mov", t("Movimento")], ["prog", `${t("Pagamenti programmati")} (${rules.filter((r) => ruleVisible(r.structureId)).length})`]] as ["mov" | "prog", string][]).map(([k, lab]) => (
@@ -1274,7 +1275,7 @@ export default function CassaPage() {
         <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[8dvh]">
           <button aria-label={t("Chiudi")} onClick={() => { setCatPicker(false); setNewCat(null); }} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[80dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Categorie")} {(catFor === "rule" ? rf.kind : form.kind) === "in" ? t("entrata") : t("uscita")}</h2><button onClick={() => { setCatPicker(false); setNewCat(null); }} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Categorie")} {(catFor === "rule" ? rf.kind : form.kind) === "in" ? t("entrata") : t("uscita")}</h2><button aria-label="Chiudi" onClick={() => { setCatPicker(false); setNewCat(null); }} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid grid-cols-3 gap-2">
               {cats.filter((c) => c.kind === (catFor === "rule" ? rf.kind : form.kind) && !c.auto).map((c) => (
                 <button key={c.key} onClick={() => { if (catFor === "rule") setRf((f) => ({ ...f, cat: c.key })); else setForm((f) => ({ ...f, cat: c.key })); setCatPicker(false); }} className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition hover:bg-wash ${(catFor === "rule" ? rf.cat : form.cat) === c.key ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`}>
@@ -1296,7 +1297,7 @@ export default function CassaPage() {
                 <div className="mb-3 flex flex-wrap gap-1.5">{PALETTE.map((col) => <button key={col} onClick={() => setNewCat({ ...newCat, color: col })} className={`h-6 w-6 rounded-full border-2 ${newCat.color === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}</div>
                 <div className="mb-1 text-xs text-dim">{t("Icona")}</div>
                 <div className="mb-3 grid max-h-40 grid-cols-7 gap-1.5 overflow-y-auto">
-                  {ICON_KEYS.map((ic) => <button key={ic} onClick={() => setNewCat({ ...newCat, icon: ic })} className={`grid aspect-square place-items-center rounded-lg border ${newCat.icon === ic ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`} style={{ color: newCat.color }}><CatIcon name={ic} size={18} /></button>)}
+                  {ICON_KEYS.map((ic) => <button aria-label={`Icona ${ic}`} key={ic} onClick={() => setNewCat({ ...newCat, icon: ic })} className={`grid aspect-square place-items-center rounded-lg border ${newCat.icon === ic ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`} style={{ color: newCat.color }}><CatIcon name={ic} size={18} /></button>)}
                 </div>
                 <div className="flex gap-2"><button onClick={() => setNewCat(null)} className="flex-1 rounded-lg border border-line py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button><button onClick={createCat} disabled={!newCat.label.trim()} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">{t("Crea categoria")}</button></div>
               </div>
@@ -1310,7 +1311,7 @@ export default function CassaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[8dvh]">
           <button aria-label={t("Chiudi")} onClick={closeRuleModal} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[84dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingRule ? t("Modifica pagamento programmato") : t("Nuovo pagamento programmato")}</h2><button onClick={closeRuleModal} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingRule ? t("Modifica pagamento programmato") : t("Nuovo pagamento programmato")}</h2><button aria-label="Chiudi" onClick={closeRuleModal} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={() => setRf((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key }))} className={`rounded-lg border py-2 text-sm font-semibold ${rf.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim"}`}>− {t("Uscita")}</button>
               <button onClick={() => setRf((f) => ({ ...f, kind: "in", cat: cats.find((c) => c.kind === "in" && !c.auto)!.key }))} className={`rounded-lg border py-2 text-sm font-semibold ${rf.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim"}`}>+ {t("Entrata")}</button>
@@ -1340,7 +1341,7 @@ export default function CassaPage() {
               <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: rf.variable ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: rf.variable ? "22px" : "2px" }} /></span>
             </button>
             {!rf.variable && (
-            <button type="button" onClick={() => setRf((f) => ({ ...f, auto: !f.auto }))} className="mb-3 flex w-full items-center justify-between rounded-lg border border-line px-3 py-2.5 text-left hover:bg-wash">
+            <button type="button" role="switch" aria-checked={!!rf.auto} onClick={() => setRf((f) => ({ ...f, auto: !f.auto }))} className="mb-3 flex w-full items-center justify-between rounded-lg border border-line px-3 py-2.5 text-left hover:bg-wash">
               <span><span className="text-sm font-medium text-txt">{t("Registrazione automatica")}</span><span className="mt-0.5 block text-[11px] text-faint">{rf.auto ? t("Alla scadenza il movimento si registra da solo.") : t("Alla scadenza dovrai confermarlo con «Segna come pagata».")}</span></span>
               <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: rf.auto ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: rf.auto ? "22px" : "2px" }} /></span>
             </button>

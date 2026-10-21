@@ -26,6 +26,7 @@ import { refineGroups, planMerges } from "./_merge";
 import { promoRecipientEmail } from "@/lib/promos";
 import { needsBulkGuard } from "@/lib/bulk-guard";
 import { useBulkGuard } from "@/components/useBulkGuard";
+import { keyActivate } from "@/lib/a11y";
 
 // Etichetta del canale principale di un ospite: per la Diretta distingue sito ufficiale e inserita a mano ("xenora.it" come prima).
 const topChLabel = (ch: Channel, b?: Parameters<typeof directOriginOf>[0]) => (ch !== "direct" ? CHANNELS[ch].label : directOriginOf(b) === "sito" ? "Sito ufficiale" : "xenora.it");
@@ -326,7 +327,7 @@ export default function OspitiPage() {
             </thead>
             <tbody>
               {shown.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh, topB }) => (
-                <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
+                <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} {...keyActivate(() => router.push(`/ospiti/${guest.id}`))} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
                   <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
                   <td className="whitespace-nowrap px-3 py-2">{nameCell(guest)}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-txt">{guest.phone ? phoneShown(guest) : "—"}</td>

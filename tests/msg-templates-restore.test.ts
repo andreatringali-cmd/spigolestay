@@ -24,9 +24,9 @@ test("benvenuto_guida nel formato {{1}} (Meta) passa alla versione con i segnapo
   assert.doesNotMatch(out[0].texts.it, /\{\{1\}\}/);
 });
 
-test("le strutture nuove ricevono i 3 modelli obbligatori già con i testi approvati; l'operazione è ripetibile", () => {
+test("le strutture nuove ricevono i 5 modelli obbligatori già con i testi approvati; l'operazione è ripetibile", () => {
   const out = ensureMandatoryPerStructure<T>([], ["aaaa1111-0000"]);
-  assert.equal(out.length, 3);
+  assert.equal(out.length, 5);
   assert.match(out.find((t) => t.id.startsWith("mand-checkout"))!.texts.it, /chiavi lasciale attaccate alla porta/);
   const again = restoreApprovedTexts(out);
   assert.deepEqual(again, out);

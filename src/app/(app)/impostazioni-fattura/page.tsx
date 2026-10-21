@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button, Input, Select, Textarea, Alert } from "@/components/ui";
+import Toggle from "@/components/Toggle";
 import { FORFETTARIO_NOTE } from "@/lib/invoicing/folio";
 import { apiPost } from "@/lib/invoicing/client";
 import { validateIssuerSettings, hasErrors, normalizeVat, normalizeCf } from "@/lib/invoicing/validate";
@@ -137,10 +138,6 @@ export default function ImpostazioniFatturaPage() {
     setMsg(error ? "Errore: " + friendlyError(error) : "Impostazioni salvate ✓");
   };
 
-  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
-  const lbl = "block text-xs font-medium text-dim";
-  const fieldCls = (error?: string) => `${inp}${error ? " !border-[color:var(--err)]" : ""}`;
-  const fieldMsg = (m?: string, soft?: boolean) => (m ? <span className="mt-0.5 block text-[11px] font-medium" style={{ color: soft ? "var(--warn)" : "var(--err)" }}>{m}</span> : null);
 
   if (loading) return <div className="p-6 text-sm text-faint">Caricamento…</div>;
   // (il messaggio di errore di lettura è sotto, accanto al messaggio di salvataggio)
@@ -148,42 +145,37 @@ export default function ImpostazioniFatturaPage() {
   return (
     <div>
       <PageHeader title="Impostazioni fattura" subtitle="Regime, dati dell'emittente e servizio di invio"
-        actions={<div className="flex flex-wrap items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<button onClick={save} disabled={saving || !tenantId || !!loadErr} className="rounded-lg bg-focus px-4 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button></div>} />
+        actions={<div className="flex flex-wrap items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<Button onClick={save} disabled={!tenantId || !!loadErr} loading={saving}>Salva</Button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <SectionTitle>Regime fiscale</SectionTitle>
-          <label className="mt-2 block">{lbl && <span className={lbl}>Regime</span>}
-            <select value={s.regime} onChange={(e) => set({ regime: e.target.value })} className={inp}>
-              <option value="imprenditoriale_ordinario">Imprenditoriale ordinario (IVA per aliquota)</option>
-              <option value="forfettario">Forfettario (IVA 0% N2.2, bollo 2€ &gt; 77,47€)</option>
-              <option value="non_imprenditoriale">Non imprenditoriale (solo ricevuta, no SDI)</option>
-            </select>
-          </label>
+          <Select label="Regime" fieldClassName="mt-2" value={s.regime} onChange={(e) => set({ regime: e.target.value })}>
+            <option value="imprenditoriale_ordinario">Imprenditoriale ordinario (IVA per aliquota)</option>
+            <option value="forfettario">Forfettario (IVA 0% N2.2, bollo 2€ &gt; 77,47€)</option>
+            <option value="non_imprenditoriale">Non imprenditoriale (solo ricevuta, no SDI)</option>
+          </Select>
           <p className="mt-2 text-[12px] text-dim">
             {s.regime === "imprenditoriale_ordinario" && "Fatture con IVA (10% pernottamento/pulizia, 22% extra), tassa di soggiorno fuori campo IVA (N1)."}
             {s.regime === "forfettario" && "Fatture senza IVA (natura N2.2), dicitura di legge in calce, bollo virtuale 2€ automatico oltre 77,47€."}
             {s.regime === "non_imprenditoriale" && "Solo ricevuta non fiscale: nessun invio allo SdI."}
           </p>
           <label className="mt-3 flex items-center justify-between"><span className="text-sm text-txt">Bollo automatico (forfettario)</span>
-            <input type="checkbox" checked={s.bollo_auto} onChange={(e) => set({ bollo_auto: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <Toggle on={s.bollo_auto} onClick={() => set({ bollo_auto: !s.bollo_auto })} /></label>
           <label className="mt-2 flex items-center justify-between"><span className="text-sm text-txt">Arrotonda il totale all'euro</span>
-            <input type="checkbox" checked={s.rounding} onChange={(e) => set({ rounding: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <Toggle on={s.rounding} onClick={() => set({ rounding: !s.rounding })} /></label>
           {s.regime === "forfettario" && (
-            <label className="mt-3 block"><span className={lbl}>Dicitura in calce</span>
-              <textarea value={s.regime_note} onChange={(e) => set({ regime_note: e.target.value })} rows={3} placeholder={FORFETTARIO_NOTE} className={inp} /></label>
+            <Textarea label="Dicitura in calce" fieldClassName="mt-3" value={s.regime_note} onChange={(e) => set({ regime_note: e.target.value })} rows={3} placeholder={FORFETTARIO_NOTE} />
           )}
         </Card>
 
         <Card>
           <SectionTitle>Servizio di invio (SdI)</SectionTitle>
-          <label className="mt-2 block"><span className={lbl}>Provider fatturazione elettronica</span>
-            <select value={s.default_provider} onChange={(e) => set({ default_provider: e.target.value })} className={inp}>
-              <option value="mock">Test (mock, nessun invio reale)</option>
-              <option value="fattureincloud">Fatture in Cloud (consigliato)</option>
-              <option value="openapi">Openapi.it (SdI)</option>
-            </select>
-          </label>
+          <Select label="Provider fatturazione elettronica" fieldClassName="mt-2" value={s.default_provider} onChange={(e) => set({ default_provider: e.target.value })}>
+            <option value="mock">Test (mock, nessun invio reale)</option>
+            <option value="fattureincloud">Fatture in Cloud (consigliato)</option>
+            <option value="openapi">Openapi.it (SdI)</option>
+          </Select>
           <p className="mt-2 text-[12px] text-dim">
             {s.default_provider === "mock" && "Modalità di prova: i documenti vengono numerati ed 'emessi' ma non trasmessi davvero allo SdI."}
             {s.default_provider === "fattureincloud" && "Le fatture vengono create nel tuo conto Fatture in Cloud, che genera l'XML e le trasmette allo SdI. Collega il tuo account qui sotto."}
@@ -192,75 +184,72 @@ export default function ImpostazioniFatturaPage() {
 
           {provNeedsCreds && (
             <div className="mt-3 space-y-2 rounded-lg border border-line bg-wash/50 p-3">
-              <label className="block"><span className={lbl}>Token API Openapi</span>
-                <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cred.hasToken ? "•••••••• (salvato — lascia vuoto per non cambiarlo)" : "Bearer token del tuo account Openapi"} className={inp} /></label>
+              <Input label="Token API Openapi" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cred.hasToken ? "•••••••• (salvato — lascia vuoto per non cambiarlo)" : "Bearer token del tuo account Openapi"} />
               <label className="flex items-center justify-between"><span className="text-sm text-txt">Ambiente di test (sandbox)</span>
-                <input type="checkbox" checked={cred.sandbox} onChange={(e) => setCred((c) => ({ ...c, sandbox: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+                <Toggle on={cred.sandbox} onClick={() => setCred((c) => ({ ...c, sandbox: !c.sandbox }))} /></label>
               <label className="flex items-center justify-between"><span className="text-sm text-txt">Firma digitale automatica</span>
-                <input type="checkbox" checked={cred.signature} onChange={(e) => setCred((c) => ({ ...c, signature: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+                <Toggle on={cred.signature} onClick={() => setCred((c) => ({ ...c, signature: !c.signature }))} /></label>
               <label className="flex items-center justify-between"><span className="text-sm text-txt">Conservazione a norma</span>
-                <input type="checkbox" checked={cred.legalStorage} onChange={(e) => setCred((c) => ({ ...c, legalStorage: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+                <Toggle on={cred.legalStorage} onClick={() => setCred((c) => ({ ...c, legalStorage: !c.legalStorage }))} /></label>
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button onClick={saveCred} disabled={!!credBusy} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{credBusy === "save" ? "Salvo…" : "Salva credenziali"}</button>
-                <button onClick={testCred} disabled={!!credBusy || !cred.hasToken} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{credBusy === "test" ? "Test…" : "Test connessione"}</button>
+                <Button onClick={saveCred} disabled={!!credBusy && credBusy !== "save"} loading={credBusy === "save"}>Salva credenziali</Button>
+                <Button variant="secondary" onClick={testCred} disabled={!!credBusy && credBusy !== "test" || !cred.hasToken} loading={credBusy === "test"}>Test connessione</Button>
                 <span className="text-[11px] font-medium" style={{ color: cred.hasToken ? "var(--ok)" : "var(--faint)" }}>{cred.hasToken ? "● token configurato" : "○ token mancante"}</span>
               </div>
-              {credMsg && <p className="text-[12px] text-dim">{credMsg}</p>}
+              {credMsg && <Alert tone="info">{credMsg}</Alert>}
               <p className="text-[11px] text-faint">Il token è cifrato sul server (AES-256-GCM) e non viene mai ri-mostrato. Usa prima la sandbox per un invio di prova.</p>
             </div>
           )}
           {s.default_provider === "fattureincloud" && (
             <div className="mt-3 space-y-3 rounded-lg border border-line bg-wash/50 p-3">
-              {!fic.configured && <p className="text-[12px] text-[color:var(--warn)]">Fatture in Cloud non è ancora abilitato sul server (mancano le chiavi FIC_CLIENT_ID/SECRET). Contatta Xenora.</p>}
+              {!fic.configured && <Alert tone="warn">Fatture in Cloud non è ancora abilitato sul server (mancano le chiavi FIC_CLIENT_ID/SECRET). Contatta Xenora.</Alert>}
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-txt">Collegamento</span>
                 <span className="text-[11px] font-medium" style={{ color: fic.connected ? "var(--ok)" : "var(--faint)" }}>{fic.connected ? `● collegato${fic.companyName ? ` — ${fic.companyName}` : ""}` : "○ non collegato"}</span>
               </div>
               {!fic.connected ? (
-                <button onClick={connectFic} disabled={!!ficBusy || !fic.configured} className="rounded-lg bg-focus px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{ficBusy === "connect" ? "Reindirizzo…" : "Collega Fatture in Cloud"}</button>
+                <Button onClick={connectFic} disabled={!fic.configured} loading={ficBusy === "connect"}>Collega Fatture in Cloud</Button>
               ) : (
                 <>
                   <label className="flex items-center justify-between rounded-lg border border-line bg-paper px-3 py-2">
                     <span className="text-sm text-txt">Modalità prova <span className="text-[11px] text-dim">(crea su Fatture in Cloud senza inviare allo SdI)</span></span>
-                    <input type="checkbox" checked={fic.dryRun} onChange={(e) => ficAction("dryrun", { dryRun: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" />
+                    <Toggle on={fic.dryRun} onClick={() => ficAction("dryrun", { dryRun: !fic.dryRun })} />
                   </label>
-                  {!fic.dryRun && <p className="text-[12px] font-medium text-[color:var(--warn)]">⚠ Invio reale attivo: le fatture emesse saranno trasmesse allo SdI.</p>}
+                  {!fic.dryRun && <Alert tone="warn">Invio reale attivo: le fatture emesse saranno trasmesse allo SdI.</Alert>}
                   <div className="flex flex-wrap items-center gap-2">
-                    <button onClick={() => ficAction("test")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{ficBusy === "test" ? "Verifico…" : "Verifica collegamento"}</button>
-                    <button onClick={() => ficAction("disconnect")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 max-sm:py-2.5 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{ficBusy === "disconnect" ? "…" : "Scollega"}</button>
+                    <Button variant="secondary" onClick={() => ficAction("test")} disabled={!!ficBusy && ficBusy !== "test"} loading={ficBusy === "test"}>Verifica collegamento</Button>
+                    <Button variant="secondary" className="text-err" onClick={() => ficAction("disconnect")} disabled={!!ficBusy && ficBusy !== "disconnect"} loading={ficBusy === "disconnect"}>Scollega</Button>
                   </div>
                 </>
               )}
-              {ficMsg && <p className="text-[12px] text-dim">{ficMsg}</p>}
+              {ficMsg && <Alert tone="info">{ficMsg}</Alert>}
               <p className="text-[11px] text-faint">Le fatture vengono create e inviate allo SdI dal tuo conto Fatture in Cloud. I token sono cifrati sul server. Alla prima connessione la modalità prova è attiva per sicurezza.</p>
             </div>
           )}
-          <label className="mt-3 block"><span className={lbl}>Lingua PDF predefinita</span>
-            <select value={s.default_pdf_lang} onChange={(e) => set({ default_pdf_lang: e.target.value })} className={inp}>
-              <option value="it">Italiano</option><option value="en">English</option>
-            </select>
-          </label>
+          <Select label="Lingua PDF predefinita" fieldClassName="mt-3" value={s.default_pdf_lang} onChange={(e) => set({ default_pdf_lang: e.target.value })}>
+            <option value="it">Italiano</option><option value="en">English</option>
+          </Select>
         </Card>
 
         <Card className="lg:col-span-2">
           <SectionTitle>Dati emittente (in fattura)</SectionTitle>
           <p className="mt-1 text-[11px] text-faint">I dati dell&apos;emittente valgono per tutto l&apos;account (tutte le strutture).</p>
-          {!canIssue && <p className="mt-2 rounded-lg border border-[color:var(--warn)] px-3 py-2 text-[12px] font-medium text-[color:var(--warn)]">Per poter emettere documenti servono almeno la denominazione e la Partita IVA (o il codice fiscale).</p>}
+          {!canIssue && <Alert tone="warn" className="mt-2">Per poter emettere documenti servono almeno la denominazione e la Partita IVA (o il codice fiscale).</Alert>}
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            <label className="block sm:col-span-2"><span className={lbl}>Denominazione / ragione sociale</span><input value={s.denominazione} onChange={(e) => set({ denominazione: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Partita IVA</span><input value={s.vat} onChange={(e) => set({ vat: e.target.value })} className={fieldCls(errOf("vat"))} inputMode="numeric" />{fieldMsg(errOf("vat"))}</label>
-            <label className="block"><span className={lbl}>Codice fiscale</span><input value={s.tax_code} onChange={(e) => set({ tax_code: e.target.value })} className={fieldCls(errOf("tax_code"))} />{fieldMsg(errOf("tax_code") || warnOf("tax_code"), !errOf("tax_code"))}</label>
-            <label className="block sm:col-span-2"><span className={lbl}>Indirizzo</span><input value={s.address} onChange={(e) => set({ address: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Città</span><input value={s.city} onChange={(e) => set({ city: e.target.value })} className={inp} /></label>
+            <Input label="Denominazione / ragione sociale" fieldClassName="sm:col-span-2" value={s.denominazione} onChange={(e) => set({ denominazione: e.target.value })} />
+            <Input label="Partita IVA" value={s.vat} onChange={(e) => set({ vat: e.target.value })} error={errOf("vat")} inputMode="numeric" />
+            <Input label="Codice fiscale" value={s.tax_code} onChange={(e) => set({ tax_code: e.target.value })} error={errOf("tax_code")} hint={warnOf("tax_code")} />
+            <Input label="Indirizzo" fieldClassName="sm:col-span-2" value={s.address} onChange={(e) => set({ address: e.target.value })} />
+            <Input label="Città" value={s.city} onChange={(e) => set({ city: e.target.value })} />
             <div className="grid grid-cols-2 gap-3">
-              <label className="block"><span className={lbl}>CAP</span><input value={s.cap} onChange={(e) => set({ cap: e.target.value })} className={fieldCls(errOf("cap"))} inputMode="numeric" />{fieldMsg(errOf("cap"))}</label>
-              <label className="block"><span className={lbl}>Provincia</span><input value={s.province} onChange={(e) => set({ province: e.target.value })} maxLength={2} placeholder="SR" className={fieldCls(errOf("province"))} />{fieldMsg(errOf("province"))}</label>
+              <Input label="CAP" value={s.cap} onChange={(e) => set({ cap: e.target.value })} error={errOf("cap")} inputMode="numeric" />
+              <Input label="Provincia" value={s.province} onChange={(e) => set({ province: e.target.value })} maxLength={2} placeholder="SR" error={errOf("province")} />
             </div>
-            <label className="block"><span className={lbl}>PEC</span><input value={s.pec} onChange={(e) => set({ pec: e.target.value })} className={fieldCls(errOf("pec"))} />{fieldMsg(errOf("pec"))}</label>
-            <label className="block"><span className={lbl}>Codice destinatario / SDI</span><input value={s.sdi} onChange={(e) => set({ sdi: e.target.value })} className={fieldCls(errOf("sdi"))} />{fieldMsg(errOf("sdi"))}</label>
-            <label className="block sm:col-span-2"><span className={lbl}>Piè di pagina PDF</span><input value={s.footer_note} onChange={(e) => set({ footer_note: e.target.value })} className={inp} /></label>
+            <Input label="PEC" value={s.pec} onChange={(e) => set({ pec: e.target.value })} error={errOf("pec")} />
+            <Input label="Codice destinatario / SDI" value={s.sdi} onChange={(e) => set({ sdi: e.target.value })} error={errOf("sdi")} />
+            <Input label="Piè di pagina PDF" fieldClassName="sm:col-span-2" value={s.footer_note} onChange={(e) => set({ footer_note: e.target.value })} />
           </div>
-          {issues.some((i) => i.level === "warn" && i.field === "address") && <p className="mt-2 text-[11px] text-[color:var(--warn)]">{issues.find((i) => i.field === "address")?.msg}</p>}
+          {issues.some((i) => i.level === "warn" && i.field === "address") && <Alert tone="warn" className="mt-2">{issues.find((i) => i.field === "address")?.msg}</Alert>}
         </Card>
 
         <Card className="lg:col-span-2">
@@ -276,8 +265,8 @@ export default function ImpostazioniFatturaPage() {
           </div>
         </Card>
       </div>
-      {loadErr && <p className="mt-3 text-sm font-medium text-[color:var(--err)]">{loadErr}</p>}
-      {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
+      {loadErr && <Alert tone="err" className="mt-3">{loadErr}</Alert>}
+      {msg && <Alert tone={msg.startsWith("Impostazioni salvate") ? "ok" : "err"} className="mt-3">{msg}</Alert>}
     </div>
   );
 }

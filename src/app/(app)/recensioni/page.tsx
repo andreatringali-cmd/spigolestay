@@ -752,7 +752,7 @@ export default function RecensioniPage() {
                 <div className="font-display text-lg font-bold text-txt">Collega Google</div>
                 <div className="mt-0.5 text-xs text-dim">Trova la struttura o incolla il Place ID{selStructureId && structures.find((s) => s.id === selStructureId) ? ` · ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</div>
               </div>
-              <button onClick={() => setCfgOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setCfgOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
             </div>
 
             {keyMissing && (
@@ -918,7 +918,7 @@ export default function RecensioniPage() {
                   <div className="text-xs text-dim">Impostazioni recensioni</div>
                 </div>
               </div>
-              <button onClick={() => setSrcCfg(null)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setSrcCfg(null)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
             </div>
 
             <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
@@ -1022,7 +1022,7 @@ export default function RecensioniPage() {
               {isChx(r) && <span className="rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-dim" title="Importata automaticamente da Channex">via Channex</span>}
               {!replies[r.id] && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.bucket === "neg" ? "var(--err)" : "var(--warn)"} 14%, transparent)`, color: r.bucket === "neg" ? "var(--err)" : "var(--warn)" }}>Da rispondere{ageDays(r.date) > 0 ? ` · da ${ageDays(r.date)} g` : ""}</span>}
               <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
-              {r.id.startsWith("manual-") && <button onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
+              {r.id.startsWith("manual-") && <button aria-label="Elimina recensione manuale" onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
             </div>
             {r.text && <p className="mt-2 text-sm text-txt">{r.text}</p>}
             {isChx(r) && (() => {

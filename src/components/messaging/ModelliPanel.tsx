@@ -5,7 +5,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
-import { mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, splitTemplatesPerStructure, ensureMandatoryPerStructure, dropRemovedTemplates, restoreApprovedTexts } from "@/lib/msg-templates";
+import { templateLabel, mergeSeedTemplates, markSeedDeleted, unmarkSeedDeleted, splitTemplatesPerStructure, ensureMandatoryPerStructure, dropRemovedTemplates, restoreApprovedTexts } from "@/lib/msg-templates";
 import ReviewSettingsCard from "@/components/messaging/ReviewSettingsCard";
 import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
@@ -73,7 +73,7 @@ export default function ModelliPanel() {
   const [editLang, setEditLang] = useState<Lang>("it");
   const saveTpl = () => { if (!editing || !editing.name.trim()) return; unmarkSeedDeleted(editing.id); setTemplates((prev) => (prev.some((t) => t.id === editing.id) ? prev.map((t) => (t.id === editing.id ? editing : t)) : [...prev, editing])); setEditing(null); };
   const insertVar = (token: string) => setEditing((e) => (e ? { ...e, texts: { ...e.texts, [editLang]: `${e.texts[editLang] ?? ""}${token}` } } : e));
-  const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) { markSeedDeleted(tpl.id); setTemplates((p) => p.filter((x) => x.id !== tpl.id)); } };
+  const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${templateLabel(tpl.name)}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) { markSeedDeleted(tpl.id); setTemplates((p) => p.filter((x) => x.id !== tpl.id)); } };
   // Struttura a cui appartiene un modello nuovo: quella selezionata, oppure l'unica struttura dell'account (con una sola struttura la selezione resta sempre «Tutte»).
   const newTplStructure = activeStructureId !== "all" ? activeStructureId : allStructures.length === 1 ? allStructures[0].id : "";
   const isAuto = (tp: MsgTemplate) => tp.trigger !== "manual"; // "automatico" = ha un orario/trigger (a prescindere se è in pausa)
@@ -121,7 +121,7 @@ export default function ModelliPanel() {
                 <Card key={tpl.id}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
+                      <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{templateLabel(tpl.name)}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
                       <div className="mt-0.5 text-xs text-dim">{tpl.structureIds?.length ? `${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
                     </div>
                     {(tpl.showInBooking || tpl.srcId) && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Nella scheda")}</span>}

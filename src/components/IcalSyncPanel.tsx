@@ -130,7 +130,7 @@ export default function IcalSyncPanel() {
         <SectionTitle>{t("Sincronizzazione iCal")} <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-wide text-[color:var(--ok)]">{t("reale · sola lettura")}</span></SectionTitle>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-dim">{t("Auto ogni 15 min")}
-            <button type="button" onClick={toggleAuto} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: auto ? "var(--ok)" : "var(--line)" }} aria-pressed={auto}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: auto ? "22px" : "2px" }} /></button>
+            <button type="button" onClick={toggleAuto} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: auto ? "var(--ok)" : "var(--line)" }} role="switch" aria-checked={auto}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: auto ? "22px" : "2px" }} /></button>
           </label>
           <button onClick={runAll} disabled={!!busy || feeds.length === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-40">↻ {busy === "all" ? t("Sincronizzo…") : t("Sincronizza tutti")}</button>
         </div>
@@ -154,7 +154,7 @@ export default function IcalSyncPanel() {
                 </div>
               </div>
               <button onClick={() => runFeed(f.id)} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{busy === f.id ? t("Sincronizzo…") : t("Sincronizza")}</button>
-              <button onClick={() => removeFeed(f.id)} disabled={!!busy} title={t("Rimuovi")} className="rounded-lg px-2 py-1.5 text-faint hover:text-[color:var(--err)] disabled:opacity-40">✕</button>
+              <button aria-label={t("Rimuovi")} onClick={() => removeFeed(f.id)} disabled={!!busy} title={t("Rimuovi")} className="rounded-lg px-2 py-1.5 text-faint hover:text-[color:var(--err)] disabled:opacity-40">✕</button>
             </div>
           ))}
         </div>

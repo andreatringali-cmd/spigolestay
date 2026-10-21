@@ -372,7 +372,7 @@ export default function PuliziePage() {
     />
   );
   const Seg = ({ v, icon, title }: { v: "rows" | "cards"; icon: string; title: string }) => (
-    <button onClick={() => pickView(v)} title={title} className={`rounded-md p-1.5 transition ${view === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}><Icon name={icon} size={16} /></button>
+    <button aria-label={title} onClick={() => pickView(v)} title={title} className={`grid h-9 w-9 place-items-center rounded-md transition max-sm:h-10 max-sm:w-10 ${view === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}><Icon name={icon} size={16} /></button>
   );
 
   // Blocco icone (persone + cane) e date, come sulle card — niente parola "persone".
@@ -419,7 +419,7 @@ export default function PuliziePage() {
         ))}
       </div>
       <div className="relative shrink-0" data-prodmenu>
-        <button ref={rowMenu === p.id ? rowMenuBtnRef : undefined} onClick={() => setRowMenu(rowMenu === p.id ? null : p.id)} title={t("Altre azioni")} className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-wash hover:text-txt">⋯</button>
+        <button aria-label={t("Altre azioni")} ref={rowMenu === p.id ? rowMenuBtnRef : undefined} onClick={() => setRowMenu(rowMenu === p.id ? null : p.id)} title={t("Altre azioni")} className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-wash hover:text-txt">⋯</button>
         <Popover open={rowMenu === p.id} anchorRef={rowMenuBtnRef} onClose={() => setRowMenu(null)} align="end" width={176} label={t("Altre azioni")}>
           <button onClick={() => { setStatusQuick(p, "ok"); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-[color:var(--ok)]"><Icon name="plus" size={15} /></span> {t("Riassortisci")}</button>
           <button onClick={() => { setProdDraft({ id: p.id, name: p.name, structureId: p.structureId, supplier: p.supplier ?? "", qty: p.qty, min: p.min }); setRowMenu(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-dim"><Icon name="settings" size={15} /></span> {t("Modifica")}</button>
@@ -434,20 +434,20 @@ export default function PuliziePage() {
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: st === "out" ? "var(--err)" : "var(--warn)" }} title={st === "out" ? t("Terminato") : t("In esaurimento")} />
       <span className="min-w-0 flex-1 truncate text-xs text-txt">{p.name}</span>
       {p.supplier && <span className="shrink-0 truncate text-[10px] text-faint" title={t("Fornitore")}>{p.supplier}</span>}
-      <button onClick={() => setStatusQuick(p, "ok")} title={t("Riassortisci")} className="shrink-0 text-[color:var(--ok)] hover:opacity-70">✓</button>
+      <button aria-label={t("Riassortisci")} onClick={() => setStatusQuick(p, "ok")} title={t("Riassortisci")} className="shrink-0 text-[color:var(--ok)] hover:opacity-70">✓</button>
     </div>
   ); };
 
   return (
     <div>
       <PageHeader title={t("Planning pulizie")} subtitle={t("Cosa fare in ogni camera oggi, da condividere con chi pulisce")} hideHelp />
-      {issueSaveErr && !issueDraft && <div role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-[color:var(--err)] px-3 py-2 text-xs text-[color:var(--err)]" style={{ backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}><span className="flex-1">{issueSaveErr}</span><button onClick={() => setIssueSaveErr("")} className="font-bold">✕</button></div>}
+      {issueSaveErr && !issueDraft && <div role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-[color:var(--err)] px-3 py-2 text-xs text-[color:var(--err)]" style={{ backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}><span className="flex-1">{issueSaveErr}</span><button aria-label="Chiudi messaggio" onClick={() => setIssueSaveErr("")} className="font-bold">✕</button></div>}
 
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-3 max-sm:mb-3 max-sm:flex-nowrap max-sm:gap-2">
-        <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:min-w-0 max-sm:flex-1">
+        <div role="tablist" aria-label="Sezioni" className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:min-w-0 max-sm:flex-1">
           {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["checklist", "Checklist"]] as ["planning" | "scorte" | "checklist", string][]).map(([v, lab]) => (
-            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-[13px] ${tab === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>
+            <button key={v} role="tab" aria-selected={tab === v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 max-sm:min-h-10 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:whitespace-nowrap max-sm:px-1 max-sm:text-[13px] ${tab === v ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>
               <span className="max-sm:hidden"><Icon name={v === "planning" ? "sparkles" : v === "checklist" ? "menu" : "clipboard"} size={15} /></span> {t(lab)}
               {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[11px] font-bold text-on-err">{shopList.length}</span>}
             </button>
@@ -519,7 +519,7 @@ export default function PuliziePage() {
             <div className="relative min-w-0 flex-1 sm:max-w-xs">
               <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
               <input value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} placeholder={t("Cerca prodotto…")} className="w-full rounded-lg border border-line bg-paper py-1.5 pl-8 pr-7 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-              {prodSearch && <button onClick={() => setProdSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-dim hover:text-txt">✕</button>}
+              {prodSearch && <button aria-label="Azzera la ricerca" onClick={() => setProdSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-dim hover:text-txt">✕</button>}
             </div>
             {/* Desktop/tablet: segmenti inline come sempre · Telefono: nella tendina «Filtri» */}
             {segs("flex items-center overflow-hidden rounded-lg border border-line max-sm:hidden", "px-3 py-1.5 text-xs font-semibold transition [&:not(:first-child)]:border-l [&:not(:first-child)]:border-line")}
@@ -675,8 +675,8 @@ export default function PuliziePage() {
                   <div className="mt-0.5 text-[11px] text-faint">{fmtShort(iss.date)} · {(() => { try { return new Date(iss.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}</div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1">
-                  <button onClick={() => resolveIssue(iss.id)} title={t("Segna risolto")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-[color:var(--ok)] hover:bg-wash">✓</button>
-                  <button onClick={() => deleteIssue(iss.id)} title={t("Elimina")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
+                  <button aria-label={t("Segna risolto")} onClick={() => resolveIssue(iss.id)} title={t("Segna risolto")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-[color:var(--ok)] hover:bg-wash">✓</button>
+                  <button aria-label={t("Elimina")} onClick={() => deleteIssue(iss.id)} title={t("Elimina")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
                 </div>
               </div>
             ); })}
@@ -704,8 +704,8 @@ export default function PuliziePage() {
                     <div className="mt-0.5 text-[11px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return fmtDM(d) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">
-                    <button onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>
-                    <button onClick={() => deleteIssue(iss.id)} title={t("Elimina dallo storico")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
+                    <button aria-label={t("Riapri")} onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>
+                    <button aria-label={t("Elimina dallo storico")} onClick={() => deleteIssue(iss.id)} title={t("Elimina dallo storico")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
                   </div>
                 </div>
               ); })}
@@ -770,7 +770,7 @@ export default function PuliziePage() {
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <span className="font-display text-lg font-bold text-txt">{prodDraft.id ? t("Modifica prodotto") : t("Aggiungi prodotto")}</span>
-              <button onClick={() => setProdDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setProdDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <label className="block text-xs font-medium text-dim">{t("Nome prodotto")}
               <input autoFocus value={prodDraft.name} onChange={(e) => setProdDraft({ ...prodDraft, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveProd(); }} placeholder={t("Es. Detergente vetri")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
@@ -821,7 +821,7 @@ export default function PuliziePage() {
           <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between">
               <span className="font-display text-lg font-bold text-txt">{t("Segnala un problema")}</span>
-              <button onClick={() => setIssueDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setIssueDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <div className="mb-3 text-xs text-dim">{issueDraft.unitName} · {issueDraft.structureName} · {fmtShort(issueDraft.date ?? date)}</div>
             <div className="mb-3 grid grid-cols-2 gap-1.5">
@@ -978,7 +978,7 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
         {note}
         <div className="mt-1.5 flex items-center gap-1.5">
           <button onClick={onToggle} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-semibold transition ${done ? "bg-[color:color-mix(in_srgb,var(--ok)_14%,transparent)] text-[color:var(--ok)]" : "border border-line text-dim hover:border-[color:var(--ok)] hover:text-[color:var(--ok)]"}`}>{done ? <><span>✓</span> {t("Fatta")}{doneAt ? ` · ${doneAt}` : ""}</> : t("Segna come fatta")}</button>
-          <button onClick={onIssue} title={t("Segnala un problema")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:border-[color:var(--err)] hover:text-[color:var(--err)]"><Icon name="alertTriangle" size={15} /></button>
+          <button aria-label={t("Segnala un problema")} onClick={onIssue} title={t("Segnala un problema")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:border-[color:var(--err)] hover:text-[color:var(--err)]"><Icon name="alertTriangle" size={15} /></button>
         </div>
       </div>
     </div>

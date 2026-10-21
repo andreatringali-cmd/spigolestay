@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button, Field, Input, Select, Alert, inputClass } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents, sumCents } from "@/lib/money";
@@ -141,23 +141,22 @@ export default function ChiusuraCassaPage() {
     w.document.close();
   };
 
-  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 max-sm:py-2.5 text-sm text-txt outline-none focus:border-focus";
-  const lbl = "block text-xs font-medium text-dim";
+  const msgOk = msg.startsWith("Chiusura salvata"); // esito positivo -> avviso verde, altrimenti rosso
 
   return (
     <div>
       <PageHeader title="Chiusura cassa" subtitle="Quadratura del contante di giornata"
         actions={<div className="flex flex-wrap items-center gap-2">
-          <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">Esporta</button>
-          <button onClick={printClose} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:py-0">Stampa</button>
+          <Button variant="secondary" size="sm" onClick={exportCsv}>Esporta</Button>
+          <Button variant="secondary" size="sm" onClick={printClose}>Stampa</Button>
         </div>} />
 
       <div className="grid gap-4 max-sm:gap-3 lg:grid-cols-2">
         <Card className="max-sm:!p-3">
           <SectionTitle>Quadratura</SectionTitle>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <label className={lbl}>Giorno<DateField value={day} onChange={(v) => setDay(v)} className={inp} /></label>
-            <label className={lbl}>Conto<select value={conto} onChange={(e) => setConto(e.target.value)} className={inp}>{conti.map((c) => <option key={c} value={c}>{contoLabel(c)}</option>)}</select></label>
+            <Field label="Giorno"><DateField value={day} onChange={(v) => setDay(v)} className={inputClass()} /></Field>
+            <Select label="Conto" value={conto} onChange={(e) => setConto(e.target.value)}>{conti.map((c) => <option key={c} value={c}>{contoLabel(c)}</option>)}</Select>
             <div className="col-span-2 text-xs text-dim">Struttura: <b className="text-txt">{scopeName}</b></div>
           </div>
           <div className="mt-3 flex flex-col gap-1 rounded-lg bg-wash p-3 text-sm">
@@ -166,12 +165,13 @@ export default function ChiusuraCassaPage() {
             <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold"><span>Saldo teorico {contoLabel(conto).toLowerCase()}</span><span className="shrink-0 whitespace-nowrap font-mono">{eur(expected)}</span></div>
             {balance.since && <div className="text-[11px] text-faint">Calcolato dal saldo di partenza del {fmtDate(balance.since)}: contano solo i movimenti successivi.</div>}
           </div>
-          <label className={`${lbl} mt-3 block`}>Conteggio in cassa €<input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" className={inp} placeholder="0,00" /></label>
-          {countedBad && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">Importo non valido: scrivi un numero, per esempio 1234,56.</p>}
-          {countedVal !== null && <div className="mt-2 flex justify-between rounded-lg px-3 py-2 text-sm font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${Math.abs(diff) < 0.005 ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: Math.abs(diff) < 0.005 ? "var(--ok)" : "var(--err)" }}><span>Differenza</span><span className="font-mono">{diff >= 0 ? "+" : ""}{eur(diff)}</span></div>}
-          <label className={`${lbl} mt-2 block`}>Note<input value={note} onChange={(e) => setNote(e.target.value)} className={inp} /></label>
-          <button onClick={save} disabled={countedVal === null} className="mt-3 rounded-lg bg-focus px-4 py-2 max-sm:w-full max-sm:py-3 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">Chiudi giornata</button>
-          {msg && <p className="mt-2 text-[12px] font-medium text-dim">{msg}</p>}
+          <Field label="Conteggio in cassa (€)" className="mt-3" error={countedBad ? "Importo non valido: scrivi un numero, per esempio 1234,56." : undefined}>
+            <Input value={counted} onChange={(e) => setCounted(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          </Field>
+          {countedVal !== null && <Alert tone={Math.abs(diff) < 0.005 ? "ok" : "err"} className="mt-2"><div className="flex justify-between font-semibold"><span>Differenza</span><span className="font-mono">{diff >= 0 ? "+" : ""}{eur(diff)}</span></div></Alert>}
+          <Input label="Note" fieldClassName="mt-2" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Button className="mt-3 max-sm:w-full" onClick={save} disabled={countedVal === null}>Chiudi giornata</Button>
+          {msg && <Alert tone={msgOk ? "ok" : "err"} className="mt-2">{msg}</Alert>}
         </Card>
 
         <Card className="max-sm:!p-3">

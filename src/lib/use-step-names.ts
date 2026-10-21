@@ -4,6 +4,7 @@
 // se il titolare rinomina un modello, cambia anche il nome del passaggio. Senza modello collegato resta il nome di base.
 import { useCallback, useEffect, useState } from "react";
 import { readTemplates, type StoredTemplate } from "./template-fill";
+import { templateLabel } from "./msg-templates";
 
 /** Passaggio del percorso → collegamento (srcId) del modello. */
 export const STEP_SRC: Record<string, string> = { checkin: "selfcheckin", pay: "pay", guide: "guida", tax: "tax", checkout: "checkout" };
@@ -12,7 +13,7 @@ export function stepNameFrom(templates: StoredTemplate[], stepKey: string, fallb
   const src = STEP_SRC[stepKey];
   if (!src) return fallback;
   const t = templates.find((x) => x.srcId === src && (!structureId || !x.structureIds?.length || x.structureIds.includes(structureId)));
-  return t?.name?.trim() || fallback;
+  return templateLabel(t?.name) || fallback; // nome tecnico salvato («checkin_online») → etichetta leggibile
 }
 
 export function useStepNames(): (stepKey: string, fallback: string, structureId?: string) => string {

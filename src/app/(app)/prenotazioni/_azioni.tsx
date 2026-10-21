@@ -132,16 +132,16 @@ export default function StepActions(p: StepActionsProps) {
     if (r.ok) { markReminder(b.id, remKind); after?.(via); p.onChanged(); }
     return r;
   };
-  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, _label: string, after?: (via: "wa" | "mail") => void, extra?: React.ReactNode) => (
+  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, _label: string, after?: (via: "wa" | "mail") => void, extra?: React.ReactNode, blockedWhy?: string) => (
     <>
     <div className="flex flex-col gap-1">
       {historyBox(remKind)}
       {isRecent(remKind) && <button className="self-start text-left text-xs font-normal text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: hai scritto da poco ({whenLabel(lastTs(remKind) ?? Date.now())}), meglio aspettare prima di rimandare. Sblocca comunque</button>}
     </div>
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
-      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail || isRecent(remKind)} title={hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : "Email"}</button>
-      <button className={`${btnGhost} px-2.5`} disabled={!!busy} title="Copia il testo del messaggio" aria-label="Copia il testo del messaggio" onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}><Icon name="copy" size={16} /></button>
+      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !!blockedWhy || !hasPhone || isRecent(remKind)} title={blockedWhy ?? (hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite")} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
+      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "var(--focus)" }} disabled={!!busy || !!blockedWhy || !hasMail || isRecent(remKind)} title={blockedWhy ?? (hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite")} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : "Email"}</button>
+      <button className={`${btnGhost} px-2.5`} disabled={!!busy || !!blockedWhy} title={blockedWhy ?? "Copia il testo del messaggio"} aria-label="Copia il testo del messaggio" onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}><Icon name="copy" size={16} /></button>
       {extra}
     </div>
     </>
@@ -212,6 +212,9 @@ export default function StepActions(p: StepActionsProps) {
       return { ok: true, message: "Registrato ✓" };
     };
     const settled = kind === "saldo" ? due <= 0.005 : !!b.cityTaxPaid; // niente da incassare
+    // Senza Stripe collegato il link di pagamento non si può creare: WhatsApp, Email e Copia restano spenti e si spiega come collegarlo (invece di fallire dopo il clic).
+    const noStripe = !(structure?.stripeAccount ?? "").trim();
+    const noStripeWhy = noStripe ? "Collega Stripe nella scheda della struttura (Strutture → Pagamenti online) per mandare il link di pagamento." : undefined;
     body = settled ? (<>
       <p className="text-sm text-dim">{kind === "saldo" ? "Il saldo del soggiorno risulta già pagato (o incassato dall'OTA)." : "La tassa di soggiorno risulta già incassata."}</p>
       <div className="flex flex-wrap gap-2"><button className={btnGhost} onClick={() => { p.onClose(); router.push("/pagamenti"); }}>Apri Incassi</button></div>
@@ -219,10 +222,16 @@ export default function StepActions(p: StepActionsProps) {
       <p className="text-sm text-dim">{kind === "saldo" ? `Mancano ${eur(due)} sul soggiorno.` : "La tassa di soggiorno non risulta incassata."} {sent
         ? <><b>Il link di pagamento è già stato inviato</b>{lastTs(remKind) ? ` (${whenLabel(lastTs(remKind)!)})` : " in chat"}: l'ospite non ha ancora pagato. Puoi <b>sollecitarlo</b> con un nuovo messaggio.</>
         : <><b>Non hai ancora mandato il link di pagamento.</b> Invialo adesso: quando l'ospite paga, l'incasso si registra da solo.</>}</p>
+      {noStripe && (
+        <div role="note" className="rounded-lg border border-line bg-wash px-3 py-2 text-xs text-txt" style={{ boxShadow: "inset 3px 0 0 var(--warn)" }}>
+          <b>Il link di pagamento online non è disponibile: Stripe non è collegato.</b> Collega Stripe in <b>Strutture → {structure?.name || "la struttura"} → Pagamenti online (Stripe)</b>. Nel frattempo puoi segnare l&apos;incasso a mano (contanti, bonifico…).
+          {structure?.id && <button className="ml-2 underline" onClick={() => { p.onClose(); router.push(`/strutture/${structure.id}`); }}>Apri la struttura</button>}
+        </div>
+      )}
       <label className="flex items-center gap-2 text-xs text-dim">Importo (lascia vuoto per tutto il residuo)
         <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={kind === "saldo" ? eur(due) : "tutta la tassa"} className="w-32 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
       </label>
-      {sendButtons(mk, remKind, sent ? "Sollecita il pagamento" : "Invia link di pagamento", undefined, <button className={`${btnGhost} whitespace-nowrap`} disabled={!!busy} title="Ha pagato in contanti o con altro mezzo?" onClick={() => run("manual", manual)}>{kind === "saldo" ? "Registra incasso a mano" : "Segna tassa incassata"}</button>)}
+      {sendButtons(mk, remKind, sent ? "Sollecita il pagamento" : "Invia link di pagamento", undefined, <button className={`${btnGhost} whitespace-nowrap`} disabled={!!busy} title="Ha pagato in contanti o con altro mezzo?" onClick={() => run("manual", manual)}>{kind === "saldo" ? "Registra incasso a mano" : "Segna tassa incassata"}</button>, noStripeWhy)}
     </>);
   } else if (step.key === "alloggiati" || step.key === "istat") {
     const isQ = step.key === "alloggiati";

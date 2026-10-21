@@ -1,7 +1,9 @@
 "use client";
 
 import DateField from "@/components/DateField";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Button, Modal } from "@/components/ui/index";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { useData } from "@/lib/store";
 import { DOC_TYPES } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
@@ -15,12 +17,11 @@ const inp = "w-full rounded-md border border-line bg-paper px-2 py-1 text-sm tex
 // con lettura del documento (AI) e aggiunta co-ospiti. Alla chiusura il chiamante rigenera le schedine.
 export default function EditBookingModal({ bookingId, onClose }: { bookingId: string; onClose: () => void }) {
   const { bookings, guests, getStructure, updateGuest, updateBooking } = useData();
+  const ask = useConfirm();
   const b = bookings.find((x) => x.id === bookingId);
   const [group, setGroup] = useState(false);
   const [extractingId, setExtractingId] = useState<string | null>(null);
   const [extractInfo, setExtractInfo] = useState<{ id: string; text: string; err?: boolean } | null>(null);
-
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
 
   if (!b) return null;
   const guest = (id: string) => guests.find((g) => g.id === id);
@@ -44,12 +45,12 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
   // Se la prenotazione ha già primaryGuest (es. dal check-in online) la sync Alloggiati lo preferisce alla scheda ospite: la correzione va applicata a entrambi.
   // La correzione si scrive SEMPRE sulla prenotazione (così conta come check-in compilato e la schedina nasce dai dati giusti); sull'anagrafica solo per prenotazioni singole:
   // nei gruppi l'anagrafica è quella del prenotante, non di chi guida questa camera.
-  const setPrimaryOf = (patch: Record<string, unknown>) => {
+  const setPrimaryOf = async (patch: Record<string, unknown>) => {
     const cur = primaryOf();
     // Prenotazione SENZA check-in: i dati mostrati vengono dalla scheda ospite (anche di un soggiorno precedente). Copiarli sulla prenotazione la fa contare come "check-in fatto":
     // l'operatore deve confermare di voler usare quei dati per questo soggiorno (si chiede una volta sola: dopo, la prenotazione ha il suo primaryGuest).
     if (!b.primaryGuest && (cur.lastName || cur.docNumber)) {
-      const ok = typeof window === "undefined" || window.confirm("Questa prenotazione non ha ancora un check-in. I dati mostrati vengono dalla scheda ospite (potrebbero essere di un soggiorno precedente): se prosegui verranno copiati su questa prenotazione, che risulterà con check-in fatto e la schedina per la Questura sarà generata con questi dati. Verifica che siano quelli di questo soggiorno. Continuare?");
+      const ok = await ask({ title: "Usare i dati della scheda ospite?", message: "Questa prenotazione non ha ancora un check-in. I dati mostrati vengono dalla scheda ospite (potrebbero essere di un soggiorno precedente): se prosegui verranno copiati su questa prenotazione, che risulterà con check-in fatto e la schedina per la Questura sarà generata con questi dati. Verifica che siano quelli di questo soggiorno. Continuare?", confirmLabel: "Continua" });
       if (!ok) return;
     }
     const base: Record<string, unknown> = b.primaryGuest ?? { firstName: cur.firstName, lastName: cur.lastName, sex: cur.sex, birthDate: cur.birthDate, birthPlace: cur.birthPlace, citizenship: cur.citizenship, docType: cur.docType, docNumber: cur.docNumber, docPlace: cur.docPlace };
@@ -99,18 +100,18 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
   const pax = (b.adults ?? 1) + (b.children ?? 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-2xl border border-line bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3 border-b border-line p-4">
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-txt">{g?.fullName || "Ospite"} <span className="font-normal text-faint">· {roleLabel(roleFor(0))}</span></h2>
-            <p className="text-[11px] text-faint">{getStructure(b.structureId)?.name}{b.code ? ` · ${b.code}` : ""} · {declared}/{pax} ospiti dichiarati</p>
-          </div>
-          <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
-        </div>
-
-        <div className="max-h-[72dvh] overflow-y-auto p-4">
+    <Modal
+      open
+      onClose={onClose}
+      size="xl"
+      title={<span className="block truncate">{g?.fullName || "Ospite"} <span className="font-normal text-dim">· {roleLabel(roleFor(0))}</span></span>}
+      description={`${getStructure(b.structureId)?.name ?? ""}${b.code ? ` · ${b.code}` : ""} · ${declared}/${pax} ospiti dichiarati`}
+      footer={<>
+        <span className="mr-auto text-[11px] text-dim">Le modifiche si salvano da sole. Chiudendo, le schedine vengono rigenerate.</span>
+        <Button onClick={onClose}>Fatto</Button>
+      </>}
+    >
+        <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {declared > 1 && <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={group} onChange={(e) => setGroup(e.target.checked)} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> Gruppo (non famiglia)</label>}
             <div className="ml-auto"><DocBtn id={b.id} withDoc apply={setPrimaryOf} /></div>
@@ -137,7 +138,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
                 <span className="text-[11px] text-faint">(familiare/membro: documento non obbligatorio)</span>
                 <div className="ml-auto flex items-center gap-2">
                   <DocBtn id={`${b.id}-${i}`} withDoc={false} apply={(p) => setCo(i, p as Partial<Co>)} />
-                  <button onClick={() => delCo(i)} className="text-faint hover:text-[color:var(--err)]" title="Rimuovi">✕</button>
+                  <button aria-label="Rimuovi" onClick={() => delCo(i)} className="text-faint hover:text-[color:var(--err)]" title="Rimuovi">✕</button>
                 </div>
               </div>
               {extractInfo?.id === `${b.id}-${i}` && <div className={`mb-2 text-[11px] font-medium ${extractInfo.err ? "text-[color:var(--warn)]" : "text-[color:var(--focus)]"}`}>✨ {extractInfo.text}</div>}
@@ -153,13 +154,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
           ))}
           <button onClick={addCo} className="mt-3 rounded-lg border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">+ Aggiungi ospite</button>
         </div>
-
-        <div className="flex items-center justify-between gap-2 border-t border-line p-4">
-          <span className="text-[11px] text-faint">Le modifiche si salvano da sole. Chiudendo, le schedine vengono rigenerate.</span>
-          <button onClick={onClose} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90">Fatto</button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

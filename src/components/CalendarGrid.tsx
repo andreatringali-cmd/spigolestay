@@ -44,6 +44,7 @@ import { usePhone } from "@/lib/usePhone";
 import { normName } from "@/lib/guest-key";
 import { bookingCode } from "@/lib/bookingCode";
 import { useToast } from "@/components/ToastProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 // Scheda camera: opzioni frequenza servizio e giorni della settimana.
 const FREQ_OPTS = ["Ogni partenza", "1 Giorno", "2 Giorni", "3 Giorni", "4 Giorni", "5 Giorni", "7 Giorni"];
@@ -1124,7 +1125,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           </div>
           {/* Menu Visualizza — spostato dopo i mesi (order) */}
           <div className="relative shrink-0 sm:order-[30]">
-            <button ref={vizRef} onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+            <button aria-label="Visualizza" ref={vizRef} onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
             </button>
             <Popover open={vizOpen} anchorRef={vizRef} onClose={() => setVizOpen(false)} align="start" width={256} label="Visualizza">
@@ -1148,7 +1149,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 </div>
             </Popover>
           </div>
-          <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 shrink-0 place-items-center sm:order-[32] rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+          <button aria-label={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 shrink-0 place-items-center sm:order-[32] rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
             <Icon name="chart" size={16} />
           </button>
           <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim sm:order-[42] transition hover:bg-wash hover:text-txt">
@@ -1427,8 +1428,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             {monthBoundaries.map((b) => (
               <div key={b} className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + b * cellW, borderLeft: "2px solid color-mix(in srgb, var(--txt) 42%, transparent)" }} />
             ))}
-            <button onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
-            <button onClick={goNext} title={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} className="absolute inset-y-0 right-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]">›</button>
+            <button aria-label={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
+            <button aria-label={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} onClick={goNext} title={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} className="absolute inset-y-0 right-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]">›</button>
           </div>
           {/* Header giorni */}
           <div className="flex border-b border-line">
@@ -1525,8 +1526,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div key={b} className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + b * cellW, borderLeft: "2px solid color-mix(in srgb, var(--txt) 42%, transparent)" }} />
             ))}
             {/* Frecce dentro il calendario: all'inizio e alla fine delle date */}
-            <button onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
-            <button onClick={goNext} title={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} className="absolute inset-y-0 right-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]">›</button>
+            <button aria-label={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
+            <button aria-label={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} onClick={goNext} title={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} className="absolute inset-y-0 right-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]">›</button>
           </div>
 
           {/* Header giorni */}
@@ -1714,7 +1715,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <span className="font-display text-lg font-bold text-txt">{evDraft.id ? "Modifica evento" : "Nuovo evento"}</span>
-              <button onClick={() => setEvDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setEvDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <label className="block text-xs font-medium text-dim">Nome
               <input autoFocus value={evDraft.name} onChange={(e) => setEvDraft({ ...evDraft, name: e.target.value })} placeholder="Es. Festa di Santa Lucia, Ponte 25 aprile…" className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
@@ -1749,7 +1750,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-3 flex items-center justify-between">
                 <span className="font-display text-lg font-bold text-txt">Modifica tariffa</span>
-                <button onClick={() => setRateEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+                <button aria-label="Chiudi" onClick={() => setRateEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-xs font-medium text-dim">Dal<DateField min={todayISO} value={rateEdit.from} onChange={(v) => { if (v) setRateEdit({ ...rateEdit, from: v }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
@@ -1808,7 +1809,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-1 flex items-center justify-between">
                 <span className="font-display text-lg font-bold text-txt">Disponibilità · {rt?.name}</span>
-                <button onClick={() => setAvailEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+                <button aria-label="Chiudi" onClick={() => setAvailEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-xs font-medium text-dim">Dal<DateField min={todayISO} value={availEdit.from} onChange={(v) => { if (v) setAvailEdit({ ...availEdit, from: v, to: v > availEdit.to ? v : availEdit.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
@@ -1827,8 +1828,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                     <label className="mt-3 block text-xs font-medium text-dim">Camere aperte alla vendita <span className="font-normal text-faint">· su {totalRooms} reali · {isos.length} {isos.length === 1 ? "giorno" : "giorni"}</span>
                       <div className="mt-1 flex items-center gap-2">
                         <input type="number" min={0} value={availStr ?? String(offered)} onFocus={(e) => e.target.select()} onChange={(e) => { const raw = e.target.value; setAvailStr(raw); if (raw !== "") commit(Number(raw)); }} onBlur={() => setAvailStr(null)} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-sm font-bold text-txt outline-none focus:border-focus" />
-                        <button onClick={() => setOffered(offered - 1)} disabled={offered <= 0} title="Diminuisci disponibilità" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-xl font-bold text-txt transition hover:bg-wash disabled:opacity-40">−</button>
-                        <button onClick={() => setOffered(offered + 1)} disabled={offered >= MAXOFF} title="Aumenta disponibilità (anche oltre le reali)" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-xl font-bold text-txt transition hover:bg-wash disabled:opacity-40">+</button>
+                        <button aria-label="Diminuisci disponibilità" onClick={() => setOffered(offered - 1)} disabled={offered <= 0} title="Diminuisci disponibilità" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-xl font-bold text-txt transition hover:bg-wash disabled:opacity-40">−</button>
+                        <button aria-label="Aumenta disponibilità (anche oltre le reali)" onClick={() => setOffered(offered + 1)} disabled={offered >= MAXOFF} title="Aumenta disponibilità (anche oltre le reali)" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-xl font-bold text-txt transition hover:bg-wash disabled:opacity-40">+</button>
                       </div>
                     </label>
                     <div className="mt-1.5 text-[11px] font-semibold" style={{ color: stColor }}>{stopSell ? "● Vendite chiuse (stop sell)" : over ? `● Overbooking · +${offered - totalRooms} oltre le ${totalRooms} reali` : "● Aperte alla vendita"}</div>
@@ -1988,7 +1989,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <span className="font-display text-lg font-bold text-txt">{oos.id ? "Modifica fuori servizio" : "Fuori servizio"}</span>
-              <button onClick={() => setOos(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={() => setOos(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-xs font-medium text-dim">Dal<DateField value={oos.from} onChange={(v) => setOos({ ...oos, from: v })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus text-left" /></label>
@@ -2022,7 +2023,7 @@ function destinationLabel(view: DragView, bookings: { id: string; checkIn: strin
 
 function MenuToggle({ label, on, onClick, disabled, title }: { label: string; on: boolean; onClick: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button onClick={disabled ? undefined : onClick} disabled={disabled} title={title} className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm ${disabled ? "cursor-not-allowed text-faint" : "text-txt hover:bg-wash"}`}>
+    <button role="switch" aria-checked={on} onClick={disabled ? undefined : onClick} disabled={disabled} title={title} className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm ${disabled ? "cursor-not-allowed text-faint" : "text-txt hover:bg-wash"}`}>
       <span>{label}</span>
       <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${disabled ? "bg-line opacity-50" : on ? "bg-focus" : "bg-line"}`}>
         <span className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all" style={{ left: on ? "14px" : "2px" }} />
@@ -2051,6 +2052,7 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
   const [clean, setClean] = useState(cleanedToday ? "Pulita" : "Da pulire");
   const [linenSt, setLinenSt] = useState(linenDoneToday ? "Cambiate" : "Da cambiare");
   const [notes, setNotes] = useState(unit.notes ?? "");
+  const ask = useConfirm();
   const toggleDay = (d: string) => setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
   const idShort = (unit.id || "").replace(/[^0-9]/g, "").slice(-6) || unit.id.slice(-4);
   const fmtDt = (iso?: string) => iso ? (fmtDateTime(iso) || "—") : "—";
@@ -2067,14 +2069,14 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
     updateUnit(id, { floor: unit.floor, view: unit.view, linenFreq: linen, tidyFreq: tidy, serviceDays: days, amenities: unit.amenities, bedConfig: unit.bedConfig, size: unit.size, notes });
     onClose();
   };
-  const del = () => { if (typeof window !== "undefined" && window.confirm(`Eliminare la camera "${unit.name}"?`)) { deleteUnit(unit.id); onClose(); } };
+  const del = async () => { if (await ask({ title: "Eliminare la camera?", message: `La camera «${unit.name}» viene eliminata.`, confirmLabel: "Elimina", danger: true })) { deleteUnit(unit.id); onClose(); } };
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6dvh]">
       <button aria-label="Chiudi" onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div className="relative max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <span className="font-display text-lg font-bold text-txt">Scheda camera</span>
-          <button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+          <button aria-label="Chiudi" onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
         </div>
         <div className="divide-y divide-[color:var(--line)]">
           <div className={RS_ROW}><span className="text-sm text-dim">Id</span><span className="font-mono text-sm text-faint">{idShort}</span></div>

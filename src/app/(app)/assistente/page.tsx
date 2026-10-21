@@ -469,8 +469,8 @@ export default function AssistentePage() {
         {micAvailable && (
           <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition active:scale-95 ${listening ? "text-on-err" : ""}`} style={listening ? { backgroundColor: "var(--err)" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
         )}
-        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Chiedimi qualsiasi cosa…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] text-txt outline-none placeholder:text-faint" />
-        <button type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-on-focus shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Chiedimi qualsiasi cosa…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] text-txt placeholder:text-faint" />
+        <button aria-label="Invia" type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-on-focus shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
         </button>
       </form>
@@ -494,7 +494,7 @@ export default function AssistentePage() {
               {ans.value && <div className="mt-1 font-display text-4xl font-bold tabular-nums leading-none text-txt">{ans.value}</div>}
               {ans.detail && <p className="mt-2 max-w-xl text-sm leading-relaxed text-dim">{ans.detail}</p>}
             </div>
-            <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="chat" size={14} /></button>
+            <button aria-label="Rileggi ad alta voce" onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="chat" size={14} /></button>
           </div>
 
           {ans.list && ans.list.length > 0 && (

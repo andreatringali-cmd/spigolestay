@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Button, Alert } from "@/components/ui";
 import type { HealthReport, Light } from "@/lib/health";
 import { fmtDateTime } from "@/lib/dates";
 
@@ -13,7 +13,7 @@ const COLOR: Record<Light, string> = { ok: "var(--ok)", warn: "var(--warn)", err
 const LABEL: Record<Light, string> = { ok: "Tutto bene", warn: "Da controllare", err: "Problema", idle: "Nessun dato" };
 
 function Dot({ light, size = 12 }: { light: Light; size?: number }) {
-  return <span aria-label={LABEL[light]} title={LABEL[light]} className="inline-block shrink-0 rounded-full" style={{ width: size, height: size, background: COLOR[light] }} />;
+  return <span role="img" aria-label={LABEL[light]} title={LABEL[light]} className="inline-block shrink-0 rounded-full" style={{ width: size, height: size, background: COLOR[light] }} />;
 }
 
 const fmt = (iso?: string) => (iso ? fmtDateTime(iso) : "");
@@ -52,10 +52,10 @@ export default function SalutePage() {
       <PageHeader
         title="Salute del sistema"
         subtitle="Se tutto funziona, qui è tutto verde. Altrimenti ti diciamo cosa guardare."
-        actions={<button onClick={ricontrolla} disabled={loading} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash max-sm:min-h-10 disabled:opacity-60">{loading ? "Controllo…" : "Ricontrolla"}</button>}
+        actions={<Button variant="secondary" size="sm" onClick={ricontrolla} loading={loading}>{loading ? "Controllo…" : "Ricontrolla"}</Button>}
       />
 
-      {err && <Card className="mb-4"><p className="text-sm" style={{ color: "var(--err)" }}>{err}</p></Card>}
+      {err && <Alert tone="err" className="mb-4">{err}</Alert>}
 
       {s && (
         <div className="mb-5 flex items-center gap-4 rounded-xl border bg-surface p-4 shadow-sm max-sm:mb-3 max-sm:gap-3 max-sm:p-3 sm:p-5" style={{ borderColor: COLOR[s.light], borderLeftWidth: 6 }}>

@@ -567,7 +567,7 @@ export default function CanaliPage() {
                 <h2 className="font-display text-base font-bold text-txt">{t("Collega i tuoi canali")}</h2>
                 <p className="text-[11px] text-dim">{t("Autorizza Booking.com, Airbnb, Expedia e gli altri portali che usi")}</p>
               </div>
-              <button onClick={closeChannelPanel} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button aria-label="Chiudi" onClick={closeChannelPanel} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <div className="relative flex-1 bg-wash">
               {channelPanel.loading && <div className="absolute inset-0 flex items-center justify-center text-sm text-dim">{t("Preparo il collegamento…")}</div>}

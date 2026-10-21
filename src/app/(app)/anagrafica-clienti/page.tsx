@@ -10,6 +10,7 @@ import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { apiPost } from "@/lib/invoicing/client";
 import { useTenantId } from "@/lib/tenant";
+import { keyActivate } from "@/lib/a11y";
 
 interface CP { id: string; kind: string; name: string; vat: string | null; tax_code: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; country: string | null; sdi_code: string | null; pec: string | null; email: string | null }
 const KIND: Record<string, string> = { privato: "Privato", societa: "Società", estero: "Estero", ota: "OTA / Agenzia" };
@@ -107,7 +108,7 @@ export default function AnagraficaClientiPage() {
           <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-dim"><th className="px-3 py-2 font-semibold">Nome</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">P.IVA / CF</th><th className="px-3 py-2 font-semibold">Città</th><th className="px-3 py-2 font-semibold">Cod. dest. / PEC</th></tr></thead>
           <tbody>
             {filtered.map((c) => (
-              <tr key={c.id} onClick={() => openEdit(c)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+              <tr key={c.id} onClick={() => openEdit(c)} {...keyActivate(() => openEdit(c))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                 <td className="px-3 py-2.5 font-medium text-txt">{c.name}</td>
                 <td className="px-3 py-2.5 text-dim">{KIND[c.kind] ?? c.kind}</td>
                 <td className="px-3 py-2.5 font-mono text-xs text-dim">{c.vat || c.tax_code || "—"}</td>

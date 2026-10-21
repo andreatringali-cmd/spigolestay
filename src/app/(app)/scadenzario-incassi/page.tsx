@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { PageHeader, Card, StatCard } from "@/components/ui";
+import { PageHeader, Card, StatCard, Button, Select, Textarea, Badge, Alert, buttonClass } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
@@ -23,6 +23,7 @@ import { useTenantId } from "@/lib/tenant";
 import { cashScopeOf, scopeVisible } from "@/lib/cassa";
 import { fmtDate } from "@/lib/dates";
 import { friendlyError } from "@/lib/friendly-error";
+import { keyActivate } from "@/lib/a11y";
 
 interface Doc {
   id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number;
@@ -93,7 +94,6 @@ export default function ScadenzarioIncassiPage() {
   const overdueTot = all.filter((r) => r.days > 0).reduce((a, r) => a + r.residuo, 0);
   const byBucket = (k: AgingKey) => all.filter((r) => r.bucket === k).reduce((a, r) => a + r.residuo, 0);
   const shownTot = rows.reduce((a, r) => a + r.residuo, 0);
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:py-0 max-sm:text-[13px]";
 
   const nameOf = (r: Doc) => `${r.counterpart?.name ?? ""} ${r.counterpart?.lastName ?? ""}`.trim();
   // Contatti: dall'ospite della prenotazione collegata (telefono) o dall'intestatario (email salvata nel documento).
@@ -154,16 +154,16 @@ export default function ScadenzarioIncassiPage() {
   const remindPanel = (r: (typeof rows)[number], c: NonNullable<ReturnType<typeof contactOf>>) => (
     <>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-dim">Testo del sollecito (modificabile)</div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+      <Textarea aria-label="Testo del sollecito" value={text} onChange={(e) => setText(e.target.value)} rows={6} />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {waDigits(c.phone)
-          ? <a href={waReminderLink(c.phone, text)} target="_blank" rel="noreferrer" onClick={() => logReminder(r.id, "WhatsApp")} className="rounded-lg px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Apri WhatsApp</a>
+          ? <a href={waReminderLink(c.phone, text)} target="_blank" rel="noreferrer" onClick={() => logReminder(r.id, "WhatsApp")} className={buttonClass("primary", "sm", "bg-ok! text-on-ok!")}>💬 Apri WhatsApp</a>
           : <span className="text-[11px] text-faint">Nessun telefono: collega la prenotazione all&apos;ospite per usare WhatsApp.</span>}
         {c.email
-          ? <a href={mailReminderLink(c.email, reminderSubject({ customerName: nameOf(r), docLabel: `${(DOC_KIND_LABEL[r.doc_kind] ?? "documento").toLowerCase()} ${r.number_label ?? ""}`.trim(), issueDate: r.issue_date, dueDate: r.due_date, residuoCents: r.residuo, daysLate: r.days, senderName: "" }), text)} onClick={() => logReminder(r.id, "email")} className="rounded-lg border border-line px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">✉ Apri email</a>
+          ? <a href={mailReminderLink(c.email, reminderSubject({ customerName: nameOf(r), docLabel: `${(DOC_KIND_LABEL[r.doc_kind] ?? "documento").toLowerCase()} ${r.number_label ?? ""}`.trim(), issueDate: r.issue_date, dueDate: r.due_date, residuoCents: r.residuo, daysLate: r.days, senderName: "" }), text)} onClick={() => logReminder(r.id, "email")} className={buttonClass("secondary", "sm")}>✉ Apri email</a>
           : <span className="text-[11px] text-faint">Nessuna email disponibile.</span>}
-        <button onClick={() => copy(r.id)} className="rounded-lg border border-line px-3 py-1.5 max-sm:py-2.5 text-xs font-semibold text-txt hover:bg-wash">Copia testo</button>
-        <button onClick={() => setText(draftText(r))} className="text-xs font-medium text-dim hover:underline">Ripristina testo</button>
+        <Button variant="secondary" size="sm" onClick={() => copy(r.id)}>Copia testo</Button>
+        <Button variant="ghost" size="sm" onClick={() => setText(draftText(r))}>Ripristina testo</Button>
         {note && <span className="text-[11px] font-medium text-dim">{note}</span>}
       </div>
       <p className="mt-1 text-[11px] text-faint">Il messaggio non parte da solo: si apre in WhatsApp/email già compilato e lo invii tu. L&apos;invio viene annotato nello storico del documento.</p>
@@ -173,7 +173,7 @@ export default function ScadenzarioIncassiPage() {
   return (
     <div>
       <PageHeader title="Scadenzario incassi" subtitle="Documenti emessi ancora da incassare, per scadenza"
-        actions={<button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50 max-sm:hidden">Esporta CSV</button>} />
+        actions={<Button variant="secondary" size="sm" onClick={exportCsv} disabled={rows.length === 0} className="max-sm:hidden">Esporta CSV</Button>} />
 
       <div className="mb-3 grid grid-cols-2 gap-3 max-sm:gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Totale da incassare" value={eur(cents(totalOpen))} hint={`${all.length} documenti`} onClick={() => setBucket("all")} active={bucket === "all"} />
@@ -186,18 +186,18 @@ export default function ScadenzarioIncassiPage() {
       <Card className="mb-4 max-sm:mb-3 max-sm:!p-3">
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, prenotazione…" className="w-full sm:w-72 max-sm:w-[calc(100%-5rem)]" />
-          <button onClick={exportCsv} disabled={rows.length === 0} className="h-9 w-[4.5rem] shrink-0 rounded-lg border border-line text-[13px] font-semibold text-txt hover:bg-wash disabled:opacity-50 sm:hidden">CSV</button>
+          <Button variant="secondary" size="sm" onClick={exportCsv} disabled={rows.length === 0} className="w-[4.5rem] sm:hidden">CSV</Button>
           {/* Telefono: un solo filtro (la select) resta inline accanto al conteggio, senza pulsante né scorrimento */}
           <div className="contents">
-          <select value={bucket} onChange={(e) => setBucket(e.target.value as AgingKey | "all" | "overdue")} className={sel}>
+          <Select aria-label="Fascia di scadenza" value={bucket} onChange={(e) => setBucket(e.target.value as AgingKey | "all" | "overdue")} className="max-sm:min-w-0">
             <option value="all">Tutti da incassare</option><option value="overdue">Solo scaduti</option>
             {BUCKETS.map((k) => <option key={k} value={k}>{AGING_LABEL[k]}</option>)}
-          </select>
+          </Select>
           <span className="ml-auto text-xs text-dim max-sm:shrink-0 max-sm:whitespace-nowrap">{rows.length} documenti · <b className="font-mono text-txt">{eur(cents(shownTot))}</b></span>
           </div>
         </div>
-        {err && <p className="mt-2 text-sm text-[color:var(--err)]">{err}</p>}
-        {ficNote && <p className="mt-2 text-[11px] font-medium" style={{ color: ficNote.ok ? "var(--ok)" : "var(--dim)" }}>{ficNote.text}</p>}
+        {err && <Alert tone="err" className="mt-2">{err}</Alert>}
+        {ficNote && <Alert tone={ficNote.ok ? "ok" : "warn"} className="mt-2" onClose={() => setFicNote(null)}>{ficNote.text}</Alert>}
       </Card>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm max-md:hidden">
@@ -210,16 +210,16 @@ export default function ScadenzarioIncassiPage() {
               const c = remind === r.id ? contactOf(r) : null;
               return (
                 <Fragment key={r.id}>
-                  <tr onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                  <tr onClick={() => router.push(`/documenti/${r.id}`)} {...keyActivate(() => router.push(`/documenti/${r.id}`))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                     <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? dmy(r.due_date) : "senza scadenza"}{overdue && <div className="text-[11px]">{r.days} gg di ritardo</div>}</td>
                     <td className="px-3 py-2.5 font-mono text-txt">{r.number_label}</td>
                     <td className="px-3 py-2.5"><div className="text-txt">{nameOf(r) || "—"}</div>{r.booking_code && <div className="text-[11px] text-faint">{r.booking_code}</div>}{rem && <div className="text-[11px] text-faint">Solleciti: {rem.count} · ultimo {fmtDate(rem.last)}</div>}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.total_cents))}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(r.residuo))}{r.credited > 0 && <div className="text-[11px] font-normal text-faint">dopo NC −{eur(cents(r.credited))}</div>}</td>
-                    <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: overdue ? "var(--err)" : "var(--warn)" }}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</span></td>
+                    <td className="px-3 py-2.5"><Badge tone={overdue ? "err" : "warn"}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</Badge></td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => openRemind(r)} className="mr-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Sollecita</button>
-                      <button onClick={() => markPaid(r)} disabled={busy === r.id} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-50">{busy === r.id ? "…" : "Incassato"}</button>
+                      <Button variant="secondary" size="sm" className="mr-1" onClick={() => openRemind(r)}>Sollecita</Button>
+                      <Button variant="secondary" size="sm" className="text-ok" onClick={() => markPaid(r)} loading={busy === r.id}>Incassato</Button>
                     </td>
                   </tr>
                   {remind === r.id && c && (
@@ -243,10 +243,9 @@ export default function ScadenzarioIncassiPage() {
           const overdue = r.days > 0;
           const rem = reminders[r.id];
           const c = remind === r.id ? contactOf(r) : null;
-          const col = overdue ? "var(--err)" : "var(--warn)";
           return (
             <div key={r.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
-              <div onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer">
+              <div onClick={() => router.push(`/documenti/${r.id}`)} {...keyActivate(() => router.push(`/documenti/${r.id}`))} className="cursor-pointer">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate font-medium text-txt">{nameOf(r) || "—"}</div>
@@ -259,13 +258,13 @@ export default function ScadenzarioIncassiPage() {
                   </div>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${col} 16%, transparent)`, color: col }}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</span>
+                  <Badge tone={overdue ? "err" : "warn"}>{overdue ? "Scaduto" : r.due_date ? "Da incassare" : "Senza scadenza"}</Badge>
                   <span style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? dmy(r.due_date) : "senza scadenza"}{overdue ? ` · ${r.days} gg di ritardo` : ""}</span>
                 </div>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <button onClick={() => openRemind(r)} className="rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-txt hover:bg-wash">Sollecita</button>
-                <button onClick={() => markPaid(r)} disabled={busy === r.id} className="rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-50">{busy === r.id ? "…" : "Incassato"}</button>
+                <Button variant="secondary" onClick={() => openRemind(r)}>Sollecita</Button>
+                <Button variant="secondary" className="text-ok" onClick={() => markPaid(r)} loading={busy === r.id}>Incassato</Button>
               </div>
               {remind === r.id && c && <div className="mt-3 border-t border-line pt-3">{remindPanel(r, c)}</div>}
             </div>

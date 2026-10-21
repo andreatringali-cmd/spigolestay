@@ -14,6 +14,8 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { supabase } from "@/lib/supabase";
 import { slugify } from "@/lib/publicdata";
 import { effectiveBase } from "@/lib/pricing";
+import { keyActivate } from "@/lib/a11y";
+import SharedToggle from "@/components/Toggle";
 
 const ACCENTS = ["#4F46E5", "#0E7C66", "#B4531F", "#B3453A", "#0891B2", "#DB2777"];
 const FONTS: [string, string][] = [
@@ -62,12 +64,8 @@ const LAYOUT_LABEL = (l: Layout) => LAYOUTS.find((x) => x.key === l)?.label ?? l
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button onClick={() => onChange(!on)} className={`relative h-5 w-9 shrink-0 rounded-full transition ${on ? "bg-focus" : "bg-[color:var(--line)]"}`}>
-      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${on ? "left-[18px]" : "left-0.5"}`} />
-    </button>
-  );
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return <SharedToggle on={on} onClick={() => onChange(!on)} label={label} />;
 }
 function Rowt({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -306,7 +304,7 @@ export default function WidgetPage() {
                 </tr></thead>
                 <tbody>
                   {shownWidgets.map((w) => (
-                    <tr key={w.id} onClick={() => setEditingId(w.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                    <tr key={w.id} onClick={() => setEditingId(w.id)} {...keyActivate(() => setEditingId(w.id))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="py-2.5 pr-3 font-medium text-txt">{w.name || "—"}</td>
                       <td className="py-2.5 pr-3 text-dim">{structures.find((s) => s.id === w.structureId)?.name ?? <span className="text-[color:var(--err)]">Struttura non trovata</span>}</td>
                       <td className="py-2.5 pr-3">{badge(w.structureId)}</td>
@@ -525,19 +523,19 @@ export default function WidgetPage() {
                   </label>
                 </div>
                 <div className="mt-2 divide-y divide-[color:var(--line)]">
-                  <Rowt label={t("Mostra intestazione")}><Toggle on={c.showHeader} onChange={(v) => set("showHeader", v)} /></Rowt>
-                  <Rowt label={t("Mostra i prezzi")}><Toggle on={c.showPrices} onChange={(v) => set("showPrices", v)} /></Rowt>
-                  <Rowt label={t("Chiedi il numero di bambini")}><Toggle on={c.askChildren} onChange={(v) => set("askChildren", v)} /></Rowt>
-                  <Rowt label={t("Richiedi il numero di telefono")}><Toggle on={c.requirePhone} onChange={(v) => set("requirePhone", v)} /></Rowt>
+                  <Rowt label={t("Mostra intestazione")}><Toggle label={t("Mostra intestazione")} on={c.showHeader} onChange={(v) => set("showHeader", v)} /></Rowt>
+                  <Rowt label={t("Mostra i prezzi")}><Toggle label={t("Mostra i prezzi")} on={c.showPrices} onChange={(v) => set("showPrices", v)} /></Rowt>
+                  <Rowt label={t("Chiedi il numero di bambini")}><Toggle label={t("Chiedi il numero di bambini")} on={c.askChildren} onChange={(v) => set("askChildren", v)} /></Rowt>
+                  <Rowt label={t("Richiedi il numero di telefono")}><Toggle label={t("Richiedi il numero di telefono")} on={c.requirePhone} onChange={(v) => set("requirePhone", v)} /></Rowt>
                 </div>
               </Card>
               <Card>
                 <SectionTitle>{t("Pagamenti accettati")}</SectionTitle>
                 <div className="divide-y divide-[color:var(--line)]">
-                  <Rowt label={t("Carta di credito")} hint="VISA · Mastercard · American Express"><Toggle on={c.payCard} onChange={(v) => set("payCard", v)} /></Rowt>
-                  <Rowt label="PayPal"><Toggle on={c.payPaypal} onChange={(v) => set("payPaypal", v)} /></Rowt>
-                  <Rowt label={t("Bonifico bancario")}><Toggle on={c.payTransfer} onChange={(v) => set("payTransfer", v)} /></Rowt>
-                  <Rowt label={t("Pagamento sul posto")} hint={t("Nessuna carta a garanzia")}><Toggle on={c.payOnsite} onChange={(v) => set("payOnsite", v)} /></Rowt>
+                  <Rowt label={t("Carta di credito")} hint="VISA · Mastercard · American Express"><Toggle label={t("Carta di credito")} on={c.payCard} onChange={(v) => set("payCard", v)} /></Rowt>
+                  <Rowt label="PayPal"><Toggle label="PayPal" on={c.payPaypal} onChange={(v) => set("payPaypal", v)} /></Rowt>
+                  <Rowt label={t("Bonifico bancario")}><Toggle label={t("Bonifico bancario")} on={c.payTransfer} onChange={(v) => set("payTransfer", v)} /></Rowt>
+                  <Rowt label={t("Pagamento sul posto")} hint={t("Nessuna carta a garanzia")}><Toggle label={t("Pagamento sul posto")} on={c.payOnsite} onChange={(v) => set("payOnsite", v)} /></Rowt>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <label className="block text-xs font-medium text-dim">{t("Acconto")}
@@ -575,7 +573,7 @@ export default function WidgetPage() {
                 {([["mobile", "Telefono"], ["tablet", "Tablet"], ["desktop", "Desktop"]] as const).map(([k, lab]) => (
                   <button key={k} onClick={() => setViewport(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition max-sm:min-h-10 ${viewport === k ? "bg-focus text-on-focus" : "border border-line text-dim hover:bg-wash"}`}>{lab}</button>
                 ))}
-                <button onClick={() => setReloadTick((x) => x + 1)} title="Ricarica l'anteprima" className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-dim hover:bg-wash">↻</button>
+                <button aria-label="Ricarica l'anteprima" onClick={() => setReloadTick((x) => x + 1)} title="Ricarica l'anteprima" className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-dim hover:bg-wash">↻</button>
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
 import { decideOrgReuse } from "@/lib/org-invite-guard";
+import { sameAccount } from "@/lib/invite-access";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -54,7 +55,9 @@ export async function POST(req: Request) {
     let allowlisted = false;
     if (!prof?.user_id && silent) {
       const { data: al } = await admin.from("access_allowlist").select("email").ilike("email", likeEsc(email)).maybeSingle();
-      allowlisted = !!al;
+      // Un indirizzo abilitato in «Utenti» vale solo per CHI L'HA INVITATO (stesso account): un altro titolare non può agganciare
+      // alla propria struttura il collaboratore di un altro account. L'amministratore di piattaforma resta libero come prima.
+      allowlisted = !!al && await sameAccount(admin, caller.email ?? "", email);
     }
     if (!prof?.user_id && !allowlisted) {
       return NextResponse.json({ error: "email_not_registered", message: `L'email ${email} non è registrata su Xenora. Il socio deve prima creare un account con questa email, poi potrai invitarlo.` }, { status: 400 });

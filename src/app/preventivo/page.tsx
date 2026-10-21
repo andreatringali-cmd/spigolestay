@@ -15,11 +15,12 @@ type QData = {
   tot?: number;      // totale soggiorno
   dep?: number;      // acconto € sul soggiorno (0/assente = paga intero)
   gn?: string; ge?: string; // ospite nome/email
-  oe?: string;       // email proprietario
+  oe?: string;       // email della struttura (proprietario): contatto per chi non può pagare online
   sid?: string; rt?: string; // riferimenti (per la conferma lato struttura)
   ref?: string;      // codice preventivo
   acct?: string;     // account Stripe Connect della struttura (incassa il proprietario)
   uid?: string;      // id utente del proprietario (destinatario della prenotazione)
+  op?: string;       // telefono/WhatsApp della struttura (contatto)
   logo?: string;     // logo struttura (dataURL), se disponibile
   accent?: string;   // colore struttura, se disponibile
   lang?: string;     // lingua del preventivo (it/en/fr/de/es), se il gestore l'ha salvata
@@ -133,7 +134,7 @@ export default function PreventivoPubblico() {
     const st = String(data.status || "").toLowerCase();
     if (data.paid === true || st === "paid" || st === "confirmed" || st === "pagato") return "Questo preventivo risulta già confermato e pagato.";
     if (st === "expired" || st === "scaduto" || (data.validUntil && ISO_RE.test(data.validUntil) && data.validUntil.slice(0, 10) < todayIso())) return "Questo preventivo è scaduto: chiedi alla struttura un nuovo link.";
-    if (!data.acct) return "Il pagamento online non è ancora attivo. Contatta la struttura per completare la prenotazione.";
+    if (!data.acct) return "Per pagare contatta la struttura.";
     if (quoteCode && !hasDeposit) return "Questo preventivo non prevede un pagamento online: l'importo si salda direttamente in struttura.";
     if (!(payAmount > 0)) return "Questo preventivo non prevede un pagamento online: l'importo si salda direttamente in struttura.";
     return null;
@@ -316,7 +317,16 @@ export default function PreventivoPubblico() {
               </div>
 
               {state === "noconfig" || payBlock ? (
-                <div className="mt-4 rounded-lg border border-line bg-paper p-3 text-sm text-dim">{payBlock ? t(payBlock) : t("Il pagamento online non è ancora attivo. Contatta la struttura per completare la prenotazione.")}</div>
+                <div className="mt-4 rounded-lg border border-line bg-paper p-3 text-sm text-dim">
+                  <div>{payBlock ? t(payBlock) : t("Per pagare contatta la struttura.")}</div>
+                  {/* Contatti della struttura: il pagamento online non è attivo, ma l'ospite sa subito a chi scrivere (niente vicolo cieco). */}
+                  {(data?.oe || data?.op) && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {data?.op && <a href={`https://wa.me/${data.op.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-txt hover:bg-wash">WhatsApp {data.op}</a>}
+                      {data?.oe && <a href={`mailto:${data.oe}`} className="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-txt hover:bg-wash">{data.oe}</a>}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <button onClick={pay} disabled={state === "paying"} className="mt-4 min-h-12 w-full rounded-xl py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent || "var(--focus)" }}>
                   {state === "paying" ? t("Avvio pagamento…") : t("Conferma e paga {amount}", { amount: eur(payAmount) })}

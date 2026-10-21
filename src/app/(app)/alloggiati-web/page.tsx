@@ -170,7 +170,7 @@ export default function AlloggiatiWebPage() {
       {(() => { const fc = (<>
         <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
         <DateField value={filterDate} onChange={(v) => setFilterDate(v)} className={fieldCls} />
-        {filterDate && <button onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
+        {filterDate && <button aria-label="Rimuovi filtro" onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Link href="/alloggiati-web/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: riscarica o stampa le ricevute quando vuoi">📁 Archivio ricevute</Link>
         <button onClick={generaTracciato} disabled={!!busy || readyCount === 0} className={`${fieldCls} ml-auto max-sm:ml-0 font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il tracciato .txt da caricare a mano sul portale (se il web service non è attivo)">{busy === "tracciato" ? "Genero…" : "⬇ Genera tracciato .txt"}</button>

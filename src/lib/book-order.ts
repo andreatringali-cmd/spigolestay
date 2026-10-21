@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sanitizeChosenExtras } from "./booking";
 import { DEFAULT_EXTRAS, type ExtraService } from "./types";
+import { isExamplePromo } from "./promo-example";
 
 type Json = Record<string, unknown>;
 const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
@@ -59,7 +60,8 @@ export async function loadOwnerPromos(admin: SupabaseClient, ownerId: string): P
 export function resolveBookPromo(promos: Json[], code: string, o: { structureId: string; checkIn: string; today: string }): BookPromo | null {
   const c = String(code || "").trim().toUpperCase();
   if (!c) return null;
-  const p = promos.find((x) => s(x.code).toUpperCase() === c && Number(x.discountPct) > 0 && (!s(x.structureId) || s(x.structureId) === o.structureId));
+  // Le promo di esempio precaricate (PASQUA15…) non sono offerte vere: il loro codice non vale (stessa regola del sito pubblico).
+  const p = promos.find((x) => s(x.code).toUpperCase() === c && Number(x.discountPct) > 0 && (!s(x.structureId) || s(x.structureId) === o.structureId) && !isExamplePromo(x as never));
   if (!p) return null;
   if (s(p.validUntil) && o.today > s(p.validUntil)) return null;
   if (s(p.validFrom) && o.checkIn < s(p.validFrom)) return null;

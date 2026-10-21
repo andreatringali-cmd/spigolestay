@@ -16,6 +16,7 @@ import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, todayLocalISO } from "@/lib/invoicing/receivables";
 import { isTrialSend, sdiBadge } from "@/lib/invoicing/sdi-status";
 import { friendlyError } from "@/lib/friendly-error";
+import { keyActivate } from "@/lib/a11y";
 
 interface DocRow {
   id: string; structure_id: string | null; booking_code: string | null; doc_kind: string; regime: string | null;
@@ -243,7 +244,7 @@ export default function DocumentiPage() {
               const late = res !== null && res > 0 && !!r.due_date && r.due_date < today;
               const isNc = r.doc_kind === "nota_di_credito";
               return (
-                <tr key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                <tr key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} {...keyActivate(() => router.push(`/documenti/${r.id}`))} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                   <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.issue_date ? fmtDate(r.issue_date) : <span className="text-faint">bozza</span>}</td>
                   <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>
                   <td className="px-3 py-2.5 text-dim">{DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
@@ -273,7 +274,7 @@ export default function DocumentiPage() {
           const late = res !== null && res > 0 && !!r.due_date && r.due_date < today;
           const isNc = r.doc_kind === "nota_di_credito";
           return (
-            <div key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
+            <div key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} {...keyActivate(() => router.push(`/documenti/${r.id}`))} className="cursor-pointer rounded-xl border border-line bg-surface p-3 shadow-sm active:bg-wash">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate font-medium text-txt">{cpName(r) || "—"}</div>

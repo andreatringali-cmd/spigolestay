@@ -83,10 +83,10 @@ export default function AssistantBar() {
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) { e.preventDefault(); void askAi(); } }}
                 placeholder={t("Chiedimi qualsiasi cosa…")}
-                className="w-full bg-transparent text-[15px] text-txt outline-none placeholder:text-faint"
+                className="w-full bg-transparent text-[15px] text-txt placeholder:text-faint"
               />
               {q
-                ? <button onClick={() => setQ("")} title="Cancella" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim transition hover:bg-wash hover:text-txt">✕</button>
+                ? <button aria-label="Cancella" onClick={() => setQ("")} title="Cancella" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim transition hover:bg-wash hover:text-txt">✕</button>
                 : <kbd className="hidden shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-dim sm:block">/</kbd>}
             </div>
 

@@ -56,9 +56,9 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 /** Interruttore a pulsanti affiancati (2-4 scelte). */
 export function Seg<T extends string>({ value, onChange, options, className = "" }: { value: T; onChange: (v: T) => void; options: { key: T; label: string }[]; className?: string }) {
   return (
-    <div className={`flex overflow-hidden rounded-lg border border-line ${className}`}>
+    <div role="group" className={`flex overflow-hidden rounded-lg border border-line ${className}`}>
       {options.map((o, i) => (
-        <button key={o.key} type="button" onClick={() => onChange(o.key)} className={`min-h-[40px] flex-1 px-2 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${value === o.key ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>{o.label}</button>
+        <button key={o.key} type="button" aria-pressed={value === o.key} onClick={() => onChange(o.key)} className={`min-h-[40px] flex-1 px-2 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${value === o.key ? "bg-focus text-on-focus" : "text-dim hover:bg-wash"}`}>{o.label}</button>
       ))}
     </div>
   );

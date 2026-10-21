@@ -1,11 +1,8 @@
 "use client";
 
 import { fmtDM } from "@/lib/dates";
-import { addDaysYmd, todayRome } from "@/lib/dates-rome";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -16,11 +13,11 @@ import { shortenLink } from "@/lib/guestlink";
 import { checkinRequestMsg } from "@/lib/guest-messages";
 import { guestLangOf } from "@/lib/guest-lang";
 import { cityTaxTotalByStructure } from "@/lib/citytax";
+import { useAdempimentiOggi } from "@/lib/use-adempimenti-oggi";
+import { expectedPaxOf, declaredPaxOf } from "@/lib/adempimenti-oggi";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
-// "Oggi" nel fuso italiano (Europe/Rome), NON UTC: altrimenti vicino a mezzanotte sfasa di un giorno.
-const today = () => todayRome();
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
 const fmtDay = (iso?: string) => (iso ? fmtDM(iso) : "—");
 const omini = (n: number) => (n <= 5 ? "👤".repeat(Math.max(1, n)) : `👤 ${n}`); // ospiti come icone
@@ -33,14 +30,11 @@ const STEP_META: Record<"fatto" | "prova" | "errore" | "niente", { icon: string;
 };
 // Scadenza schedina Questura: entro 24h dall'arrivo (mostrata come giorno successivo all'arrivo).
 
-// Completezza del check-in PER PERSONA (usata da card e righe).
-const expectedPaxOf = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
-const primaryDoneOf = (b: Booking) => b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
+// Completezza del check-in PER PERSONA: regola in lib/adempimenti-oggi.ts (la stessa di Dashboard e badge laterale).
 // Un ospite conta come "dichiarato" solo se ha davvero dei dati (nome/cognome): un ospite
 // vuoto aggiunto come segnaposto NON conta (altrimenti risulterebbe "2/2" con 1 solo compilato).
 // Nome mostrato: chi ha fatto il check-in di QUESTA prenotazione (nei gruppi ogni camera ha il suo capocamera), poi l'anagrafica — come in Adempimenti 2.
 const shownName = (b: Booking, g?: Guest) => [b.primaryGuest?.firstName, b.primaryGuest?.lastName].filter(Boolean).join(" ") || g?.fullName || "Ospite";
-const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0);
 
 // Scheda di uno step in ordine cronologico: badge numerato (la sequenza è informativa),
 // numero grande, pill di stato, mini-lista opzionale e azione a piena larghezza in fondo.
@@ -154,52 +148,19 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
 
 export default function AdempimentiPage() {
   const router = useRouter();
-  const { bookings: allBookings, structures, getGuest, getStructure, activeStructureId } = useData();
-  // Tutto ciò che segue lavora SOLO sulla struttura selezionata in alto a destra ("Tutte" = nessun filtro).
-  const inScope = useCallback((sid: string | null | undefined) => activeStructureId === "all" || sid === activeStructureId, [activeStructureId]);
-  const bookings = useMemo(() => (activeStructureId === "all" ? allBookings : allBookings.filter((b) => b.structureId === activeStructureId)), [allBookings, activeStructureId]);
+  const { structures, getGuest, getStructure, activeStructureId } = useData();
+  // Dati del server e regola del conteggio: UNICI per pagina, Dashboard e badge laterale (lib/adempimenti-oggi.ts). Tutto lavora SOLO sulla struttura selezionata in alto a destra.
+  const { result: R, reload: loadData, scoped } = useAdempimentiOggi();
+  const bookings = scoped.bookings;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const showStruct = activeStructureId === "all"; // se una struttura è già selezionata in alto, non ripeto il nome
   const bkNo = (b: Booking) => b.code || b.id.slice(0, 6).toUpperCase();       // numero prenotazione
   const structPart = (structureId: string) => (showStruct ? ` · ${getStructure(structureId)?.name ?? ""}` : "");
-  const [schedAll, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; guest: { cognome?: string; nome?: string } | null; structure_id: string | null }[]>([]);
-  const [istatAll, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; structure_id: string | null }[]>([]);
-  const [docsAll, setDocs] = useState<{ id: string; structure_id: string | null; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
-  const sched = useMemo(() => schedAll.filter((s) => inScope(s.structure_id)), [schedAll, inScope]);
-  const istat = useMemo(() => istatAll.filter((s) => inScope(s.structure_id)), [istatAll, inScope]);
-  const docs = useMemo(() => docsAll.filter((d) => inScope(d.structure_id)), [docsAll, inScope]);
-  const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
-  const [passiveAll, setPassive] = useState<{ id: string; structure_id: string | null; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
-  const passive = useMemo(() => passiveAll.filter((p) => inScope(p.structure_id)), [passiveAll, inScope]); // fatture fornitori: solo della struttura attiva
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo
   // WhatsApp Cloud API collegato? Se sì, il pulsante invia DIRETTO; altrimenti apre wa.me.
   const [waOn, setWaOn] = useState(false);
   useEffect(() => { apiPost<{ connected: boolean }>("whatsapp/settings", { action: "status" }).then((r) => setWaOn(!!r.connected)).catch(() => {}); }, []);
-
-  // Carica tutti i dati (anche il lato "fatti") in modo da poter aggiornare le schede dopo un'azione.
-  const loadData = useCallback(async () => {
-    if (!supabase) return;
-    const [a, i, d, p, pv] = await Promise.all([
-      supabase.from("alloggiati_schedine").select("id, arrival, stato, booking_id, guest, structure_id"),
-      supabase.from("istat_rows").select("id, arrival, stato, booking_id, structure_id").in("stato", ["pending", "sent"]),
-      supabase.from("documents").select("id, structure_id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
-      supabase.from("document_payments").select("document_id, amount_cents"),
-      supabase.from("purchase_documents").select("id, structure_id, supplier_name, due_date, total_cents, paid"),
-    ]);
-    setSched((a.data ?? []) as typeof schedAll); setIstat((i.data ?? []) as typeof istatAll);
-    setDocs((d.data ?? []) as typeof docsAll); setPays((p.data ?? []) as typeof pays);
-    setPassive((pv.data ?? []) as typeof passiveAll);
-  }, []);
-  useEffect(() => { loadData(); }, [loadData]);
-  // Ricarica schedine/documenti al rientro sulla pagina o dopo una sincronizzazione dati,
-  // così lo stato non resta indietro rispetto alle modifiche fatte altrove.
-  useEffect(() => {
-    const h = () => loadData();
-    window.addEventListener("focus", h);
-    window.addEventListener("spigolestay:datasync", h);
-    return () => { window.removeEventListener("focus", h); window.removeEventListener("spigolestay:datasync", h); };
-  }, [loadData]);
 
   // "Passaggio di palla" passo 1 → 2: genera/aggiorna le schedine dagli arrivi con check-in fatto.
   const [syncing, setSyncing] = useState(false);
@@ -280,92 +241,10 @@ export default function AdempimentiPage() {
     finally { setRunBusy(false); setRunConfirm(false); }
   };
 
-  const t = today();
   // Badge "fatti/totali" (X/Y) per le card: undefined se non c'è nulla (così resta "In ordine").
   const frac = (done: number, todo: number) => (done + todo > 0 ? `${done}/${done + todo}` : undefined);
-  // Completezza del check-in PER PERSONA: quanti ospiti dichiarati vs attesi (helper a livello modulo).
-  const isComplete = (b: Booking) => declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b);
-  const isActiveArrival = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
-  // Prenotazioni con almeno una schedina "da validare" (usata per il PASSO 2, a livello schedina).
-  const bookingsWithInvalid = useMemo(() => new Set(sched.filter((s) => s.stato === "da_validare" && s.booking_id).map((s) => s.booking_id as string)), [sched]);
-  // Validità calcolata sui DATI VERI della prenotazione (non sulla schedina, che è una copia).
-  const guestFieldsOk = (g?: { lastName?: string; firstName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; country?: string }) =>
-    !!(g?.lastName && g?.firstName && g?.sex && g?.birthDate && g?.birthPlace && (g?.citizenship || g?.country));
-  const bookingDataValid = (b: Booking) => {
-    const p = b.primaryGuest ?? getGuest(b.guestId); // i dati del check-in stanno sulla prenotazione; l'anagrafica è condivisa fra le camere di un gruppo
-    if (!guestFieldsOk(p) || !(p?.docType && p?.docNumber && p?.docPlace)) return false; // anche il luogo di rilascio: la schedina lo richiede
-    for (const e of (b.extraGuests ?? [])) if (!guestFieldsOk(e)) return false;
-    return !bookingsWithInvalid.has(b.id); // se la schedina è già stata generata e il controllo (codici inclusi / portale) l'ha rifiutata, il check-in NON è "valido"
-  };
-  // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dati ospite non validi),
-  // CHECK-IN FATTI (completi e validi). Lo stato dipende dai DATI della prenotazione, non dalla schedina.
-  const arrivalsToday = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b)), [bookings, t]);
-  // COLLASSO PER GRUPPO (solo visualizzazione PASSO 1): le prenotazioni con lo stesso groupId
-  // diventano UNA voce (rappresentante = codice più basso, poi arrivo). Quelle senza groupId
-  // restano individuali. Lo stato del gruppo è aggregato su TUTTE le sue prenotazioni.
-  type ArrivalGroup = { key: string; rep: Booking; members: Booking[]; rooms: number; expected: number; declared: number; cat: "todo" | "fix" | "done" };
-  const buildArrivalGroups = (list: Booking[]): ArrivalGroup[] => {
-    const solo: Booking[] = [];
-    const byGroup = new Map<string, Booking[]>();
-    for (const b of list) {
-      if (b.groupId) { const arr = byGroup.get(b.groupId) ?? []; arr.push(b); byGroup.set(b.groupId, arr); }
-      else solo.push(b);
-    }
-    const mk = (members: Booking[], key: string): ArrivalGroup => {
-      const rep = [...members].sort((a, c) => { const ka = bkNo(a), kc = bkNo(c); if (ka !== kc) return ka < kc ? -1 : 1; return (a.checkIn || "") < (c.checkIn || "") ? -1 : 1; })[0];
-      const expected = members.reduce((s, m) => s + expectedPaxOf(m), 0);
-      const declared = members.reduce((s, m) => s + declaredPaxOf(m), 0);
-      const allDone = members.every((m) => isComplete(m) && bookingDataValid(m));
-      const someFix = members.some((m) => isComplete(m) && !bookingDataValid(m));
-      const cat: ArrivalGroup["cat"] = allDone ? "done" : someFix ? "fix" : "todo";
-      return { key, rep, members, rooms: members.length, expected, declared, cat };
-    };
-    const groups: ArrivalGroup[] = [];
-    for (const b of solo) groups.push(mk([b], b.id));
-    for (const [gid, members] of byGroup) groups.push(mk(members, gid));
-    return groups.sort((a, b) => ((a.rep.checkIn || "") < (b.rep.checkIn || "") ? -1 : 1));
-  };
-  const arrivalGroups = buildArrivalGroups(arrivalsToday);
-  const groupsNoCheckin = arrivalGroups.filter((gr) => gr.cat === "todo");
-  const groupsToFix = arrivalGroups.filter((gr) => gr.cat === "fix");
-  const groupsCheckedIn = arrivalGroups.filter((gr) => gr.cat === "done");
-  const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
-  const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
-  // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
-  // anche prima della prossima sincronizzazione che ripulisce gli orfani lato server.
-  const activeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id)), [bookings]);
-  const isActive = (bookingId: string | null) => !bookingId || activeBookingIds.has(bookingId);
-  // Prenotazioni col check-in COMPLETO per tutte le persone: solo queste possono avere schedine
-  // "da inviare". Se una prenotazione è "da completare" (es. 0/2), NON deve comparire nel PASSO 2.
-  const completeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b)).map((b) => b.id)), [bookings]);
-  // 2 · Schedine Questura — "da inviare" SOLO se: schedina PRONTA + prenotazione COMPLETA + nessuna
-  // schedina della stessa prenotazione ancora da validare. Gli arrivi futuri sono esclusi (sotto).
-  const schedPending = sched.filter((s) => s.stato === "pronta" && isActive(s.booking_id) && !!s.booking_id && completeBookingIds.has(s.booking_id) && !bookingsWithInvalid.has(s.booking_id));
-  const schedToSend = schedPending.filter((s) => (s.arrival || "") <= t);   // arrivate/in arrivo oggi → inviabili
-  const schedSent = sched.filter((s) => s.stato === "inviata");
-  // Prenotazioni con check-in COMPLETO ma SENZA schedine ancora generate → "da trasferire alle schedine".
-  const schedBookingIds = new Set(sched.map((s) => s.booking_id).filter(Boolean) as string[]);
-  const weekAgo = addDaysYmd(t, -7); // aritmetica di calendario: niente toISOString (UTC), che sfasava di un giorno
-  const needsTransfer = bookings.filter((b) => isActiveArrival(b) && isComplete(b) && (b.checkIn || "") >= weekAgo && !schedBookingIds.has(b.id));
-  // Tra i "check-in fatti" (completi e validi), quali non hanno ancora la schedina generata → da trasferire.
-  // Conteggio PER GRUPPO (come la lista «Check-in fatti» sopra): un gruppo non ancora completo non è tra i fatti, quindi non va contato.
-  const toTransfer = groupsCheckedIn.filter((gr) => !gr.members.every((m) => schedBookingIds.has(m.id)));
-  // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
-  // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
-  type SchedRow = typeof sched[number];
-  const groupSched = (list: SchedRow[]) => {
-    const m = new Map<string, { key: string; bookingId: string | null; arrival: string; structureId: string | null; count: number }>();
-    for (const s of list) {
-      const key = s.booking_id || s.id;
-      const cur = m.get(key) ?? { key, bookingId: s.booking_id, arrival: s.arrival, structureId: s.structure_id, count: 0 };
-      cur.count += 1;
-      if (s.arrival && (!cur.arrival || s.arrival < cur.arrival)) cur.arrival = s.arrival;
-      m.set(key, cur);
-    }
-    return [...m.values()].sort((a, b) => (a.arrival < b.arrival ? -1 : 1));
-  };
-  const schedToSendG = groupSched(schedToSend);
-  const schedSentG = groupSched(schedSent);
+  const { groupsNoCheckin, groupsToFix, groupsCheckedIn, schedToSendG, schedSentG, needsTransfer, toTransfer, schedBookingIds,
+    istatPend, istatSent, docsUnpaid, docsPaid, docsRejected, docsSdiOk, passiveUnpaid, passivePaid, passiveOverdue, balanceOf } = R;
   // Etichetta prenotazione: numero · ospite (· struttura solo se non già selezionata in alto).
   const bookingLabel = (bookingId: string | null, structureId: string | null) => {
     const b = bookingId ? bookings.find((x) => x.id === bookingId) : null;
@@ -384,32 +263,14 @@ export default function AdempimentiPage() {
     const lbl = days >= 1 ? `${days}g ${h}h` : h >= 1 ? `${h}h ${m}m` : `${m}m`;
     return over ? `⚠ scaduta da ~${lbl}` : `⏱ tra ~${lbl}`; // stima: l'orario vero di arrivo non lo conosciamo (si assumono le 14:00)
   };
-  // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
-  const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id) && (s.arrival || "") <= t);
-  const istatSent = istat.filter((s) => s.stato === "sent");
-  // 4 · Incassi — documenti non saldati vs saldati.
-  const docsUnpaid = docs.filter((d) => d.stato !== "scartata" && balanceOf(d) > 0);
-  const docsPaid = docs.filter((d) => d.stato !== "scartata" && balanceOf(d) <= 0);
-  // 5 · SdI — scartati vs consegnati/emessi.
-  const docsRejected = docs.filter((d) => d.stato === "scartata");
-  const docsSdiOk = docs.filter((d) => d.stato !== "scartata");
-  // 6 · Fornitori — scadute da pagare vs pagate.
-  const passiveUnpaid = passive.filter((p) => !p.paid);
-  const passivePaid = passive.filter((p) => p.paid);
-  const passiveOverdue = passiveUnpaid.filter((p) => p.due_date && p.due_date <= t);
-
   // Il totale in alto usa gli STESSI conteggi delle card (schedine raggruppate per prenotazione).
-  const checkinTodo = groupsNoCheckin.length + groupsToFix.length; // da completare + da correggere (per GRUPPO)
-  const allClear = checkinTodo === 0 && schedToSendG.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
-  const totalTasks = checkinTodo + schedToSendG.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
-  const urgent = schedToSendG.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
-  const toDo = totalTasks - urgent;
+  const { allClear, total: totalTasks, urgent, toDo } = R.counts; // lo STESSO numero di Dashboard e badge della barra laterale
   const headTone = allClear ? "var(--ok)" : urgent > 0 ? "var(--err)" : "var(--focus)";
   const dateStr = `${new Date().toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(new Date())}`;
 
   return (
     <div>
-      <PageHeader title="Adempimenti oggi" subtitle="Tutto ciò che va gestito o inviato, in ordine cronologico" actions={<><Link href="/adempimenti-2" className="rounded-lg px-2.5 py-2 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt">Prova Adempimenti 2</Link><WeatherWidget compact /></>} />
+      <PageHeader title="Adempimenti oggi" subtitle="Tutto ciò che va gestito o inviato, in ordine cronologico" actions={<WeatherWidget compact />} />
 
       {/* Riepilogo d'impatto: quante cose da gestire e con che priorità */}
       <section className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-line bg-surface p-4 shadow-sm max-sm:mb-3 max-sm:gap-x-3 max-sm:gap-y-2 max-sm:p-3 sm:p-5">

@@ -1,3 +1,5 @@
+import type { User } from "./users";
+
 // Accesso reale a Xenora per un utente creato in "Utenti": invito (email con il link di registrazione, dove la persona sceglie LEI la password),
 // condivisione delle strutture e permessi. Puro: nessun import di rete; le chiamate le fa il componente.
 
@@ -10,6 +12,9 @@ export const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.t
 
 /** Messaggio leggibile per un errore dell'API di invito/condivisione. */
 export function humanInviteError(code?: string, message?: string): string {
+  // Errori dell'invito del collaboratore: il server manda già una frase completa in italiano (con l'indirizzo giusto).
+  if (message && ["email_other_account", "already_member", "invite_limit", "missing_permission", "rate_limited", "invite_not_found"].includes(code ?? "")) return message;
+  if (code === "not_owner") return "le strutture saranno condivise appena il titolare dell'account aprirà Xenora";
   if (code === "email_not_registered") return "non ha ancora completato la registrazione: appena si è registrata, riprova a condividere le strutture";
   if (code === "self_invite") return "è il tuo stesso account";
   if (code === "forbidden") return "solo il titolare può farlo";
@@ -43,4 +48,27 @@ export function sanitizeProfile(p: unknown): Record<string, unknown> | null {
   if (typeof o.allStructures === "boolean") out.allStructures = o.allStructures;
   if (Array.isArray(o.structureIds)) out.structureIds = o.structureIds.filter((x) => typeof x === "string").slice(0, 100);
   return Object.keys(out).length ? out : null;
+}
+
+/** Frase per l'utente dopo una chiamata fallita a /api/admin/allowlist (mai un generico «solo dal titolare» quando lo si è). */
+export function inviteFailureMessage(status: number, j: { error?: unknown; message?: unknown } | null | undefined): string {
+  const msg = typeof j?.message === "string" ? j.message : "";
+  if (msg) return msg;
+  if (status === 401) return "Sessione scaduta: esci e rientra, poi riprova.";
+  if (status === 403) return "Non hai il permesso di invitare utenti in questo account.";
+  if (status === 429) return "Troppi inviti in poco tempo: riprova più tardi.";
+  if (status === 503) return "Servizio momentaneamente non disponibile: riprova tra poco.";
+  return "L'invito non è partito: riprova.";
+}
+
+/** Stato dell'invito di una scheda: null = non c'è un invito da mostrare (utente già entrato, sé stessi, nessuna email). */
+export type InviteState = { kind: "sent"; at: string } | { kind: "mail-failed"; at: string } | { kind: "not-sent" };
+export function inviteStateOf(u: User, opts: { selfEmail?: string; lastAccess?: string | null; serverDates?: Record<string, string> }): InviteState | null {
+  const email = u.email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || u.id === "u-owner") return null;
+  if (opts.selfEmail && opts.selfEmail.trim().toLowerCase() === email) return null;
+  if (opts.lastAccess) return null;
+  const at = u.invitedAt || opts.serverDates?.[email] || "";
+  if (!at) return { kind: "not-sent" };
+  return u.inviteMailFailed ? { kind: "mail-failed", at } : { kind: "sent", at };
 }

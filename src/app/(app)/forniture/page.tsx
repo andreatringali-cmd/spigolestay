@@ -17,6 +17,7 @@ import { forecastConsumption, estimateStock, stockState, reorderQty, type StockS
 import { useConfirm } from "@/components/ConfirmProvider";
 import { productImage } from "@/lib/forniture/image";
 import { getCart, setQty as cartSetQty, clearCart, onCartChange, addToCart, type CartItem } from "@/lib/forniture/cart";
+import { keyActivate } from "@/lib/a11y";
 
 interface Category { id: string; slug: string; name: string; sort_order: number; phase: number }
 interface Product {
@@ -351,9 +352,9 @@ export default function ForniturePage() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 max-sm:mb-3 max-sm:gap-2">
-        <div className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:flex max-sm:w-full">
+        <div role="tablist" aria-label="Sezioni" className="inline-flex rounded-lg border border-line bg-surface p-0.5 max-sm:flex max-sm:w-full">
           {(["catalogo", "scorte", "riordino", "ordini"] as const).map((tk) => (
-            <button key={tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:py-2.5 max-sm:text-[13px] text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold text-on-warn" style={{ backgroundColor: "var(--warn)" }}>{lowRows.length}</span>}</button>
+            <button key={tk} role="tab" aria-selected={tab === tk} onClick={() => setTab(tk)} className={`rounded-md px-3 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:py-2.5 max-sm:text-[13px] text-sm font-semibold capitalize transition ${tab === tk ? "bg-focus text-on-focus" : "text-dim hover:text-txt"}`}>{tk}{tk === "scorte" && lowRows.length > 0 && <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold text-on-warn" style={{ backgroundColor: "var(--warn)" }}>{lowRows.length}</span>}</button>
           ))}
         </div>
       </div>
@@ -552,7 +553,7 @@ export default function ForniturePage() {
                 {shownOrders.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-dim">Nessun ordine.</td></tr>}
                 {shownOrders.map((o) => (
                   <Fragment key={o.id}>
-                    <tr onClick={() => toggleOrder(o)} className="cursor-pointer border-b border-line/60 hover:bg-wash">
+                    <tr onClick={() => toggleOrder(o)} {...keyActivate(() => toggleOrder(o))} className="cursor-pointer border-b border-line/60 hover:bg-wash">
                       <td className="px-3 py-2 text-xs">{fmtDate(new Date(o.created_at))}</td>
                       <td className="px-3 py-2 text-xs">{structOf(o.structure_id)}</td>
                       <td className="px-3 py-2 text-xs">{o.suggested_for ? `Suggerito ${o.suggested_for}` : "Manuale"}</td>
