@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 import { syncSchedine, sendReady } from "@/lib/alloggiati/service";
 import { syncIstat, closeDay } from "@/lib/istat/service";
@@ -35,11 +36,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const querySecret = url.searchParams.get("secret") || "";
-  if (bearer !== secret && querySecret !== secret) {
+  if (!cronAuthorized(req, secret)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

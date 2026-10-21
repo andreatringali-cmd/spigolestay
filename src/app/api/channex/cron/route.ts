@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 import { importBookings } from "@/lib/channex-inbound";
 import { channexEnabled } from "@/lib/channex";
@@ -17,9 +18,7 @@ async function run(req: Request) {
   // Senza CRON_SECRET la rotta si ferma (come gli altri cron): niente accesso anonimo all'importazione di tutti i tenant.
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
-  const auth = req.headers.get("authorization") || "";
-  const key = new URL(req.url).searchParams.get("key") || "";
-  if (auth !== `Bearer ${secret}` && key !== secret) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!cronAuthorized(req, secret, ["key"])) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });

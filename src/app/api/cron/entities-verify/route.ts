@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -14,10 +15,7 @@ export const maxDuration = 60;
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (bearer !== secret && (url.searchParams.get("secret") || "") !== secret) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  if (!cronAuthorized(req, secret)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized, safeEqualStr } from "@/lib/cron-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { deliverPuliziePlan, romeNowSlot } from "@/lib/pulizie-send";
@@ -42,15 +43,12 @@ export async function GET(req: Request) {
   // Chi chiama: Vercel Cron (Bearer CRON_SECRET), una prova a mano (?secret=) oppure il pianificatore del database ogni 10 minuti (intestazione x-cron-token = chiave
   // salvata nella tabella cron_tokens: Vercel Hobby non permette cron più frequenti di uno al giorno, quindi l'orario scelto è garantito da pg_cron).
   const secret = process.env.CRON_SECRET;
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  let authorized = !!secret && (bearer === secret || (url.searchParams.get("secret") || "") === secret);
+  let authorized = cronAuthorized(req, secret);
   if (!authorized) {
     const tok = req.headers.get("x-cron-token") || "";
     if (tok) {
       const { data: row } = await admin.from("cron_tokens").select("token").eq("name", "pulizie-plan").maybeSingle();
-      authorized = !!row?.token && row.token === tok;
+      authorized = !!row?.token && safeEqualStr(String(row.token), tok);
     }
   }
   if (!authorized) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });

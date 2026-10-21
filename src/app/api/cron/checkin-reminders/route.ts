@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { logInvio, giaInviato } from "@/lib/invii-log";
@@ -68,11 +69,7 @@ export async function GET(req: Request) {
     // Nessun segreto configurato: non facciamo nulla, ma non è un errore.
     return NextResponse.json({ ok: false, skipped: "no_secret" });
   }
-  const url = new URL(req.url);
-  const authHeader = req.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const querySecret = url.searchParams.get("secret") || "";
-  if (bearer !== secret && querySecret !== secret) {
+  if (!cronAuthorized(req, secret)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

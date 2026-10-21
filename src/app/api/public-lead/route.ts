@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { rateLimited } from "@/lib/server-auth";
 import { clientIp } from "@/lib/server-booking-guard";
 import { entitiesShadow, findGuestsByContact } from "@/lib/server-entities";
+import { declaredTooLarge, slugKey, SLUG_WINDOW_MS, LIMITS } from "@/lib/public-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +22,12 @@ export async function POST(req: Request) {
 
   // Endpoint anonimo che scrive nei dati del proprietario: limite di richieste per IP.
   if (rateLimited("pl:" + clientIp(req), 5, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
+  if (declaredTooLarge(req, LIMITS.publicLeadBody)) return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
 
   try {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();
+    if (slug && rateLimited(slugKey("pl", slug), LIMITS.publicLeadPerSlug, SLUG_WINDOW_MS)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
     const g = (body?.guest ?? {}) as Record<string, string>;
     const firstName = String(g.firstName || "").trim();
     const lastName = String(g.lastName || "").trim();

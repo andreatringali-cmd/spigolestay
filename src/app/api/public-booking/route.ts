@@ -15,6 +15,7 @@ import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { ymdRome } from "@/lib/dates-rome";
 import { plural } from "@/lib/plural";
+import { declaredTooLarge, slugKey, SLUG_WINDOW_MS, LIMITS } from "@/lib/public-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,10 +47,13 @@ export async function POST(req: Request) {
   // Chiamate anonime (il browser dell'ospite): niente "pagato", niente riferimenti Stripe, niente rimborsi, con limite di frequenza.
   const internal = isInternalRequest(req);
   if (!internal && rateLimited("pb:" + clientIp(req), 10, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
+  if (!internal && declaredTooLarge(req, LIMITS.publicBookingBody)) return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
 
   try {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();
+    // Oltre all IP: tetto per sito (un attaccante che cambia IP non puo riempire il calendario ne far partire centinaia di email di voucher).
+    if (!internal && slug && rateLimited(slugKey("pb", slug), LIMITS.publicBookingPerSlug, SLUG_WINDOW_MS)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
     const rt = String(body?.rt || "").trim();       // roomTypeId
     const ci = String(body?.ci || "").trim();
     const co = String(body?.co || "").trim();
