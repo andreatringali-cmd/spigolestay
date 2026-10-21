@@ -22,6 +22,7 @@ import { fillTemplateForBooking, linkedTemplate, templateRawFor } from "@/lib/te
 import { useStepNames } from "@/lib/use-step-names";
 import { fmtDMY } from "@/lib/dates";
 import Icon from "@/components/Icon";
+import { Modal, Button, buttonClass } from "@/components/ui";
 
 export interface StepActionsProps {
   b: Booking;
@@ -37,9 +38,9 @@ export interface StepActionsProps {
   onChanged: () => void;
 }
 
-const btn = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-50";
-const btnPrimary = `${btn} border-transparent text-on-focus hover:opacity-90`;
-const btnGhost = `${btn} border-line bg-surface text-txt hover:border-focus hover:text-focus`;
+// Pulsanti dei passaggi: stessi del componente Button (36 px, 44 su telefono)
+const btnPrimary = buttonClass("primary", "sm");
+const btnGhost = buttonClass("secondary", "sm");
 
 export default function StepActions(p: StepActionsProps) {
   const { b, step, guest, structure } = p;
@@ -316,23 +317,16 @@ export default function StepActions(p: StepActionsProps) {
 
   const guestLabel = guest?.fullName || [b.primaryGuest?.firstName, b.primaryGuest?.lastName].filter(Boolean).join(" ") || "Ospite";
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center">
-      <button aria-label="Chiudi" onClick={p.onClose} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
-      <div role="dialog" aria-label={nameOfStep(step.key, step.label, b.structureId)} className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
-        <div className="border-b border-line px-5 py-3.5">
-          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-dim">{nameOfStep(step.key, step.label, b.structureId)}</div>
-          <div className="text-base font-bold text-txt">{guestLabel}</div>
-          <div className="text-xs" style={{ color: step.state === "late" ? (step.sent ? "var(--warn)" : "var(--err)") : "var(--dim)" }}>{step.detail}</div>
-        </div>
-        <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
+    <Modal open onClose={p.onClose} title={nameOfStep(step.key, step.label, b.structureId)} size="md" closeLabel="Chiudi"
+    description={<><b className="text-txt">{guestLabel}</b> · <span style={{ color: step.state === "late" ? (step.sent ? "var(--warn)" : "var(--err)") : "var(--dim)" }}>{step.detail}</span></>}
+    footer={<>
+    <button type="button" className="mr-auto text-sm font-semibold text-focus hover:underline" onClick={() => { p.onClose(); openBooking(b.id); }}>Apri la prenotazione</button>
+    <Button variant="secondary" onClick={p.onClose}>Chiudi</Button>
+    </>}>
+        <div className="flex flex-col gap-3">
           {body}
           {res && <div className="rounded-lg px-3 py-2 text-sm font-medium" style={{ color: res.ok ? "var(--ok)" : "var(--err)", background: `color-mix(in srgb, ${res.ok ? "var(--ok)" : "var(--err)"} 12%, transparent)` }}>{res.text}</div>}
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-line bg-wash px-5 py-3">
-          <button className="text-sm font-semibold text-focus hover:underline" onClick={() => { p.onClose(); openBooking(b.id); }}>Apri la prenotazione</button>
-          <button className={btnGhost} onClick={p.onClose}>Chiudi</button>
-        </div>
-      </div>
-    </div>
+        </Modal>
   );
 }

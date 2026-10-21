@@ -8,7 +8,7 @@ import { bookingsLostWithRoomType, roomTypeCascadeIds } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
 import { ROOM_TYPE_OPTIONS, BED_CONFIGS, ROOM_AMENITIES, ROOM_SPACES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import ImageUploader from "@/components/ImageUploader";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { needsBulkGuard } from "@/lib/bulk-guard";
@@ -328,10 +328,11 @@ function TipologiaScheda() {
           .sort((a, b) => (Number(a.name.match(/\d+/)?.[0] ?? 0)) - (Number(b.name.match(/\d+/)?.[0] ?? 0)));
         const selCount = [...removeSel].filter((id) => !hasActiveBooking(id)).length;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setPickerOpen(false)}>
-            <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="text-lg font-bold text-txt">{t("Quali camere rimuovere?")}</div>
-              <p className="mt-1 text-xs text-dim">{t("Spunta le camere da eliminare. Quelle con prenotazioni attive non sono selezionabili.")}</p>
+          <Modal open onClose={() => setPickerOpen(false)} title={t("Quali camere rimuovere?")} description={t("Spunta le camere da eliminare. Quelle con prenotazioni attive non sono selezionabili.")} size="sm" closeLabel={t("Chiudi")} footer={<>
+          <span className="mr-auto text-xs text-dim">{myUnits.length - selCount === 1 ? t("Rimarrà") : t("Rimarranno")}: <b className="text-txt">{myUnits.length - selCount}</b> {myUnits.length - selCount === 1 ? t("camera") : t("camere")}</span>
+          <Button variant="secondary" data-autofocus onClick={() => setPickerOpen(false)}>{t("Annulla")}</Button>
+          <Button variant="danger" onClick={confirmRemove} disabled={selCount === 0}>{t("Rimuovi")} {selCount > 0 ? `(${selCount})` : ""}</Button>
+          </>}>
               <div className="mt-3 max-h-72 space-y-1 overflow-y-auto">
                 {myUnits.map((u) => {
                   const blocked = hasActiveBooking(u.id);
@@ -345,15 +346,7 @@ function TipologiaScheda() {
                   );
                 })}
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-dim">{myUnits.length - selCount === 1 ? t("Rimarrà") : t("Rimarranno")}: <b className="text-txt">{myUnits.length - selCount}</b> {myUnits.length - selCount === 1 ? t("camera") : t("camere")}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => setPickerOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-                  <button onClick={confirmRemove} disabled={selCount === 0} className="rounded-lg px-3 py-2 text-sm font-semibold text-on-err disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Rimuovi")} {selCount > 0 ? `(${selCount})` : ""}</button>
-                </div>
-              </div>
-            </div>
-          </div>
+              </Modal>
         );
       })()}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
@@ -142,13 +142,10 @@ export default function ModelliPanel() {
 
       {/* Editor */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
-          <button aria-label={t("Chiudi")} onClick={() => setEditing(null)} className="absolute inset-0 bg-black/40" />
-          <Card className="relative w-full max-w-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <SectionTitle>{t("Modello messaggio")}</SectionTitle>
-              <button onClick={() => setEditing(null)} aria-label={t("Chiudi")} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt max-sm:px-3 max-sm:py-2.5">✕</button>
-            </div>
+        <Modal open onClose={() => setEditing(null)} title={t("Modello messaggio")} size="lg" closeLabel={t("Chiudi")} footer={<>
+        <Button variant="secondary" onClick={() => setEditing(null)}>{t("Annulla")}</Button>
+        <Button onClick={saveTpl}>{t("Salva")}</Button>
+        </>}>
             <div className="flex items-end gap-2">
               <label className="block flex-1 text-xs font-medium text-dim">{t("Nome modello")} *<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" placeholder={t("Es. Benvenuto pre-arrivo")} /></label>
               <label className="block w-20 text-xs font-medium text-dim" title={t("Numero d'ordine: più basso = più in alto nella lista")}>{t("Ordine")}<input type="number" min={0} value={editing.order ?? ""} onChange={(e) => setEditing({ ...editing, order: e.target.value === "" ? undefined : Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" placeholder="—" /></label>
@@ -173,12 +170,7 @@ export default function ModelliPanel() {
             </label>
             )}
 
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash max-sm:min-h-11">{t("Annulla")}</button>
-              <button onClick={saveTpl} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 max-sm:min-h-11">{t("Salva modello")}</button>
-            </div>
-          </Card>
-        </div>
+            </Modal>
       )}
     </div>
   );

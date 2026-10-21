@@ -4,7 +4,7 @@ import { fmtDate } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, Modal, Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE, trialInfo, type TrialInfo } from "@/lib/plans";
@@ -505,10 +505,10 @@ export default function AbbonamentoPage() {
         const pt = TIERS.find((x) => x.key === pendingTier)!;
         const up = TIERS.findIndex((x) => x.key === pendingTier) > TIERS.findIndex((x) => x.key === tier.key);
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingTier(null)}>
-            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="font-display text-lg font-bold text-txt">{up ? t("Passa al piano") : t("Cambia nel piano")} {pt.name}</div>
-              <p className="mt-1 text-sm text-dim">{t("Vuoi confermare il cambio di piano?")}</p>
+          <Modal open onClose={() => setPendingTier(null)} title={<>{up ? t("Passa al piano") : t("Cambia nel piano")} {pt.name}</>} description={t("Vuoi confermare il cambio di piano?")} size="sm" closeLabel={t("Chiudi")} footer={<>
+          <Button variant="secondary" onClick={() => setPendingTier(null)}>{t("Annulla")}</Button>
+          <Button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }}>{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</Button>
+          </>}>
               <div className="mt-3 space-y-1 rounded-lg border border-line bg-wash p-3 text-sm">
                 <div className="flex justify-between"><span className="text-dim">{t("Da")}</span><span className="font-semibold text-txt">{tier.name} · {eur(tier.price)}{t("/mese")}</span></div>
                 <div className="flex justify-between"><span className="text-dim">{t("A")}</span><span className="font-semibold text-txt">{pt.name} · {eur(annual ? Math.round(pt.price * (1 - ANNUAL_OFF)) : pt.price)}{t("/mese")}</span></div>
@@ -519,12 +519,7 @@ export default function AbbonamentoPage() {
                 <span>{hasRealSub ? t("Hai già un abbonamento attivo: il cambio di piano non è automatico, perché l'addebito si modifica solo su Stripe. Contatta il supporto (sales@xenora.app) indicando il piano desiderato, oppure gestisci l'abbonamento dal portale pagamenti. Finché non è confermato, i moduli del tuo piano non cambiano.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
               {!hasRealSub && <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>}
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { setPendingTier(null); window.location.assign("/abbonamento/pagamento"); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Vai al portale pagamenti") : t("Vai al pagamento"))}</button>
-              </div>
-            </div>
-          </div>
+              </Modal>
         );
       })()}
 
@@ -533,21 +528,17 @@ export default function AbbonamentoPage() {
         const m = MODULES.find((x) => x.key === pendingAddon)!;
         const on = !!active[pendingAddon];
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingAddon(null)}>
-            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="font-display text-lg font-bold text-txt">{on ? t("Rimuovere il modulo?") : t("Attivare il modulo?")}</div>
+          <Modal open onClose={() => setPendingAddon(null)} title={on ? t("Rimuovere il modulo?") : t("Attivare il modulo?")} size="sm" closeLabel={t("Chiudi")} footer={<>
+          <Button variant="secondary" data-autofocus onClick={() => setPendingAddon(null)}>{t("Annulla")}</Button>
+          <Button variant={on ? "danger" : "primary"} onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }}>{on ? t("Rimuovi") : t("Attiva")}</Button>
+          </>}>
               <div className="mt-3 rounded-lg border border-line bg-wash p-3">
                 <div className="text-sm font-semibold text-txt">{t(m.name)}</div>
                 <div className="text-[11px] text-faint">{t(m.desc)}</div>
                 {!on && <div className="mt-2 font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[pendingAddon] || 0)}<span className="text-[11px] font-normal text-faint">{t("/mese")}</span></div>}
               </div>
               <p className="mt-2 text-[11px] text-faint">{on ? t("Il modulo verrà disattivato e tolto dal totale mensile.") : t("Il modulo verrà aggiunto al tuo piano e al totale mensile.")}</p>
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => setPendingAddon(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }} className={`flex-1 rounded-lg py-2 text-sm font-semibold hover:opacity-90 ${on ? "text-on-err" : "text-on-focus"}`} style={{ backgroundColor: on ? "var(--err)" : "var(--focus)" }}>{on ? t("Rimuovi") : t("Attiva")}</button>
-              </div>
-            </div>
-          </div>
+              </Modal>
         );
       })()}
     </div>

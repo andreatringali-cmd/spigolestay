@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard, Modal } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { eur } from "@/lib/format";
 import Icon from "@/components/Icon";
@@ -494,16 +494,7 @@ export default function CanaliPage() {
         const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
         const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setChannelDetail(null); }}>
-            <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl">
-              <div className="mb-3 flex items-center gap-3">
-                <ChannelLogo channel={chKey} size={28} title={label} name={c.title} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-txt">{label}</div>
-                  <div className="text-[11px] text-dim">{t("Colore su calendario e incasso")}</div>
-                </div>
-                <button onClick={() => setChannelDetail(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt" aria-label={t("Chiudi")}>✕</button>
-              </div>
+          <Modal open onClose={() => setChannelDetail(null)} title={<span className="flex items-center gap-3"><ChannelLogo channel={chKey} size={28} title={label} name={c.title} />{label}</span>} description={t("Colore su calendario e incasso")} size="sm" closeLabel={t("Chiudi")}>
               <div className="flex flex-wrap items-center gap-1.5">
                         {[...(CHANNEL_BRAND_COLORS[chKey] ? [CHANNEL_BRAND_COLORS[chKey] as string] : []), ...CHANNEL_PRESET_COLORS].map((hex) => (
                           <button key={hex} onClick={() => { saveChannelColor(chKey, hex); setColorTick((n) => n + 1); }} title={hex} aria-pressed={pickerColor.toLowerCase() === hex.toLowerCase()} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold leading-none text-white" style={{ backgroundColor: hex, textShadow: "0 0 2px rgba(0,0,0,.6)", boxShadow: pickerColor.toLowerCase() === hex.toLowerCase() ? "0 0 0 2px var(--surface), 0 0 0 4px var(--txt)" : "0 0 0 1px rgba(0,0,0,.12)" }}>{pickerColor.toLowerCase() === hex.toLowerCase() ? "✓" : ""}</button>
@@ -549,8 +540,7 @@ export default function CanaliPage() {
                   </div>
                 );
               })()}
-            </div>
-          </div>
+            </Modal>
         );
       })()}
 

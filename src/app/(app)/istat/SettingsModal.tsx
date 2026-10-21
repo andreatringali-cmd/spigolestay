@@ -1,6 +1,7 @@
 "use client";
 
 import DateField from "@/components/DateField";
+import { Modal, Button } from "@/components/ui";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
@@ -50,16 +51,7 @@ export default function IstatSettingsModal({ sid, onClose }: { sid: string; onCl
   const lbl = "block text-xs font-medium text-dim";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-txt">Impostazioni ISTAT · Turist@t</h2>
-            <p className="text-[11px] text-faint">Portale regionale del turismo e opzioni di invio — si impostano una volta.</p>
-          </div>
-          <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
-        </div>
+    <Modal open onClose={onClose} title="Impostazioni ISTAT · Turist@t" description="Portale regionale del turismo e opzioni di invio — si impostano una volta." size="md" closeLabel="Chiudi">
         <div className="mt-2 space-y-2">
           <label className="block"><span className={lbl}>Regione</span><select value={s.region} onChange={(e) => set({ region: e.target.value })} className={inp}>{REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
           <label className="block"><span className={lbl}>Portale / partner</span><input value={s.partner} onChange={(e) => set({ partner: e.target.value })} placeholder="Turist@t / Ross1000…" className={inp} /></label>
@@ -78,14 +70,13 @@ export default function IstatSettingsModal({ sid, onClose }: { sid: string; onCl
           <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: il movimento viene chiuso e inviato ogni giorno in automatico." : "Spento: chiudi e invii tu con «Invia / chiudi»."}</span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-on-focus hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
+        <Button onClick={save} disabled={!!busy} loading={busy === "save"}>{busy === "save" ? "Salvataggio…" : "Salva"}</Button>
         </div>
         {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
         <div className="mt-3 border-t border-line pt-3 text-sm">
           <span className="text-dim">Stato: </span>
           {s.status === "attivata" ? <span className="font-semibold text-[color:var(--ok)]">✔ Attivo</span> : s.status === "errore" ? <span className="font-semibold text-[color:var(--err)]">✕ Errore</span> : s.username ? <span className="font-semibold text-[color:var(--focus)]">Configurato</span> : <span className="text-faint">non configurato</span>}
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }
