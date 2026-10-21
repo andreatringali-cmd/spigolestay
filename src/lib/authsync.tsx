@@ -110,6 +110,12 @@ function markLocalOwner(uid: string) { try { localStorage.setItem(LOCAL_OWNER_KE
 function localBelongsToOther(uid: string): boolean {
   try { return localStorage.getItem(LOCAL_OWNER_KEY) !== uid; } catch { return true; }
 }
+// Il localStorage è condiviso tra TUTTE le schede del browser. Se in un'altra scheda si è entrati con un altro account, il marcatore dei dati locali non è più di `uid`:
+// questa scheda non deve né leggere né spingere sul server di `uid` ciò che c'è ora in locale (sono dati dell'altro account: è così che le impostazioni di un account
+// finivano in quello di prova). Un marcatore assente (account appena cambiato, locale in svuotamento) vale come «non sicuro»: si aspetta.
+function localIsForeign(uid: string): boolean {
+  try { return localStorage.getItem(LOCAL_OWNER_KEY) !== uid; } catch { return false; }
+}
 
 // Ricarica la pagina in modo SICURO: applica gli aggiornamenti scaricati dal server
 // (rimettendo in sync l'app in memoria con il localStorage appena aggiornato) SENZA poter
@@ -726,6 +732,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // force: sincronizzazione richiesta (es. caricamento di un'altra struttura): salta il controllo «non è cambiato nulla».
       const runSync = async (force: boolean = false) => {
         if (syncingRef.current) return; // già in corso: evita run concorrenti (intervallo + focus)
+        if (localIsForeign(userId)) { try { window.dispatchEvent(new Event("xenora:other-account")); } catch { /* ambiente senza window */ } return; } // un'altra scheda ha cambiato account: niente scambi con il server finché non si rientra
         syncingRef.current = true;
         let syncOk = false;
         const reqAtStart = DELTA_MODE ? requestedSnapshot() : null; // strutture richieste all'INIZIO del ciclo: sono quelle che il ciclo, se riesce, avrà caricato
