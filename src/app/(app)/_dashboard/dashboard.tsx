@@ -45,7 +45,7 @@ const ospiti = (n: number) => `${n} ${plural(n, "ospite", "ospiti")}`;
 type Bk = ReturnType<typeof useData>["bookings"][number];
 
 export default function Dashboard() {
-  const { bookings, guests, units, roomTypes, structures, allStructures, openBooking, openNewBooking, activeStructureId, setActiveStructure } = useData();
+  const { bookings, guests, units, roomTypes, structures, openBooking, openNewBooking, activeStructureId } = useData();
   const sFilter = activeStructureId;
 
   // Orologio: oggi e ora (aggiornati ogni minuto, così il giorno resta giusto a pagina aperta).
@@ -226,9 +226,6 @@ export default function Dashboard() {
   const firstName = (localUser?.firstName?.trim() || (authMd?.first_name as string | undefined) || (authMd?.full_name as string | undefined) || "").trim().split(/\s+/)[0];
   const dateLabel = cap(`${parseISO(today).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDMY(today)}`);
   const subtitle = `${greetingFor(clock.hour)}${firstName ? " " + firstName : ""} · ${dateLabel}`;
-  const several = allStructures.length > 1;
-  const partial = several && (sFilter !== "all" || structures.length !== allStructures.length); // si guarda solo una parte delle strutture
-  const scopeName = sFilter === "all" ? (structures.length === allStructures.length ? (several ? "Tutte le strutture" : structures[0]?.name ?? "") : `${structures.length} strutture`) : structMap.get(sFilter)?.name ?? "";
   // «Aggiorna»: un attimo di feedback visibile (i dati si ricaricano in sottofondo)
   const [busy, setBusy] = useState(false);
   const refresh = () => { dati.reload(); setBusy(true); setTimeout(() => setBusy(false), 900); };
@@ -259,12 +256,6 @@ export default function Dashboard() {
         title="Dashboard" subtitle={subtitle}
         actions={
           <>
-            <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-dim">
-              <span>{several ? "Stai guardando:" : "Struttura:"} <b className="font-semibold text-txt">{scopeName || "nessuna"}</b></span>
-              {partial && (
-                <button type="button" onClick={() => setActiveStructure("all")} title="Con l'apertura su una sola struttura le altre si caricano quando le scegli (anche dal menu in alto)" className="rounded-[var(--r-md)] px-1.5 py-1 font-medium text-focus hover:bg-wash max-sm:min-h-10">Mostra tutte le strutture</button>
-              )}
-            </span>
             {setupReady && !setup.complete && local?.hidden && <button type="button" onClick={() => setSetupHidden(false)} className={BTN_SM}>Configurazione {setup.done}/{setup.total}</button>}
             <button type="button" onClick={refresh} aria-busy={busy} title="Rilegge adempimenti, invii e canali" className={`${BTN_SM} min-w-[7.5rem]`}>{busy ? "Aggiornamento…" : "Aggiorna"}</button>
             {updated && <span className="text-xs text-dim max-xl:hidden" role="status">Aggiornato alle {updated}</span>}
