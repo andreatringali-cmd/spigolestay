@@ -605,6 +605,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const revRef = useRef<number>(-1); // versione (rev) dell'ultimo stato letto dal server (-1 = sconosciuta)
   const orgRefs = useRef<Record<string, SyncRef>>({}); // rev/base per ogni struttura condivisa (org_state)
   const focusSyncRef = useRef<(() => void) | null>(null); // sync immediato al ritorno sulla scheda
+  const writeWatchRef = useRef<ReturnType<typeof setInterval> | null>(null); // controlla ogni 300 ms se il locale è cambiato (salvataggio rapido)
+  const writeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSigRef = useRef(""); // firma (server + locale) dell'ultima sincronizzazione riuscita: se non cambia, non si rifà nulla
   const lastFullRef = useRef(0);   // quando è stata fatta l'ultima sincronizzazione completa
   const syncingRef = useRef(false); // guardia anti-rientro: evita run concorrenti (intervallo + focus)
@@ -613,6 +615,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const stopPush = () => {
     registerLoader(null);
     if (pushTimer.current) { clearInterval(pushTimer.current); pushTimer.current = null; }
+    if (writeWatchRef.current) { clearInterval(writeWatchRef.current); writeWatchRef.current = null; }
+    if (writeDebounceRef.current) { clearTimeout(writeDebounceRef.current); writeDebounceRef.current = null; }
     if (focusSyncRef.current) {
       try { window.removeEventListener("focus", focusSyncRef.current); document.removeEventListener("visibilitychange", focusSyncRef.current); } catch {}
       focusSyncRef.current = null;
@@ -820,6 +824,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       };
       pushTimer.current = setInterval(() => { void runSync(); }, 4000);
+      // SALVATAGGIO RAPIDO: appena l'utente modifica qualcosa (es. una prenotazione inserita dal telefono) si sincronizza dopo meno di un secondo, senza aspettare il giro da 4 s.
+      // Sul telefono, se si cambia app subito dopo aver salvato, il timer da 4 s viene sospeso e la modifica restava solo sul dispositivo fino al ritorno nell'app
+      // (l'email di «nuova prenotazione» partiva subito, il server la riceveva molto dopo).
+      const lastQuickRef = { current: 0 };
+      let seenVersion = kvVersion();
+      writeWatchRef.current = setInterval(() => {
+        const v = kvVersion();
+        if (v === seenVersion) return;
+        seenVersion = v;
+        if (writeDebounceRef.current) clearTimeout(writeDebounceRef.current);
+        // al massimo un salvataggio rapido ogni 2,5 s: scritture continue (es. orologi, contatori) non devono moltiplicare le richieste
+        const wait = Math.max(700, 2500 - (Date.now() - lastQuickRef.current));
+        writeDebounceRef.current = setTimeout(() => { writeDebounceRef.current = null; lastQuickRef.current = Date.now(); void runSync(); }, wait);
+      }, 300);
       // Modalità veloce: caricamento di altre strutture su richiesta (cambio struttura, «Tutte»…). Si aggiungono alla richiesta e si fa subito un ciclo completo;
       // se ne sta già girando uno (con la richiesta di prima) si aspetta che finisca e se ne fa un altro. true = arrivate; false = non riuscito (la vista resta com'è).
       registerLoader(async (need, all) => {
