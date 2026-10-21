@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addDaysISO, adempimentiStato, buildAdempimenti, buildControlli, cumulative, diffDays, greetingFor, isLive, monthStats,
-  namesLine, occupancyStrip, splitDay, statusSentence, todaySentence, unassignedArrivals, type DBooking, type DUnit,
+  addDaysISO, adempimentiStato, buildAdempimenti, buildControlli, buildSetupSteps, buildTodo, cumulative, diffDays, greetingFor, isLive, monthStats,
+  namesLine, occupancyOutlook, occupancyStrip, splitDay, statusSentence, todaySentence, unassignedArrivals, type DBooking, type DUnit,
 } from "../src/lib/dashboard.ts";
 
 const T = "2026-10-06";
@@ -220,4 +220,65 @@ test("da controllare: ordine, toni e testi", () => {
   assert.equal(out[3].label, "Airbnb: poche prenotazioni");
   assert.equal(out[4].tone, "dim");
   assert.deepEqual(buildControlli({ unassigned: { count: 0, nearest: null }, contacts: { count: 0, urgent: 0 }, invii: [], pulse: [], oos: 0 }), []);
+});
+
+const facts = (o: Partial<import("../src/lib/dashboard.ts").SetupFacts> = {}) => ({ id: "s1", name: "Casa Uno", profile: true, rooms: 3, pricedTypes: 2, totalTypes: 2, guide: true, ...o });
+
+test("configurazione: struttura appena creata = nessun passo fatto, non completa", () => {
+  const st = buildSetupSteps({ structures: [facts({ profile: false, rooms: 0, pricedTypes: 0, totalTypes: 0, guide: false })], channels: false, extraUsers: false });
+  assert.deepEqual(st.steps.map((x) => x.key), ["struttura", "camere", "prezzi", "guida", "canali", "utenti"]);
+  assert.equal(st.done, 0); assert.equal(st.pct, 0); assert.equal(st.complete, false);
+  assert.equal(st.steps[0].href, "/strutture/s1"); // una sola struttura: apre la sua scheda
+});
+
+test("configurazione: senza strutture tutto è da fare e il passo canali non risulta fatto", () => {
+  const st = buildSetupSteps({ structures: [], channels: true, extraUsers: false });
+  assert.equal(st.done, 0); assert.equal(st.complete, false);
+  assert.equal(st.steps[0].href, "/strutture");
+});
+
+test("configurazione: i collaboratori sono facoltativi, conta quel che manca davvero", () => {
+  const ok = buildSetupSteps({ structures: [facts()], channels: true, extraUsers: false });
+  assert.equal(ok.complete, true); assert.equal(ok.done, 5); assert.equal(ok.total, 6); assert.equal(ok.pct, 83);
+  assert.equal(ok.steps.find((x) => x.key === "utenti")?.optional, true);
+  const noGuide = buildSetupSteps({ structures: [facts({ guide: false })], channels: true, extraUsers: true });
+  assert.equal(noGuide.complete, false); assert.equal(noGuide.pct, 83);
+  assert.equal(noGuide.steps.find((x) => x.key === "guida")?.done, false);
+});
+
+test("configurazione: con più strutture un passo è fatto solo se lo è in tutte e dice quali mancano", () => {
+  const st = buildSetupSteps({ structures: [facts(), facts({ id: "s2", name: "Casa Due", rooms: 0, pricedTypes: 1, totalTypes: 2 })], channels: true, extraUsers: false });
+  const camere = st.steps.find((x) => x.key === "camere")!, prezzi = st.steps.find((x) => x.key === "prezzi")!;
+  assert.equal(camere.done, false); assert.deepEqual(camere.missing, ["Casa Due"]);
+  assert.equal(prezzi.done, false); assert.deepEqual(prezzi.missing, ["Casa Due"]);
+  assert.equal(st.steps[0].href, "/strutture"); // più strutture: elenco
+  assert.equal(st.complete, false);
+});
+
+test("da fare: urgenti prima, adempimenti prima dei controlli a parità, testi con il numero", () => {
+  const items = [
+    { key: "pay", short: "Saldi", one: "saldo da incassare", many: "saldi da incassare", count: 2, tone: "warn" as const, detail: "Rossi, Bianchi", amount: 300, href: "/pagamenti", bookingIds: [] },
+    { key: "checkin", short: "Check-in", one: "check-in online da completare", many: "check-in online da completare", count: 1, tone: "err" as const, detail: "Verdi", href: "/adempimenti", bookingIds: [] },
+    { key: "tax", short: "Tassa", one: "tassa di soggiorno da incassare", many: "tassa di soggiorno da incassare", count: 3, tone: "warn" as const, detail: "", amount: 12, href: "/tassa-soggiorno", bookingIds: [] },
+  ];
+  const ctr = buildControlli({ unassigned: { count: 2, nearest: 0 }, contacts: { count: 0, urgent: 0 }, invii: [], pulse: [], oos: 1 });
+  const rows = buildTodo(items, ctr);
+  assert.deepEqual(rows.map((r) => r.key), ["checkin", "senzacamera", "pay", "tax", "oos"]);
+  assert.equal(rows[0].title, "1 check-in online da completare"); assert.equal(rows[0].label, "Urgente"); assert.equal(rows[0].action, "Sollecita");
+  assert.equal(rows[1].title, "2 arrivi senza camera assegnata"); assert.equal(rows[1].action, "Assegna");
+  assert.equal(rows[2].label, "Oggi"); assert.equal(rows[2].amount, 300); assert.equal(rows[2].detail, "Rossi, Bianchi");
+  assert.equal(rows[3].title, "3 tasse di soggiorno da incassare"); assert.equal(rows[3].detail, undefined);
+  assert.equal(rows[4].tone, "dim"); assert.equal(rows[4].title, "1 camera fuori servizio");
+  assert.deepEqual(buildTodo([], []), []);
+});
+
+test("occupazione: media, giorno più pieno e più libero, giorni al completo; senza camere tutto a zero", () => {
+  const units: DUnit[] = [{ id: "u1", structureId: "s1" }, { id: "u2", structureId: "s1" }];
+  const live = [bk({ checkIn: T, checkOut: "2026-10-08", unitId: "u1" }), bk({ checkIn: T, checkOut: "2026-10-07", unitId: "u2" })];
+  const cells = occupancyStrip(live, units, T, 4, T); // 6, 7, 8, 9 ottobre: 100%, 50%, 0%, 0%
+  assert.deepEqual(cells.map((c) => c.pct), [100, 50, 0, 0]);
+  const o = occupancyOutlook(cells);
+  assert.equal(o.avg, 38); assert.equal(o.fullDays, 1);
+  assert.deepEqual(o.peak, { iso: "2026-10-06", pct: 100 }); assert.deepEqual(o.low, { iso: "2026-10-08", pct: 0 });
+  assert.deepEqual(occupancyOutlook(occupancyStrip([], [], T, 3, T)), { avg: 0, peak: null, low: null, fullDays: 0 });
 });

@@ -18,11 +18,13 @@ export function useDashboard2Dati(structureIds: string[], scope: string, today: 
   const [questuraErrors, setQuesturaErrors] = useState(0);
   const [threads, setThreads] = useState<Threads>({});
   const [ready, setReady] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null); // ultimo caricamento riuscito (per «Aggiornato alle…»)
+  const [tick, setTick] = useState(0); // «Aggiorna»: rilancia anche invii e collegamenti dei canali
   const idsKey = structureIds.join("|");
 
   const load = useCallback(async () => {
     try { setThreads(JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}")); } catch { setThreads({}); }
-    if (!supabase) { setReady(true); return; }
+    if (!supabase) { setReady(true); setUpdatedAt(Date.now()); return; }
     const cutoff = addDaysISO(today, -120);
     const ids = idsKey ? idsKey.split("|") : [];
     try {
@@ -43,6 +45,7 @@ export function useDashboard2Dati(structureIds: string[], scope: string, today: 
       setSched(merged);
       setIstat((ist.data ?? []) as SchedRow[]);
       setQuesturaErrors((err as { count: number | null }).count ?? 0);
+      setUpdatedAt(Date.now());
     } catch { /* offline: restano i dati già caricati */ }
     setReady(true);
   }, [today, idsKey]);
@@ -90,10 +93,11 @@ export function useDashboard2Dati(structureIds: string[], scope: string, today: 
       setInviiKo(out);
     }).catch((e) => { console.error("Lettura registro invii non riuscita", e); });
     return () => { alive = false; };
-  }, []);
+  }, [tick]);
 
   // Collegamento reale dei canali (Channex) per la struttura attiva.
   const [chConn, setChConn] = useState<Record<string, boolean>>({});
+  const [chReady, setChReady] = useState(false); // la richiesta sui canali è finita (bene o male): serve a non dire «nessun canale» prima del tempo
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -105,9 +109,13 @@ export function useDashboard2Dati(structureIds: string[], scope: string, today: 
         lists.flat().forEach((c) => { byCh[c.channel] = !!byCh[c.channel] || c.active; });
         setChConn(byCh);
       } catch { /* nessun dato: la salute dei canali si calcola comunque dal flusso di prenotazioni */ }
+      if (alive) setChReady(true);
     })();
     return () => { alive = false; };
-  }, [scope]);
+  }, [scope, tick]);
 
-  return { ready, schedBy, istatPendingIds, questuraErrors, threads, inviiKo, chConn };
+  /** «Aggiorna»: ricarica schedine, ISTAT, errori Questura, invii e collegamenti dei canali. */
+  const reload = useCallback(() => { setTick((t) => t + 1); void load(); }, [load]);
+
+  return { ready, chReady, updatedAt, reload, schedBy, istatPendingIds, questuraErrors, threads, inviiKo, chConn };
 }

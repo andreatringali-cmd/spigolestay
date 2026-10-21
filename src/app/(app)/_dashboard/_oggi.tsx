@@ -1,11 +1,10 @@
 "use client";
 
-// "Oggi": chi arriva, chi parte, chi è in casa. Colori col significato di sempre:
-// verde = arrivo, rosso = partenza, metà e metà = turnover (stessa camera), blu = ospite in casa.
+// «Oggi»: chi arriva, chi parte, chi è in casa, in righe compatte (camera · ospite · dettaglio · stato). Ogni riga è un pulsante che apre la prenotazione.
+// Colori col significato giusto: il rosso è SOLO errore/ritardo (qui «Senza camera»). Arrivi, partenze e soggiorni si riconoscono da icona e titolo, non dal colore.
 import { useState } from "react";
-import { cleanTint } from "@/lib/pulizie-colors";
-import { tint } from "../_ui";
-import { MoreLink, P, Tile, TileHead, toneColor } from "./_kit";
+import Icon from "@/components/Icon";
+import { BTN_SM, Chip, EmptyRow, HeadLink, Panel, TONE_TEXT, type Tone } from "./_kit";
 
 export interface MoveRow {
   id: string;
@@ -14,78 +13,80 @@ export interface MoveRow {
   room: string | null;           // numero/nome breve della camera (null = da assegnare)
   name: string;
   sub: string;
-  chip?: { text: string; tone: "ok" | "warn" | "err" | "dim" };
+  /** stato in chiaro: check-in, pagamento, senza camera, turnover */
+  chips: { text: string; tone: Tone }[];
 }
 
 const KIND = {
-  arr: { title: "Arrivi", color: "var(--ok)" },
-  dep: { title: "Partenze", color: "var(--err)" },
-  stay: { title: "In casa", color: P.vi },
+  arr: { title: "Arrivi", icon: "login", tone: "focus", empty: "Nessun arrivo oggi", limit: 8 },
+  dep: { title: "Partenze", icon: "logout", tone: "dim", empty: "Nessuna partenza oggi", limit: 8 },
+  stay: { title: "In casa", icon: "bed", tone: "dim", empty: "Nessun ospite in casa", limit: 5 },
 } as const;
-const STAY_VISIBLE = 4;
+const ORDER = ["arr", "dep", "stay"] as const;
 
 function Row({ r, onOpen }: { r: MoveRow; onOpen: (id: string) => void }) {
-  const color = KIND[r.kind].color;
-  const tileBg = r.turnover ? cleanTint("turnover", 16) : tint(color, 14);
-  const chipColor = r.chip ? toneColor(r.chip.tone) : "";
   return (
     <li>
       <button
         type="button" onClick={() => onOpen(r.id)}
-        className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]"
+        className="grid min-h-11 w-full grid-cols-[4.75rem_minmax(0,1fr)] items-center gap-x-3 px-3 py-1 text-left hover:bg-wash sm:grid-cols-[4.75rem_minmax(0,1fr)_auto]"
       >
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-sm font-bold max-sm:w-[3.75rem] max-sm:text-xs" style={{ background: tileBg, color: r.turnover ? "var(--txt)" : color }} title={r.turnover ? "Turnover: partenza e arrivo nella stessa camera" : undefined}>
-          <span className="max-w-full truncate px-0.5">{r.room ?? "—"}</span>
+        <span className="truncate text-[13px] font-semibold text-txt" title={r.room ? `Camera ${r.room}` : "Camera da assegnare"}>{r.room ?? "—"}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-semibold leading-5 text-txt">{r.name}</span>
+          <span className="block truncate text-xs leading-4 text-dim">{r.sub}</span>
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-txt">{r.name}</span>
-          <span className="block truncate text-xs text-dim">{r.sub}</span>
-        </span>
-        {r.chip && <span className="max-w-[44%] shrink-0 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: tint(chipColor, 14), color: chipColor }}>{r.chip.text}</span>}
+        {r.chips.length > 0 && (
+          <span className="col-start-2 mt-1 flex min-w-0 flex-wrap justify-end gap-1 max-sm:justify-start sm:col-start-auto sm:mt-0 sm:max-w-[15rem]">
+            {r.chips.map((c) => <Chip key={c.text} tone={c.tone}>{c.text}</Chip>)}
+          </span>
+        )}
       </button>
     </li>
   );
 }
 
-const EMPTY = { arr: "Nessun arrivo oggi", dep: "Nessuna partenza oggi", stay: "Nessun ospite in casa" } as const;
-const ORDER = ["arr", "stay", "dep"] as const; // da sinistra a destra: arrivi, in casa, partenze
-const VISIBLE = { arr: 5, dep: 5, stay: STAY_VISIBLE } as const;
-
-function Colonna({ k, list, onOpen, delay }: { k: "arr" | "dep" | "stay"; list: MoveRow[]; onOpen: (id: string) => void; delay: number }) {
+function Gruppo({ k, list, onOpen, first }: { k: (typeof ORDER)[number]; list: MoveRow[]; onOpen: (id: string) => void; first: boolean }) {
   const [all, setAll] = useState(false);
   const meta = KIND[k];
-  const limit = VISIBLE[k];
-  const hidden = !all && list.length > limit + 1;
-  const shown = hidden ? list.slice(0, limit) : list;
-  const turn = k !== "stay" ? list.filter((r) => r.turnover).length : 0;
+  const hidden = !all && list.length > meta.limit + 1;
+  const shown = hidden ? list.slice(0, meta.limit) : list;
   return (
-    <Tile label={meta.title} delay={delay}>
-      <TileHead
-        title={<span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: meta.color }} />{meta.title}</span>}
-        count={list.length}
-        sub={turn > 0 ? `${turn} turnover` : undefined}
-        right={k === "arr" ? <MoreLink href="/prenotazioni">Prenotazioni</MoreLink> : undefined}
-      />
+    <div>
+      <h3 className={`flex h-8 items-center gap-2 bg-wash px-3 text-xs font-semibold text-dim ${first ? "" : "border-t border-line"}`}>
+        <span className={TONE_TEXT[meta.tone]} aria-hidden><Icon name={meta.icon} size={14} /></span>
+        {meta.title}
+        <span className="font-mono tabular-nums">{list.length}</span>
+      </h3>
       {list.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line px-3 py-5 text-center text-sm text-faint">{EMPTY[k]}</div>
+        <div className="flex min-h-9 items-center px-3 text-xs text-dim">{meta.empty}</div>
       ) : (
         <>
-          <ul>{shown.map((r) => <Row key={r.id} r={r} onOpen={onOpen} />)}</ul>
-          {hidden && (
-            <button type="button" onClick={() => setAll(true)} className="ml-2 mt-1 rounded-lg px-2 py-1 text-xs max-sm:min-h-10 max-sm:px-3 font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">
-              Mostra tutti ({list.length})
+          <ul className="divide-y divide-line">{shown.map((r) => <Row key={r.id} r={r} onOpen={onOpen} />)}</ul>
+          {(hidden || (all && list.length > meta.limit + 1)) && (
+            <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className="flex min-h-9 w-full items-center px-3 text-xs font-medium text-focus hover:bg-wash max-sm:min-h-10">
+              {all ? "Mostra meno" : `Mostra tutti (${list.length})`}
             </button>
           )}
         </>
       )}
-    </Tile>
+    </div>
   );
 }
 
-export default function Oggi({ rows, onOpen, delay = 0 }: { rows: MoveRow[]; turnovers?: number; onOpen: (id: string) => void; delay?: number }) {
+export default function Oggi({ rows, onOpen, onNew, noBookings, noStructures }: { rows: MoveRow[]; onOpen: (id: string) => void; onNew: () => void; noBookings: boolean; noStructures: boolean }) {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {ORDER.map((k, i) => <Colonna key={k} k={k} list={rows.filter((r) => r.kind === k)} onOpen={onOpen} delay={delay + i * 60} />)}
-    </div>
+    <Panel
+      id="oggi" title="Oggi" className="scroll-mt-4"
+      right={<>{!noStructures && <button type="button" onClick={onNew} className={BTN_SM}>Nuova prenotazione</button>}<HeadLink href="/prenotazioni">Prenotazioni</HeadLink></>}
+    >
+      {noStructures ? (
+        <EmptyRow action={<HeadLink href="/strutture">Crea la struttura</HeadLink>}>Nessuna struttura: creala per iniziare.</EmptyRow>
+      ) : noBookings ? (
+        <EmptyRow action={<button type="button" onClick={onNew} className={BTN_SM}>Aggiungi la prima prenotazione</button>}>Non ci sono ancora prenotazioni.</EmptyRow>
+      ) : (
+        ORDER.map((k, i) => <Gruppo key={k} k={k} first={i === 0} list={rows.filter((r) => r.kind === k)} onOpen={onOpen} />)
+      )}
+    </Panel>
   );
 }

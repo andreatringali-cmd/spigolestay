@@ -406,7 +406,7 @@ export default function PageHelp() {
   if (!guide) return null;
   return (
     <>
-      <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-sm font-bold max-sm:h-9 max-sm:w-9 text-dim transition hover:bg-wash hover:text-txt">?</button>
+      <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-sm font-bold max-sm:h-10 max-sm:w-10 text-dim transition hover:bg-wash hover:text-txt">?</button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[8dvh]">
           <button aria-label="Chiudi" onClick={() => setOpen(false)} className="absolute inset-0 bg-black/40" />

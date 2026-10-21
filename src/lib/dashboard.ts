@@ -266,6 +266,101 @@ export function buildControlli(i: ControlliInput): ControlloItem[] {
   return out;
 }
 
+// ---------- «Da fare»: adempimenti e controlli in un solo elenco ordinato per urgenza ----------
+export interface TodoRow {
+  key: string; tone: "err" | "warn" | "dim";
+  /** parola di stato mostrata in chiaro (il colore non basta): «Urgente», «Oggi», «Da controllare» */
+  label: string;
+  title: string; detail?: string; amount?: number; href: string;
+  /** verbo del pulsante: «Sollecita», «Incassa», «Invia»… */
+  action: string;
+  /** nome dell'icona (components/Icon) */
+  icon: string;
+  channel?: string;
+}
+const TODO_ACTION: Record<string, string> = { checkin: "Sollecita", questura: "Invia", qerr: "Controlla", pay: "Incassa", tax: "Incassa", istat: "Invia", guide: "Invia" };
+const TODO_ICON: Record<string, string> = { checkin: "login", questura: "id", qerr: "alertTriangle", pay: "card", tax: "receipt", istat: "chart", guide: "chat" };
+const CONTROLLO_COUNTED = new Set(["senzacamera", "contatti", "oos"]); // etichette senza numero: lo si antepone
+const controlloAction = (k: string): string => (k.startsWith("invio") ? "Verifica" : k === "senzacamera" ? "Assegna" : k === "contatti" ? "Correggi" : k === "oos" ? "Vedi" : "Controlla");
+const controlloIcon = (k: string): string => (k.startsWith("invio") ? "mail" : k === "senzacamera" ? "bed" : k === "contatti" ? "chat" : k === "oos" ? "lock" : "alertTriangle");
+/**
+ * Elenco unico di ciò che richiede attenzione: prima gli urgenti (ritardi, errori), poi le scadenze di oggi e le cose da controllare, infine le informazioni.
+ * A parità di urgenza gli adempimenti precedono i controlli, ciascuno nell'ordine che già avevano.
+ */
+export function buildTodo(items: AdempimentoItem[], controlli: ControlloItem[]): TodoRow[] {
+  const rows: TodoRow[] = [];
+  for (const it of items) {
+    const text = it.key === "tax" && it.count > 1 ? "tasse di soggiorno da incassare" : it.count === 1 ? it.one : it.many;
+    rows.push({
+      key: it.key, tone: it.tone, label: it.tone === "err" ? "Urgente" : "Oggi", title: `${it.count} ${text}`, detail: it.detail || undefined,
+      amount: it.amount, href: it.href, action: TODO_ACTION[it.key] ?? "Apri", icon: TODO_ICON[it.key] ?? "clipboard",
+    });
+  }
+  for (const c of controlli) {
+    rows.push({
+      key: c.key, tone: c.tone, label: c.tone === "err" ? "Urgente" : c.tone === "warn" ? "Da controllare" : "Informazione",
+      title: CONTROLLO_COUNTED.has(c.key) ? `${c.count} ${c.label}` : c.label, detail: c.detail, href: c.href, action: controlloAction(c.key),
+      icon: controlloIcon(c.key), channel: c.channel,
+    });
+  }
+  const rank = (t: string) => (t === "err" ? 0 : t === "warn" ? 1 : 2);
+  return rows.map((r, i) => ({ r, i })).sort((a, b) => rank(a.r.tone) - rank(b.r.tone) || a.i - b.i).map((x) => x.r);
+}
+
+// ---------- Occupazione: sintesi dei prossimi giorni ----------
+export interface OccupancyOutlook { avg: number; peak: { iso: string; pct: number } | null; low: { iso: string; pct: number } | null; fullDays: number }
+/** Media, giorno più pieno e più vuoto, giorni al completo di una striscia (solo giorni con camere). Senza camere: tutto a zero. */
+export function occupancyOutlook(cells: DayCell[]): OccupancyOutlook {
+  const days = cells.filter((c) => c.total > 0);
+  if (!days.length) return { avg: 0, peak: null, low: null, fullDays: 0 };
+  let peak = days[0], low = days[0];
+  for (const c of days) { if (c.pct > peak.pct) peak = c; if (c.pct < low.pct) low = c; }
+  return {
+    avg: Math.round(days.reduce((s, c) => s + c.pct, 0) / days.length),
+    peak: { iso: peak.iso, pct: peak.pct }, low: { iso: low.iso, pct: low.pct }, fullDays: days.filter((c) => c.pct >= 100).length,
+  };
+}
+
+// ---------- Configurazione iniziale ("Completa la configurazione") ----------
+/** Fatti sulla singola struttura, raccolti dal chiamante (la funzione resta pura e collaudabile). */
+export interface SetupFacts {
+  id: string; name: string;
+  /** indirizzo, città e almeno un contatto compilati */
+  profile: boolean;
+  /** camere fisiche create */
+  rooms: number;
+  /** tipologie con un prezzo (base o derivato) / tipologie totali */
+  pricedTypes: number; totalTypes: number;
+  /** la guida ospiti ha dei testi veri (non solo lo scaffold vuoto) */
+  guide: boolean;
+}
+export interface SetupInput { structures: SetupFacts[]; channels: boolean; extraUsers: boolean }
+export interface SetupStep { key: "struttura" | "camere" | "prezzi" | "guida" | "canali" | "utenti"; label: string; hint: string; href: string; done: boolean; optional: boolean; missing: string[] }
+export interface SetupState { steps: SetupStep[]; done: number; total: number; pct: number; /** tutti i passi obbligatori fatti */ complete: boolean }
+
+/**
+ * Passi di avvio di una struttura nuova. Con più strutture un passo è fatto solo se lo è in TUTTE (le mancanti sono elencate in `missing`).
+ * Senza strutture tutto è da fare. «Canali» e «Utenti» dipendono da ciò che il chiamante sa del collegamento dei canali e dei collaboratori;
+ * «Utenti» è facoltativo (un titolare da solo è una configurazione valida) e non conta per `complete`, ma conta nell'avanzamento.
+ */
+export function buildSetupSteps(inp: SetupInput): SetupState {
+  const list = inp.structures;
+  const missingOf = (ok: (s: SetupFacts) => boolean) => list.filter((s) => !ok(s)).map((s) => s.name);
+  const only = list.length === 1 ? list[0].id : null;
+  const eachDone = (ok: (s: SetupFacts) => boolean) => list.length > 0 && list.every(ok);
+  const steps: SetupStep[] = [
+    { key: "struttura", label: "Dati della struttura", hint: "Indirizzo, città e contatti", href: only ? `/strutture/${only}` : "/strutture", done: eachDone((s) => s.profile), optional: false, missing: missingOf((s) => s.profile) },
+    { key: "camere", label: "Camere", hint: "Crea le camere e le tipologie", href: "/camere", done: eachDone((s) => s.rooms > 0), optional: false, missing: missingOf((s) => s.rooms > 0) },
+    { key: "prezzi", label: "Prezzi", hint: "Una tariffa per ogni tipologia", href: "/tariffe", done: eachDone((s) => s.totalTypes > 0 && s.pricedTypes >= s.totalTypes), optional: false, missing: missingOf((s) => s.totalTypes > 0 && s.pricedTypes >= s.totalTypes) },
+    { key: "guida", label: "Guida ospiti", hint: "Wi-Fi, arrivo e info utili", href: "/guida-ospiti", done: eachDone((s) => s.guide), optional: false, missing: missingOf((s) => s.guide) },
+    { key: "canali", label: "Canali e calendari", hint: "Booking, Airbnb o un calendario", href: "/canali", done: list.length > 0 && inp.channels, optional: false, missing: [] },
+    { key: "utenti", label: "Collaboratori", hint: "Facoltativo: invita chi lavora con te", href: "/utenti", done: inp.extraUsers, optional: true, missing: [] },
+  ];
+  if (!list.length) steps.forEach((s) => { s.missing = []; });
+  const done = steps.filter((s) => s.done).length;
+  return { steps, done, total: steps.length, pct: Math.round((done / steps.length) * 100), complete: steps.filter((s) => !s.optional).every((s) => s.done) };
+}
+
 // ---------- Salute degli adempimenti ----------
 const HEALTH_KEYS = ["checkin", "pay", "tax", "alloggiati"];
 /**

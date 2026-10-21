@@ -1,51 +1,54 @@
 "use client";
 
-// Dashboard: la dashboard "a mosaico". Poche cose giuste: hero con la sintesi del giorno, adempimenti subito sotto,
-// poi Oggi, i prossimi 14 giorni, i ricavi del mese, i canali e ciò che merita un'occhiata.
-// I calcoli stanno in lib/dashboard.ts (puri e collaudati); qui si collegano ai dati reali e si disegna.
-// La dashboard classica resta su "/" e ha un collegamento qui (e viceversa).
+// Dashboard: la prima pagina dopo l'accesso, un cruscotto di lavoro.
+// Dall'alto: testata sottile (giorno, struttura, aggiorna) → eventuale «Completa la configurazione» → indicatori di oggi →
+// a sinistra «Da fare» e «Oggi», a destra occupazione, ricavi e canali → «Altri indicatori» (chiusi).
+// I calcoli stanno in lib/dashboard.ts (puri e collaudati); qui si collegano ai dati reali. Su telefono: indicatori → Da fare → Oggi → il resto.
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { toISO, parseISO, nights, fmtDM } from "@/lib/dates";
-import { num } from "@/lib/format";
+import { toISO, parseISO, nights, fmtDM, fmtDMY } from "@/lib/dates";
+import { eur } from "@/lib/format";
+import { PageHeader } from "@/components/ui";
 import { bookingPaidTotal, cityTaxOfBooking } from "@/lib/booking";
 import { stayDue } from "@/lib/incassi";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
 import { contactReportCached } from "@/lib/contacts-check";
 import { upcomingContactIssues } from "@/lib/contacts-upcoming";
+import { guideHasText } from "@/lib/guide-copy";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
-  addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, greetingFor, histogram, isLive, LEAD_LABELS, LEAD_UPPER,
-  leadDays, monthStats, occupancyStrip, pickupDaily, splitDay, statusSentence, STAY_LABELS, STAY_UPPER, stayNights, todaySentence, topCountries,
-  unassignedArrivals,
+  addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, buildSetupSteps, buildTodo, greetingFor, isLive,
+  monthStats, occupancyOutlook, occupancyStrip, plural, splitDay, stayNights, unassignedArrivals,
 } from "@/lib/dashboard";
-import Hero from "./_hero";
 import { useAuth } from "@/lib/authsync";
 import { useAccess } from "@/lib/access";
-import Adempimenti from "./_adempimenti";
-import Oggi, { type MoveRow } from "./_oggi";
-import Giorni from "./_giorni";
-import Incassi from "./_incassi";
-import Canali, { type ChannelRow } from "./_canali";
-import Controllo from "./_controllo";
-import Pickup from "./_pickup";
-import Provenienza from "./_provenienza";
-import Prenotazioni from "./_prenotazioni";
-import { D2Styles } from "./_kit";
-import { useDashboard2Dati } from "./_dati";
 import { loadChannelColor } from "@/lib/channelOverrides";
+import { BTN_SM } from "./_kit";
+import Kpis, { type KpiItem } from "./_kpi";
+import Avvio from "./_avvio";
+import DaFare from "./_dafare";
+import Oggi, { type MoveRow } from "./_oggi";
+import Occupazione from "./_occupazione";
+import Ricavi from "./_ricavi";
+import Canali, { type ChannelRow } from "./_canali";
+import Altri from "./_altri";
+import { useDashboard2Dati } from "./_dati";
 
 const OTA_CH = ["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"];
+const SETUP_HIDDEN_KEY = "xn-dash-avvio"; // preferenza per dispositivo: «Completa la configurazione» nascosto ("1")
+const GUIDES_KEY = "spigolestay:guides";   // guide ospiti (per struttura)
+const ICAL_KEY = "spigolestay:icalfeeds:v1"; // calendari collegati
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const shortDate = (iso: string) => fmtDM(iso);
+const ospiti = (n: number) => `${n} ${plural(n, "ospite", "ospiti")}`;
+type Bk = ReturnType<typeof useData>["bookings"][number];
 
-export default function Dashboard2() {
-  const { bookings, guests, units, structures, openBooking, activeStructureId } = useData();
+export default function Dashboard() {
+  const { bookings, guests, units, roomTypes, structures, allStructures, openBooking, openNewBooking, activeStructureId, setActiveStructure } = useData();
   const sFilter = activeStructureId;
 
-  // Orologio: oggi e ora (aggiornati ogni minuto, così il saluto e il giorno restano giusti a pagina aperta).
+  // Orologio: oggi e ora (aggiornati ogni minuto, così il giorno resta giusto a pagina aperta).
   const [clock, setClock] = useState(() => { const d = new Date(); return { iso: toISO(d), hour: d.getHours() }; });
   useEffect(() => {
     const id = setInterval(() => {
@@ -56,9 +59,10 @@ export default function Dashboard2() {
   }, []);
   const today = clock.iso;
 
-  // Scope: prenotazioni vere e camere della struttura attiva.
+  // Scope: prenotazioni vere e camere della struttura attiva (con l'apertura su una struttura sola, in modalità veloce, solo i suoi dati).
   const live = useMemo(() => bookings.filter((b) => isLive(b) && (sFilter === "all" || b.structureId === sFilter)), [bookings, sFilter]);
   const scopedUnits = useMemo(() => (sFilter === "all" ? units : units.filter((u) => u.structureId === sFilter)), [units, sFilter]);
+  const scopeStructures = useMemo(() => (sFilter === "all" ? structures : structures.filter((s) => s.id === sFilter)), [structures, sFilter]);
   const guestMap = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests]);
   const structMap = useMemo(() => new Map(structures.map((s) => [s.id, s])), [structures]);
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
@@ -72,20 +76,19 @@ export default function Dashboard2() {
   const remLog = useReminderLog(windowBookings);
 
   // Percorso della prenotazione (check-in, pagamento, tassa, guida…): stessa logica di Prenotazioni.
-  const stepsOf = (b: (typeof bookings)[number]): JourneyStep[] | null => journeyOf(b, {
+  const stepsOf = (b: Bk): JourneyStep[] | null => journeyOf(b, {
     today, guest: guestMap.get(b.guestId), structure: structMap.get(b.structureId),
     schedina: dati.schedBy.get(b.id) ?? "none", istat: dati.istatPendingIds.has(b.id) ? "pending" : "none",
     guideSent: isGuideSent(b, dati.threads[b.guestId], remLog[b.id]), reminderNotes: reminderNotes(remLog[b.id]),
   }).steps;
-  const balanceOf = (b: (typeof bookings)[number]) => stayDue(b, structMap.get(b.structureId));
+  const balanceOf = (b: Bk) => stayDue(b, structMap.get(b.structureId));
 
   // --- Giornata ---
   const split = useMemo(() => splitDay(live, today), [live, today]);
-  // 61 giorni: i 30 passati, oggi (posizione 30) e i 30 a venire. Dalla striscia escono anche le sparkline dell'hero.
-  const strip = useMemo(() => occupancyStrip(live, scopedUnits, addDaysISO(today, -30), 61, today), [live, scopedUnits, today]);
-  const tonight = strip[30];
-  const stripFwd = useMemo(() => occupancyStrip(live, scopedUnits, today, 60, today), [live, scopedUnits, today]); // grafico Occupazione: da oggi in avanti
-  const last14 = strip.slice(17, 31);
+  // Prossimi 14 giorni (oggi compreso): una sola passata; la prima colonna è «stanotte».
+  const strip = useMemo(() => occupancyStrip(live, scopedUnits, today, 14, today), [live, scopedUnits, today]);
+  const tonight = strip[0];
+  const outlook = useMemo(() => occupancyOutlook(strip), [strip]);
 
   // --- Adempimenti ---
   const items = useMemo(() => buildAdempimenti({
@@ -121,9 +124,9 @@ export default function Dashboard2() {
     pulse: pulseBad.map((p) => ({ channel: p.channel, label: p.label, level: p.level, headline: p.headline, detail: p.detail })),
     oos: scopedUnits.filter((u) => u.outOfService).length,
   }), [live, today, contactIssues, dati.inviiKo, pulseBad, scopedUnits]);
+  const todo = useMemo(() => buildTodo(items, controlli), [items, controlli]);
 
-  // --- Ricavi, canali, provenienza, anticipo e durata: TUTTI sulle prenotazioni in corso e future, come il riepilogo di Prenotazioni ---
-  // (chi parte oggi conta ancora; totale lordo = soggiorno + pulizia + extra).
+  // --- Ricavi e canali: TUTTI sulle prenotazioni in corso e future, come il riepilogo di Prenotazioni (chi parte oggi conta ancora; totale lordo = soggiorno + pulizia + extra) ---
   const upcomingList = useMemo(() => live.filter((b) => b.checkOut >= today), [live, today]);
   const upcoming = useMemo(() => ({
     total: upcomingList.reduce((a, b) => a + bookingPaidTotal(b), 0), count: upcomingList.length, nights: upcomingList.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0),
@@ -140,89 +143,152 @@ export default function Dashboard2() {
     revenue: Math.round(r.revenue), count: r.count, share: upcoming.total ? Math.round((r.revenue / upcoming.total) * 100) : 0, name: r.name,
   })), [byChannel, upcoming.total]);
 
-  // Pickup (ricevute negli ultimi 30 giorni, tra quelle in corso e future), anticipo, durata e provenienza.
-  const pickup = useMemo(() => pickupDaily(upcomingList, today, 30), [upcomingList, today]);
-  const leadHisto = useMemo(() => histogram(upcomingList.map(leadDays).filter((v): v is number => v !== null), LEAD_UPPER, LEAD_LABELS), [upcomingList]);
-  const stayHisto = useMemo(() => histogram(upcomingList.map(stayNights), STAY_UPPER, STAY_LABELS), [upcomingList]);
-  const countries = useMemo(() => topCountries(upcomingList.map((b) => guestMap.get(b.guestId)?.country), 5), [upcomingList, guestMap]);
-
-  // --- Righe di "Oggi" ---
+  // --- «Oggi»: righe e piccoli totali per gli indicatori ---
   const multiAll = sFilter === "all" && structures.length > 1;
-  const rows: MoveRow[] = useMemo(() => {
-    const room = (b: (typeof bookings)[number]) => { const u = b.unitId ? unitMap.get(b.unitId) : undefined; return u ? u.name.replace(/^camera\s*/i, "") : null; };
-    const pax = (b: (typeof bookings)[number]) => { const n = b.adults + b.children; return `${n} ${n === 1 ? "ospite" : "ospiti"}`; };
-    const where = (b: (typeof bookings)[number]) => (multiAll ? ` · ${structMap.get(b.structureId)?.name ?? ""}` : "");
-    const byRoom = (a: (typeof bookings)[number], b: (typeof bookings)[number]) => (unitMap.get(a.unitId ?? "")?.name ?? "~").localeCompare(unitMap.get(b.unitId ?? "")?.name ?? "~", "it", { numeric: true });
-    const turn = (b: (typeof bookings)[number]) => !!b.unitId && split.turnoverUnits.has(b.unitId);
+  const day = useMemo(() => {
+    const room = (b: Bk) => { const u = b.unitId ? unitMap.get(b.unitId) : undefined; return u ? u.name.replace(/^camera\s*/i, "") : null; };
+    const pax = (b: Bk) => b.adults + b.children;
+    const where = (b: Bk) => (multiAll ? ` · ${structMap.get(b.structureId)?.name ?? ""}` : "");
+    const byRoom = (a: Bk, b: Bk) => (unitMap.get(a.unitId ?? "")?.name ?? "~").localeCompare(unitMap.get(b.unitId ?? "")?.name ?? "~", "it", { numeric: true });
+    const turn = (b: Bk) => !!b.unitId && split.turnoverUnits.has(b.unitId);
     const out: MoveRow[] = [];
+    let checkinTodo = 0, depDue = 0, guestsIn = 0;
     for (const b of [...split.arrivals].sort((a, c) => (a.arrivalTime ?? "99").localeCompare(c.arrivalTime ?? "99") || byRoom(a, c))) {
       const ci = stepsOf(b)?.find((s) => s.key === "checkin");
-      out.push({
-        id: b.id, kind: "arr", turnover: turn(b), room: room(b), name: guestName(b.guestId),
-        sub: `${pax(b)} · ${CHANNELS[b.channel].label}${b.arrivalTime ? ` · arrivo ${b.arrivalTime}` : ""}${where(b)}`,
-        chip: !b.unitId ? { text: "Senza camera", tone: "err" } : ci?.state === "done" ? { text: "Check-in fatto", tone: "ok" } : { text: "Check-in da fare", tone: "warn" },
-      });
+      const bal = balanceOf(b);
+      const chips: MoveRow["chips"] = [];
+      if (!b.unitId) chips.push({ text: "Senza camera", tone: "err" });
+      if (ci?.state === "done") chips.push({ text: "Check-in fatto", tone: "ok" });
+      else if (ci?.state !== "na") { chips.push({ text: "Check-in da fare", tone: "warn" }); checkinTodo++; }
+      if (bal > 0.005) chips.push({ text: `Da incassare ${eur(bal)}`, tone: "warn" });
+      out.push({ id: b.id, kind: "arr", turnover: turn(b), room: room(b), name: guestName(b.guestId), sub: `${ospiti(pax(b))} · ${CHANNELS[b.channel].label}${b.arrivalTime ? ` · arrivo ${b.arrivalTime}` : ""}${turn(b) ? " · turnover" : ""}${where(b)}`, chips });
     }
     for (const b of [...split.departures].sort(byRoom)) {
       const bal = balanceOf(b);
-      out.push({
-        id: b.id, kind: "dep", turnover: turn(b), room: room(b), name: guestName(b.guestId),
-        sub: `${pax(b)} · ${CHANNELS[b.channel].label}${turn(b) ? " · poi nuovo arrivo" : ""}${where(b)}`,
-        chip: bal > 0.005 ? { text: `€ ${num(bal)} da incassare`, tone: "warn" } : bookingPaidTotal(b) > 0 ? { text: "Saldato", tone: "ok" } : undefined,
-      });
+      const chips: MoveRow["chips"] = [];
+      if (bal > 0.005) { chips.push({ text: `Da incassare ${eur(bal)}`, tone: "warn" }); depDue += bal; }
+      else if (bookingPaidTotal(b) > 0) chips.push({ text: "Saldato", tone: "ok" });
+      out.push({ id: b.id, kind: "dep", turnover: turn(b), room: room(b), name: guestName(b.guestId), sub: `${ospiti(pax(b))} · ${CHANNELS[b.channel].label}${turn(b) ? " · turnover: poi nuovo arrivo" : ""}${where(b)}`, chips });
     }
     for (const b of [...split.inHouse].sort((a, c) => a.checkOut.localeCompare(c.checkOut) || byRoom(a, c))) {
       const bal = balanceOf(b);
-      out.push({
-        id: b.id, kind: "stay", turnover: false, room: room(b), name: guestName(b.guestId),
-        sub: `${pax(b)} · fino al ${shortDate(b.checkOut)}${where(b)}`,
-        chip: bal > 0.005 ? { text: `Saldo € ${num(bal)}`, tone: "warn" } : undefined,
-      });
+      guestsIn += pax(b);
+      out.push({ id: b.id, kind: "stay", turnover: false, room: room(b), name: guestName(b.guestId), sub: `${ospiti(pax(b))} · fino al ${fmtDM(b.checkOut)}${where(b)}`, chips: bal > 0.005 ? [{ text: `Saldo ${eur(bal)}`, tone: "warn" }] : [] });
     }
-    return out;
+    return { rows: out, checkinTodo, depDue, guestsIn };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [split, unitMap, structMap, guestMap, multiAll, dati.threads, dati.schedBy, remLog, today]);
 
-  // --- Testi ---
-  const dateLabel = cap(`${parseISO(today).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDM(today)}`);
-  const scopeLabel = sFilter === "all" ? (structures.length > 1 ? "Tutte le strutture" : structures[0]?.name ?? "") : structMap.get(sFilter)?.name ?? "";
-  const statusText = loadingAdem ? "Controllo gli adempimenti…" : statusSentence(stato.total, stato.urgent).replace(/\.$/, "");
-  const statusTone = loadingAdem ? "dim" : stato.tone;
+  // --- Configurazione iniziale: passi veri per la struttura (o le strutture) che si sta guardando ---
+  // Guide e calendari stanno nel browser: si leggono una volta in effetto (mai in render, per non creare differenze con il server) e a ogni ritorno sulla finestra.
+  const [local, setLocal] = useState<{ guides: Set<string>; ical: number; hidden: boolean } | null>(null);
+  useEffect(() => {
+    const read = () => {
+      let guides = new Set<string>(), ical = 0, hidden = false;
+      try { const all = JSON.parse(localStorage.getItem(GUIDES_KEY) || "{}") as Record<string, { content?: unknown }>; guides = new Set(Object.keys(all).filter((id) => guideHasText(all[id]?.content))); } catch { /* guida illeggibile: come se mancasse */ }
+      try { const f = JSON.parse(localStorage.getItem(ICAL_KEY) || "[]"); ical = Array.isArray(f) ? f.length : 0; } catch { /* nessun calendario */ }
+      try { hidden = localStorage.getItem(SETUP_HIDDEN_KEY) === "1"; } catch { /* preferenza non letta */ }
+      setLocal((p) => (p && p.ical === ical && p.hidden === hidden && p.guides.size === guides.size && [...guides].every((g) => p.guides.has(g)) ? p : { guides, ical, hidden }));
+    };
+    read();
+    window.addEventListener("focus", read);
+    window.addEventListener("spigolestay:datasync", read);
+    return () => { window.removeEventListener("focus", read); window.removeEventListener("spigolestay:datasync", read); };
+  }, []);
+  // Senza strutture può essere un account davvero nuovo oppure i dati non sono ancora arrivati: si aspetta un attimo prima di proporre i passi.
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setWaited(true), 1500); return () => clearTimeout(t); }, []);
+  const { users: accessUsers, can, user: localUser } = useAccess();
+  const setup = useMemo(() => buildSetupSteps({
+    structures: scopeStructures.map((s) => {
+      const types = roomTypes.filter((r) => r.structureId === s.id);
+      return {
+        id: s.id, name: s.name,
+        profile: !!(s.city?.trim() && s.address?.trim() && (s.phone?.trim() || s.email?.trim() || s.whatsapp?.trim())),
+        rooms: units.filter((u) => u.structureId === s.id).length,
+        pricedTypes: types.filter((t) => t.basePrice > 0 || !!t.deriveFrom).length, totalTypes: types.length,
+        guide: !!local?.guides.has(s.id),
+      };
+    }),
+    channels: Object.values(dati.chConn).some(Boolean) || (local?.ical ?? 0) > 0 || bookings.some((b) => OTA_CH.includes(b.channel)),
+    extraUsers: accessUsers.length > 1,
+  }), [scopeStructures, roomTypes, units, local, dati.chConn, bookings, accessUsers]);
+  const setupReady = !!local && dati.ready && dati.chReady && (scopeStructures.length > 0 || waited) && can("impostazioni") && can("camere");
+  const showSetup = setupReady && !setup.complete && !local?.hidden;
+  const setSetupHidden = (hidden: boolean) => {
+    try { if (hidden) localStorage.setItem(SETUP_HIDDEN_KEY, "1"); else localStorage.removeItem(SETUP_HIDDEN_KEY); } catch { /* preferenza non salvata */ }
+    setLocal((p) => (p ? { ...p, hidden } : p));
+  };
 
-  const controlliOnTop = controlli.length > 0;
-  const wrap = "min-w-0 [&>section]:h-full";
+  // --- Testi ---
   const { user: authUser } = useAuth();
   const authMd = authUser?.user_metadata as Record<string, unknown> | undefined; // il nome arriva da «full_name» (registrazione) o da «first_name» (configurazione guidata)
-  const { user: localUser } = useAccess();
   const firstName = (localUser?.firstName?.trim() || (authMd?.first_name as string | undefined) || (authMd?.full_name as string | undefined) || "").trim().split(/\s+/)[0];
-  const SPAN: Record<number, string> = { 1: "lg:col-span-12", 2: "lg:col-span-6", 3: "lg:col-span-4" };
-  const hasPickup = pickup.total > 0;
-  const hasPren = leadHisto.total > 0 || stayHisto.total > 0;
-  const rowC = 1 + (channelRows.length > 0 ? 1 : 0) + (countries.rows.length > 0 ? 1 : 0);
+  const dateLabel = cap(`${parseISO(today).toLocaleDateString("it-IT", { weekday: "long" })} ${fmtDMY(today)}`);
+  const subtitle = `${greetingFor(clock.hour)}${firstName ? " " + firstName : ""} · ${dateLabel}`;
+  const several = allStructures.length > 1;
+  const partial = several && (sFilter !== "all" || structures.length !== allStructures.length); // si guarda solo una parte delle strutture
+  const scopeName = sFilter === "all" ? (structures.length === allStructures.length ? (several ? "Tutte le strutture" : structures[0]?.name ?? "") : `${structures.length} strutture`) : structMap.get(sFilter)?.name ?? "";
+  // «Aggiorna»: un attimo di feedback visibile (i dati si ricaricano in sottofondo)
+  const [busy, setBusy] = useState(false);
+  const refresh = () => { dati.reload(); setBusy(true); setTimeout(() => setBusy(false), 900); };
+  const updated = dati.updatedAt ? new Date(dati.updatedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : null;
+
+  // --- Indicatori ---
+  const arrN = split.arrivals.length, depN = split.departures.length, stayN = split.inHouse.length;
+  const payItem = items.find((i) => i.key === "pay"), taxItem = items.find((i) => i.key === "tax");
+  const free = tonight ? Math.max(0, tonight.total - tonight.occupied) : 0;
+  const kpis: KpiItem[] = [
+    { key: "arr", label: "Arrivi oggi", value: String(arrN), href: "/prenotazioni", sub: arrN === 0 ? "Nessun arrivo" : day.checkinTodo > 0 ? `${day.checkinTodo} check-in da fare` : "Check-in completati" },
+    { key: "dep", label: "Partenze oggi", value: String(depN), href: "/prenotazioni", sub: depN === 0 ? "Nessuna partenza" : day.depDue > 0.005 ? `${eur(day.depDue)} da incassare` : split.turnoverUnits.size > 0 ? `${split.turnoverUnits.size} turnover` : "Tutte saldate" },
+    { key: "stay", label: "In casa", value: String(stayN), href: "/prenotazioni", sub: stayN === 0 ? "Nessun ospite in casa" : ospiti(day.guestsIn) },
+    { key: "occ", label: "Occupazione stanotte", value: tonight && tonight.total ? `${tonight.pct}%` : "–", href: "/calendario", sub: tonight && tonight.total ? `${tonight.occupied}/${tonight.total} camere · ${free} ${plural(free, "libera", "libere")}` : "Nessuna camera" },
+    {
+      key: "due", label: "Da incassare", value: eur(payItem?.amount ?? 0), long: true, href: "/pagamenti", loading: loadingAdem,
+      sub: payItem ? `${payItem.count} ${plural(payItem.count, "saldo", "saldi")}${taxItem?.amount ? ` · tassa ${eur(taxItem.amount)}` : ""}` : taxItem?.amount ? `Tassa di soggiorno ${eur(taxItem.amount)}` : "Nessun saldo aperto",
+    },
+    {
+      key: "ade", label: "Adempimenti", value: String(stato.total), href: "/adempimenti", loading: loadingAdem, tone: stato.urgent > 0 ? "err" : undefined,
+      sub: stato.urgent > 0 ? `${stato.urgent} ${plural(stato.urgent, "urgente", "urgenti")}` : stato.total > 0 ? "Da fare oggi" : "Niente in scadenza",
+    },
+  ];
+
   return (
-    <div className="d2-root">
-      <D2Styles />
-      {/* key = struttura: cambiando struttura tutto si ridisegna con una transizione morbida */}
-      <div key={sFilter} className="d2-fade flex flex-col gap-4">
-        <Hero
-          greeting={`${greetingFor(clock.hour)}${firstName ? " " + firstName : ""}`} dateLabel={dateLabel} scopeLabel={scopeLabel}
-          sentence={todaySentence(split.arrivals.length, split.departures.length, split.inHouse.length)}
-          statusText={statusText} statusTone={statusTone} statusCount={stato.total}
-          arrivals={split.arrivals.length} departures={split.departures.length} stays={split.inHouse.length}
-          arrSpark={last14.map((c) => c.arrivals)} depSpark={last14.map((c) => c.departures)} staySpark={last14.map((c) => c.stay)}
-          occupied={tonight?.occupied ?? 0} totalRooms={tonight?.total ?? 0} pct={tonight?.pct ?? 0}
-        />
-        <div className="grid gap-4 lg:grid-cols-12">
-          <div className={`order-4 lg:order-none ${hasPickup ? "lg:col-span-8" : "lg:col-span-12"} ${wrap}`}><Giorni cells={stripFwd} delay={60} /></div>
-          {hasPickup && <div className={`order-5 lg:order-none lg:col-span-4 ${wrap}`}><Pickup pickup={pickup} delay={120} /></div>}
-          <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} delay={60} /></div>
-          {channelRows.length > 0 && <div className={`order-7 lg:order-none ${SPAN[rowC]} ${wrap}`}><Canali rows={channelRows} total={upcoming.total} monthName="in corso e future" delay={120} /></div>}
-          {countries.rows.length > 0 && <div className={`order-8 lg:order-none ${SPAN[rowC]} ${wrap}`}><Provenienza rows={countries.rows} known={countries.known} delay={180} /></div>}
-          {hasPren && <div className={`order-9 lg:order-none lg:col-span-12 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
-          <div className={`order-11 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} health={health} delay={60} /></div>
-          <div className={`${controlliOnTop ? "order-3" : "order-10"} lg:order-none lg:col-span-5 ${wrap}`}><Controllo items={controlli} delay={120} /></div>
-          <div className="order-12 min-w-0 lg:order-none lg:col-span-12"><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={120} /></div>
+    <div className="mx-auto w-full max-w-[1440px]">
+      <PageHeader
+        title="Dashboard" subtitle={subtitle}
+        actions={
+          <>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-dim">
+              <span>{several ? "Stai guardando:" : "Struttura:"} <b className="font-semibold text-txt">{scopeName || "nessuna"}</b></span>
+              {partial && (
+                <button type="button" onClick={() => setActiveStructure("all")} title="Con l'apertura su una sola struttura le altre si caricano quando le scegli (anche dal menu in alto)" className="rounded-[var(--r-md)] px-1.5 py-1 font-medium text-focus hover:bg-wash max-sm:min-h-10">Mostra tutte le strutture</button>
+              )}
+            </span>
+            {setupReady && !setup.complete && local?.hidden && <button type="button" onClick={() => setSetupHidden(false)} className={BTN_SM}>Configurazione {setup.done}/{setup.total}</button>}
+            <button type="button" onClick={refresh} aria-busy={busy} title="Rilegge adempimenti, invii e canali" className={`${BTN_SM} min-w-[7.5rem]`}>{busy ? "Aggiornamento…" : "Aggiorna"}</button>
+            {updated && <span className="text-xs text-dim max-xl:hidden" role="status">Aggiornato alle {updated}</span>}
+          </>
+        }
+      />
+      <div className="flex flex-col gap-3">
+        {showSetup && <Avvio state={setup} onHide={() => setSetupHidden(true)} />}
+        <Kpis items={kpis} />
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] xl:items-start">
+          <div className="flex min-w-0 flex-col gap-3">
+            <DaFare rows={todo} loading={loadingAdem} health={health} setupPending={!setup.complete} />
+            <Oggi rows={day.rows} onOpen={openBooking} onNew={() => openNewBooking()} noBookings={live.length === 0} noStructures={structures.length === 0} />
+          </div>
+          {/* sotto i 1280 px la colonna di destra passa su due colonne (occupazione | ricavi e canali); da xl sta accanto a Da fare e Oggi */}
+          <div className="grid min-w-0 items-start gap-3 lg:grid-cols-2 xl:grid-cols-1">
+            <Occupazione cells={strip} outlook={outlook} />
+            <div className="flex min-w-0 flex-col gap-3">
+              <Ricavi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} onNew={structures.length ? () => openNewBooking() : undefined} />
+              <Canali rows={channelRows} />
+            </div>
+          </div>
         </div>
+        <Altri list={upcomingList} guests={guestMap} today={today} />
       </div>
     </div>
   );
