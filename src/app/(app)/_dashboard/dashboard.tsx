@@ -239,13 +239,13 @@ export default function Dashboard() {
   const payItem = items.find((i) => i.key === "pay"), taxItem = items.find((i) => i.key === "tax");
   const free = tonight ? Math.max(0, tonight.total - tonight.occupied) : 0;
   const kpis: KpiItem[] = [
-    { key: "arr", label: "Arrivi oggi", value: String(arrN), href: "/prenotazioni", sub: arrN === 0 ? "Nessun arrivo" : day.checkinTodo > 0 ? `${day.checkinTodo} check-in da fare` : "Check-in completati" },
-    { key: "dep", label: "Partenze oggi", value: String(depN), href: "/prenotazioni", sub: depN === 0 ? "Nessuna partenza" : day.depDue > 0.005 ? `${eur(day.depDue)} da incassare` : split.turnoverUnits.size > 0 ? `${split.turnoverUnits.size} turnover` : "Tutte saldate" },
-    { key: "stay", label: "In casa", value: String(stayN), href: "/prenotazioni", sub: stayN === 0 ? "Nessun ospite in casa" : ospiti(day.guestsIn) },
+    { key: "arr", label: "Arrivi oggi", value: String(arrN), href: "/calendario?vista=dettaglio&col=arr", sub: arrN === 0 ? "Nessun arrivo" : day.checkinTodo > 0 ? `${day.checkinTodo} check-in da fare` : "Check-in completati" },
+    { key: "dep", label: "Partenze oggi", value: String(depN), href: "/calendario?vista=dettaglio&col=dep", sub: depN === 0 ? "Nessuna partenza" : day.depDue > 0.005 ? `${eur(day.depDue)} da incassare` : split.turnoverUnits.size > 0 ? `${split.turnoverUnits.size} turnover` : "Tutte saldate" },
+    { key: "stay", label: "In casa", value: String(stayN), href: "/calendario?vista=dettaglio&col=stay", sub: stayN === 0 ? "Nessun ospite in casa" : ospiti(day.guestsIn) },
     { key: "occ", label: "Occupazione stanotte", value: tonight && tonight.total ? `${tonight.pct}%` : "–", href: "/calendario", sub: tonight && tonight.total ? `${tonight.occupied}/${tonight.total} camere · ${free} ${plural(free, "libera", "libere")}` : "Nessuna camera" },
     {
-      key: "due", label: "Da incassare", value: eur(payItem?.amount ?? 0), long: true, href: "/pagamenti", loading: loadingAdem,
-      sub: payItem ? `${payItem.count} ${plural(payItem.count, "saldo", "saldi")}${taxItem?.amount ? ` · tassa ${eur(taxItem.amount)}` : ""}` : taxItem?.amount ? `Tassa di soggiorno ${eur(taxItem.amount)}` : "Nessun saldo aperto",
+      key: "due", label: "Da incassare", value: eur((payItem?.amount ?? 0) + (taxItem?.amount ?? 0)), long: true, href: "/pagamenti", loading: loadingAdem,
+      sub: payItem?.amount || taxItem?.amount ? [payItem?.amount ? `saldi ${eur(payItem.amount)}` : "", taxItem?.amount ? `tassa di soggiorno ${eur(taxItem.amount)}` : ""].filter(Boolean).join(" · ") : "Niente da incassare",
     },
     {
       key: "ade", label: "Adempimenti", value: String(stato.total), href: "/adempimenti", loading: loadingAdem, tone: stato.urgent > 0 ? "err" : undefined,
@@ -279,13 +279,13 @@ export default function Dashboard() {
             <DaFare rows={todo} loading={loadingAdem} health={health} setupPending={!setup.complete} />
             <Oggi rows={day.rows} onOpen={openBooking} onNew={() => openNewBooking()} noBookings={live.length === 0} noStructures={structures.length === 0} />
           </div>
-          {/* sotto i 1280 px la colonna di destra passa su due colonne (occupazione | ricavi e canali); da xl sta accanto a Da fare e Oggi */}
+          {/* sotto i 1280 px la colonna di destra passa su due colonne (ricavi e canali | occupazione); da xl sta accanto a Da fare e Oggi */}
           <div className="grid min-w-0 items-start gap-3 lg:grid-cols-2 xl:grid-cols-1">
-            <Occupazione cells={strip} outlook={outlook} />
             <div className="flex min-w-0 flex-col gap-3">
               <Ricavi total={upcoming.total} count={upcoming.count} nights={upcoming.nights} onNew={structures.length ? () => openNewBooking() : undefined} />
               <Canali rows={channelRows} />
             </div>
+            <Occupazione cells={strip} outlook={outlook} />
           </div>
         </div>
         <Altri list={upcomingList} guests={guestMap} today={today} />

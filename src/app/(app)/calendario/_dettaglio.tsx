@@ -53,7 +53,7 @@ function Vuoto({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
+export default function CalendarioDettaglio({ viewSwitch, initialCol = null }: { viewSwitch?: React.ReactNode; initialCol?: Col | null } = {}) {
   const phone = usePhone();
   const router = useRouter();
   const { bookings, guests, units, roomTypes, structures, events, getStructure, openBooking, openNewBooking, activeStructureId } = useData();
@@ -70,7 +70,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const COL_LIMIT = 6;
   // Riga sotto il calendario: ricerca (ospite, camera, codice) e tre badge (Arrivi / In casa / Partenze) che mostrano una sola sezione.
   const [q, setQ] = useState("");
-  const only: Col | null = null;
+  const [only, setOnly] = useState<Col | null>(initialCol); // una sola colonna (arrivo da un indicatore della dashboard); «Mostra tutto» la toglie
   const [cleanDone, setCleanDone] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const h = () => setCleanDone(readCleanDone());
@@ -313,6 +313,12 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
       )}
 
       {/* Arrivi / In casa / Partenze */}
+      {!results && only && (
+        <div className="mt-4 flex items-center gap-2 text-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-focus bg-wash px-3 py-1 font-semibold text-txt">Solo {only === "arr" ? "arrivi" : only === "dep" ? "partenze" : "ospiti in casa"}</span>
+          <button type="button" onClick={() => setOnly(null)} className="font-semibold text-focus hover:underline">Mostra tutto</button>
+        </div>
+      )}
       {!results && (
       <div className="mt-5 flex flex-col gap-8">
         {COLS.filter((c) => !only || c.key === only).map((c) => {

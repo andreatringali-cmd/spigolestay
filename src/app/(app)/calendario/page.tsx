@@ -16,7 +16,11 @@ export default function CalendarioPage() {
   const { activeStructureId, getStructure } = useData();
   const st = activeStructureId !== "all" ? getStructure(activeStructureId) : undefined;
   // Vista scelta (ricordata): null finché non è letta dal browser, per non montare la griglia se si preferisce il dettaglio.
-  const [view, setView] = useState<Vista>(() => { try { return localStorage.getItem(VIEW_KEY) === "detail" ? "detail" : "grid"; } catch { return "grid"; } });
+  // Collegamento dalla dashboard: /calendario?vista=dettaglio&col=arr|dep|stay apre la vista Dettagliata (senza cambiare la vista ricordata) filtrata su una colonna.
+  const [deep] = useState<{ detail: boolean; col: "arr" | "stay" | "dep" | null }>(() => {
+    try { const q = new URLSearchParams(window.location.search); const c = q.get("col"); return { detail: q.get("vista") === "dettaglio", col: c === "arr" || c === "stay" || c === "dep" ? c : null }; } catch { return { detail: false, col: null }; }
+  });
+  const [view, setView] = useState<Vista>(() => { if (deep.detail) return "detail"; try { return localStorage.getItem(VIEW_KEY) === "detail" ? "detail" : "grid"; } catch { return "grid"; } });
   const choose = (v: Vista) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
   // Selettore della vista: stesso aspetto di "Compatta / Dettagliata" in Prenotazioni. Nella griglia sta nella riga dei filtri,
   // prima del pulsante dei grafici; nella vista dettagliata (che non ha quella riga) resta in alto accanto al meteo.
@@ -37,7 +41,7 @@ export default function CalendarioPage() {
         </>}
       />
       {view === "grid" && <CalendarGrid viewSwitch={viewSwitch} />}
-      {view === "detail" && <CalendarioDettaglio viewSwitch={viewSwitch} />}
+      {view === "detail" && <CalendarioDettaglio viewSwitch={viewSwitch} initialCol={deep.col} />}
     </div>
   );
 }
