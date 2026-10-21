@@ -233,7 +233,15 @@ export default function Dashboard() {
 
   // --- Indicatori ---
   const arrN = split.arrivals.length, depN = split.departures.length, stayN = split.inHouse.length;
-  const payItem = items.find((i) => i.key === "pay"), taxItem = items.find((i) => i.key === "tax");
+  const payItem = items.find((i) => i.key === "pay");
+  // Tassa di soggiorno da incassare OGGI: solo le partenze di oggi (si riscuote al check-out) la cui tassa non è ancora segnata incassata. Quella delle partenze dei giorni
+  // scorsi resta in Adempimenti («Tassa»), non in «Da incassare».
+  const taxToday = live.reduce((sum, b) => {
+    if (b.checkOut !== today) return sum;
+    const st = stepsOf(b)?.find((x) => x.key === "tax");
+    const t = cityTaxOfBooking(structMap.get(b.structureId), b);
+    return st && t > 0 && (st.state === "todo" || st.state === "late") ? sum + t : sum;
+  }, 0);
   const free = tonight ? Math.max(0, tonight.total - tonight.occupied) : 0;
   const kpis: KpiItem[] = [
     { key: "arr", label: "Arrivi oggi", value: String(arrN), href: "/calendario?vista=dettaglio&col=arr", sub: arrN === 0 ? "Nessun arrivo" : day.checkinTodo > 0 ? `${day.checkinTodo} check-in da fare` : "Check-in completati" },
@@ -241,8 +249,8 @@ export default function Dashboard() {
     { key: "stay", label: "In casa", value: String(stayN), href: "/calendario?vista=dettaglio&col=stay", sub: stayN === 0 ? "Nessun ospite in casa" : ospiti(day.guestsIn) },
     { key: "occ", label: "Occupazione stanotte", value: tonight && tonight.total ? `${tonight.pct}%` : "–", href: "/calendario", sub: tonight && tonight.total ? `${tonight.occupied}/${tonight.total} camere · ${free} ${plural(free, "libera", "libere")}` : "Nessuna camera" },
     {
-      key: "due", label: "Da incassare", value: eur((payItem?.amount ?? 0) + (taxItem?.amount ?? 0)), long: true, href: "/pagamenti", loading: loadingAdem,
-      sub: payItem?.amount || taxItem?.amount ? [payItem?.amount ? `saldi ${eur(payItem.amount)}` : "", taxItem?.amount ? `tassa di soggiorno ${eur(taxItem.amount)}` : ""].filter(Boolean).join(" · ") : "Niente da incassare",
+      key: "due", label: "Da incassare", value: eur((payItem?.amount ?? 0) + taxToday), long: true, href: "/pagamenti", loading: loadingAdem,
+      sub: payItem?.amount || taxToday > 0 ? [payItem?.amount ? `saldi ${eur(payItem.amount)}` : "", taxToday > 0 ? `tassa di soggiorno ${eur(taxToday)} (check-out oggi)` : ""].filter(Boolean).join(" · ") : "Niente da incassare oggi",
     },
     {
       key: "ade", label: "Adempimenti", value: String(stato.total), href: "/adempimenti", loading: loadingAdem, tone: stato.urgent > 0 ? "err" : undefined,
