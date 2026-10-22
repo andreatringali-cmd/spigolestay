@@ -4,6 +4,7 @@
 // il link non si può falsificare. Se il segreto non è configurato la feature resta disattiva
 // (demo-request non include il pulsante).
 import { createHmac, timingSafeEqual } from "crypto";
+import { buildAccessUrl } from "./access-token";
 
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // link valido 30 giorni
 
@@ -45,13 +46,15 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
  * se l'invio fallisce (manca RESEND_API_KEY o errore di rete): ritorna semplicemente false.
  * È quasi sempre la PRIMA email che la persona riceve da Xenora: curata come un vero benvenuto,
  * non come una notifica di sistema — logo, tono caldo, un accenno di cosa trova dentro. */
-export async function notifyAccessApproved(email: string): Promise<boolean> {
+export async function notifyAccessApproved(email: string, next: string = "/"): Promise<boolean> {
   if (!RESEND) return false;
   // Sempre il "Passo 1" (username + email precompilata + password), per chiunque — a prescindere
   // dal dominio dell'email. Il login con Google resta disponibile come opzione in un secondo
   // momento dalla pagina di login, ma non è la scorciatoia di default da questo link.
-  const loginUrl = `${APP_URL}/login?mode=signup&email=${encodeURIComponent(email)}`;
-  const ctaNote = " (scegli una password per completare la registrazione)";
+  // Con il link personale (firmato) basta UN clic: si sceglie la password e si entra, senza seconda email di conferma. Senza segreto: vecchia registrazione.
+  const accessUrl = buildAccessUrl(APP_URL, email, next);
+  const loginUrl = accessUrl ?? `${APP_URL}/login?mode=signup&email=${encodeURIComponent(email)}`;
+  const ctaNote = accessUrl ? " (con un clic scegli la password ed entri)" : " (scegli una password per completare la registrazione)";
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
   <body style="margin:0;background:#eef1f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
   <div style="max-width:540px;margin:0 auto;padding:40px 16px;">

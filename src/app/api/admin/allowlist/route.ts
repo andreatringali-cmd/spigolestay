@@ -9,6 +9,7 @@ import {
   loadCollaborators, norm, pendingStructureCode, registeredUserId, rootOf, standingOf, type Standing,
 } from "@/lib/invite-access";
 import { sendInviteEmail } from "@/lib/invite-notify";
+import { buildAccessUrl } from "@/lib/access-token";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,13 @@ async function requireStaff(req: Request): Promise<Ctx | NextResponse> {
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
   const name = String(meta.full_name || meta.name || "").trim() || email;
   return { admin, userId: user.id, email, name, standing };
+}
+
+// Dove atterra la persona dopo aver scelto la password: l'invito a una struttura, altrimenti le Pulizie per l'addetta, altrimenti la home.
+function nextAfterInvite(code: string | null | undefined, profile: unknown): string {
+  if (code) return `/accetta-invito?code=${encodeURIComponent(code)}`;
+  const key = (profile as { templateKey?: string } | null | undefined)?.templateKey;
+  return key === "cleaner" ? "/pulizie" : "/";
 }
 
 const normEmail = norm;
@@ -88,7 +96,7 @@ export async function POST(req: Request) {
     const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email, kind: body?.kind === "collaboratore" || (note ?? "").startsWith("Utente:") ? "collaboratore" : "titolare", ...(profile ? { profile } : {}) }, { onConflict: "email" });
     if (error) return NextResponse.json({ error: error.message }, { status: 200 });
     // notify:false = l'email la manderà un passo successivo (dopo la condivisione delle strutture, così contiene il link all'invito)
-    const notified = body?.notify === false ? false : await notifyAccessApproved(email);
+    const notified = body?.notify === false ? false : await notifyAccessApproved(email, nextAfterInvite(null, profile));
     return NextResponse.json({ ok: true, notified, sentAt: new Date().toISOString() });
   }
 
@@ -129,7 +137,9 @@ export async function POST(req: Request) {
   if (body?.resend) {
     if (!existing) return deny(404, "invite_not_found", "Non trovo un invito per questo indirizzo: crea di nuovo l'utente.");
     const code = await pendingStructureCode(admin, email, a.userId);
-    const notified = await sendInviteEmail({ origin: siteOrigin(req), email, inviter: a.name, code, replyTo: a.email });
+    const origin = siteOrigin(req);
+    const { data: prof } = await admin.from("access_allowlist").select("profile").eq("email", existing.email).maybeSingle();
+    const notified = await sendInviteEmail({ origin, email, inviter: a.name, code, accessLink: buildAccessUrl(origin, email, nextAfterInvite(code, (prof as { profile?: unknown } | null)?.profile)), replyTo: a.email });
     return NextResponse.json({ ok: true, notified, sentAt: new Date().toISOString() });
   }
 
@@ -154,7 +164,9 @@ export async function POST(req: Request) {
     : await admin.from("access_allowlist").upsert(row, { onConflict: "email" });
   if (error) return deny(500, "invite_failed", "Non sono riuscito a registrare l'invito: riprova tra poco.");
 
-  const notified = body?.notify === false ? false : await sendInviteEmail({ origin: siteOrigin(req), email, inviter: a.name, code: await pendingStructureCode(admin, email, a.userId), replyTo: a.email });
+  const origin = siteOrigin(req);
+  const inviteCode = body?.notify === false ? null : await pendingStructureCode(admin, email, a.userId);
+  const notified = body?.notify === false ? false : await sendInviteEmail({ origin, email, inviter: a.name, code: inviteCode, accessLink: buildAccessUrl(origin, email, nextAfterInvite(inviteCode, clean)), replyTo: a.email });
   return NextResponse.json({ ok: true, notified, sentAt: new Date().toISOString() });
 }
 

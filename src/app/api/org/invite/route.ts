@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
 import { decideOrgReuse } from "@/lib/org-invite-guard";
-import { sameAccount } from "@/lib/invite-access";
+import { sameAccount, registeredUserId } from "@/lib/invite-access";
+import { buildAccessUrl } from "@/lib/access-token";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -173,7 +174,10 @@ export async function POST(req: Request) {
 
     // Invia l'email con il link per accettare.
     const origin = siteOrigin(req);
-    const link = `${origin}/accetta-invito?code=${code}`;
+    // Chi non ha ancora un accesso riceve il link personale: un clic, sceglie la password ed arriva all'invito (niente email di conferma). Chi ce l'ha già usa il link normale.
+    const acceptPath = `/accetta-invito?code=${code}`;
+    const accessLink = (await registeredUserId(admin, email)) ? null : buildAccessUrl(origin, email, acceptPath);
+    const link = accessLink ?? `${origin}${acceptPath}`;
     let emailSent = false;
     if (RESEND && !silent) {
       const inviter = caller.email || "un collega";

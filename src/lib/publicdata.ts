@@ -36,7 +36,7 @@ export const AUX_KEYS = [
 // coincidere con questi, altrimenti il sito verrebbe "coperto" dalla pagina interna.
 export const RESERVED_SLUGS = new Set<string>([
   // route al root
-  "accetta-invito", "api", "checkin", "g", "invito", "login", "og", "prenota", "preventivo", "prezzi", "sito-web",
+  "accesso", "accetta-invito", "api", "checkin", "g", "invito", "login", "og", "prenota", "preventivo", "prezzi", "sito-web",
   // route dell'app (gruppo)
   "abbonamento", "admin", "alloggiati", "assistente-ricavi", "calendario", "camere", "canali", "cassa",
   "guida-ospiti", "importa", "impostazioni", "mercato", "messaggi", "metasearch", "nettare", "ospiti",
