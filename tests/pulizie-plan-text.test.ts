@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -102,4 +103,10 @@ test("email planning: pulsante «Apri il gestionale», chiusura e piè di pagina
   assert.match(html, /Grazie,\s*la direzione/);
   assert.match(html, /Via Roma 1, Siracusa/);
   assert.match(html, /Central Perk - Antioco/);
+});
+
+test("email planning: «Buongiorno,» in apertura e «Grazie, la direzione» in chiusura se il titolare non sceglie le sue righe", () => {
+  const src = readFileSync(new URL("../src/lib/pulizie-send.ts", import.meta.url), "utf8");
+  assert.match(src, /intro: \(cfg\.intro \?\? ""\)\.trim\(\) \? cfg\.intro : "Buongiorno,"/);
+  assert.ok(src.includes('cfg.outro : "Grazie,\\nla direzione"'));
 });

@@ -32,8 +32,8 @@ export async function deliverPuliziePlan(a: {
   const planArgs = { date, scopedStructures: [st], rooms, guests: a.guests, notes: a.notes };
   const custom = { intro: cfg.intro, outro: cfg.outro }; // riga iniziale e finale scelte dal titolare
   const text = buildPuliziePlanText({ ...planArgs, ...custom, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
-  // Email: gli asterischi *…* diventano grassetto nel corpo HTML (textBlockHtml); se il titolare non ha scelto una riga finale si chiude con un saluto.
-  const emailText = buildPuliziePlanText({ ...planArgs, ...custom, outro: (cfg.outro ?? "").trim() ? cfg.outro : "Grazie,\nla direzione", style: "whatsapp" });
+  // Email: gli asterischi *…* diventano grassetto nel corpo HTML (textBlockHtml); se il titolare non ha scelto la riga iniziale e finale, l'email si apre con «Buongiorno,» e si chiude con «Grazie, la direzione».
+  const emailText = buildPuliziePlanText({ ...planArgs, ...custom, intro: (cfg.intro ?? "").trim() ? cfg.intro : "Buongiorno,", outro: (cfg.outro ?? "").trim() ? cfg.outro : "Grazie,\nla direzione", style: "whatsapp" });
   const summary = buildPuliziePlanSummary(planArgs);
   // Una voce per tipo di lavoro, per il modello WhatsApp "a righe". Prima la versione dettagliata (chi esce, chi entra, persone, fino a quando: come nel messaggio condiviso a mano);
   // il corpo del modello Meta ha un limite (1024 caratteri in tutto), quindi se il dettaglio non ci sta si ripiega sulla versione con i soli numeri delle camere.
