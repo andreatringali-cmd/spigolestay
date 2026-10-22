@@ -42,8 +42,17 @@ export function verifyAccessToken(email: string, ts: string, next: string, sig: 
   return normEmail(email);
 }
 
-/** Che cosa fare quando la persona sceglie la password: crea l'accesso, completa uno rimasto a metà (email mai confermata), oppure rifiuta (ha già un accesso). */
-export function decideCompletion(existing: { confirmed: boolean } | null): "create" | "complete" | "already" {
+/**
+ * Che cosa fare quando la persona sceglie la password dal link:
+ *  - nessun accesso: lo si crea ("create"); accesso rimasto a metà, email mai confermata: lo si completa ("complete");
+ *  - accesso già confermato (es. registrato con Google, tolto dall'elenco e invitato di nuovo): il link firmato prova che l'indirizzo è suo, come una
+ *    email di reset, quindi può impostare la password ("reset") a patto che da quando il link è stato creato NON abbia fatto altri accessi: così il link
+ *    si «consuma» da solo (appena entra, un link vecchio non vale più) e non si può riusare ("used").
+ */
+export function decideAccess(existing: { confirmed: boolean; lastSignInAt?: string | null } | null, tsSeconds: number): "create" | "complete" | "reset" | "used" {
   if (!existing) return "create";
-  return existing.confirmed ? "already" : "complete";
+  if (!existing.confirmed) return "complete";
+  const last = existing.lastSignInAt ? Date.parse(existing.lastSignInAt) : NaN;
+  if (Number.isFinite(last) && last >= tsSeconds * 1000) return "used";
+  return "reset";
 }

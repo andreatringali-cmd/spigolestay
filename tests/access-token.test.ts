@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildAccessUrl, verifyAccessToken, safeNext, decideCompletion } from "../src/lib/access-token.ts";
+import { buildAccessUrl, verifyAccessToken, safeNext, decideAccess } from "../src/lib/access-token.ts";
 import { buildInviteEmail } from "../src/lib/invite-notify.ts";
 
 process.env.ALLOWLIST_APPROVE_SECRET = "segreto-di-prova";
@@ -38,10 +38,15 @@ test("percorso dopo l'accesso: solo interno (mai un sito esterno)", () => {
   assert.equal(safeNext("/" + String.fromCharCode(92) + "evil"), "/");
   assert.equal(safeNext(undefined), "/");
 });
-test("scelta della password: crea, completa un accesso rimasto a metà, rifiuta chi ha già un accesso confermato", () => {
-  assert.equal(decideCompletion(null), "create");
-  assert.equal(decideCompletion({ confirmed: false }), "complete");
-  assert.equal(decideCompletion({ confirmed: true }), "already");
+test("scelta della password: crea, completa, imposta su un accesso esistente, rifiuta un link già consumato", () => {
+  const ts = 1_800_000_000; // secondi
+  assert.equal(decideAccess(null, ts), "create");
+  assert.equal(decideAccess({ confirmed: false }, ts), "complete");
+  // accesso già confermato (es. Google), mai entrato dopo la creazione del link: può impostare la password
+  assert.equal(decideAccess({ confirmed: true, lastSignInAt: new Date((ts - 3600) * 1000).toISOString() }, ts), "reset");
+  assert.equal(decideAccess({ confirmed: true, lastSignInAt: null }, ts), "reset");
+  // è entrato dopo che il link è stato creato: il link si è «consumato»
+  assert.equal(decideAccess({ confirmed: true, lastSignInAt: new Date((ts + 60) * 1000).toISOString() }, ts), "used");
 });
 test("email di invito: con il link personale il pulsante è uno solo e non parla di conferma", () => {
   const link = buildAccessUrl("https://xenora.it", "a@x.it", "/pulizie")!;
