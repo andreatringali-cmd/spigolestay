@@ -137,12 +137,12 @@ export function buildPuliziePlanText(opts: {
   const keyOf = (unitId: string) => `${unitId}:${date}`;
   const noteOf = (r: PlanRoom) => { const n = notes[keyOf(r.unit.id)]?.trim(); return n ? ` [${n}]` : ""; };
 
-  const lines: string[] = [`${bold(t("Pulizie di oggi"))} — ${fmtLongIT(date)}`];
+  const lines: string[] = [`${bold(t("Pulizie di oggi"))}: ${fmtLongIT(date)}`];
   for (const s of scopedStructures) {
     const list = rooms.filter((r) => r.structure.id === s.id).sort(byUnit);
     if (!list.length) continue;
     const todo = list.filter((r) => !r.oos && r.action !== "niente").length;
-    lines.push("", `${bold(s.name)} — ${todo} ${todo === 1 ? t("camera da fare") : t("camere da fare")}`);
+    lines.push("", `${bold(s.name)}: ${todo} ${todo === 1 ? t("camera da fare") : t("camere da fare")}`);
 
     for (const g of GROUPS) {
       const grp = list.filter((r) => !r.oos && r.action === g.key);
@@ -151,14 +151,14 @@ export function buildPuliziePlanText(opts: {
       for (const r of grp) {
         let row: string;
         if (g.key === "turnover" && r.dep && r.arr) {
-          row = `${r.unit.name} — ${t("esce")} ${guestName(r.dep.guestId)} · ${t("entra")} ${guestName(r.arr.guestId)} (${pers(r.arr)}, ${t("fino al")} ${fmtDM(r.arr.checkOut)})`;
+          row = `${r.unit.name}: ${t("esce")} ${guestName(r.dep.guestId)} · ${t("entra")} ${guestName(r.arr.guestId)} (${pers(r.arr)}, ${t("fino al")} ${fmtDM(r.arr.checkOut)})`;
         } else if (g.key === "arrivo" && r.arr) {
-          row = `${r.unit.name} — ${t("entra")} ${guestName(r.arr.guestId)} (${pers(r.arr)}, ${t("fino al")} ${fmtDM(r.arr.checkOut)})`;
+          row = `${r.unit.name}: ${t("entra")} ${guestName(r.arr.guestId)} (${pers(r.arr)}, ${t("fino al")} ${fmtDM(r.arr.checkOut)})`;
         } else if (g.key === "partenza" && r.dep) {
-          row = `${r.unit.name} — ${t("esce")} ${guestName(r.dep.guestId)}`;
+          row = `${r.unit.name}: ${t("esce")} ${guestName(r.dep.guestId)}`;
         } else {
           const b = r.stay ?? r.arr ?? r.dep;
-          row = b ? `${r.unit.name} — ${guestName(b.guestId)} (${pers(b)}, ${t("fino al")} ${fmtDM(b.checkOut)})` : r.unit.name;
+          row = b ? `${r.unit.name}: ${guestName(b.guestId)} (${pers(b)}, ${t("fino al")} ${fmtDM(b.checkOut)})` : r.unit.name;
         }
         lines.push(`• ${row}${noteOf(r)}${r.oosFrom && r.oosNote ? ` [${r.oosNote}]` : ""}`);
       }
@@ -167,7 +167,7 @@ export function buildPuliziePlanText(opts: {
     const oos = list.filter((r) => r.oos);
     if (oos.length) {
       lines.push("", t("FUORI SERVIZIO"));
-      for (const r of oos) lines.push(`• ${r.unit.name}${r.oosNote ? ` — ${r.oosNote}` : ""}${noteOf(r)}`);
+      for (const r of oos) lines.push(`• ${r.unit.name}${r.oosNote ? `: ${r.oosNote}` : ""}${noteOf(r)}`);
     }
     const nothing = list.filter((r) => !r.oos && r.action === "niente");
     if (nothing.length) lines.push("", bold(t(ACT_LABEL.niente)), ...nothing.map((r) => `• ${r.unit.name}`)); // come gli altri gruppi: titolo in grassetto e una camera per riga
@@ -200,11 +200,11 @@ export function buildPuliziePlanFields(opts: { scopedStructures: Structure[]; ro
     const until = (b: Booking) => `${t("fino al")} ${fmtDM(b.checkOut)}`;
     const joinD = (rs: PlanRoom[], label: (r: PlanRoom) => string) => (rs.length ? rs.map((r) => clean(`${label(r)}${note(r)}`)).join("; ") : none);
     return {
-      cambio: joinD(of("turnover"), (r) => (r.dep && r.arr ? `${r.unit.name} — ${t("esce")} ${gname(r.dep.guestId)} · ${t("entra")} ${gname(r.arr.guestId)} (${pers(r.arr)}, ${until(r.arr)})` : withPers(r))),
-      arrivi: joinD(of("arrivo"), (r) => (r.arr ? `${r.unit.name} — ${t("entra")} ${gname(r.arr.guestId)} (${pers(r.arr)}, ${until(r.arr)})` : r.unit.name)),
-      partenze: joinD(of("partenza"), (r) => (r.dep ? `${r.unit.name} — ${t("esce")} ${gname(r.dep.guestId)}` : r.unit.name)),
-      riassetto: joinD(of("riassetto"), (r) => { const b = r.stay ?? r.arr ?? r.dep; return b ? `${r.unit.name} — ${gname(b.guestId)} (${pers(b)}, ${until(b)})` : r.unit.name; }),
-      fuori: joinD(list.filter((r) => r.oos), (r) => `${r.unit.name}${r.oosNote ? ` — ${r.oosNote}` : ""}`),
+      cambio: joinD(of("turnover"), (r) => (r.dep && r.arr ? `${r.unit.name}: ${t("esce")} ${gname(r.dep.guestId)} · ${t("entra")} ${gname(r.arr.guestId)} (${pers(r.arr)}, ${until(r.arr)})` : withPers(r))),
+      arrivi: joinD(of("arrivo"), (r) => (r.arr ? `${r.unit.name}: ${t("entra")} ${gname(r.arr.guestId)} (${pers(r.arr)}, ${until(r.arr)})` : r.unit.name)),
+      partenze: joinD(of("partenza"), (r) => (r.dep ? `${r.unit.name}: ${t("esce")} ${gname(r.dep.guestId)}` : r.unit.name)),
+      riassetto: joinD(of("riassetto"), (r) => { const b = r.stay ?? r.arr ?? r.dep; return b ? `${r.unit.name}: ${gname(b.guestId)} (${pers(b)}, ${until(b)})` : r.unit.name; }),
+      fuori: joinD(list.filter((r) => r.oos), (r) => `${r.unit.name}${r.oosNote ? `: ${r.oosNote}` : ""}`),
       niente: join(of("niente"), (r) => r.unit.name),
     };
   }
@@ -242,7 +242,7 @@ export function buildPuliziePlanSummary(opts: {
     if (oos.length) seg.push(`${t("fuori servizio")}: ${oos.map((r) => r.unit.name).join(", ")}`);
     const nothing = list.filter((r) => !r.oos && r.action === "niente");
     if (nothing.length && seg.length) seg.push(`${t("niente")}: ${nothing.map((r) => r.unit.name).join(", ")}`);
-    parts.push(seg.length ? `${s.name} — ${seg.join(" | ")}` : `${s.name} — ${t("nessuna pulizia")}`);
+    parts.push(seg.length ? `${s.name}: ${seg.join(" | ")}` : `${s.name}: ${t("nessuna pulizia")}`);
   }
   return parts.join(" // ") || t("Nessuna pulizia in programma.");
 }

@@ -239,7 +239,7 @@ export function messageEmailHtml(o: { lang?: Lang; title: string; text: string; 
   const body = textBlockHtml(o.text)
     + (o.ctaUrl ? ctaButtonHtml(o.ctaUrl, o.ctaLabel || "→", accent) : "")
     + (o.note ? `<p style="margin:8px 0 0;font:12px/1.5 Arial,Helvetica,sans-serif;color:#6b7280;text-align:center;">${esc(o.note)}</p>` : "");
-  return emailShell({ lang: o.lang, title: o.title, accent, brand: o.brand, eyebrow: o.title, bodyHtml: body, preheader: o.preheader || nonEmpty(o.text).slice(0, 110) });
+  return emailShell({ lang: o.lang, title: o.title, accent, brand: o.brand, eyebrow: o.title, bodyHtml: body, preheader: o.preheader || nonEmpty(o.text).replace(/\*/g, "").slice(0, 110) });
 }
 
 // ── Check-in completato (al TITOLARE) ───────────────────────────────────────

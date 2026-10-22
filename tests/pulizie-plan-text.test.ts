@@ -24,9 +24,9 @@ test("il testo è ordinato per lavoro, con le camere in ordine naturale e le vuo
   const t = buildPuliziePlanText({ ...args, style: "plain" } as never);
   assert.ok(t.indexOf("Partenza + Arrivo") < t.indexOf("\nPartenza\n"));
   assert.ok(t.indexOf("\nPartenza\n") < t.indexOf("\nRiassetto\n"));
-  assert.match(t, /• 1 — esce SUN HE · entra Karl Josef \(2 pers\., fino al 13\.10\)/);
+  assert.match(t, /• 1: esce SUN HE · entra Karl Josef \(2 pers\., fino al 13\.10\)/);
   assert.match(t, /\nNiente\n• 2/);
-  assert.match(t, /FUORI SERVIZIO\n• 5 — perdita d'acqua/);
+  assert.match(t, /FUORI SERVIZIO\n• 5: perdita d'acqua/);
   assert.match(t, /3 camere da fare/);
 });
 
@@ -38,7 +38,7 @@ test("stile email senza asterischi, stile WhatsApp con il grassetto", () => {
 test("riepilogo di una riga per il modello WhatsApp: niente a capo, solo i numeri delle camere", () => {
   const s = buildPuliziePlanSummary(args as never);
   assert.ok(!s.includes("\n"));
-  assert.match(s, /Spigolehouse — cambio completo: 1 \| partenza: 3 \| riassetto: 10 \| fuori servizio: 5 \| niente: 2/);
+  assert.match(s, /Spigolehouse: cambio completo: 1 \| partenza: 3 \| riassetto: 10 \| fuori servizio: 5 \| niente: 2/);
 });
 
 test("senza camere: messaggio chiaro", () => {
@@ -61,10 +61,10 @@ test("campi per il modello WhatsApp a righe: una voce per lavoro, mai vuota, per
 
 test("campi dettagliati: come il messaggio condiviso a mano (chi esce, chi entra, persone, fino a quando), una riga e mai vuoti", () => {
   const f = buildPuliziePlanFields({ ...(args as object), detailed: true } as never);
-  assert.equal(f.cambio, "1 — esce SUN HE · entra Karl Josef (2 pers., fino al 13.10)");
-  assert.equal(f.partenze, "3 — esce SUN HE");
-  assert.equal(f.riassetto, "10 — Thomas Pies (1 pers., fino al 13.10)");
-  assert.equal(f.fuori, "5 — perdita d'acqua");
+  assert.equal(f.cambio, "1: esce SUN HE · entra Karl Josef (2 pers., fino al 13.10)");
+  assert.equal(f.partenze, "3: esce SUN HE");
+  assert.equal(f.riassetto, "10: Thomas Pies (1 pers., fino al 13.10)");
+  assert.equal(f.fuori, "5: perdita d'acqua");
   assert.equal(f.arrivi, "nessuna");
   for (const v of Object.values(f)) assert.ok(v.length > 0 && !/[\r\n\t]/.test(v) && !/ {5}/.test(v));
 });
@@ -73,7 +73,7 @@ test("campi dettagliati: più camere dello stesso lavoro separate da punto e vir
   const two = [...(rooms as unknown[]), room("4", "turnover", { dep: bk("b5", "g3", "2026-10-09", "2026-10-11"), arr: bk("b6", "g1", "2026-10-11", "2026-10-14") })];
   const f = buildPuliziePlanFields({ date: "2026-10-11", scopedStructures: [S], rooms: two, guests, detailed: true } as never);
   assert.equal(f.cambio.split("; ").length, 2);
-  assert.match(f.cambio, /^1 — .*; 4 — esce Thomas Pies · entra SUN HE \(2 pers\., fino al 14\.10\)$/);
+  assert.match(f.cambio, /^1: .*; 4: esce Thomas Pies · entra SUN HE \(2 pers\., fino al 14\.10\)$/);
 });
 
 test("riga iniziale e finale scelte dal titolare: prima e dopo l'elenco; vuote = niente", () => {
@@ -82,4 +82,12 @@ test("riga iniziale e finale scelte dal titolare: prima e dopo l'elenco; vuote =
   assert.ok(custom.startsWith("Buongiorno, ecco il planning\n\nPulizie di oggi"));
   assert.ok(custom.endsWith("\n\nGrazie!"));
   assert.equal(buildPuliziePlanText({ ...(args as object), style: "plain", intro: "  ", outro: "" } as never), base);
+});
+
+test("email: i titoli di sezione (Partenza, Riassetto…) diventano grassetto, gli asterischi non si vedono", async () => {
+  const { textBlockHtml } = await import("../src/lib/mail/shell.ts");
+  const html = textBlockHtml("*Pulizie di oggi*: giovedì\n\n*Partenza*\n• 3: esce Michela Pianesi");
+  assert.match(html, /<b>Pulizie di oggi<\/b>: giovedì/);
+  assert.match(html, /<b>Partenza<\/b>/);
+  assert.ok(!html.includes("*"));
 });
