@@ -14,7 +14,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const { can, moduleOn, user } = useAccess();
   const router = useRouter();
   // Profilo "solo Pulizie" (la signora delle pulizie): ovunque atterri, va alla sua pagina.
-  const pulOnlyOff = !!user && isPulizieOnly(user.perms) && !pathname.startsWith("/pulizie");
+  const pulOnlyOff = !!user && isPulizieOnly(user.perms) && !pathname.startsWith("/pulizie") && !pathname.startsWith("/profilo");
   useEffect(() => { if (pulOnlyOff) router.replace("/pulizie"); }, [pulOnlyOff, router]);
   const item = NAV.filter((n) => n.href !== "/" && pathname.startsWith(n.href)).sort((a, b) => b.href.length - a.href.length)[0];
 
