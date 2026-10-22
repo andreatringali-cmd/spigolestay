@@ -91,3 +91,15 @@ test("email: i titoli di sezione (Partenza, Riassetto…) diventano grassetto, g
   assert.match(html, /<b>Partenza<\/b>/);
   assert.ok(!html.includes("*"));
 });
+
+test("email planning: pulsante «Apri il gestionale», chiusura e piè di pagina della struttura", async () => {
+  const { messageEmailHtml, brandFrom } = await import("../src/lib/mail/guest-emails.ts");
+  const brand = brandFrom({ structureName: "Central Perk - Antioco", address: "Via Roma 1, Siracusa", phone: "+39 333 0000000", structureEmail: "info@example.com", color: "#285f92" } as never);
+  const html = messageEmailHtml({ title: "Planning pulizie", text: "*Pulizie di oggi*: giovedì\n\nGrazie,\nla direzione", accent: "#285f92", brand, ctaUrl: "https://xenora.it/pulizie", ctaLabel: "Apri il gestionale →" });
+  assert.match(html, /Apri il gestionale/);
+  assert.match(html, /https:\/\/xenora\.it\/pulizie/);
+  assert.match(html, /<b>Pulizie di oggi<\/b>/);
+  assert.match(html, /Grazie,\s*la direzione/);
+  assert.match(html, /Via Roma 1, Siracusa/);
+  assert.match(html, /Central Perk - Antioco/);
+});

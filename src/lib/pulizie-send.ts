@@ -32,7 +32,8 @@ export async function deliverPuliziePlan(a: {
   const planArgs = { date, scopedStructures: [st], rooms, guests: a.guests, notes: a.notes };
   const custom = { intro: cfg.intro, outro: cfg.outro }; // riga iniziale e finale scelte dal titolare
   const text = buildPuliziePlanText({ ...planArgs, ...custom, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
-  const emailText = buildPuliziePlanText({ ...planArgs, ...custom, style: "whatsapp" }); // email: gli asterischi *…* diventano grassetto nel corpo HTML (textBlockHtml)
+  // Email: gli asterischi *…* diventano grassetto nel corpo HTML (textBlockHtml); se il titolare non ha scelto una riga finale si chiude con un saluto.
+  const emailText = buildPuliziePlanText({ ...planArgs, ...custom, outro: (cfg.outro ?? "").trim() ? cfg.outro : "Grazie,\nla direzione", style: "whatsapp" });
   const summary = buildPuliziePlanSummary(planArgs);
   // Una voce per tipo di lavoro, per il modello WhatsApp "a righe". Prima la versione dettagliata (chi esce, chi entra, persone, fino a quando: come nel messaggio condiviso a mano);
   // il corpo del modello Meta ha un limite (1024 caratteri in tutto), quindi se il dettaglio non ci sta si ripiega sulla versione con i soli numeri delle camere.
@@ -48,7 +49,10 @@ export async function deliverPuliziePlan(a: {
     try {
       const resp = await internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "guest_message", lang: "it", to: cfg.emailTo, ...(cfg.emailCc?.length ? { cc: cfg.emailCc } : {}), subject, text: emailText, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
+        body: JSON.stringify({ kind: "guest_message", lang: "it", to: cfg.emailTo, ...(cfg.emailCc?.length ? { cc: cfg.emailCc } : {}), subject, text: emailText,
+          // Pulsante verso le Pulizie (chi riceve l'email segna fatta/da fare o segnala un guasto) e piè di pagina con i dati della struttura.
+          ctaUrl: `${origin}/pulizie`, ctaLabel: "Apri il gestionale →",
+          booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo), address: [str(stJ.address), str(stJ.city)].filter(Boolean).join(", "), phone: str(stJ.phone), structureEmail: str(stJ.email), website: str(stJ.website), cin: str(stJ.cin) } }),
       });
       const j = await resp.json().catch(() => ({}));
       r = resp.ok && j?.ok ? { channel: "email", ok: true, detail: cfg.emailCc?.length ? `${cfg.emailTo} (in copia: ${cfg.emailCc.join(", ")})` : cfg.emailTo } : { channel: "email", ok: false, detail: errText(j, resp.status) };
