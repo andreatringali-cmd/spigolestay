@@ -270,31 +270,35 @@ export default function UserSchedaPage() {
             <label className="mt-2 block text-xs font-medium text-dim">{t("Username")} *
               <input value={u.username} onChange={(e) => set("username", e.target.value)} className={`${inp} mt-1`} placeholder={t("es. mario.rossi")} />
             </label>
-            <div className="mt-3">
-              <div className="text-xs font-medium text-dim">{t("Password")}</div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                <Button variant="secondary" size="xs" onClick={() => { setPwOpen((o) => !o); resetPwFields(); }}>🔑 {t("Cambia password")}</Button>
-              </div>
-              {pwOpen && (isSelf ? (
-                <div className="mt-2 space-y-2">
-                  <input type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder={t("Password attuale")} className={inp} />
-                  <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t(`Nuova password (min. ${PASSWORD_MIN})`)} className={inp} />
-                  <input type="password" autoComplete="new-password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} placeholder={t("Ripeti nuova password")} className={inp} />
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Button size="xs" onClick={changePw} disabled={pwBusy}>{pwBusy ? t("Attendi…") : t("Aggiorna password")}</Button>
-                    <button type="button" onClick={forgotPw} disabled={pwBusy} className="text-xs font-medium text-focus hover:underline">{t("Password dimenticata?")}</button>
+            {isNew ? (
+              <p className="mt-3 rounded-lg bg-wash px-3 py-2 text-[12px] text-dim">{t("La password la sceglie la persona stessa: dopo «Crea utente» riceve un'email con il link per registrarsi e impostarla. Qui non serve scriverla.")}</p>
+            ) : (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-dim">{t("Password")}</div>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <Button variant="secondary" size="xs" onClick={() => { setPwOpen((o) => !o); resetPwFields(); }}>🔑 {t("Cambia password")}</Button>
+                </div>
+                {pwOpen && (isSelf ? (
+                  <div className="mt-2 space-y-2">
+                    <input type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder={t("Password attuale")} className={inp} />
+                    <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t(`Nuova password (min. ${PASSWORD_MIN})`)} className={inp} />
+                    <input type="password" autoComplete="new-password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} placeholder={t("Ripeti nuova password")} className={inp} />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button size="xs" onClick={changePw} disabled={pwBusy}>{pwBusy ? t("Attendi…") : t("Aggiorna password")}</Button>
+                      <button type="button" onClick={forgotPw} disabled={pwBusy} className="text-xs font-medium text-focus hover:underline">{t("Password dimenticata?")}</button>
+                    </div>
+                    <p className="text-[11px] text-faint">{t("Se non ricordi quella attuale, usa «Password dimenticata»: ti arriva un link via email per reimpostarla.")}</p>
                   </div>
-                  <p className="text-[11px] text-faint">{t("Se non ricordi quella attuale, usa «Password dimenticata»: ti arriva un link via email per reimpostarla.")}</p>
-                </div>
-              ) : (
-                <div className="mt-2 space-y-2">
-                  <p className="text-[12px] text-dim">{t("Per motivi di sicurezza non puoi impostare tu la password di un altro utente. Invia un'email di reset: l'utente sceglierà la sua nuova password.")}</p>
-                  <Button size="xs" onClick={forgotPw} disabled={pwBusy}>{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</Button>
-                </div>
-              ))}
-              {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
-            </div>
-            <MfaSetup />
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-[12px] text-dim">{t("Per motivi di sicurezza non puoi impostare tu la password di un altro utente. Invia un'email di reset: l'utente sceglierà la sua nuova password.")}</p>
+                    <Button size="xs" onClick={forgotPw} disabled={pwBusy}>{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</Button>
+                  </div>
+                ))}
+                {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
+              </div>
+            )}
+            {!isNew && isSelf && <MfaSetup />}
           </Card>
 
           {!isNew && <UserAccessCard user={u} structures={structures.map((x) => ({ id: x.id, name: x.name }))} onShared={(sid, orgId) => updateStructure(sid, { orgId })} />}
