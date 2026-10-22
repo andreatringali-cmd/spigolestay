@@ -23,7 +23,6 @@ import AddettaView from "@/components/pulizie/AddettaView";
 import AddettaPurchases from "@/components/pulizie/AddettaPurchases";
 import AddettaAgenda from "@/components/pulizie/AddettaAgenda";
 import { useAccess } from "@/lib/access";
-import { isPulizieOnly } from "@/lib/pulizie-addetta";
 import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors";
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
@@ -123,16 +122,15 @@ export default function PuliziePage() {
   const [tab, setTab] = useState<"planning" | "scorte" | "checklist">("planning");
   const [agSpan, setAgSpan] = useState<"3" | "7" | "14">("7"); // vista elenco: quanti giorni mostrare
   const [agOpen, setAgOpen] = useState({ open: false, n: 0 }); // vista elenco: apri/chiudi tutti i giorni
-  // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=checklist.
-  const { user: accessUser, level } = useAccess();
-  const pulOnly = isPulizieOnly(accessUser?.perms);
+  // Vista "Addetta" (Checklist): solo con /pulizie?tab=checklist. Chi ha accesso SOLO a Pulizie (la signora) si apre sulla scheda «Pulizie» (il programma del giorno).
+  const { level } = useAccess();
   const tabInit = useRef(false);
   useEffect(() => {
     if (tabInit.current) return;
     let want = false;
     try { const q = new URLSearchParams(window.location.search).get("tab"); want = q === "addetta" || q === "checklist"; } catch {}
-    if (want || pulOnly) { tabInit.current = true; setTab("checklist"); }
-  }, [pulOnly]);
+    if (want) { tabInit.current = true; setTab("checklist"); }
+  }, []);
   const [stock, setStock] = useState<Prod[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [prodDraft, setProdDraft] = useState<null | { id?: string; name: string; structureId: string; supplier: string; qty: number; min: number; applyAll?: boolean }>(null);

@@ -10,6 +10,7 @@ import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import UserSwitcher from "./UserSwitcher";
 import { useNavBadges } from "@/lib/navbadges";
+import { isPulizieOnly } from "@/lib/pulizie-addetta";
 
 // Email del titolare Xenora che vede il link al back-office (l'accesso vero è comunque
 // verificato lato server dalla variabile ADMIN_EMAILS).
@@ -30,7 +31,7 @@ export default function Sidebar({
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }) {
-  const { can, moduleOn } = useAccess();
+  const { can, moduleOn, user: accessUser } = useAccess();
   const { t } = useLang();
   const { user } = useAuth();
   const badges = useNavBadges(pathname);
@@ -38,7 +39,11 @@ export default function Sidebar({
   const isOwner = !!user?.email && OWNER_EMAILS.includes(user.email.toLowerCase());
   // Mostra TUTTE le voci per cui hai i permessi (anche dei piani superiori): quelle non incluse
   // nel piano appaiono col lucchetto e, cliccandole, portano all'attivazione dall'Abbonamento.
-  const visible = NAV.filter((n) => can(n.perm) && (!n.ownerOnly || isOwner));
+  // Chi ha accesso SOLO a Pulizie (la signora delle pulizie) vede una sola voce, «Pulizie», in alto: niente Dashboard e niente gruppo PMS con dentro una voce sola.
+  const pulOnly = !!accessUser && isPulizieOnly(accessUser.perms);
+  const visible = pulOnly
+    ? NAV.filter((n) => n.href === "/pulizie").map((n) => ({ ...n, group: "" }))
+    : NAV.filter((n) => can(n.perm) && (!n.ownerOnly || isOwner));
   const locked = (n: (typeof NAV)[number]) => !moduleOn(n.module);
   const TOP = visible.filter((n) => !n.group);
   const GROUPS = Array.from(new Set(visible.filter((n) => n.group).map((n) => n.group)));

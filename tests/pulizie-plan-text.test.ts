@@ -110,3 +110,13 @@ test("email planning: «Buongiorno,» in apertura e «Grazie, la direzione» in 
   assert.match(src, /intro: \(cfg\.intro \?\? ""\)\.trim\(\) \? cfg\.intro : "Buongiorno,"/);
   assert.ok(src.includes('cfg.outro : "Grazie,\\nla direzione"'));
 });
+
+test("profilo «solo Pulizie»: sidebar con la sola voce Pulizie in alto, apertura sul programma e non sulla Checklist", () => {
+  const sb = readFileSync(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8");
+  assert.match(sb, /isPulizieOnly\(accessUser\.perms\)/);
+  assert.match(sb, /n\.href === "\/pulizie"\)\.map\(\(n\) => \(\{ \.\.\.n, group: "" \}\)\)/);
+  const gate = readFileSync(new URL("../src/components/AccessGate.tsx", import.meta.url), "utf8");
+  assert.ok(gate.includes('router.replace("/pulizie")') && !gate.includes("tab=checklist"));
+  const pg = readFileSync(new URL("../src/app/(app)/pulizie/page.tsx", import.meta.url), "utf8");
+  assert.ok(!/if \(want \|\| pulOnly\)/.test(pg));
+});
