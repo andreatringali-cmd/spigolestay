@@ -105,6 +105,7 @@ const PG_CODES: Record<string, string> = {
 
 /** Testi tipici degli errori inglesi (browser, Supabase/PostgREST, Postgres): [espressione, frase]. Il primo che combacia vince. */
 const PATTERNS: [RegExp, string][] = [
+  [/already been registered|email_exists|user already registered/i, "Esiste già un accesso con questo indirizzo: entra con la tua email e password, oppure con Google."],
   [/weak and easy to guess|known to be weak|pwned|leaked password|weak_password/i, "Questa password è troppo comune o è già comparsa in violazioni di dati: scegline un'altra, più lunga e solo tua (lettere, numeri e un simbolo)."],
   [/failed to fetch|load failed|networkerror|network request failed|network error|fetch failed|err_internet|err_network|the internet connection appears to be offline|aborterror|the operation was aborted|econnreset|etimedout|socket hang up/i, CONNECTION],
   [/jwt expired|invalid jwt|jwt malformed|token (is )?expired|session (has )?expired|not authenticated|refresh token/i, SESSION],

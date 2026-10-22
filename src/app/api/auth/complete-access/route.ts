@@ -46,12 +46,19 @@ export async function POST(req: Request) {
     }
     const what = decideCompletion(existing);
     if (what === "already") {
-      return NextResponse.json({ error: "already_registered", message: "Hai già un accesso: entra con la tua email e password. Se non la ricordi, usa «Password dimenticata»." }, { status: 409 });
+      return NextResponse.json({ error: "already_registered", message: "Hai già un accesso con questo indirizzo: entra con Google oppure con la tua email e password. Se non la ricordi, usa «Password dimenticata»." }, { status: 409 });
     }
     const res = what === "create"
       ? await admin.auth.admin.createUser({ email, password, email_confirm: true })
       : await admin.auth.admin.updateUserById(userId as string, { password, email_confirm: true });
-    if (res.error) return NextResponse.json({ error: "auth_failed", message: friendlyError(res.error) }, { status: 400 });
+    if (res.error) {
+      // L'indirizzo ha già un accesso che qui non risultava (es. registrato con Google): non si crea un doppione, si rimanda al login.
+      const code = String((res.error as { code?: string }).code ?? "");
+      if (code === "email_exists" || /already been registered|already registered/i.test(String(res.error.message ?? ""))) {
+        return NextResponse.json({ error: "already_registered", message: "Hai già un accesso con questo indirizzo: entra con Google oppure con la tua email e password. Se non la ricordi, usa «Password dimenticata»." }, { status: 409 });
+      }
+      return NextResponse.json({ error: "auth_failed", message: friendlyError(res.error) }, { status: 400 });
+    }
     return NextResponse.json({ ok: true, email });
   } catch (e) {
     return NextResponse.json({ error: "failed", message: friendlyError(e) }, { status: 500 });

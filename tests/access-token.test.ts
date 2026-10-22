@@ -59,3 +59,9 @@ test("email di nuovo link: oggetto e testo dedicati", () => {
   assert.equal(m.subject, "Il tuo link per entrare in Xenora");
   assert.match(m.html, /nuovo link/);
 });
+
+test("indirizzo già registrato (es. con Google): messaggio chiaro, non «operazione non riuscita»", async () => {
+  const { friendlyError } = await import("../src/lib/friendly-error.ts");
+  const out = friendlyError({ message: "A user with this email address has already been registered", code: "email_exists" });
+  assert.match(out, /Esiste già un accesso/);
+});
