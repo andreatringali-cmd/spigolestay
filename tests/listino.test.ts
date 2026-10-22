@@ -27,3 +27,11 @@ test("listino: il check-in online è dal Pro in su, non nel Basic", () => {
   assert.ok(inc("pro").includes("checkin"));
   assert.ok(inc("ultimate").includes("checkin"));
 });
+
+// Messaggi di Supabase Auth in inglese: all'utente arrivano sempre in italiano.
+test("password debole: il messaggio inglese di Supabase diventa italiano", async () => {
+  const { friendlyError } = await import("../src/lib/friendly-error.ts");
+  const out = friendlyError({ message: "Password is known to be weak and easy to guess, please choose a different one." });
+  assert.match(out, /troppo comune/);
+  assert.ok(!/weak|guess/i.test(out));
+});

@@ -413,5 +413,7 @@ function traduci(msg: string): string {
   if (m.includes("rate limit") || m.includes("too many")) return "Troppi tentativi. Attendi qualche minuto e riprova.";
   if (m.includes("captcha")) return "Verifica di sicurezza non riuscita. Riprova.";
   if (m.includes("same password")) return "La nuova password non può essere uguale alla precedente.";
+  if (m.includes("weak and easy to guess") || m.includes("known to be weak") || m.includes("pwned") || m.includes("weak_password")) return "Questa password è troppo comune o è già comparsa in violazioni di dati: scegline un'altra, più lunga e solo tua (lettere, numeri e un simbolo).";
+  if (m.includes("should contain at least one character")) return "La password deve contenere almeno una lettera maiuscola, una minuscola, un numero e un simbolo.";
   return msg;
 }
