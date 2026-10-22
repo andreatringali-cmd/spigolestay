@@ -5,6 +5,8 @@ import { useAccess } from "@/lib/access";
 import { PERM_TEMPLATES, initials } from "@/lib/users";
 import { playSound } from "@/lib/sound";
 import { useAuth } from "@/lib/authsync";
+import Link from "next/link";
+import { isPulizieOnly } from "@/lib/pulizie-addetta";
 import Popover from "./Popover";
 
 import { onSolid, solidBg } from "@/lib/on-solid";
@@ -33,6 +35,14 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
               <span className="block text-[11px] text-dim">{roleLabel(user.templateKey)}</span>
             </span>
           </div>
+          {isPulizieOnly(user.perms) && (
+            <div className="border-t border-line pt-1">
+              <Link href="/profilo" onClick={() => setOpen(false)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-txt hover:bg-wash">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+                Il mio profilo
+              </Link>
+            </div>
+          )}
           {authEnabled && (
             <div className="border-t border-line pt-1">
               {authUser?.email && <div className="px-2 pb-1 pt-0.5 text-[11px] text-faint truncate" title={authUser.email}>Account: {authUser.email}</div>}

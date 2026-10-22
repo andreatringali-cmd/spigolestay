@@ -42,7 +42,7 @@ export default function Sidebar({
   // Chi ha accesso SOLO a Pulizie (la signora delle pulizie) vede una sola voce, «Pulizie», in alto: niente Dashboard e niente gruppo PMS con dentro una voce sola.
   const pulOnly = !!accessUser && isPulizieOnly(accessUser.perms);
   const visible = pulOnly
-    ? [...NAV.filter((n) => n.href === "/pulizie").map((n) => ({ ...n, group: "" })), { label: "Il mio profilo", href: "/profilo", group: "", icon: "users" } as (typeof NAV)[number]]
+    ? NAV.filter((n) => n.href === "/pulizie").map((n) => ({ ...n, group: "" }))
     : NAV.filter((n) => can(n.perm) && (!n.ownerOnly || isOwner));
   const locked = (n: (typeof NAV)[number]) => !moduleOn(n.module);
   const TOP = visible.filter((n) => !n.group);

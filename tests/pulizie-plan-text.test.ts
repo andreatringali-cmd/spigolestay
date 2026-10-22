@@ -121,9 +121,11 @@ test("profilo «solo Pulizie»: sidebar con la sola voce Pulizie in alto, apertu
   assert.ok(!/if \(want \|\| pulOnly\)/.test(pg));
 });
 
-test("profilo «solo Pulizie»: oltre a Pulizie c'è «Il mio profilo» (foto, password, esci) e non viene rimandata indietro", () => {
+test("profilo «solo Pulizie»: «Il mio profilo» (foto, password, esci) si apre dal nome in basso e non viene rimandata indietro", () => {
   const sb = readFileSync(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8");
-  assert.ok(sb.includes('label: "Il mio profilo", href: "/profilo"'));
+  const us = readFileSync(new URL("../src/components/UserSwitcher.tsx", import.meta.url), "utf8");
+  assert.ok(us.includes("isPulizieOnly(user.perms)") && us.includes('href="/profilo"') && us.includes("Il mio profilo"));
+  assert.ok(!sb.includes('label: "Il mio profilo"')); // nella sidebar resta la sola voce Pulizie
   const gate = readFileSync(new URL("../src/components/AccessGate.tsx", import.meta.url), "utf8");
   assert.ok(gate.includes('!pathname.startsWith("/profilo")'));
   const pg = readFileSync(new URL("../src/app/(app)/profilo/page.tsx", import.meta.url), "utf8");
