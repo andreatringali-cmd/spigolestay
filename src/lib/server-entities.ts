@@ -1,3 +1,4 @@
+import { recordCompare } from "./compare-stats";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Lettura LATO SERVER dalle tabelle (public.entities) al posto dei blocchi interi (app_state / org_state, chiave "spigolestay:data:v1").
@@ -51,15 +52,20 @@ const OK_EVERY_MS = 10 * 60_000;
 /** Solo per i test: sostituisce (o ripristina, con null) la destinazione dei messaggi [entities-compare] e azzera il limitatore delle righe "ok". */
 export function _setEntitiesLogger(fn: LogFn | null) { logFn = fn ?? defaultLog; okAt.clear(); }
 
-/** Registra un evento del confronto: sempre una riga JSON con prefisso [entities-compare]. */
-export function logCompare(level: "info" | "warn", payload: Json) {
+function emitCompare(level: "info" | "warn", payload: Json) {
   try { logFn(level, "[entities-compare] " + JSON.stringify({ ts: new Date().toISOString(), ...payload })); } catch { /* il registro non deve mai rompere una richiesta */ }
 }
+/** Registra un evento del confronto: una riga JSON con prefisso [entities-compare] nei log e un conteggio nel database (entities_compare_stats). */
+export function logCompare(level: "info" | "warn", payload: Json) {
+  recordCompare(String((payload as { label?: unknown }).label ?? "?"), String((payload as { result?: unknown }).result ?? "error"), payload);
+  emitCompare(level, payload);
+}
 function logOk(label: string) {
+  recordCompare(label, "ok"); // il conteggio nel database è completo
   const now = Date.now();
-  if ((okAt.get(label) ?? 0) + OK_EVERY_MS > now) return; // le righe "tutto uguale" al massimo una ogni 10 minuti per punto: i log restano leggibili
+  if ((okAt.get(label) ?? 0) + OK_EVERY_MS > now) return; // le righe "tutto uguale" nei log al massimo una ogni 10 minuti per punto: i log restano leggibili
   okAt.set(label, now);
-  logCompare("info", { label, result: "ok" });
+  emitCompare("info", { label, result: "ok" });
 }
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);
 

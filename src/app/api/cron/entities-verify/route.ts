@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
+import { flushCompareStats, recordCompare } from "@/lib/compare-stats";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,5 +27,19 @@ export async function GET(req: Request) {
   if (error) { console.error("[entities-verify]", error.message); return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); }
   const r = data as { ok?: boolean; bad?: number } | null;
   if (!r?.ok) console.error("[entities-verify] DIFFERENZE tra blob e tabella:", JSON.stringify(r).slice(0, 2000));
-  return NextResponse.json({ ok: !!r?.ok, bad: r?.bad ?? null });
+
+  // Anche i tipi aggiunti dopo (prezzi, attività, cancellazioni…): prima il controllo notturno non li guardava. L'esito va nei contatori (riga «verify:extra»).
+  let extraBad: number | null = null;
+  try {
+    const ex = await admin.rpc("entities_verify_extra");
+    if (!ex.error && Array.isArray(ex.data)) {
+      const bad = (ex.data as { kind?: string; missing?: number; extra?: number; different?: number }[]).filter((x) => (x.missing ?? 0) > 0 || (x.extra ?? 0) > 0 || (x.different ?? 0) > 0 || x.kind === "parse_error");
+      extraBad = bad.length;
+      if (bad.length) console.error("[entities-verify] DIFFERENZE nei tipi aggiuntivi:", JSON.stringify(bad).slice(0, 2000));
+      recordCompare("verify:extra", bad.length ? "diff" : "ok", bad.slice(0, 5));
+    } else if (ex.error) { recordCompare("verify:extra", "error", { message: ex.error.message.slice(0, 200) }); }
+  } catch (e) { recordCompare("verify:extra", "error", { message: e instanceof Error ? e.message.slice(0, 200) : "errore" }); }
+  recordCompare("verify:main", r?.ok ? "ok" : "diff", r);
+  await flushCompareStats();
+  return NextResponse.json({ ok: !!r?.ok && (extraBad ?? 0) === 0, bad: r?.bad ?? null, extraBad });
 }
