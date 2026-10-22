@@ -2,6 +2,13 @@
 // Il browser dell'ospite manda solo il NOME del piano: percentuale di caparra, rimborsabilita' e giorni di cancellazione gratuita
 // si ricavano dai piani del proprietario (spigolestay:rateplans) e non da cio' che dichiara il client. Le regole sono le stesse di
 // lib/rate-plans.ts (planApplies / planDepositPct): qui sono ripetute perche' quel modulo importa il client Supabase del browser.
+// La CANCELLAZIONE non e' piu' del piano: la decide la scheda struttura, uguale per tutti i piani. Stessa tabella di lib/cancel-policy.ts (un test controlla che coincidano):
+// qui e' ripetuta perche' questo modulo resta senza import.
+const STRUCTURE_CANCEL: Record<string, { refundable: boolean; days: number }> = { flessibile: { refundable: true, days: 1 }, moderata: { refundable: true, days: 7 }, rigida: { refundable: false, days: 0 } };
+const withStructureCancel = <T extends { refundable?: boolean; cancelDays?: number }>(plan: T, kind: unknown): T => {
+  const r = typeof kind === "string" ? STRUCTURE_CANCEL[kind] : undefined;
+  return r ? { ...plan, refundable: r.refundable, cancelDays: r.refundable ? r.days : 0 } : plan;
+};
 
 export interface PlanLike {
   id?: string; name?: string; adjPct?: number; refundable?: boolean; minStay?: number; enabled?: boolean;
@@ -48,17 +55,18 @@ export interface ResolvedPolicy {
 /** Politica applicabile: il piano con quel nome tra quelli del proprietario (o predefiniti). Se non esiste o non vale per le date: prepagato, non rimborsabile. */
 export function resolvePlanPolicy(
   plans: unknown[] | null | undefined, planName: string,
-  o: { roomTypeId: string; checkIn: string; nights: number; structureId: string },
+  o: { roomTypeId: string; checkIn: string; nights: number; structureId: string; cancelPolicy?: unknown },
 ): ResolvedPolicy {
   const list = (Array.isArray(plans) && plans.length ? plans : DEFAULT_SERVER_PLANS).filter((x): x is PlanLike => !!x && typeof x === "object");
   const want = String(planName || "").trim().toLowerCase();
   const p = want ? list.find((x) => String(x.name || "").trim().toLowerCase() === want && applies(x, o)) : undefined;
   if (!p) return { found: false, planName: String(planName || ""), refundable: false, cancelDays: 0, depositPct: 100, adjPct: 0 };
-  const refundable = p.refundable === true;
+  const eff = withStructureCancel(p, o.cancelPolicy); // politica della struttura (se scelta) al posto di quella del piano
+  const refundable = eff.refundable === true;
   return {
     found: true, planName: String(p.name || planName), refundable,
-    cancelDays: refundable ? Math.max(0, Math.round(Number(p.cancelDays) || 0)) : 0,
-    depositPct: planDepositPctOf(p),
+    cancelDays: refundable ? Math.max(0, Math.round(Number(eff.cancelDays) || 0)) : 0,
+    depositPct: planDepositPctOf(eff),
     adjPct: Number(p.adjPct) || 0,
   };
 }

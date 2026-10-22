@@ -169,7 +169,7 @@ export const AMENITIES = ["Wi-Fi", "Aria condizionata", "Riscaldamento", "Parche
 export const PAY_METHODS = ["Contanti", "Carta / POS", "Bonifico", "PayPal", "Satispay"];
 export const CANCEL_POLICIES: { key: "flessibile" | "moderata" | "rigida"; label: string; desc: string }[] = [
   { key: "flessibile", label: "Flessibile", desc: "Cancellazione gratuita fino a 24h prima." },
-  { key: "moderata", label: "Moderata", desc: "Gratuita fino a 5 giorni prima." },
+  { key: "moderata", label: "Moderata", desc: "Gratuita fino a 7 giorni prima." },
   { key: "rigida", label: "Rigida", desc: "Nessun rimborso dopo la prenotazione." },
 ];
 

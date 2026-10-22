@@ -1,5 +1,6 @@
 "use client";
 
+import { withStructureCancel } from "@/lib/cancel-policy";
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { effectiveBase } from "@/lib/pricing";
@@ -109,6 +110,8 @@ export default function PianiTariffariPage() {
   const addPlan = () => { const sid = newItemStructureId(effStructure); const p: RatePlan = { id: uid(), name: t("Nuovo piano"), adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none", ...(sid ? { structureId: sid } : {}) }; setNewPlan(p); setEditId(p.id); };
   // Si salva SEMPRE l'elenco completo (tutte le strutture); la vista mostra solo i piani della struttura + quelli per tutte.
   const shownPlans = plans.filter((p) => inScope(p.structureId, effStructure));
+  // La cancellazione la decide la scheda struttura: per ogni piano si mostra quella della sua struttura (o di quella selezionata in alto).
+  const policyFor = (p: RatePlan) => structures.find((x) => x.id === (p.structureId || (effStructure !== "all" ? effStructure : structures[0]?.id)))?.cancelPolicy;
   const structName = (id?: string) => (id ? structures.find((s) => s.id === id)?.name ?? "?" : t("Tutte le strutture"));
 
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
@@ -170,7 +173,7 @@ export default function PianiTariffariPage() {
                       <td className="px-3 py-2.5 text-dim">{t(p.board)}</td>
                       <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: p.adjPct === 0 ? "var(--wash)" : `color-mix(in srgb, ${p.adjPct > 0 ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: p.adjPct === 0 ? "var(--dim)" : p.adjPct > 0 ? "var(--ok)" : "var(--err)" }}>{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span></td>
                       <td className="px-3 py-2.5 text-center font-mono text-dim">{p.minStay}</td>
-                      <td className="px-3 py-2.5"><span className="text-xs font-medium" style={{ color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span></td>
+                      <td className="px-3 py-2.5"><span className="text-xs font-medium" style={{ color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(withStructureCancel(p, policyFor(p)), t)}</span></td>
                       <td className="px-3 py-2.5 text-xs text-dim">{depositLabel(p, t)}</td>
                       <td className="px-3 py-2.5 text-xs text-dim">{nRooms ? `${nRooms} ${t("tipologie")}` : t("Tutte")}</td>
                       <td className="px-3 py-2.5"><button onClick={(e) => { e.stopPropagation(); setPlan(p.id, { enabled: !on }); }} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}</button></td>
@@ -197,7 +200,7 @@ export default function PianiTariffariPage() {
                 <div className="text-[11px] text-faint">{t("su")} {eur(refBase)} {t("base")} · {t("esempio")}</div>
                 <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t(p.board)}</span>
-                  <span className="rounded-full px-2 py-0.5 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span>
+                  <span className="rounded-full px-2 py-0.5 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(withStructureCancel(p, policyFor(p)), t)}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{depositLabel(p, t)}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t("min")} {p.minStay} {p.minStay === 1 ? t("notte") : t("notti")}</span>
                   {structures.length > 1 && <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{structName(p.structureId)}</span>}
@@ -271,10 +274,7 @@ function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDe
 
       {/* Politiche prenotazione */}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="col-span-2 grid grid-cols-1 gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
-          <label className="col-span-2 flex items-center justify-between gap-2 text-sm text-txt">{t("Rimborsabile")}<Toggle on={f.refundable} onClick={() => set("refundable", !f.refundable)} /></label>
-          {f.refundable && <label className={`${lbl} col-span-2`}>{t("Cancellazione gratuita fino a (giorni prima)")}<input type="number" min={0} value={f.cancelDays ?? 0} onFocus={(e) => e.currentTarget.select()} onChange={(e) => set("cancelDays", num(e.target.value))} className={`${inp} mt-1`} placeholder="7" /></label>}
-        </div>
+        <p className="col-span-2 rounded-lg bg-wash px-3 py-2 text-xs text-dim">{t("La cancellazione non si sceglie qui: vale la politica della struttura (Strutture → Policy), uguale per tutti i piani, per il mini-sito e per Google.")}</p>
         <label className={lbl}>{t("Politica di incasso")}<select value={f.deposit ?? "none"} onChange={(e) => set("deposit", e.target.value as DepositId)} className={`${inp} mt-1`}>{DEPOSITS.map((d) => <option key={d.id} value={d.id}>{t(d.label)}</option>)}</select></label>
         {f.deposit === "deposit" && <label className={lbl}>{t("Acconto %")}<input type="number" min={1} max={100} value={f.depositPct ?? 30} onFocus={(e) => e.currentTarget.select()} onChange={(e) => set("depositPct", num(e.target.value, 1))} className={`${inp} mt-1`} /></label>}
       </div>

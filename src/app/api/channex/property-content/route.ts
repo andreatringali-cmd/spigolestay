@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { allowedChannexProperties } from "@/lib/channex-guard";
 import {
-  channexEnabled, listFacilityOptions, findHotelPolicyId, saveHotelPolicy, findCancellationPolicyId, updateProperty, uploadPhotoFile, createPhoto, countPhotos, listPhotos, deletePhoto, createCancellationPolicy,
+  channexEnabled, listFacilityOptions, findHotelPolicyId, saveHotelPolicy, findCancellationPolicyId, updateCancellationPolicy, updateProperty, uploadPhotoFile, createPhoto, countPhotos, listPhotos, deletePhoto, createCancellationPolicy,
 } from "@/lib/channex";
 import { buildHotelPolicyBody, buildPropertyUpdate, matchFacilities, buildCancellationPolicyBody, completeCancellationBody, type StructureContent } from "@/lib/channex-content";
 
@@ -98,7 +98,14 @@ export async function POST(req: Request) {
   // 3) Politica di cancellazione: se ne esiste già una si usa; altrimenti si crea quella scelta nella scheda (Flessibile / Moderata / Rigida)
   let cancellationPolicyId: string | undefined;
   const canc = await findCancellationPolicyId(propertyId);
-  if (canc.ok && canc.id) { cancellationPolicyId = canc.id; steps.push({ key: "cancel", label: "Politica di cancellazione", ok: true, detail: "Registrata" }); }
+  if (canc.ok && canc.id) {
+    cancellationPolicyId = canc.id;
+    // La regola è quella della scheda struttura: se su Channex ne esiste già una (magari diversa) la si riallinea.
+    if (content.cancelPolicy) {
+      const upd = await updateCancellationPolicy(canc.id, buildCancellationPolicyBody(propertyId, content.cancelPolicy, content.currency));
+      steps.push({ key: "cancel", label: "Politica di cancellazione", ok: true, detail: upd.ok ? "Aggiornata" : "Registrata (non sono riuscito ad aggiornarla: controlla su Channex)", debug: upd.ok ? undefined : upd.error });
+    } else steps.push({ key: "cancel", label: "Politica di cancellazione", ok: true, detail: "Registrata" });
+  }
   else if (!content.cancelPolicy) steps.push({ key: "cancel", label: "Politica di cancellazione", ok: false, detail: "Scegli una politica di cancellazione e salva." });
   else {
     const kind = content.cancelPolicy;

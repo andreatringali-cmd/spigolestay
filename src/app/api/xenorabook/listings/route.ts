@@ -13,6 +13,7 @@
 //
 // Sola lettura, nessuna PII: usa esclusivamente dati già pubblicati dal proprietario.
 
+import { cancelRuleOf } from "@/lib/cancel-policy";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
@@ -119,7 +120,7 @@ export async function GET() {
         name: rt.name || "Camera",
         occ: rt.maxOccupancy || rt.beds || 2,
         price: effectiveBase(rt, allTypes),
-        refundable: structure.cancelPolicy === "flessibile",
+        refundable: cancelRuleOf(structure.cancelPolicy)?.refundable === true,
       }))
       .sort((a, b) => a.price - b.price);
 

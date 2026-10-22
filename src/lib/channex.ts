@@ -537,6 +537,12 @@ export async function saveHotelPolicy(existingId: string | undefined, body: unkn
   if (!res.ok) return { ok: false, error: res.error };
   return { ok: true, id: (res.data?.data ? rowId(res.data.data) : "") || existingId };
 }
+/** Aggiorna una politica di cancellazione già esistente (API non documentata: se Channex la rifiuta si ritorna l'errore, la politica resta com'è). */
+export async function updateCancellationPolicy(id: string, body: { cancellation_policy: Record<string, unknown> }): Promise<{ ok: boolean; error?: string }> {
+  const res = await channex(`/cancellation_policies/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) });
+  return res.ok ? { ok: true } : { ok: false, error: `${res.status}: ${res.error ?? ""}` };
+}
+
 export async function findCancellationPolicyId(propertyId: string): Promise<{ ok: boolean; status: number; id?: string }> {
   const res = await channex<{ data?: Row[] }>(`/cancellation_policies?filter[property_id]=${encodeURIComponent(propertyId)}`);
   if (!res.ok) return { ok: false, status: res.status };

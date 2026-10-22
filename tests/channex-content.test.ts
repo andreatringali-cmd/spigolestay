@@ -63,10 +63,10 @@ test("elenco di controllo: segnala cosa manca", () => {
 
 test("politica di cancellazione: parametri per livello e corpo della richiesta", () => {
   assert.deepEqual(cancelParams("flessibile"), { deadlineHours: 24, penaltyNights: 1, nonRefundable: false });
-  assert.equal(cancelParams("moderata").deadlineHours, 120);
+  assert.equal(cancelParams("moderata").deadlineHours, 168);
   assert.equal(cancelParams("rigida").nonRefundable, true);
   const b = buildCancellationPolicyBody("P1", "flessibile").cancellation_policy;
-  assert.equal(b.property_id, "P1"); assert.equal(b.title, "Flessibile"); assert.equal(b.cancellation_policy_deadline, 24); assert.equal(b.cancellation_policy_logic, "deadline");
+  assert.equal(b.property_id, "P1"); assert.equal(b.title, "Cancellazione gratuita fino a 1 giorno prima"); assert.equal(b.cancellation_policy_deadline, 24); assert.equal(b.cancellation_policy_logic, "deadline");
   assert.equal(buildCancellationPolicyBody("P1", "rigida").cancellation_policy.cancellation_policy_logic, "non_refundable");
 });
 
@@ -74,7 +74,7 @@ test("politica di cancellazione: i campi che Channex dice mancanti si completano
   const first = buildCancellationPolicyBody("P1", "moderata");
   const c = completeCancellationBody(first, { guarantee_payment_policy: ["can't be blank"], non_show_policy: ["can't be blank"], title: ["x"] }, "moderata")!;
   assert.equal(c.cancellation_policy.guarantee_payment_policy, "none"); assert.equal(c.cancellation_policy.non_show_policy, "none");
-  assert.equal(c.cancellation_policy.title, "Moderata", "già presente: non si tocca");
+  assert.equal(c.cancellation_policy.title, "Cancellazione gratuita fino a 7 giorni prima", "già presente: non si tocca");
   assert.equal(completeCancellationBody(first, { campo_sconosciuto: ["can't be blank"] }, "moderata"), null);
   assert.equal(completeCancellationBody(first, undefined, "moderata"), null);
 });

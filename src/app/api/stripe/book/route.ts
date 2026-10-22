@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
     // Politica del piano scelto: dai piani del proprietario, mai dal client.
     const nightsN = nNights;
-    const policy = resolvePlanPolicy(await loadOwnerRatePlans(admin, ownerId), planName, { roomTypeId: rt, checkIn: ci, nights: nightsN, structureId: sid });
+    const policy = resolvePlanPolicy(await loadOwnerRatePlans(admin, ownerId), planName, { roomTypeId: rt, checkIn: ci, nights: nightsN, structureId: sid, cancelPolicy: st?.cancelPolicy }); // la cancellazione la decide la scheda struttura
     // Senza nome di piano (widget semplici) vale l'acconto della struttura (30% se non impostato), non rimborsabile.
     if (!planName.trim()) policy.depositPct = typeof st?.depositPct === "number" ? Math.min(100, Math.max(0, Math.round(st.depositPct))) : 30;
     // Extra scelti (validati sul catalogo del proprietario) e codice promo (validato sulle sue promo): servono a importo, floor e prenotazione.

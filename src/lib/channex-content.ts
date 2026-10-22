@@ -155,11 +155,12 @@ export function buildPropertyUpdate(c: StructureContent, x: { hotelPolicyId?: st
 // Channex non documenta questa risorsa: i nomi dei campi derivano dall'oggetto che restituisce nelle API di lettura (cancellation_policy_*). Se la creazione viene rifiutata
 // con un errore di validazione che elenca campi mancanti, si completano con valori di ripiego e si riprova (vedi completeCancellationBody).
 export type CancelKind = "flessibile" | "moderata" | "rigida";
-export const CANCEL_TITLES: Record<CancelKind, string> = { flessibile: "Flessibile", moderata: "Moderata", rigida: "Rigida (non rimborsabile)" };
+// Titoli chiari: sono quelli che l'ospite legge su Google. Le ore vengono da lib/cancel-policy.ts (stessa regola di sito e mini-sito).
+export const CANCEL_TITLES: Record<CancelKind, string> = { flessibile: "Cancellazione gratuita fino a 1 giorno prima", moderata: "Cancellazione gratuita fino a 7 giorni prima", rigida: "Non rimborsabile" };
 
 /** Parametri della politica: ore di preavviso per la cancellazione gratuita e penale (in notti) dopo quel termine. Rigida = nessun rimborso: preavviso 0 e penale di tutto il soggiorno. */
 export function cancelParams(kind: CancelKind): { deadlineHours: number; penaltyNights: number; nonRefundable: boolean } {
-  if (kind === "moderata") return { deadlineHours: 120, penaltyNights: 1, nonRefundable: false };
+  if (kind === "moderata") return { deadlineHours: 7 * 24, penaltyNights: 1, nonRefundable: false };
   if (kind === "rigida") return { deadlineHours: 0, penaltyNights: 1, nonRefundable: true };
   return { deadlineHours: 24, penaltyNights: 1, nonRefundable: false };
 }

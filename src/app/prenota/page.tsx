@@ -10,6 +10,7 @@ import { eur } from "@/lib/format";
 import { effectiveClosed, rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { cityTaxOfBookingRaw } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, type RatePlan } from "@/lib/rate-plans";
+import { plansWithStructureCancel } from "@/lib/cancel-policy";
 import { amenityIcon } from "@/lib/amenities";
 import { loadRealPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
@@ -102,7 +103,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const cancelLabel = (p: { refundable?: boolean; cancelDays?: number }) => !p.refundable ? t("Non rimborsabile") : p.cancelDays === 1 ? t("Cancellazione gratuita fino a 1 giorno prima") : p.cancelDays && p.cancelDays > 0 ? t("Cancellazione gratuita fino a {n} giorni prima", { n: p.cancelDays }) : t("Cancellazione gratuita");
 
   // Config salvata (piani, weekend) — fallback ai default.
-  const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
+  const plansRaw = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
   // % weekend di default (0 se l'host ha spento la maggiorazione); le regole per struttura le applica rateForDay.
   const weekendPct = useMemo(() => loadWeekendPct(), []);
   const allPromos = useMemo(() => { try { return loadRealPromos(); } catch { return []; } }, []); // solo promo vere: i modelli di esempio non valgono come codici
@@ -123,6 +124,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structures, roomTypes]);
   const structure = getStructure(structureId);
+  // La cancellazione la decide la scheda struttura (Policy), uguale per tutti i piani: stessa regola di mini-sito, rimborsi e Google.
+  const plans = useMemo<Plan[]>(() => plansWithStructureCancel(plansRaw, structure?.cancelPolicy), [plansRaw, structure?.cancelPolicy]);
   const extras: ExtraService[] = (structure?.extras && structure.extras.length ? structure.extras : DEFAULT_EXTRAS).filter((e) => e.active !== false);
 
   const today = toISO(new Date());

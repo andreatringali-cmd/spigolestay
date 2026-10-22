@@ -139,7 +139,8 @@ export async function POST(req: Request) {
     // Politica di cancellazione per l'anonimo: dal piano scelto (per nome) tra quelli del proprietario o predefiniti. Piano sconosciuto = non rimborsabile.
     if (!internal) {
       // Stessa fonte di /api/stripe/book (stato personale, poi organizzazioni): un piano che sta solo nell'organizzazione non deve diventare "non rimborsabile" nel voucher.
-      const pol = resolvePlanPolicy(await loadOwnerRatePlans(admin, ownerId), planName, { roomTypeId: rt, checkIn: ci, nights: nNights, structureId: sid });
+      const stPolicy = (merged.structures as unknown as { id?: string; cancelPolicy?: string }[]).find((s) => s.id === sid)?.cancelPolicy; // la cancellazione la decide la scheda struttura
+      const pol = resolvePlanPolicy(await loadOwnerRatePlans(admin, ownerId), planName, { roomTypeId: rt, checkIn: ci, nights: nNights, structureId: sid, cancelPolicy: stPolicy });
       refundable = pol.refundable; cancelDays = pol.cancelDays;
     }
 
