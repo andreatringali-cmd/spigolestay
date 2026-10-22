@@ -16,7 +16,7 @@ test("link di accesso: modificato (altra email, altro percorso, firma) non vale"
   const p = parse(buildAccessUrl("https://xenora.it", "a@x.it", "/pulizie")!);
   assert.equal(verifyAccessToken("b@x.it", p.t, p.n, p.s), null);
   assert.equal(verifyAccessToken(p.e, p.t, "/prenotazioni", p.s), null);
-  assert.equal(verifyAccessToken(p.e, p.t, p.n, p.s.replace(/.$/, "0")), null);
+  assert.equal(verifyAccessToken(p.e, p.t, p.n, p.s.slice(0, -1) + (p.s.endsWith("0") ? "1" : "0")), null); // cambia davvero l'ultimo carattere (prima 1 volta su 16 restava uguale)
   assert.equal(verifyAccessToken(p.e, p.t, p.n, "zz"), null);
 });
 test("link di accesso: scade dopo 7 giorni", () => {
