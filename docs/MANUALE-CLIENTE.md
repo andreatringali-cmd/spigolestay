@@ -195,7 +195,7 @@ Altro:
 
 ## 11. Abbonamento e prova gratuita
 
-- **Piani** (prezzi mensili, IVA inclusa secondo la pagina Prezzi `[DA DECIDERE: confermare IVA inclusa o esclusa]`): **Basic 29 €**, **Pro 59 €**, **Ultimate 99 €**. Con la fatturazione annuale lo sconto è del 20%.
+- **Piani** (prezzi mensili, IVA inclusa secondo la pagina Prezzi `[DA DECIDERE: confermare IVA inclusa o esclusa]`): **Basic 39 €**, **Pro 69 €**, **Ultimate 119 €**. Con la fatturazione annuale lo sconto è del 20%.
 - **Prova gratuita**: 5 giorni, senza costi di attivazione, dal momento in cui attivi l'abbonamento. Il primo addebito è alla fine della prova.
 - Si attiva e si cambia da **Abbonamento**. Il pagamento è gestito da Stripe: i dati della carta non passano dall'app. Se hai già un abbonamento attivo, il cambio di piano non è automatico (l'addebito si modifica solo su Stripe): scrivi all'assistenza.
 - Le fatture dell'abbonamento sono in **Fatture** (dentro «Il mio abbonamento»); la prima arriva alla fine della prova.

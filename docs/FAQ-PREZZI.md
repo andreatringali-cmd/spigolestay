@@ -8,7 +8,7 @@ Numeri di riferimento, presi dal codice:
 
 | | Basic | Pro | Ultimate |
 |---|---|---|---|
-| Prezzo al mese | 29 € | 59 € | 99 € |
+| Prezzo al mese | 39 € | 69 € | 119 € |
 | Prezzo all'anno (-20%) | 278 € | 566 € | 950 € |
 | Strutture | 1 | fino a 3 | fino a 8 |
 | Camere incluse | 6 | 18 | 48 |
@@ -34,9 +34,9 @@ La configurazione guidata ha 7 passaggi e richiede un paio di minuti: profilo, a
 ## Piani e prezzi
 
 ### Cosa include ogni piano?
-- **Basic (29 € al mese)**: 1 struttura. PMS (prenotazioni, calendario, tariffe, camere, ospiti e incassi, adempimenti Alloggiati Web / ISTAT e tassa di soggiorno), Channel Manager, Booking Engine, Cassa · Prima nota, Guida ospiti.
-- **Pro (59 € al mese)**: fino a 3 strutture. Tutto Basic più Messaggi e modelli, Pulizie, Preventivi e vendite, Report e statistiche con esportazione Excel, Meta Search (beta), Utenti e permessi, Gestione condivisa con un socio, Rete città.
-- **Ultimate (99 € al mese)**: fino a 8 strutture. Tutto Pro più Self check-in online, Xenosite (mini-sito), Revenue e prezzi dinamici, Rate checker.
+- **Basic (39 € al mese)**: 1 struttura. PMS (prenotazioni, calendario, tariffe, camere, ospiti e incassi, adempimenti Alloggiati Web / ISTAT e tassa di soggiorno), Channel Manager, Booking Engine, Cassa · Prima nota, Guida ospiti.
+- **Pro (69 € al mese)**: fino a 3 strutture. Tutto Basic più Self check-in online, Messaggi e modelli, Pulizie, Preventivi e vendite, Report e statistiche con esportazione Excel, Meta Search (beta), Utenti e permessi, Gestione condivisa con un socio, Rete città.
+- **Ultimate (119 € al mese)**: fino a 8 strutture. Tutto Pro più Xenosite (mini-sito), Revenue e prezzi dinamici, Rate checker.
 
 Ogni piano comprende 6 camere per struttura.
 

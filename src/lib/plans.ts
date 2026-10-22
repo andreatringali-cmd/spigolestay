@@ -19,15 +19,15 @@ export function trialInfo(): TrialInfo {
   const daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000));
   return { signup, trialEnd, inTrial, firstInvoice: trialEnd, daysLeft };
 }
-export const ROOM_OVERAGE = 4; // €/camera/mese oltre le incluse
+export const ROOM_OVERAGE = 6; // €/camera/mese oltre le incluse (IVA inclusa)
 export const ANNUAL_OFF = 0.2; // −20% con fatturazione annuale
 export const ALL = ["pms", "cm", "booking", "cassa", "guide", "checkin", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team", "sharing", "market"];
 
 export interface Tier { key: string; name: string; price: number; structures: number; includes: string[]; tagline: string }
 export const TIERS: Tier[] = [
-  { key: "basic", name: "Basic", price: 29, structures: 1, includes: ["pms", "cm", "booking", "cassa", "guide"], tagline: "Per iniziare" },
-  { key: "pro", name: "Pro", price: 59, structures: 3, includes: ["pms", "cm", "booking", "cassa", "guide", "messaging", "housekeeping", "concierge", "bi", "meta", "team", "sharing", "market"], tagline: "In crescita" },
-  { key: "ultimate", name: "Ultimate", price: 99, structures: 8, includes: ALL, tagline: "Tutto incluso" },
+  { key: "basic", name: "Basic", price: 39, structures: 1, includes: ["pms", "cm", "booking", "cassa", "guide"], tagline: "Per iniziare" },
+  { key: "pro", name: "Pro", price: 69, structures: 3, includes: ["pms", "cm", "booking", "cassa", "guide", "checkin", "messaging", "housekeeping", "concierge", "bi", "meta", "team", "sharing", "market"], tagline: "In crescita" },
+  { key: "ultimate", name: "Ultimate", price: 119, structures: 8, includes: ALL, tagline: "Tutto incluso" },
 ];
 
 export interface Module { key: string; name: string; desc: string; href: string; core?: boolean }

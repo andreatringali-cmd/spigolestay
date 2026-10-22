@@ -19,9 +19,9 @@ Gravità: **Alta** = promessa falsa o importo sbagliato; **Media** = incoerenza 
 | Voce | Vetrina | Pagina Prezzi | App | Gravità | Cosa correggere |
 |---|---|---|---|---|---|
 | Nomi dei piani | Basic, Pro, Ultimate | Basic, Pro, Ultimate | Basic, Pro, Ultimate (ma il testo di aiuto di Abbonamento dice «Basic/Pro/Enterprise/Premium» e «Piano Base») | Media | Correggere il testo di aiuto dell'app. |
-| Basic | 29 € al mese | 29 € | 29 € | - | Uguale. |
-| **Pro** | **49 €** | **59 €** | **59 €** | **Alta** | Vetrina da 49 a 59. |
-| **Ultimate** | **89 €** | **99 €** | **99 €** | **Alta** | Vetrina da 89 a 99. |
+| Basic | 29 € al mese | 39 € | 39 € | Alta | Vetrina da 29 a 39. |
+| **Pro** | **49 €** | **69 €** | **69 €** | **Alta** | Vetrina da 49 a 69. |
+| **Ultimate** | **89 €** | **119 €** | **119 €** | **Alta** | Vetrina da 89 a 119. |
 | **IVA** | **«Prezzi IVA esclusa»** | **«IVA inclusa»** | Scorporo del 22% sulle fatture (importo mostrato = lordo) | **Alta** | Scegliere una sola formula `[DA DECIDERE]` e riportarla ovunque. |
 | Sconto annuale | Non citato | -20% (278 / 566 / 950 € all'anno) | -20% | Bassa | Citarlo in vetrina, è un argomento di vendita. |
 | Camere incluse | 6 per struttura, 4 € per camera in più | 6 per struttura, 4 € | 6 per struttura, 4 € | - | Uguale. |

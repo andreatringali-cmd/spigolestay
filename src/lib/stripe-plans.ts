@@ -13,9 +13,9 @@ export interface StripePlan {
 
 // IMPORTANTE: allineati ai prezzi mostrati in /abbonamento (src/lib/plans.ts TIERS).
 export const STRIPE_PLANS: StripePlan[] = [
-  { key: "basic", name: "Basic", amount: 29 },
-  { key: "pro", name: "Pro", amount: 59 },
-  { key: "ultimate", name: "Ultimate", amount: 99 },
+  { key: "basic", name: "Basic", amount: 39 },
+  { key: "pro", name: "Pro", amount: 69 },
+  { key: "ultimate", name: "Ultimate", amount: 119 },
 ];
 
 export const planByKey = (k?: string | null): StripePlan | undefined =>
@@ -23,7 +23,7 @@ export const planByKey = (k?: string | null): StripePlan | undefined =>
 
 // Fatturazione annuale: -20% (ANNUAL_OFF), addebitato in un'unica soluzione una volta l'anno
 // (non è il "/mese" scontato mostrato in UI, ma il totale annuo corrispondente).
-// Es. Basic 29€/mese → 29*12*0.8 = 278€/anno.
+// Es. Basic 39€/mese → 39*12*0.8 = 374€/anno.
 export const annualAmount = (plan: StripePlan): number =>
   Math.round(plan.amount * 12 * (1 - ANNUAL_OFF));
 

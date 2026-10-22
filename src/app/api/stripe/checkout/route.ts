@@ -19,17 +19,22 @@ async function getPriceId(stripe: Stripe, plan: StripePlan, interval: BillingInt
   const other_lookup_key = lookupKeyFor(plan, otherInterval);
   const found = await stripe.prices.list({ lookup_keys: [lookup_key, other_lookup_key], active: true, limit: 2 });
   const exact = found.data.find((p) => p.lookup_key === lookup_key);
-  if (exact) return exact.id;
-  const sibling = found.data.find((p) => p.lookup_key === other_lookup_key);
-  const productId = typeof sibling?.product === "string" ? sibling.product : sibling?.product?.id;
-  const product = productId ?? (await stripe.products.create({ name: `Xenora ${plan.name}`, metadata: { plan: plan.key } })).id;
   const unit_amount = interval === "year" ? annualAmount(plan) * 100 : plan.amount * 100;
+  // Il Price esiste con l'importo giusto: si usa così com'è.
+  if (exact && exact.unit_amount === unit_amount) return exact.id;
+  // Esiste ma con un importo vecchio (listino cambiato): se ne crea uno nuovo sullo stesso Product e la lookup_key passa al nuovo.
+  // Gli abbonamenti già attivi restano agganciati al loro Price: non cambia nulla per chi è già cliente.
+  const sibling = found.data.find((p) => p.lookup_key === other_lookup_key);
+  const refProduct = exact?.product ?? sibling?.product;
+  const productId = typeof refProduct === "string" ? refProduct : refProduct?.id;
+  const product = productId ?? (await stripe.products.create({ name: `Xenora ${plan.name}`, metadata: { plan: plan.key } })).id;
   const price = await stripe.prices.create({
     product,
     unit_amount,
     currency: "eur",
     recurring: { interval },
     lookup_key,
+    ...(exact ? { transfer_lookup_key: true } : {}),
   });
   return price.id;
 }
