@@ -22,6 +22,11 @@ let db: IDBDatabase | null = null;
 let initPromise: Promise<void> | null = null;
 let version = 0; // sale a ogni scrittura: permette di accorgersi che qualcosa è cambiato senza rileggere i dati
 
+// Guardia di scrittura (vedi local-guard.ts): se risponde true la scrittura/rimozione della chiave viene ignorata. Serve a una scheda rimasta su un altro account:
+// senza, il suo blocco dati (in memoria) verrebbe scritto in IndexedDB, che è condiviso tra le schede, sopra i dati dell'account che è entrato dopo.
+let writeGuard: ((key: string) => boolean) | null = null;
+export function setKvWriteGuard(fn: ((key: string) => boolean) | null): void { writeGuard = fn; }
+
 /** Contatore delle modifiche locali (vedi sopra). */
 export function kvVersion(): number { return version; }
 
@@ -136,12 +141,14 @@ export function kvGet(key: string): string | null {
 
 /** Scrive. Per le chiavi normali può lanciare (quota localStorage) come localStorage.setItem. */
 export function kvSet(key: string, value: string): void {
+  if (writeGuard && writeGuard(key)) return; // scheda in pausa (altro account nel locale): non si scrive
   version++;
   if (isBig(key)) { mem.set(key, value); pending.set(key, value); schedule(); return; }
   localStorage.setItem(key, value);
 }
 
 export function kvRemove(key: string): void {
+  if (writeGuard && writeGuard(key)) return; // scheda in pausa (altro account nel locale): non si toglie nulla
   version++;
   if (isBig(key)) { mem.delete(key); pending.set(key, null); schedule(); return; }
   try { localStorage.removeItem(key); } catch { /* ignora */ }

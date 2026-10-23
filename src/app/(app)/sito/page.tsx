@@ -8,6 +8,7 @@ import { uploadImage, cssBgUrl } from "@/lib/media-client";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
+import { isLocalForeign } from "@/lib/sync-owner";
 import { buildPublishData, slugify, RESERVED_SLUGS, siteConfigKey, getSiteConfigRaw } from "@/lib/publicdata";
 import { friendlyError } from "@/lib/friendly-error";
 import StructureRequired from "@/components/StructureRequired";
@@ -104,6 +105,8 @@ export default function SitoPage() {
     if (!supabase || !user) { setPubMsg(t("Devi essere connesso per pubblicare.")); return; }
     const base = slugify(slug) || slugify(siteName) || "struttura";
     if (RESERVED_SLUGS.has(base)) { setPubMsg(t("Questo indirizzo è riservato, scegline un altro.")); return; }
+    // Il sito si costruisce dal localStorage, condiviso tra le schede: se in un'altra scheda è entrato un altro account non si pubblica nulla.
+    try { if (isLocalForeign(localStorage, user.id)) { setPubMsg(t("In un'altra scheda hai effettuato l'accesso con un altro account: ricarica la pagina prima di continuare, così nulla viene mescolato tra i due account.")); return; } } catch { /* storage non disponibile */ }
     const data = buildPublishData(sid);
     if (!data) { setPubMsg(t("Dati struttura non disponibili.")); return; }
     setPubBusy(true); setPubMsg("");

@@ -18,7 +18,7 @@
 //     letto; altrimenti si rilegge e si rifonde al ciclo successivo (niente sovrascritture cieche).
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { initBigStore, kvGet, kvSet, kvRemove, kvKeys, kvFlush, kvVersion, lastIdbError } from "./bigstore";
+import { initBigStore, kvGet, kvSet, kvRemove, kvKeys, kvFlush, kvVersion, lastIdbError, setKvWriteGuard } from "./bigstore";
 import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled } from "./supabase";
@@ -31,6 +31,8 @@ import { flatHash as flatHashOf } from "./sync-flat";
 import { deltaAllowedFor, deltaWantedFrom } from "./delta-allow";
 import { applyRaceChanges } from "./sync-merge";
 import { isSyncKey, LOCAL_OWNER_KEY, SYNCBASE_KEY, decideEntry, syncBaseText, readSyncBase, contentSig, settingsSig, mergeSnapshots, stableStringify } from "./sync-core";
+import { isLocalForeign, wipeOrder } from "./sync-owner";
+import { installLocalWriteGuard, isWriteBlocked, setActiveAccount } from "./local-guard";
 import { pruneLocalToStructures } from "./sync-window";
 import { retainOrgGuests } from "./sync-canon";
 import { splitByOrg, EMPTY_ORG_DATA } from "./org-split";
@@ -39,6 +41,8 @@ import { setDeltaScopeActive, initRequested, requestedParam, requestedIds, reque
 
 // Pulizia una tantum: la vecchia copia nel localStorage occupava ~400 KB di una quota di ~5 MB.
 if (typeof window !== "undefined") { try { localStorage.removeItem("spigolestay:channex-arisnapshot"); } catch { /* storage non disponibile */ } }
+// Guardia di scrittura: una scheda rimasta su un altro account non scrive più nel localStorage condiviso (vedi sync-owner.ts / local-guard.ts). Attiva solo dopo l'idratazione (setActiveAccount in startPush).
+if (typeof window !== "undefined") { installLocalWriteGuard(); setKvWriteGuard(isWriteBlocked); }
 
 function snapshot(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -69,11 +73,14 @@ function restore(data: Record<string, string>): boolean {
 
 function wipeLocalAccount() {
   try {
-    kvKeys().filter(isSyncKey).forEach((k) => kvRemove(k));
+    // PRIMA il marcatore dei dati locali e la base (le altre schede capiscono subito che il locale non è più sicuro), POI le chiavi (vedi wipeOrder).
+    for (const k of wipeOrder(kvKeys())) {
+      if (k === LOCAL_OWNER_KEY || k === SYNCBASE_KEY) { try { localStorage.removeItem(k); } catch { /* storage non disponibile */ } }
+      else kvRemove(k);
+    }
     sessionStorage.removeItem("spigolestay:loginlogged");
     sessionStorage.removeItem("spigolestay:hydrated-for");
-    // Marcatore dei dati locali e base persistente non sono chiavi sincronizzate (SKIP_KEYS): restano dopo il wipe e vanno tolti a mano. A locale vuoto non c'è nulla da proteggere.
-    try { localStorage.removeItem(LOCAL_OWNER_KEY); localStorage.removeItem(SYNCBASE_KEY); } catch {}
+    // (Il marcatore dei dati locali e la base persistente non sono chiavi sincronizzate: li toglie wipeOrder, per primi.)
     // Marcatori "una volta per sessione" dell'account precedente (ultimo accesso già registrato): per il nuovo account vanno rifatti.
     try { Object.keys(sessionStorage).filter((k) => k.startsWith("spigolestay:stamped:")).forEach((k) => sessionStorage.removeItem(k)); } catch {}
   } catch {}
@@ -114,7 +121,7 @@ function localBelongsToOther(uid: string): boolean {
 // questa scheda non deve né leggere né spingere sul server di `uid` ciò che c'è ora in locale (sono dati dell'altro account: è così che le impostazioni di un account
 // finivano in quello di prova). Un marcatore assente (account appena cambiato, locale in svuotamento) vale come «non sicuro»: si aspetta.
 function localIsForeign(uid: string): boolean {
-  try { return localStorage.getItem(LOCAL_OWNER_KEY) !== uid; } catch { return false; }
+  try { return isLocalForeign(localStorage, uid); } catch { return false; }
 }
 
 // Ricarica la pagina in modo SICURO: applica gli aggiornamenti scaricati dal server
@@ -309,7 +316,9 @@ async function syncOnce(
   revRef: { current: number },
   lastSynced: { current: Record<string, string> },
   orgRefs: { current: Record<string, SyncRef> },
-): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean; synced?: boolean; allOk?: boolean; roSig?: string }> {
+): Promise<{ changedLocal: boolean; newBlob?: Record<string, string>; wrote: boolean; synced?: boolean; allOk?: boolean; roSig?: string; foreign?: boolean }> {
+  // Un'altra scheda ha cambiato account: il locale non è più di `uid`, non si fotografa né si spinge nulla (la verifica e la fotografia avvengono nello stesso istante).
+  if (localIsForeign(uid)) return { changedLocal: false, wrote: false, foreign: true };
   const versionAtStart = kvVersion(); // contatore delle scritture locali al momento della fotografia (per l'anti-race più sotto)
   const snap = snapshot();
   if (!("spigolestay:data:v1" in snap)) return { changedLocal: false, wrote: false };
@@ -317,6 +326,7 @@ async function syncOnce(
   try { fullData = JSON.parse(snap["spigolestay:data:v1"]) as DataObj; } catch { return { changedLocal: false, wrote: false }; }
 
   const orgIds = await fetchOrgIds(client, uid);
+  if (localIsForeign(uid)) return { changedLocal: false, wrote: false, foreign: true }; // durante l'attesa di rete un'altra scheda può aver cambiato account: la fotografia di prima non si spinge
   const { personal, orgs } = splitByOrg(fullData);
   const orgSids = orgStructureSets(fullData); // strutture di ogni org: conti e regole di incasso di quelle strutture viaggiano nell'org (stessi per tutti i soci)
 
@@ -529,6 +539,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [storageFull, setStorageFull] = useState(false); // il browser non ha più spazio: i dati non si salvano in locale
+  const [otherAccount, setOtherAccount] = useState(false); // in un'altra scheda è entrato un altro account: questa scheda è in pausa (non salva né invia nulla)
   // Il browser allega da solo il token di accesso a ogni chiamata alle nostre API (/api/*): così le API possono pretendere il login
   // senza riscrivere ogni punto che le chiama. Il token non esce mai verso altri domini.
   useEffect(() => {
@@ -562,6 +573,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(t);
   }, [sessionUid, hydrated]); // impossibile leggere i dati dal server (e nessuna copia locale)
   useEffect(() => { const h = () => setStorageFull(true); window.addEventListener("xenora:storage-full", h); return () => window.removeEventListener("xenora:storage-full", h); }, []);
+  useEffect(() => { const h = () => setOtherAccount(true); window.addEventListener("xenora:other-account", h); return () => window.removeEventListener("xenora:other-account", h); }, []);
   const [mfaChecked, setMfaChecked] = useState(false); // AAL verificato per la sessione corrente
   const [mfaNeeded, setMfaNeeded] = useState(false);    // il 2FA è attivo ma la sessione è a un fattore
   const [accessAllowed, setAccessAllowed] = useState<boolean | null>(null); // cancello accesso su invito (null = in verifica)
@@ -578,6 +590,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hydratedUidRef = useRef<string>(""); // utente per cui questo AuthProvider ha avviato la sincronizzazione (se cambia sotto i piedi, es. login con un altro account in un'altra scheda, si riparte da zero)
 
   const stopPush = () => {
+    setActiveAccount(null); // nessun account attivo in questa scheda: la guardia di scrittura si spegne (login/uscita in corso)
     registerLoader(null);
     if (pushTimer.current) { clearInterval(pushTimer.current); pushTimer.current = null; }
     if (writeWatchRef.current) { clearInterval(writeWatchRef.current); writeWatchRef.current = null; }
@@ -729,10 +742,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const startPush = (userId: string) => {
       stopPush();
+      setActiveAccount(userId); // da qui questa scheda non può scrivere chiavi sincronizzate se il marcatore dei dati locali non è di `userId`
       // force: sincronizzazione richiesta (es. caricamento di un'altra struttura): salta il controllo «non è cambiato nulla».
       const runSync = async (force: boolean = false) => {
         if (syncingRef.current) return; // già in corso: evita run concorrenti (intervallo + focus)
         if (localIsForeign(userId)) { try { window.dispatchEvent(new Event("xenora:other-account")); } catch { /* ambiente senza window */ } return; } // un'altra scheda ha cambiato account: niente scambi con il server finché non si rientra
+        setOtherAccount(false);
         syncingRef.current = true;
         let syncOk = false;
         const reqAtStart = DELTA_MODE ? requestedSnapshot() : null; // strutture richieste all'INIZIO del ciclo: sono quelle che il ciclo, se riesce, avrà caricato
@@ -744,8 +759,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!force && fullSig && fullSig === lastSigRef.current && Date.now() - lastFullRef.current < 45000) return;
           // Sincronizzazione completa: personale (app_state) + eventuali strutture condivise (org_state),
           // con fusione 3 vie + lucchetto. Se non sei in nessuna org, è identico a prima.
-          const { newBlob, changedLocal, wrote, synced, allOk, roSig } = await syncOnce(supabase!, userId, revRef, lastSynced, orgRefs);
+          const { newBlob, changedLocal, wrote, synced, allOk, roSig, foreign } = await syncOnce(supabase!, userId, revRef, lastSynced, orgRefs);
           if (hydratedUidRef.current !== userId) return; // l'utente è cambiato durante il ciclo: il risultato è di un altro account, non si applica
+          // Anche solo durante il ciclo un'altra scheda può aver preso il localStorage: il risultato (dati di `userId`) non si riscrive lì sopra.
+          if (foreign || localIsForeign(userId)) { try { window.dispatchEvent(new Event("xenora:other-account")); } catch { /* ambiente senza window */ } return; }
           syncOk = true;
           if (changedLocal && newBlob) {
             // Il server (o una struttura condivisa) aveva novità: aggiorno SEMPRE il browser…
@@ -825,6 +842,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
+        setActiveAccount(null); // chi idrata costruisce il locale (anche svuotandolo): la guardia di scrittura resta spenta finché non parte startPush
         // Scorciatoia "già reidratato in questa scheda": valida SOLO se il localStorage ha ancora i
         // dati. Se il flag è rimasto ma il locale è vuoto (es. sessione scaduta / logout senza reset),
         // NON usare la scorciatoia — prosegui col caricamento completo dal server qui sotto, altrimenti
@@ -842,6 +860,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let localOwner: string | null = null; try { localOwner = localStorage.getItem(LOCAL_OWNER_KEY); } catch { /* storage non disponibile */ }
         const entry = decideEntry({ localOwner, uid, sessionFlag: sessionStorage.getItem(flagKey), localHasData });
         if (!switching && entry === "shortcut") {
+          if (localOwner === null) markLocalOwner(uid); // marcatore mancante ma scheda già reidratata per questo utente: si ripristina PRIMA di sincronizzare (mai su dati di un altro proprietario: vedi decideEntry)
           try {
             if (DELTA_MODE) await deltaStartupSync(supabase!, uid, revRef, lastSynced, orgRefs); // apertura per struttura: prima la sola struttura di apertura, poi (se serve) il completamento
             else {
@@ -851,7 +870,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           } catch { /* rete assente: riproverà il push periodico */ }
           void syncProfile(uid);
-          if (localOwner === null) markLocalOwner(uid); // marcatore mancante ma scheda già reidratata per questo utente: si ripristina (mai su dati di un altro proprietario)
           setHydrated(true);
           startPush(uid);
           return;
@@ -1005,7 +1023,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { sessionStorage.removeItem("spigolestay:hydrated-for"); } catch {}
     // Svuota i dati locali SOLO se sono stati salvati sul server, altrimenti li perderei
     // (es. tabella app_state non ancora creata / rete assente).
-    if (saved) wipeLocalAccount();
+    // ...e SOLO se il locale è ancora di questo account: se un altro account è entrato in un'altra scheda quei dati sono suoi e non si toccano.
+    if (saved && !(uid && localIsForeign(uid))) wipeLocalAccount();
     router.replace("/login");
   };
 
@@ -1034,6 +1053,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {storageFull && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, padding: "10px 16px", background: "#b42318", color: "#fff", fontSize: 14, textAlign: "center" }}>
           Spazio del browser esaurito: le ultime modifiche potrebbero non essere salvate su questo dispositivo. Svuota i dati del sito xenora.it dalle impostazioni del browser e riaccedi (i dati restano sul server), oppure scrivici.{(() => { const d = lastIdbError(); return d ? ` [${d}]` : ""; })()}
+        </div>
+      )}
+      {otherAccount && (
+        <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9998, padding: "10px 16px", background: "#92400e", color: "#fff", fontSize: 14, textAlign: "center" }}>
+          In un&apos;altra scheda hai effettuato l&apos;accesso con un altro account. Per proteggere i tuoi dati questa scheda è in pausa: non salva e non invia nulla.{" "}
+          <button onClick={() => window.location.reload()} style={{ marginLeft: 8, padding: "4px 12px", borderRadius: 8, border: "1px solid #fff", background: "transparent", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Ricarica la pagina</button>
         </div>
       )}
       <DeltaBar />
