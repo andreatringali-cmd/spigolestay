@@ -1,7 +1,7 @@
 // Email al TITOLARE (nuova prenotazione, modifica, cancellazione, pagamento, messaggio, recensione, avviso).
 // Sempre in italiano: il destinatario è chi gestisce la struttura. Puro: lo usa la route /api/email (kind "notify") e i test.
 import {
-  esc, emailShell, eventBadgeHtml, channelChipHtml, kvRow, kvTable, sectionTitle, cardBox, ctaButtonHtml, textBlockHtml,
+  esc, emailShell, eventBadgeHtml, channelChipHtml, kvRow, kvTable, sectionTitle, cardBox, ctaButtonHtml, textBlockHtml, nl2brHtml,
   fmtDay, fmtIso, money, countLabel, peopleLabel, accentText, normHex, EVENT_STYLE, INK,
   type Brand, type MailEvent,
 } from "./shell";
@@ -37,7 +37,7 @@ export interface NotifyEmailInput {
 
 const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const str = (v: unknown): string => String(v ?? "").replace(/\s+/g, " ").trim();
-/** Testo libero dell'ospite/note: gli a capo restano (pre-wrap); si compattano solo gli spazi orizzontali ripetuti. */
+/** Testo libero dell'ospite/note: gli a capo restano (<br>: Outlook ignora pre-wrap); si compattano solo gli spazi orizzontali ripetuti. */
 const multiline = (v: unknown): string => String(v ?? "").replace(/\r\n?/g, "\n").replace(/[^\S\n]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 
 /** Cifre per il link WhatsApp (wa.me): serve il prefisso internazionale; un cellulare italiano senza prefisso riceve il 39. */
@@ -146,11 +146,11 @@ function bookingBody(input: NotifyEmailInput, accent: string): string {
   const guestBox = g.length ? sectionTitle("Ospite") + kvTable(g) : "";
 
   // 6) Richieste e note evidenziate
-  const req = multiline(b.guestRequests), note = multiline(b.note); // a capo preservati (white-space:pre-wrap)
+  const req = multiline(b.guestRequests), note = multiline(b.note); // a capo preservati (<br>)
   const reqBox = (req || note)
     ? sectionTitle("Richieste") + cardBox(
-      (req ? `<div style="font:600 13px/1.5 Arial,Helvetica,sans-serif;color:#6b4a00;">Richieste dell'ospite</div><div style="white-space:pre-wrap;font:14px/1.5 Arial,Helvetica,sans-serif;color:${INK};margin-top:2px;">${esc(req)}</div>` : "")
-      + (note ? `<div style="font:600 13px/1.5 Arial,Helvetica,sans-serif;color:#6b4a00;${req ? "margin-top:8px;" : ""}">Note</div><div style="white-space:pre-wrap;font:14px/1.5 Arial,Helvetica,sans-serif;color:${INK};margin-top:2px;">${esc(note)}</div>` : ""),
+      (req ? `<div style="font:600 13px/1.5 Arial,Helvetica,sans-serif;color:#6b4a00;">Richieste dell'ospite</div><div style="font:14px/1.5 Arial,Helvetica,sans-serif;color:${INK};margin-top:2px;">${nl2brHtml(esc(req))}</div>` : "")
+      + (note ? `<div style="font:600 13px/1.5 Arial,Helvetica,sans-serif;color:#6b4a00;${req ? "margin-top:8px;" : ""}">Note</div><div style="font:14px/1.5 Arial,Helvetica,sans-serif;color:${INK};margin-top:2px;">${nl2brHtml(esc(note))}</div>` : ""),
       { bg: "#FFF8E1", border: "#F2D98B" })
     : "";
 

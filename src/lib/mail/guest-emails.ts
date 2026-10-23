@@ -4,7 +4,7 @@
 import { et, emailLang, cancelPolicyIn, cityTaxRuleIn, type CityTaxRule } from "../email-i18n";
 import { asGuestLang } from "../guest-i18n";
 import {
-  esc, emailShell, eventBadgeHtml, statusBadgeHtml, kvRow, kvTable, sectionTitle, cardBox, ctaButtonHtml, ghostButtonHtml, textBlockHtml,
+  esc, emailShell, eventBadgeHtml, statusBadgeHtml, kvRow, kvTable, sectionTitle, cardBox, ctaButtonHtml, ghostButtonHtml, textBlockHtml, nl2brHtml,
   fmtDay, money, countLabel, peopleLabel, greetingName, accentText, normHex, INK,
   type Brand, type Lang,
 } from "./shell";
@@ -138,7 +138,7 @@ export function voucherEmailHtml(b: GuestBookingPayload, o: { checkinUrl?: strin
     : "";
 
   const reqHtml = nonEmpty(b.guestRequests)
-    ? sectionTitle(T("Richieste speciali")) + cardBox(`<div style="white-space:pre-wrap;font:14px/1.5 Arial,Helvetica,sans-serif;color:${INK};">${esc(b.guestRequests)}</div>`, { bg: "#FFF8E1", border: "#F2D98B" })
+    ? sectionTitle(T("Richieste speciali")) + cardBox(`<div style="font:14px/1.5 Arial,Helvetica,sans-serif;color:${INK};">${nl2brHtml(esc(b.guestRequests))}</div>`, { bg: "#FFF8E1", border: "#F2D98B" })
     : "";
 
   const termsHtml = (policyText || taxText)

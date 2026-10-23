@@ -100,10 +100,12 @@ test("ricevuta abbonamento: piano grezzo capitalizzato nell'oggetto", () => {
 });
 
 // ── 9. a capo di richieste e note ──
-test("notifica: gli a capo di richieste e note dell'ospite restano (pre-wrap)", () => {
+test("notifica: gli a capo di richieste e note dell'ospite restano (con <br>, Outlook ignora pre-wrap)", () => {
   const { html } = N.notifyEmailHtml({ event: "newBooking", brand, booking: { ...nb, guestRequests: "Culla\r\nArrivo tardi\n\n\n\nGrazie", note: "riga1\nriga2" } });
-  assert.ok(html.includes("Culla\nArrivo tardi\n\nGrazie"), "a capo preservati, righe vuote ripetute compattate");
-  assert.ok(html.includes("riga1\nriga2"));
+  const piano = html.replace(/<br>\n/g, "\n");
+  assert.ok(piano.includes("Culla\nArrivo tardi\n\nGrazie"), "a capo preservati, righe vuote ripetute compattate");
+  assert.ok(piano.includes("riga1\nriga2"));
+  assert.ok(html.includes("Culla<br>"), "gli a capo sono <br>");
 });
 
 // ── 10. contrasto ──

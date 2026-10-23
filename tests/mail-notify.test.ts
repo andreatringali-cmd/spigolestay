@@ -71,7 +71,7 @@ test("pagamento: incasso registrato in evidenza", () => {
 test("solo testo (altri chiamanti): stessa shell curata, nessun layout ricco", () => {
   const { html, subject } = N.notifyEmailHtml({ subject: "Documento rifiutato", text: "Riga 1\nRiga 2 <b>", ctaUrl: "https://xenora.it/documenti/1", ctaLabel: "Apri il documento", accent: "#4F46E5" });
   assert.equal(subject, "Documento rifiutato");
-  assert.ok(html.includes("Riga 1\nRiga 2 &lt;b&gt;"));
+  assert.ok(html.includes("Riga 1<br>\nRiga 2 &lt;b&gt;"), "a capo come <br> (Outlook ignora pre-wrap)");
   assert.ok(html.includes("Apri il documento"));
   assert.match(html, /<meta name="viewport"/);
   // con event ma senza booking: badge + testo

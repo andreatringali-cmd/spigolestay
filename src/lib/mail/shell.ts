@@ -201,10 +201,16 @@ export function ghostButtonHtml(url: string, label: string, accent: string): str
   const t = accentText(accent);
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 4px;"><tr><td align="center" style="border:1px solid ${t};border-radius:10px;background:#ffffff;"><a href="${esc(url)}" target="_blank" style="display:block;padding:12px 18px;font:700 14px/1.3 ${FONT};color:${t};text-decoration:none;">${esc(label)}</a></td></tr></table>`;
 }
+/**
+ * A capo e spazi multipli di un testo GIA' passato da esc() → HTML. Si usano <br> e &nbsp; e non `white-space:pre-wrap`: Outlook (mobile e Windows) ignora quella regola
+ * e unisce tutto in un blocco unico (preventivi illeggibili); i <br> li capiscono tutti i client.
+ */
+export const nl2brHtml = (escaped: string): string =>
+  escaped.replace(/\r\n?/g, "\n").replace(/ {2,}/g, (m) => " " + "&nbsp;".repeat(m.length - 1)).replace(/\n/g, "<br>\n");
 /** Testo libero (a capo preservati) in un paragrafo. */
 // *testo* diventa grassetto (come su WhatsApp): i messaggi con titoli di sezione, es. il planning pulizie, restano leggibili anche in email.
 export const textBlockHtml = (text: string): string =>
-  `<div style="white-space:pre-wrap;font:15px/1.6 ${FONT};color:${INK};">${esc(text).replace(/\*([^*\n]+)\*/g, "<b>$1</b>")}</div>`;
+  `<div style="font:15px/1.6 ${FONT};color:${INK};">${nl2brHtml(esc(text).replace(/\*([^*\n]+)\*/g, "<b>$1</b>"))}</div>`;
 
 // ── Shell ───────────────────────────────────────────────────────────────────
 export interface ShellOptions {

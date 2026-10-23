@@ -93,6 +93,15 @@ test("email: i titoli di sezione (Partenza, Riassetto…) diventano grassetto, g
   assert.ok(!html.includes("*"));
 });
 
+test("email: gli a capo sono <br> (Outlook ignora white-space:pre-wrap e univa tutto il preventivo in un blocco)", async () => {
+  const { textBlockHtml, nl2brHtml } = await import("../src/lib/mail/shell.ts");
+  const html = textBlockHtml("Preventivo n. 4/2026\r\n\r\nPeriodo:\n• Check-in: 29.10.2026\n• Check-out: 30.10.2026\n\nTOTALE: € 93,60 <ok> & \"x\"");
+  assert.ok(!/white-space/.test(html), "niente pre-wrap");
+  assert.ok(html.includes("Preventivo n. 4/2026<br>\n<br>\nPeriodo:<br>\n• Check-in: 29.10.2026<br>\n• Check-out"));
+  assert.ok(!html.includes("<ok>") && html.includes("&lt;ok&gt; &amp; &quot;x&quot;"), "il testo resta escapato");
+  assert.equal(nl2brHtml("a    b"), "a &nbsp;&nbsp;&nbsp;b", "gli spazi multipli si conservano");
+});
+
 test("email planning: pulsante «Apri il gestionale», chiusura e piè di pagina della struttura", async () => {
   const { messageEmailHtml, brandFrom } = await import("../src/lib/mail/guest-emails.ts");
   const brand = brandFrom({ structureName: "Central Perk - Antioco", address: "Via Roma 1, Siracusa", phone: "+39 333 0000000", structureEmail: "info@example.com", color: "#285f92" } as never);
