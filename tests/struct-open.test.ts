@@ -358,7 +358,7 @@ test("primo passaggio alla modalità veloce: le modifiche locali non ancora sinc
   const src = readFileSync(new URL("../src/lib/authsync.tsx", import.meta.url), "utf8");
   const fn = src.slice(src.indexOf("async function prepareDeltaMode"), src.indexOf("async function prepareDeltaMode") + 2500);
   assert.ok(fn.indexOf("await syncOnce(") > 0 && fn.indexOf("await syncOnce(") < fn.indexOf('kvRemove("spigolestay:data:v1")'), "syncOnce prima di scartare la copia locale");
-  assert.ok(fn.indexOf("restore(r.newBlob)") > 0 && fn.indexOf("restore(r.newBlob)") < fn.indexOf('kvRemove("spigolestay:data:v1")'));
+  assert.ok(fn.indexOf("restore(r.newBlob") > 0 && fn.indexOf("restore(r.newBlob") < fn.indexOf('kvRemove("spigolestay:data:v1")'));
 });
 
 // ───────────────────────────── stato di caricamento (struct-load) ─────────────────────────────

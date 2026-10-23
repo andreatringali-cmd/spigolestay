@@ -15,7 +15,7 @@ import Icon from "@/components/Icon";
 import Popover from "@/components/Popover";
 import { copyGuideContent, guideHasText } from "@/lib/guide-copy";
 import { exampleContentFrom, loadExampleIt } from "@/lib/guide-example";
-import { GUIDES_KEY, commitGuidePatch, rememberGuideUndo, peekGuideUndo, clearGuideUndo, summarizeGuide, replaceConfirmMessage } from "@/lib/guide-protect";
+import { GUIDES_KEY, commitGuidePatch, structExplicitKeys, rememberGuideUndo, peekGuideUndo, clearGuideUndo, summarizeGuide, replaceConfirmMessage } from "@/lib/guide-protect";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAuth } from "@/lib/authsync";
 import { isLocalForeign } from "@/lib/sync-owner";
@@ -567,7 +567,7 @@ export default function GuidaOspitiPage() {
     // compaiono da sole appena la struttura ha i dati, senza che l'host scriva nulla.
     const merged = { ...base, ...structFields, content: base.content ?? EMPTY_CONTENT, id: sid, social: { ...base.social, ...(structFields.social ?? {}) } };
     // I campi della struttura seguono le Impostazioni struttura SOLO se la struttura esiste; tutto il resto non può svuotarsi da solo (vedi protectGuideWrite).
-    const res = commitGuidePatch(stored, sid, merged as unknown as Record<string, unknown>, struct ? Object.keys(structFields) : [], base as unknown as Record<string, unknown>);
+    const res = commitGuidePatch(stored, sid, merged as unknown as Record<string, unknown>, struct ? structExplicitKeys(structFields as Record<string, unknown>) : [], base as unknown as Record<string, unknown>);
     if (JSON.stringify(cur ?? null) !== JSON.stringify(res.guide)) {
       persist(res.map as Record<string, Guide>);
       // Prima creazione del record guida: ricarico l'anteprima così mostra la guida (vuota) dell'host

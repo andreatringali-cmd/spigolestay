@@ -88,6 +88,32 @@ class Tab {
     this.base = merged;
     return "ok";
   }
+
+  /**
+   * Sincronizzazione INIZIALE di una scheda già idratata (scorciatoia di authsync / deltaStartupSync / prepareDeltaMode): la guardia di scrittura è SPENTA (idratazione),
+   * quindi l'unica difesa è ricontrollare il proprietario dopo la rete, prima di restore(newBlob, uid) e di commitSyncBase. "start" = come prima della correzione (nessun ricontrollo).
+   */
+  async startupSync(mid: { afterNetwork?: () => void | Promise<void> } = {}): Promise<string> {
+    this.activeUid = null;
+    const snap = this.snapshot();
+    if (!(DK in snap)) return "locale-vuoto";
+    const merged = Core.mergeSnapshots(snap, this.server.row(this.uid), this.base, Core.readSyncBase(this.br.ls.get(Core.SYNCBASE_KEY), this.uid) ?? {});
+    this.server.write(this.uid, merged);
+    if (mid.afterNetwork) await mid.afterNetwork();                 // rete: un'altra scheda entra con un altro account
+    if (this.mode === "full" && this.foreign()) return "in-pausa";  // restore(r.newBlob, uid) esce e commitSyncBaseIfMine non scrive
+    this.restore(merged);
+    this.base = merged;
+    this.br.ls.set(Core.SYNCBASE_KEY, Core.syncBaseText(this.uid, merged));
+    this.activeUid = this.uid;
+    return "ok";
+  }
+
+  /** Uscita (logout) con salvataggio finale riuscito: svuota il locale? Prima della correzione ("start") non lo faceva con il marcatore assente. */
+  signOutWipe(): boolean {
+    const wipe = this.mode === "full" ? Owner.shouldWipeOnSignOut(this.owner(), this.uid) : !this.foreign();
+    if (wipe) this.wipe();
+    return wipe;
+  }
 }
 
 // ── Dati di prova ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -241,4 +267,68 @@ test("stesso account in due schede: nessuna pausa, i dati si scambiano normalmen
   assert.equal(await t1.cycle(), "ok");
   assert.equal(await t2.cycle(), "ok");
   assert.equal(JSON.stringify(server.row("A")).includes("MARK_A_due"), true);
+});
+
+// ── D2: uscita con marcatore assente ───────────────────────────────────────────────────────────────────────────────────────────────────────
+test("uscita (logout): con il marcatore ASSENTE il locale dell'account che esce viene svuotato; con il marcatore di un ALTRO account no", async () => {
+  for (const [mode, expectWipe] of [["start", false], ["full", true]] as [Mode, boolean][]) {
+    const { br, tabA } = world(mode);
+    await tabA.enter();
+    br.ls.delete(Core.LOCAL_OWNER_KEY);                 // marcatore perso (localStorage ripulito in parte, altra scheda a metà svuotamento…)
+    assert.equal(localHas(br, "A"), true);
+    assert.equal(tabA.signOutWipe(), expectWipe, `modo ${mode}`);
+    assert.equal(localHas(br, "A"), !expectWipe, expectWipe ? "i dati di A non restano sul dispositivo dopo l'uscita" : "prima della correzione restavano");
+  }
+  // marcatore di un altro account: i dati sono di B, non si toccano (in entrambe le versioni)
+  for (const mode of ["start", "full"] as Mode[]) {
+    const { br, tabA, tabB } = world(mode);
+    await tabA.enter(); await tabB.enter();
+    assert.equal(tabA.signOutWipe(), false);
+    assert.equal(localHas(br, "B"), true, `modo ${mode}: i dati di B restano`);
+  }
+  // marcatore proprio: si svuota
+  const w = world("full"); await w.tabA.enter();
+  assert.equal(w.tabA.signOutWipe(), true);
+  const S = Owner.shouldWipeOnSignOut;
+  assert.equal(S(null, "A"), true); assert.equal(S("A", "A"), true); assert.equal(S("B", "A"), false);
+  assert.equal(S(null, undefined), true, "senza sessione nota: come prima, si svuota"); assert.equal(S("B", undefined), true);
+});
+
+// ── D3: sincronizzazione iniziale con un altro account che entra durante la rete ───────────────────────────────────────────────────────────
+test("sincronizzazione iniziale (guardia di scrittura spenta): se B entra durante la rete, A NON riscrive i suoi dati sopra quelli di B né la sua base", async () => {
+  for (const [mode, expectLeak] of [["start", true], ["full", false]] as [Mode, boolean][]) {
+    const { br, server, tabA, tabB } = world(mode);
+    await tabA.enter();
+    const res = await tabA.startupSync({ afterNetwork: () => tabB.enter() });
+    assert.equal(localHas(br, "A"), expectLeak, `modo ${mode}: ${expectLeak ? "senza il ricontrollo il restore di A sporca il locale di B" : "il locale resta quello di B"}`);
+    assert.equal(br.ls.get(Core.LOCAL_OWNER_KEY), "B");
+    const base = br.ls.get(Core.SYNCBASE_KEY);
+    assert.equal(Core.readSyncBase(base, "B") !== null, !expectLeak, `modo ${mode}: la base persistente ${expectLeak ? "è stata sovrascritta da A" : "resta quella di B"}`);
+    if (!expectLeak) {
+      assert.equal(res, "in-pausa");
+      assert.equal(await tabB.cycle(), "ok");
+      assert.equal(has(server.row("B"), "A"), false);
+    } else {
+      await tabB.cycle();
+      assert.equal(has(server.row("B"), "A"), true, "CONTROLLO: senza difesa i dati di A finiscono sul server di B");
+    }
+  }
+});
+
+test("sincronizzazione iniziale senza intrusi: restore e base procedono normalmente", async () => {
+  const { server, tabA } = world("full");
+  await tabA.enter();
+  assert.equal(await tabA.startupSync(), "ok");
+  assert.equal(has(server.row("A"), "B"), false);
+});
+
+// ── D5: motivo del blocco (altro account / marcatore assente) ──────────────────────────────────────────────────────────────────────────────
+test("scheda in pausa: il motivo distingue «altro account» da «marcatore assente»; le chiavi per-dispositivo e le scheda senza account attivo non sono bloccate", () => {
+  const r = Owner.writeBlockReason;
+  assert.equal(r("spigolestay:guides", "B", "A"), "other");
+  assert.equal(r("spigolestay:guides", null, "A"), "unknown", "marcatore assente: resta bloccato (potrebbe essere la finestra di ricostruzione di un altro account), ma il messaggio non parla di altro account");
+  assert.equal(r("spigolestay:guides", "A", "A"), null);
+  assert.equal(r("xn-collab", "B", "A"), null);
+  assert.equal(r("spigolestay:guides", "B", null), null);
+  assert.equal(Owner.ownedByOther(null, "A"), false); assert.equal(Owner.ownedByOther("B", "A"), true); assert.equal(Owner.ownedByOther("A", "A"), false);
 });

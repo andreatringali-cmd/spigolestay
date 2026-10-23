@@ -26,6 +26,20 @@ export function isLocalForeign(store: OwnerReader, uid: string): boolean {
   try { return store.getItem(LOCAL_OWNER_KEY) !== uid; } catch { return false; }
 }
 
+/** true = il marcatore indica CON CERTEZZA un altro account (presente e diverso da `uid`). Un marcatore assente NON è «di un altro»: può essere un locale svuotato o ripulito dal browser. */
+export function ownedByOther(owner: string | null, uid: string): boolean { return owner !== null && owner !== uid; }
+
+/** Motivo per cui la scrittura è bloccata (serve a scegliere il messaggio): "other" = nel locale ci sono i dati di un altro account; "unknown" = marcatore assente (locale in ricostruzione o ripulito); null = non bloccata. */
+export function writeBlockReason(key: string, owner: string | null, activeUid: string | null): "other" | "unknown" | null {
+  if (!shouldBlockLocalWrite(key, owner, activeUid)) return null;
+  return owner === null ? "unknown" : "other";
+}
+
+/** All'uscita (logout) il locale si svuota se è di questo account OPPURE se il marcatore manca (dati senza proprietario, mai di un altro): si salta SOLO se il marcatore è di un altro account. */
+export function shouldWipeOnSignOut(owner: string | null, uid: string | undefined): boolean {
+  return !(uid && ownedByOther(owner, uid));
+}
+
 /**
  * Una scrittura su `key` va ignorata? Solo se la scheda ha un account attivo (`activeUid`), la chiave è sincronizzata e il marcatore non è quello dell'account attivo.
  * Una scheda senza account attivo (login, idratazione in corso, uscita) scrive liberamente: è lei che costruisce il locale.

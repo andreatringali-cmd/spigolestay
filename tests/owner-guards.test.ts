@@ -15,7 +15,7 @@ test("authsync: il ciclo di sincronizzazione controlla il proprietario del local
   const run = s.slice(s.indexOf("const runSync = async"), s.indexOf("pushTimer.current = setInterval"));
   assert.ok(run.indexOf("localIsForeign(userId)") < run.indexOf("remoteSyncSig"), "controllo iniziale prima di qualsiasi lavoro");
   assert.ok(run.indexOf("foreign || localIsForeign(userId)") > run.indexOf("await syncOnce(") && run.indexOf("foreign || localIsForeign(userId)") < run.indexOf("restore(newBlob)"), "ricontrollo dopo syncOnce e prima di restore");
-  assert.ok(s.includes("if (saved && !(uid && localIsForeign(uid))) wipeLocalAccount();"), "signOut non svuota il locale di un altro account");
+  assert.ok(s.includes("if (saved && shouldWipeOnSignOut(ownerNow, uid)) wipeLocalAccount();"), "signOut non svuota il locale di un altro account (ma sì con marcatore assente)");
   assert.ok(s.includes("setActiveAccount(userId)") && s.includes("setActiveAccount(null)"), "la guardia di scrittura si accende in startPush e si spegne in stopPush");
   assert.ok(s.includes("setKvWriteGuard(isWriteBlocked)") && s.includes("installLocalWriteGuard()"), "guardia di scrittura installata");
   assert.ok(s.includes("wipeOrder(kvKeys())"), "lo svuotamento toglie prima il marcatore");
@@ -23,10 +23,37 @@ test("authsync: il ciclo di sincronizzazione controlla il proprietario del local
   assert.ok(shortcut.indexOf("markLocalOwner(uid)") < shortcut.indexOf("syncOnce("), "scorciatoia: il marcatore mancante si ripristina prima di sincronizzare");
 });
 
-test("bigstore: le scritture del blocco grande passano dalla guardia (IndexedDB è condiviso tra le schede)", () => {
+test("bigstore: le scritture del blocco grande passano dalla guardia (IndexedDB è condiviso tra le schede), anche quelle già in coda", () => {
   const s = read("src/lib/bigstore.ts");
   assert.ok(s.includes("export function setKvWriteGuard"));
   assert.ok(count(s, "writeGuard && writeGuard(key)") === 2, "kvSet e kvRemove");
+  const flush = s.slice(s.indexOf("function runFlush()"), s.indexOf("const schedule"));
+  assert.ok(count(flush, "dropBlocked()") === 2, "runFlush rivaluta la guardia prima di ogni scrittura su IndexedDB (primo tentativo e secondo)");
+  assert.ok(flush.indexOf("dropBlocked()") < flush.indexOf("await idbWrite(batch)"));
+  // la prova vera (con un IndexedDB finto) è in bigstore-guard.test.ts
+});
+
+test("authsync: dopo l'attesa di rete della sincronizzazione iniziale restore e base ricontrollano il proprietario del locale (la guardia di scrittura è spenta in idratazione)", () => {
+  const s = read("src/lib/authsync.tsx");
+  assert.ok(s.includes("function restore(data: Record<string, string>, uid?: string): boolean {") && s.includes("if (uid && localIsForeign(uid))"), "restore(data, uid) esce se il locale non è di uid");
+  const prep = s.slice(s.indexOf("async function prepareDeltaMode("), s.indexOf("async function prepareDeltaMode(") + 2600);
+  assert.ok(prep.includes("restore(r.newBlob, uid)") && prep.includes("commitSyncBaseIfMine(uid"), "prepareDeltaMode");
+  const startup = s.slice(s.indexOf("async function deltaStartupSync("), s.indexOf("async function deltaStartupSync(") + 1800);
+  assert.ok(startup.includes("restore(r.newBlob, uid)") && startup.includes("commitSyncBaseIfMine(uid") && !/[^f]commitSyncBase\(uid/.test(startup.replace(/commitSyncBaseIfMine/g, "")), "deltaStartupSync");
+  assert.ok(startup.indexOf("r.foreign || localIsForeign(uid)") > startup.indexOf("await syncOnce(") && startup.indexOf("r.foreign || localIsForeign(uid)") < startup.indexOf("restore(r.newBlob, uid)"));
+  const shortcut = s.slice(s.indexOf('if (!switching && entry === "shortcut")'), s.indexOf("return;", s.indexOf('if (!switching && entry === "shortcut")')));
+  assert.ok(shortcut.includes("restore(res.newBlob, uid)") && shortcut.includes("notifyOtherAccount(") , "scorciatoia");
+  assert.ok(s.includes("if (localOwnedByOtherNow(uid)) { notifyOtherAccount(\"other\"); return; }"), "dopo prepareDeltaMode l'idratazione si ferma se il locale è di un altro account");
+});
+
+test("scheda in pausa: avviso BLOCCANTE (finestra modale con «Ricarica»), anche prima dell'idratazione, con il motivo", () => {
+  const s = read("src/lib/authsync.tsx");
+  const ov = s.slice(s.indexOf("function OtherAccountOverlay("), s.indexOf("export function useAuth()"));
+  assert.ok(ov.includes('role="alertdialog"') && ov.includes('aria-modal="true"') && ov.includes("inset: 0") && ov.includes("window.location.reload()") && ov.includes("Ricarica la pagina"));
+  assert.ok(s.includes("{otherAccount && <OtherAccountOverlay reason={otherReason} />}") && s.includes("if (otherAccount && !hydrated) return <OtherAccountOverlay"));
+  assert.ok(!s.includes('position: "fixed", top: 0, left: 0, right: 0, zIndex: 9998'), "il vecchio banner non bloccante non c'è più");
+  const g = read("src/lib/local-guard.ts");
+  assert.ok(g.includes("writeBlockReason(key, ownerNow(), activeUid)") && g.includes('new CustomEvent("xenora:other-account"'));
 });
 
 test("Cassa: la migrazione una-tantum dei dati locali verso il server non parte se il locale è di un altro account", () => {

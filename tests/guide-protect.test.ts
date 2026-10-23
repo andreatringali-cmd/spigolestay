@@ -248,3 +248,40 @@ test("copia di salvataggio: è una COPIA (modifiche successive non la cambiano),
 test("la chiave della copia di salvataggio NON è sincronizzata (resta sul dispositivo, non finisce sul server)", () => {
   assert.equal(Core.isSyncKey("xn-guide-undo:" + SID), false);
 });
+
+// ── D1: struttura esistente ma con campi vuoti ───────────────────────────────────────────────────────────────────────────────────────────
+test("struttura esistente ma con campi vuoti: telefono, email, mappa, social pieni della guida NON diventano vuoti", () => {
+  const emptyStruct: Rec = { name: "", city: "", guideLogo: "", address: "", mapsUrl: "", phone: "", email: "", whatsapp: "", phoneGreta: "", social: { instagram: "", facebook: "", website: "" } };
+  assert.deepEqual(G.structExplicitKeys(emptyStruct), [], "nessun campo vuoto è una scelta del titolare");
+  const stored = { [SID]: fullGuide() };
+  const prev = fullGuide();
+  const merged = { ...prev, ...emptyStruct, content: prev.content, id: SID, social: { ...(prev.social as Rec), ...(emptyStruct.social as Rec) } };
+  const res = G.commitGuidePatch(stored, SID, merged, G.structExplicitKeys(emptyStruct), prev);
+  for (const k of ["phone", "email", "mapsUrl", "address", "whatsapp", "guideLogo", "name", "city"]) assert.equal(res.guide[k], prev[k], k);
+  assert.equal((res.guide.social as Rec).instagram, "spigolehouse");
+  assert.equal((res.guide.social as Rec).website, "https://spigole.it");
+  assert.ok(res.restored.includes("phone") && res.restored.includes("email") && res.restored.includes("mapsUrl"), res.restored.join(","));
+  // Con il vecchio calcolo (tutte le chiavi) il danno c'era: lo si dimostra, così il test fallirebbe se si tornasse indietro.
+  const old = G.commitGuidePatch(stored, SID, merged, Object.keys(emptyStruct), prev);
+  assert.equal(old.guide.phone, "", "con tutte le chiavi «esplicite» il telefono si svuotava");
+});
+
+test("struttura con alcuni campi pieni: quelli pieni seguono la struttura (anche se cambiati), i vuoti non svuotano", () => {
+  const fields: Rec = { name: "Nuovo nome", city: "", phone: "+39 333 9999999", email: "", social: { instagram: "nuovo_ig", facebook: "", website: "" } };
+  assert.deepEqual(G.structExplicitKeys(fields).sort(), ["name", "phone", "social.instagram"]);
+  const prev = fullGuide();
+  const merged = { ...prev, ...fields, content: prev.content, id: SID, social: { ...(prev.social as Rec), ...(fields.social as Rec) } };
+  const res = G.commitGuidePatch({ [SID]: prev }, SID, merged, G.structExplicitKeys(fields), prev);
+  assert.equal(res.guide.name, "Nuovo nome");
+  assert.equal(res.guide.phone, "+39 333 9999999");
+  assert.equal((res.guide.social as Rec).instagram, "nuovo_ig");
+  assert.equal(res.guide.email, "info@spigole.it", "email vuota in struttura: resta quella della guida");
+  assert.equal(res.guide.city, "Siracusa");
+  assert.equal((res.guide.social as Rec).website, "https://spigole.it");
+});
+
+test("la pagina usa structExplicitKeys (non tutte le chiavi) per l'allineamento con la struttura", () => {
+  const src = fs.readFileSync(new URL("../src/app/(app)/guida-ospiti/page.tsx", import.meta.url), "latin1");
+  assert.ok(src.includes("structExplicitKeys(structFields"), "la pagina passa solo le chiavi piene");
+  assert.ok(!src.includes("Object.keys(structFields)"), "niente più Object.keys(structFields)");
+});

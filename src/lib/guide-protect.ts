@@ -110,6 +110,19 @@ export function commitGuidePatch(stored: Record<string, unknown> | null | undefi
   return { map: { ...map, [sid]: guide }, guide, restored };
 }
 
+/**
+ * Percorsi «espliciti» dei dati che la pagina allinea dalla struttura: SOLO quelli con un valore (per `social` le sole sotto-chiavi piene).
+ * Un dato struttura vuoto non è una scelta del titolare (la struttura può non essere ancora caricata o compilata): non deve svuotare il campo pieno della guida.
+ */
+export function structExplicitKeys(fields: Rec): string[] {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(fields)) {
+    if (isRec(v)) { for (const [k2, v2] of Object.entries(v)) if (!isEmptyValue(v2)) out.push(k + "." + k2); }
+    else if (!isEmptyValue(v)) out.push(k);
+  }
+  return out;
+}
+
 // ── Fusione tra dispositivi ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 /**
  * Fonde le due versioni (locale e server) della guida di UNA struttura. Il vincitore si sceglie come per le altre chiavi piatte (a 3 vie con la base: locale invariato → server; server invariato →
