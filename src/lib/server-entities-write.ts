@@ -7,9 +7,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // public.entity_authority(owner_type, owner_id, kind, authority 'blob'|'table') dice chi comanda; se manca la riga o la tabella, comanda il blocco.
 //
 // Regola d'oro: l'helper scrive nella tabella SOLO se (1) l'interruttore SERVER_WRITE_ENTITIES=on E (2) per quel proprietario e quel kind l'autorita' e' 'table'.
-// In ogni altro caso (interruttore spento, tabella entity_authority inesistente, riga assente, autorita' 'blob', QUALUNQUE errore nel leggere l'autorita')
-// non scrive nulla e restituisce { handled:false }: il chiamante prosegue col percorso di sempre (il blocco). Nessun proprietario e' 'table' oggi, quindi
-// oggi questo modulo non cambia il comportamento di nessuno scrittore.
+// In ogni altro caso (interruttore spento, tabella entity_authority inesistente, riga assente, autorita' 'blob') non scrive nulla e restituisce { handled:false }:
+// il chiamante prosegue col percorso di sempre (il blocco). Nessun proprietario e' 'table' oggi, quindi oggi questo modulo non cambia il comportamento di nessuno scrittore.
+// ECCEZIONE (fail-closed): con l'interruttore ACCESO, se la lettura dell'autorita' va in errore (errore del database o eccezione; NON la tabella assente) non si sa se il blocco
+// sia la verita': si risponde { handled:true, ok:false, error:"read_error" } e NON si scrive il blocco (il chiamante lo tratta come un conflitto/errore da ritentare).
+// L'interruttore SPENTO resta «fail-open» per costruzione: vale solo se NESSUN proprietario ha righe 'table' (vedi docs/FASE3-STORE-DA-TABELLE.md).
 //
 // Una volta confermata l'autorita' 'table' l'helper NON ricade piu' sul blocco (non sarebbe piu' la verita': si creerebbero due versioni): non lancia mai,
 // ma riporta { handled:true, ok:false, error } e il chiamante tratta il caso come un normale conflitto di scrittura (i webhook di Stripe/Channex ritentano).
@@ -79,6 +81,35 @@ export async function readEntityAuthority(admin: SupabaseClient, ownerType: Owne
     return { authority: "blob", reason: "error", message: errMsg(e) };
   }
 }
+
+/**
+ * Quali tra `kinds` hanno per questo proprietario l'autorita' 'table'? UNA sola richiesta a entity_authority (per i lettori che ricostruiscono uno store dalle tabelle,
+ * vedi server-entities-store.ts). Stessa regola di readEntityAuthority: interruttore spento = [] senza nessuna chiamata al database; tabella assente, nessuna riga,
+ * valore diverso da 'table', errore o eccezione = [] (si resta sul blocco, come oggi). Non lancia mai.
+ */
+export async function readTableKinds(admin: SupabaseClient, ownerType: OwnerType, ownerId: string, kinds: readonly string[]): Promise<string[]> {
+  return (await readTableKindsInfo(admin, ownerType, ownerId, kinds)).kinds;
+}
+/** Come readTableKinds ma dice anche se la lettura e' fallita (error valorizzato: errore o eccezione; la tabella assente NON e' un errore, vuol dire che nessuno e' 'table'). */
+export async function readTableKindsInfo(admin: SupabaseClient, ownerType: OwnerType, ownerId: string, kinds: readonly string[]): Promise<{ kinds: string[]; error?: string }> {
+  if (!entitiesWriteEnabled() || !ownerId || !kinds.length) return { kinds: [] };
+  if (Date.now() < missingUntil) return { kinds: [] };
+  try {
+    const { data, error } = await admin.from(AUTHORITY).select("kind,authority").eq("owner_type", ownerType).eq("owner_id", ownerId).in("kind", [...kinds]);
+    if (error) {
+      if (isMissingTable(error)) { missingUntil = Date.now() + MISSING_TTL_MS; return { kinds: [] }; }
+      return { kinds: [], error: errMsg(error) };
+    }
+    const want = new Set(kinds);
+    return { kinds: arr(data).filter((r) => r.authority === "table" && want.has(String(r.kind))).map((r) => String(r.kind)) };
+  } catch (e) {
+    return { kinds: [], error: errMsg(e) };
+  }
+}
+
+/** Gli altri tipi che uno scrittore di prenotazioni puo' leggere dal blocco intero (oltre a bookings). */
+const SCOPE_OTHER_KINDS = ["structures", "roomTypes", "units", "guests"] as const;
+const authReadFailed = (a: AuthorityInfo): { handled: true; ok: false; error: "read_error"; message: string } => ({ handled: true, ok: false, error: "read_error", message: "autorita': " + (a.message ?? "lettura non riuscita") });
 
 const reasonOf = (a: AuthorityInfo): NotHandledReason =>
   a.reason === "disabled" ? "disabled" : a.reason === "missing_table" ? "authority_missing_table" : a.reason === "error" ? "authority_error" : "authority_blob";
@@ -203,6 +234,7 @@ export async function patchEntity(admin: SupabaseClient, args: PatchEntityArgs):
       && (!!args.patch !== !!args.mutate) && (args.patch === undefined || isObj(args.patch));
     if (!okInput) return { handled: false, reason: "bad_input" };
     const auth = await readEntityAuthority(admin, args.ownerType, args.ownerId, args.kind);
+    if (auth.reason === "error") return authReadFailed(auth); // interruttore acceso ma autorita' illeggibile: NON si scrive il blocco (potrebbe non essere la verita')
     if (auth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
     return await patchTable(admin, args);
   } catch (e) {
@@ -260,7 +292,17 @@ export async function mutateBookingScope(admin: SupabaseClient, a: BookingScopeA
   try {
     if (!a.ownerId || !a.bookingId || (a.ownerType !== "u" && a.ownerType !== "o")) return { handled: false, reason: "bad_input" };
     const auth = await readEntityAuthority(admin, a.ownerType, a.ownerId, "bookings");
-    if (auth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
+    if (auth.reason === "error") return authReadFailed(auth);
+    if (auth.authority !== "table") {
+      // Uno scrittore non migrato lavora sul blocco intero: se UN QUALSIASI altro tipo che puo' usare (strutture, tipologie, camere, ospiti) ha autorita' 'table' il blocco
+      // non lo contiene piu' e la funzione vedrebbe dati mancanti (importi sbagliati senza errore). Si rifiuta, come per le prenotazioni.
+      if (!a.supported && auth.reason !== "disabled" && auth.reason !== "missing_table") {
+        const other = await readTableKindsInfo(admin, a.ownerType, a.ownerId, SCOPE_OTHER_KINDS);
+        if (other.error) return { handled: true, ok: false, error: "read_error", message: other.error };
+        if (other.kinds.length) return { handled: true, ok: false, error: "writer_not_migrated", message: "autorita' table su " + other.kinds.join(",") };
+      }
+      return { handled: false, reason: reasonOf(auth) };
+    }
     if (!a.supported) return { handled: true, ok: false, error: "writer_not_migrated" };
     return await scopeTable(admin, a);
   } catch (e) {
@@ -330,6 +372,7 @@ export async function mutateEntitySet(admin: SupabaseClient, a: EntitySetArgs): 
   try {
     if (!a.ownerId || (a.ownerType !== "u" && a.ownerType !== "o") || !(WRITABLE_KINDS as readonly string[]).includes(a.kind)) return { handled: false, reason: "bad_input" };
     const auth = await readEntityAuthority(admin, a.ownerType, a.ownerId, a.kind);
+    if (auth.reason === "error") return { handled: true, outcome: "error", message: "read_error: " + (auth.message ?? "") };
     if (auth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
     const now = a.now ?? Date.now();
     let outcome: SetResult = { handled: true, outcome: "conflict" };

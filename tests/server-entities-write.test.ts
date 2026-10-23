@@ -149,12 +149,16 @@ test("ingresso non valido: handled:false (kind sconosciuto, ne' patch ne' mutate
 });
 
 // ───────────────────────── (c) errori: mai una richiesta rotta ─────────────────────────
-test("errore nel leggere l'autorita' (errore del database o eccezione): handled:false, ricade sul percorso attuale", async () => {
+test("errore nel leggere l'autorita' (errore del database o eccezione) con interruttore ACCESO: read_error, fail-closed (nessuna scrittura, il blocco non e' una verita' certa)", async () => {
   const w1 = world({ hooks: { authority: { error: { code: "XX000", message: "boom" } } } });
-  assert.deepEqual(await on(() => patchB1(w1.admin)), { handled: false, reason: "authority_error" });
+  const r1 = await on(() => patchB1(w1.admin)) as J;
+  assert.equal(r1.handled, true); assert.equal(r1.ok, false); assert.equal(r1.error, "read_error"); assert.match(r1.message, /boom/);
   const w2 = world({ hooks: { authority: { throws: "rete caduta" } } });
-  assert.deepEqual(await on(() => patchB1(w2.admin)), { handled: false, reason: "authority_error" });
+  const r2 = await on(() => patchB1(w2.admin)) as J;
+  assert.equal(r2.handled, true); assert.equal(r2.error, "read_error");
   assert.equal(updates(w1.db) + updates(w2.db), 0);
+  // interruttore spento: nessuna lettura dell'autorita', quindi nessun errore possibile (fail-open per costruzione)
+  assert.deepEqual(await withWrite(undefined, () => patchB1(w1.admin)), { handled: false, reason: "disabled" });
 });
 
 test("errore del database sulla scrittura con autorita' 'table': ok:false write_error, senza lanciare e senza ripiego sul blocco", async () => {
@@ -336,7 +340,7 @@ test("mutateStore senza opzioni (scrittore non ancora migrato, es. /api/checkin)
 
 // ───────────────────────── i punti di scrittura reali: percorso del blocco invariato ─────────────────────────
 test("writeBookingPatch / mutateStore: interruttore spento, tabella assente o autorita' blob => il blocco e' scritto come sempre", async () => {
-  for (const [label, v, o] of [["spento", undefined, { auth: TABLE_BOOKINGS }], ["tabella assente", "on", { authTable: false }], ["blob", "on", { auth: [{ owner: OWN, kind: "bookings", authority: "blob" }] }], ["errore", "on", { hooks: { authority: { throws: "x" } } }]] as const) {
+  for (const [label, v, o] of [["spento", undefined, { auth: TABLE_BOOKINGS }], ["tabella assente", "on", { authTable: false }], ["blob", "on", { auth: [{ owner: OWN, kind: "bookings", authority: "blob" }] }]] as const) {
     const w = world(o as never);
     const s = store(); s.blob = (w.db.tables.app_state[0].data as J); s.data = JSON.parse(s.blob[DATA_KEY]); s.booking = { id: "b-1" }; s.bookingIndex = 0;
     const okPatch = await withWrite(v, () => MB.writeBookingPatch(w.admin, s, { note: "n1", updatedAt: 5 }));
