@@ -19,6 +19,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // (structure_id, check_in, check_out, status, channel) sono ricalcolate dal dato come fa il trigger blocco -> tabella; le colonne delle prenotazioni
 // (unit_id, guest_id, group_id, ota_code, ext_id) le ricalcola il trigger entities_bk_cols_trg della migrazione 0015.
 // Istruzioni di accensione e di spegnimento: docs/FASE3-PASSO3A.md.
+//
+// Passo 3b (docs/FASE3-PASSO3B.md): stesse regole, esteso a due scrittori che toccano piu' righe di tipi diversi.
+//  - mutateBookingScope con `guest: true` (usata da /api/checkin): prenotazione + anagrafica ospite collegata nella stessa operazione, con ripristino se una va in conflitto.
+//    Serve l'autorita' 'table' per ENTRAMBI i kind; se e' diversa si rifiuta (authority_mixed) e non si scrive da nessuna parte.
+//  - mutateEntitySet con `kind` come elenco (usata dalla purge delle foto documento in alloggiati/purge.ts), piu' readRowsByIds e unreferencedRefs: un file si cancella
+//    dallo Storage solo se nessuna riga di prenotazione o ospite del proprietario lo cita piu'.
 
 export type Json = Record<string, unknown>;
 export type OwnerType = "u" | "o";
@@ -33,7 +39,7 @@ export interface WriteRow {
 }
 
 export type NotHandledReason = "disabled" | "bad_input" | "authority_blob" | "authority_missing_table" | "authority_error";
-export type WriteError = "conflict" | "not_found" | "read_error" | "write_error" | "unsupported_shape" | "writer_not_migrated";
+export type WriteError = "conflict" | "not_found" | "read_error" | "write_error" | "unsupported_shape" | "writer_not_migrated" | "authority_mixed" | "partial_group_write";
 
 const ENTITIES = "entities";
 const AUTHORITY = "entity_authority";
@@ -141,10 +147,12 @@ async function casUpdate(admin: SupabaseClient, row: WriteRow, next: Json, prevM
 }
 
 interface Item { row: WriteRow; cur: Json; next: Json }
-type WriteRowsResult = { ok: true; updatedMs: number[] } | { ok: false; error: "conflict" | "write_error"; message?: string };
+type WriteRowsResult = { ok: true; updatedMs: number[] } | { ok: false; error: "conflict" | "write_error" | "partial_group_write"; message?: string };
 /**
  * Scrive piu' righe una dopo l'altra, ognuna col suo compare-and-set. Se una fallisce, quelle gia' scritte vengono rimesse com'erano (anch'esse con compare-and-set).
  * NON e' una transazione: per le operazioni a piu' righe che devono essere atomiche servira' una funzione SQL (passo 3c); qui si copre il caso gruppo di camere.
+ * Se anche il ripristino di una riga gia' scritta fallisce (qualcuno l'ha toccata nel frattempo) il risultato e' `partial_group_write`, NON `conflict`: lo stato e' meta' nuovo e meta' vecchio,
+ * quindi e' un errore distinto e NON ritentabile alla cieca (chi ritenta deve rileggere e riconciliare). Vale per ogni operazione a piu' righe: gruppo di camere, prenotazione + ospite, purge.
  */
 async function writeRows(admin: SupabaseClient, items: Item[], now: number): Promise<WriteRowsResult> {
   const done: { item: Item; prevMs: number; newMs: number }[] = [];
@@ -154,11 +162,13 @@ async function writeRows(admin: SupabaseClient, items: Item[], now: number): Pro
     const newMs = stampNext(next, prevMs, now);
     const r = await casUpdate(admin, it.row, next, prevMs, newMs);
     if (r.ok) { done.push({ item: it, prevMs, newMs }); continue; }
+    const stuck: string[] = [];
     for (const d of done.reverse()) {
       const back = { ...d.item.cur, id: d.item.row.id, updatedAt: d.newMs + 1 };
       const rb = await casUpdate(admin, d.item.row, back, d.newMs, d.newMs + 1);
-      if (!rb.ok) console.error("[entities-write] ripristino non riuscito", d.item.row.kind, d.item.row.id, rb.error);
+      if (!rb.ok) { stuck.push(d.item.row.kind + ":" + d.item.row.id); console.error("[entities-write] ripristino non riuscito", d.item.row.kind, d.item.row.id, rb.error); }
     }
+    if (stuck.length) return { ok: false, error: "partial_group_write", message: "partial_group_write: ripristino non riuscito su " + stuck.join(",") };
     return r;
   }
   return { ok: true, updatedMs: done.map((d) => d.newMs) };
@@ -244,6 +254,16 @@ export interface BookingScopeArgs {
   mutate: (data: Json, bookingIndex: number) => boolean;
   /** true = il chiamante e' stato verificato per questa forma ridotta dei dati. false = scrittore non ancora migrato: se l'autorita' e' 'table' si rifiuta (non si scrive il blocco). */
   supported: boolean;
+  /**
+   * Passo 3b. Che cosa mettere nell'oggetto «data» passato a `mutate` (default: come nel passo 3a, prenotazione + camere del gruppo + struttura):
+   *  - group: false = solo la prenotazione, senza le altre camere del gruppo;
+   *  - structure: false = senza la struttura (la chiave `structures` non c'e' nemmeno);
+   *  - guest: true = aggiunge `guests` con l'anagrafica ospite collegata (booking.guestId), che `mutate` puo' modificare. In tal caso l'autorita' deve essere 'table'
+   *    per ENTRAMBI i kind (bookings e guests): se e' diversa si rifiuta con authority_mixed e non si scrive da nessuna parte.
+   */
+  group?: boolean;
+  structure?: boolean;
+  guest?: boolean;
   now?: number;
 }
 export type ScopeResult =
@@ -260,7 +280,15 @@ export async function mutateBookingScope(admin: SupabaseClient, a: BookingScopeA
   try {
     if (!a.ownerId || !a.bookingId || (a.ownerType !== "u" && a.ownerType !== "o")) return { handled: false, reason: "bad_input" };
     const auth = await readEntityAuthority(admin, a.ownerType, a.ownerId, "bookings");
-    if (auth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
+    if (a.guest) {
+      // Scrive anche l'anagrafica ospite: prenotazioni e ospiti devono avere la STESSA autorita'. Tutte e due 'blob' = percorso del blocco (invariato);
+      // una sola 'table' = il blocco non e' la verita' per uno dei due e le tabelle non lo sono per l'altro: si rifiuta, senza scrivere da nessuna parte.
+      const gAuth = await readEntityAuthority(admin, a.ownerType, a.ownerId, "guests");
+      // Fail-closed (solo su questo percorso nuovo): se l'autorita' non si riesce a LEGGERE non si puo' escludere che il proprietario sia 'table', quindi non si ricade sul blocco.
+      if (auth.reason === "error" || gAuth.reason === "error") return { handled: true, ok: false, error: "read_error", message: auth.message ?? gAuth.message };
+      if (auth.authority !== "table" && gAuth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
+      if (auth.authority !== gAuth.authority) return { handled: true, ok: false, error: "authority_mixed" };
+    } else if (auth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
     if (!a.supported) return { handled: true, ok: false, error: "writer_not_migrated" };
     return await scopeTable(admin, a);
   } catch (e) {
@@ -276,30 +304,46 @@ async function scopeTable(admin: SupabaseClient, a: BookingScopeArgs): Promise<S
     if (t.error) return { handled: true, ok: false, error: "read_error", message: t.error };
     if (!t.row) return { handled: true, ok: false, error: "not_found" };
     const target = entityOf(t.row);
+    const wantGroup = a.group !== false, wantStruct = a.structure !== false, wantGuest = a.guest === true;
     let rows: WriteRow[] = [t.row];
     const gid = strOrNull(target.groupId);
-    if (gid) {
+    if (gid && wantGroup) {
       const { data, error } = await admin.from(ENTITIES).select(COLS).eq("owner_type", a.ownerType).eq("owner_id", a.ownerId).eq("kind", "bookings").eq("data->>groupId", gid);
       if (error) return { handled: true, ok: false, error: "read_error", message: errMsg(error) };
       rows = [t.row, ...(Array.isArray(data) ? (data as WriteRow[]) : []).filter((r) => r.id !== t.row!.id)];
     }
     const sid = strOrNull(target.structureId);
     let structures: Json[] = [];
-    if (sid) {
+    if (sid && wantStruct) {
       const s = await readOne(admin, a.ownerType, a.ownerId, "structures", sid);
       if (s.error) return { handled: true, ok: false, error: "read_error", message: s.error };
       if (s.row) structures = [entityOf(s.row)];
     }
+    // Anagrafica ospite collegata (solo se richiesta): una sola riga, quella di booking.guestId.
+    let guestRows: WriteRow[] = [];
+    const guestId = wantGuest ? strOrNull(target.guestId) : null;
+    if (guestId) {
+      const g = await readOne(admin, a.ownerType, a.ownerId, "guests", guestId);
+      if (g.error) return { handled: true, ok: false, error: "read_error", message: g.error };
+      if (g.row) guestRows = [g.row];
+    }
     const before = rows.map(entityOf);
-    const data: Json = { bookings: structuredClone(before), structures: structuredClone(structures) };
+    const guestsBefore = guestRows.map(entityOf);
+    const data: Json = { bookings: structuredClone(before) };
+    if (wantStruct) data.structures = structuredClone(structures);
+    if (wantGuest) data.guests = structuredClone(guestsBefore);
     if (!a.mutate(data, 0)) return { handled: true, ok: true, wrote: false, skipped: true };
     const after = arr(data.bookings);
+    const guestsAfter = arr(data.guests);
     const keys = Object.keys(data).sort().join(",");
-    if (keys !== "bookings,structures" || after.length !== before.length || after.some((b, i) => String(b?.id ?? "") !== String(before[i].id)) || !sameContent(data.structures, structures)) {
+    const sameIds = (x: Json[], y: Json[]) => x.length === y.length && x.every((b, i) => String(b?.id ?? "") === String(y[i].id));
+    if (keys !== ["bookings", ...(wantGuest ? ["guests"] : []), ...(wantStruct ? ["structures"] : [])].join(",") || !sameIds(after, before) || (wantGuest && !sameIds(guestsAfter, guestsBefore)) || (wantStruct && !sameContent(data.structures, structures))) {
       return { handled: true, ok: false, error: "unsupported_shape" };
     }
+    // Si riscrivono SOLO le righe cambiate. Prima le prenotazioni, poi l'anagrafica: se l'anagrafica va in conflitto, writeRows rimette a posto le prenotazioni gia' scritte.
     const items: Item[] = [];
     rows.forEach((row, i) => { if (!sameContent(before[i], after[i])) items.push({ row, cur: before[i], next: after[i] }); });
+    guestRows.forEach((row, i) => { if (!sameContent(guestsBefore[i], guestsAfter[i])) items.push({ row, cur: guestsBefore[i], next: guestsAfter[i] }); });
     if (!items.length) return { handled: true, ok: true, wrote: false };
     const w = await writeRows(admin, items, now);
     if (w.ok) return { handled: true, ok: true, wrote: true };
@@ -309,13 +353,17 @@ async function scopeTable(admin: SupabaseClient, a: BookingScopeArgs): Promise<S
   return last;
 }
 
-// ───────────────────────── insieme di righe scelte dal chiamante (riconciliazione Stripe) ─────────────────────────
+// ───────────────────────── insieme di righe scelte dal chiamante (riconciliazione Stripe, purge foto documento) ─────────────────────────
 export type SetPlan = { action: "none" } | { action: "noop" } | { action: "changes"; changes: { idx: number; next: Json }[] };
 export interface EntitySetArgs {
   ownerType: OwnerType;
   ownerId: string;
-  kind: string;
-  /** Carica le righe candidate (devono essere del proprietario indicato). Rieseguita su conflitto. */
+  /**
+   * Il kind delle righe. Passo 3b: puo' essere un elenco (es. ["bookings","guests"]) per scrivere in un'unica operazione righe di tipi diversi, con ripristino delle gia' scritte
+   * se una va in conflitto. Con piu' kind l'autorita' deve essere 'table' per TUTTI: se e' mista si rifiuta (authority_mixed), se nessuno e' 'table' non gestisce nulla.
+   */
+  kind: string | string[];
+  /** Carica le righe candidate (devono essere del proprietario indicato e di uno dei kind). Rieseguita su conflitto. */
   load: () => Promise<WriteRow[]>;
   /** Riceve le entita' candidate (stesso ordine delle righe) e decide cosa riscrivere (idx = posizione nell'elenco). */
   compute: (current: Json[]) => SetPlan;
@@ -323,32 +371,84 @@ export interface EntitySetArgs {
 }
 export type SetResult =
   | { handled: false; reason: NotHandledReason }
-  | { handled: true; outcome: "ok" | "none" | "conflict" | "error"; message?: string };
+  | { handled: true; outcome: "ok" | "none" | "conflict" | "error"; message?: string; /** solo con outcome "ok": true se almeno una riga e' stata davvero riscritta. */ wrote?: boolean };
 
 /** Come patchEntity ma su un insieme di righe trovato dal chiamante. Esiti: none = nessuna riga pertinente, ok = riscritte (o gia' a posto), conflict/error = da ritentare. */
 export async function mutateEntitySet(admin: SupabaseClient, a: EntitySetArgs): Promise<SetResult> {
   try {
-    if (!a.ownerId || (a.ownerType !== "u" && a.ownerType !== "o") || !(WRITABLE_KINDS as readonly string[]).includes(a.kind)) return { handled: false, reason: "bad_input" };
-    const auth = await readEntityAuthority(admin, a.ownerType, a.ownerId, a.kind);
-    if (auth.authority !== "table") return { handled: false, reason: reasonOf(auth) };
+    const kinds = Array.isArray(a.kind) ? a.kind : [a.kind];
+    if (!a.ownerId || (a.ownerType !== "u" && a.ownerType !== "o") || !kinds.length || kinds.some((k) => !(WRITABLE_KINDS as readonly string[]).includes(k))) return { handled: false, reason: "bad_input" };
+    const auths: AuthorityInfo[] = [];
+    for (const k of kinds) auths.push(await readEntityAuthority(admin, a.ownerType, a.ownerId, k));
+    // Fail-closed sui percorsi a piu' kind (purge): autorita' illeggibile = non si sa dove sta la verita', non si fa nulla (e non si ricade sul blocco).
+    if (Array.isArray(a.kind) && auths.some((x) => x.reason === "error")) return { handled: true, outcome: "error", message: "read_error: " + (auths.find((x) => x.reason === "error")?.message ?? "autorita' non leggibile") };
+    const tables = auths.filter((x) => x.authority === "table").length;
+    if (tables === 0) return { handled: false, reason: reasonOf(auths[0]) };
+    if (tables < kinds.length) return { handled: true, outcome: "error", message: "authority_mixed" };
     const now = a.now ?? Date.now();
     let outcome: SetResult = { handled: true, outcome: "conflict" };
     for (let attempt = 0; attempt < 2; attempt++) {
-      const rows = (await a.load()).filter((r) => r.owner_type === a.ownerType && r.owner_id === a.ownerId && r.kind === a.kind);
+      const rows = (await a.load()).filter((r) => r.owner_type === a.ownerType && r.owner_id === a.ownerId && kinds.includes(r.kind));
       const cur = rows.map(entityOf);
       const plan = a.compute(structuredClone(cur));
       if (plan.action === "none") return { handled: true, outcome: "none" };
-      if (plan.action === "noop" || !plan.changes.length) return { handled: true, outcome: "ok" };
+      if (plan.action === "noop" || !plan.changes.length) return { handled: true, outcome: "ok", wrote: false };
       const items: Item[] = [];
       for (const c of plan.changes) { if (rows[c.idx] && isObj(c.next) && !sameContent(cur[c.idx], c.next)) items.push({ row: rows[c.idx], cur: cur[c.idx], next: c.next }); }
-      if (!items.length) return { handled: true, outcome: "ok" };
+      if (!items.length) return { handled: true, outcome: "ok", wrote: false };
       const w = await writeRows(admin, items, now);
-      if (w.ok) return { handled: true, outcome: "ok" };
+      if (w.ok) return { handled: true, outcome: "ok", wrote: true };
       outcome = { handled: true, outcome: w.error === "conflict" ? "conflict" : "error", message: w.message };
       if (w.error !== "conflict") return outcome;
     }
     return outcome;
   } catch (e) {
     return { handled: true, outcome: "error", message: errMsg(e) };
+  }
+}
+
+// ───────────────────────── lettura per id e ricerca dei riferimenti ai file (passo 3b) ─────────────────────────
+const ID_CHUNK = 100;
+const PAGE = 500;
+
+/** Righe di un kind di un proprietario per id (a gruppi, per non fare richieste troppo lunghe). Lancia un errore se il database risponde con un errore. */
+export async function readRowsByIds(admin: SupabaseClient, ownerType: OwnerType, ownerId: string, kind: string, ids: readonly string[]): Promise<WriteRow[]> {
+  const uniq = [...new Set(ids.filter(Boolean))];
+  const out: WriteRow[] = [];
+  for (let i = 0; i < uniq.length; i += ID_CHUNK) {
+    const { data, error } = await admin.from(ENTITIES).select(COLS).eq("owner_type", ownerType).eq("owner_id", ownerId).eq("kind", kind).in("id", uniq.slice(i, i + ID_CHUNK));
+    if (error) throw new Error(errMsg(error));
+    out.push(...(Array.isArray(data) ? (data as WriteRow[]) : []));
+  }
+  return out;
+}
+
+/**
+ * Dei riferimenti `candidates` (file che una modifica ha tolto da una prenotazione/ospite), quelli che NESSUNA riga di prenotazione o ospite del proprietario cita piu':
+ * sono gli unici che si possono cancellare dallo Storage. Equivale a `orphanedRefs` sul blocco intero: si cerca il testo del riferimento in tutto il dato di ogni riga
+ * (qualunque campo, anche negli ospiti aggiuntivi), a pagine. Va chiamata DOPO aver scritto le righe.
+ * Fail-safe: a qualunque errore di lettura risponde [] (nessun file da cancellare: meglio un file in piu' che una foto ancora in uso persa).
+ */
+export async function unreferencedRefs(admin: SupabaseClient, ownerType: OwnerType, ownerId: string, candidates: readonly string[]): Promise<string[]> {
+  const left = new Set(candidates.filter(Boolean));
+  if (!left.size || !ownerId || (ownerType !== "u" && ownerType !== "o")) return [];
+  try {
+    for (const kind of ["bookings", "guests"]) {
+      for (let from = 0; left.size; from += PAGE) {
+        const { data, error } = await admin.from(ENTITIES).select("id,data").eq("owner_type", ownerType).eq("owner_id", ownerId).eq("kind", kind).order("id", { ascending: true }).range(from, from + PAGE - 1);
+        if (error) return [];
+        const rows = Array.isArray(data) ? (data as { data?: unknown }[]) : [];
+        for (const r of rows) {
+          const text = typeof r.data === "string" ? r.data : JSON.stringify(r.data ?? null);
+          for (const ref of [...left]) if (text.includes(ref)) left.delete(ref);
+          if (!left.size) break;
+        }
+        if (rows.length < PAGE) break;
+      }
+      if (!left.size) break;
+    }
+    return [...left];
+  } catch {
+    return [];
   }
 }
