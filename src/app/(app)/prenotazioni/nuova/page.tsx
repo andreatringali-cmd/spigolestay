@@ -20,6 +20,8 @@ import { Card, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import QRCode from "qrcode";
 import Toggle from "@/components/Toggle";
+import GuestSuggestList from "@/components/GuestSuggestList";
+import { suggestGuests, guestFormFields } from "@/lib/guest-suggest";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 // Normalizza il telefono in formato internazionale (default +39) così WhatsApp funziona sempre.
@@ -81,6 +83,9 @@ export default function NuovaPrenotazionePage() {
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [pickedGuest, setPickedGuest] = useState<string | null>(null); // ospite già nel registro scelto dai suggerimenti (compila cognome, nome, email e telefono)
+  const [sugOpen, setSugOpen] = useState(false);
+  const pickGuest = (g: Guest) => { const f = guestFormFields(g); setPickedGuest(g.id); setLastName(f.lastName); setFirstName(f.firstName); setEmail(f.email); setPhone(f.phone); setSugOpen(false); };
   const [channel, setChannel] = useState<Channel>("direct");
   const [parking, setParking] = useState(false);
   const [parkingPrice, setParkingPrice] = useState(0);
@@ -172,7 +177,7 @@ export default function NuovaPrenotazionePage() {
     const fullName = `${firstName} ${lastName}`.trim();
     const phoneN = normPhone(phone);
     const norm = (s?: string) => (s ?? "").trim().toLowerCase();
-    const existing = guests.find((g) => {
+    const existing = (pickedGuest ? guests.find((g) => g.id === pickedGuest) : undefined) ?? guests.find((g) => {
       if (norm(email) && norm(g.email) === norm(email)) return true;
       if (norm(fullName) && norm(g.fullName) === norm(fullName) && (!norm(g.phone) || !norm(phoneN) || norm(g.phone) === norm(phoneN))) return true;
       return false;
@@ -525,8 +530,11 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               <Card>
                 <h3 className="mb-3 font-display text-base font-bold text-txt">Dettagli ospite</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <FieldL label="Cognome *"><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder="Cognome" /></FieldL>
-                  <FieldL label="Nome"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder="Nome" /></FieldL>
+                  <div className="relative">
+                    <FieldL label="Cognome *"><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder="Cognome" /></FieldL>
+                    {sugOpen && <GuestSuggestList items={pickedGuest ? [] : suggestGuests(guests, bookings, lastName, firstName)} onPick={pickGuest} />}
+                  </div>
+                  <FieldL label="Nome"><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder="Nome" /></FieldL>
                   <FieldL label="Canale"><select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>{CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}</select></FieldL>
                   <FieldL label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder="per il voucher" /></FieldL>
                   <FieldL label="Telefono"><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>

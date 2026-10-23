@@ -7,13 +7,19 @@ import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
 import { effectiveClosed, loadWeekendPct, rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, fmtDM } from "@/lib/dates";
 import DateField from "@/components/DateField";
+import GuestSuggestList from "@/components/GuestSuggestList";
+import { suggestGuests, guestFormFields } from "@/lib/guest-suggest";
 import { useLang } from "@/lib/i18n";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 const fmtDay = (iso: string) => fmtDM(iso) || iso;
 
+// Un soggiorno già messo da parte, in attesa di essere creato insieme agli altri: stesso ospite, date diverse, ogni prenotazione con il suo prezzo.
+interface Draft { structureId: string; roomTypeId: string; unitId: string | null; adults: number; children: number; childAges?: number[]; total?: number }
+interface Stay { checkIn: string; checkOut: string; drafts: Draft[]; groupId?: string; label: string }
+
 export default function NewBookingModal() {
-  const { newBooking, closeNewBooking, structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, activeStructureId } = useData();
+  const { newBooking, closeNewBooking, structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, activeStructureId } = useData();
   const { t } = useLang();
   const weekendPct = loadWeekendPct(); // riletta a ogni render (il modale resta montato: Tariffe o la sync possono cambiarla); regola weekend del calendario (rispetta "weekend disattivato" e le regole per struttura)
 
@@ -34,6 +40,9 @@ export default function NewBookingModal() {
   const [structFilter, setStructFilter] = useState<string>("all");
   const [err, setErr] = useState("");
   const [preferUnit, setPreferUnit] = useState<string | null>(null); // camera scelta dal chiamante (es. "Nuova" su una camera libera): se libera ha la precedenza
+  const [stays, setStays] = useState<Stay[]>([]); // soggiorni già aggiunti (altre date) per lo stesso ospite
+  const [pickedGuest, setPickedGuest] = useState<string | null>(null); // ospite già nel registro scelto dai suggerimenti
+  const [sugOpen, setSugOpen] = useState(false);
 
   const locked = activeStructureId !== "all";
   const structColor = (sId: string) => structures.find((s) => s.id === sId)?.photoColor || "var(--focus)";
@@ -53,6 +62,7 @@ export default function NewBookingModal() {
     setQty(rtId ? { [rtId]: 1 } : {});
     setPreferUnit(newBooking.unitId ?? null);
     setPriceOv({});
+    setStays([]); setPickedGuest(null); setSugOpen(false);
     setErr("");
     // Se arrivo da una cella (camera già scelta) vado dritto ai risultati; altrimenti parto dalla ricerca.
     setStep(rtId ? "results" : "search");
@@ -70,7 +80,10 @@ export default function NewBookingModal() {
   const nightsN = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000));
   const party = adults + children;
 
-  const availUnits = (rt: RoomType) => sortUnitsByName(units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)));
+  // Libere = senza prenotazioni nelle date E non già assegnate a un soggiorno messo da parte (stessa camera, date che si sovrappongono).
+  const availUnits = (rt: RoomType) => sortUnitsByName(units.filter((u) => u.roomTypeId === rt.id && !u.outOfService
+    && !bookings.some((b) => b.status !== "cancelled" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)
+    && !stays.some((s) => s.checkIn < checkOut && s.checkOut > checkIn && s.drafts.some((d) => d.unitId === u.id))));
   const dayPrice = (rt: RoomType, iso: string) => rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct); // stessa tariffa del calendario (override, tipologie derivate, weekend)
   const stayPrice = (rt: RoomType) => { let s = 0; for (let i = 0; i < nightsN; i++) s += dayPrice(rt, shiftISO(checkIn, i)); return s; };
   const cap = (rt: RoomType) => rt.maxOccupancy ?? rt.beds ?? 2;
@@ -98,26 +111,95 @@ export default function NewBookingModal() {
     setStep("results");
   };
 
-  const submit = () => {
-    if (!lastName.trim() && !firstName.trim()) return setErr(t("Inserisci nome o cognome dell'ospite"));
-    if (totalRooms < 1) return setErr(t("Seleziona almeno una camera"));
-    // Espande le camere selezionate assegnando unità reali libere.
+  // Il soggiorno che si sta compilando (date + camere scelte) come elenco di prenotazioni da creare, con unità reali libere. Errore (testo) se qualcosa non è più libero.
+  const buildStay = (): Stay | string => {
     const flat: { rt: RoomType; unitId: string | null }[] = [];
     selectedLines.forEach((rt) => { const free = availUnits(rt); if (preferUnit) { const pi = free.findIndex((u) => u.id === preferUnit); if (pi > 0) free.unshift(...free.splice(pi, 1)); } const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) flat.push({ rt, unitId: free[k]?.id ?? null }); });
     // Se le camere libere sono meno di quelle mostrate nel carrello NON si crea nulla (né ospite né prenotazioni parziali): errore visibile.
-    if (flat.length !== totalRooms) return setErr(t("Alcune camere scelte non sono più disponibili per queste date: controlla il riepilogo e riprova."));
-    const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });
-    const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
+    if (flat.length !== totalRooms) return t("Alcune camere scelte non sono più disponibili per queste date: controlla il riepilogo e riprova.");
     const nR = Math.max(1, flat.length);
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
     let ci = 0;
-    flat.forEach((r, i) => {
+    const drafts: Draft[] = flat.map((r, i) => {
       const kidCount = nR > 1 ? dist(children, i) : children;
       const ages = childAges.slice(ci, ci + kidCount); ci += kidCount;
-      addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? Math.max(dist(adults, i), 0) : adults, children: kidCount, childAges: ages.length ? ages : undefined, total: linePrice(r.rt) || undefined });
+      return { structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, adults: nR > 1 ? Math.max(dist(adults, i), 0) : adults, children: kidCount, childAges: ages.length ? ages : undefined, total: linePrice(r.rt) || undefined };
     });
+    const groupId = flat.length > 1 ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
+    return { checkIn, checkOut, drafts, groupId, label: selectedLines.map((rt) => `${(qty[rt.id] ?? 0) > 1 ? (qty[rt.id] ?? 0) + "× " : ""}${rt.name}`).join(", ") };
+  };
+  const stayTotal = (s: Stay) => s.drafts.reduce((a, d) => a + (d.total ?? 0), 0);
+  const stayNights = (s: Stay) => Math.max(1, Math.round((new Date(s.checkOut).getTime() - new Date(s.checkIn).getTime()) / 86400000));
+
+  // «Aggiungi un altro soggiorno»: mette da parte quello in corso e riparte dalla scelta delle date (stesso ospite, prenotazioni separate).
+  const addStay = () => {
+    if (totalRooms < 1) return;
+    const s = buildStay();
+    if (typeof s === "string") return setErr(s);
+    setStays((p) => [...p, s]);
+    setCheckIn(s.checkOut); setCheckOut(shiftISO(s.checkOut, 1));
+    setQty({}); setPriceOv({}); setPreferUnit(null);
+    setErr(""); setStep("search");
+  };
+  const removeStay = (i: number) => setStays((p) => p.filter((_, j) => j !== i));
+
+  // Ospiti già nel registro: già dalla prima lettera, sulle iniziali del cognome o del nome. Scegliendone uno si compilano insieme cognome, nome, email e telefono.
+  const suggestions = pickedGuest ? [] : suggestGuests(guests, bookings, lastName, firstName);
+  const pickGuest = (g: (typeof guests)[number]) => {
+    const f = guestFormFields(g);
+    setPickedGuest(g.id);
+    setLastName(f.lastName); setFirstName(f.firstName); setEmail(f.email); setPhone(f.phone);
+    setSugOpen(false);
+  };
+  // L'ospite delle prenotazioni: quello scelto dai suggerimenti, oppure uno con la stessa email, altrimenti nuovo. Mai un doppione per la stessa persona.
+  const resolveGuest = (): string => {
+    const ln = lastName.trim() || undefined, fn = firstName.trim() || undefined, em = email.trim() || undefined, ph = phone.trim() || undefined;
+    const same = (pickedGuest ? guests.find((g) => g.id === pickedGuest) : undefined) ?? (em ? guests.find((g) => (g.email ?? "").trim().toLowerCase() === em.toLowerCase()) : undefined);
+    if (!same) return addGuest({ lastName: ln, firstName: fn, email: em, phone: ph });
+    const patch: Record<string, string> = {};
+    if (em && em !== same.email) patch.email = em;
+    if (ph && ph !== same.phone) patch.phone = ph;
+    if (ln && !same.lastName) patch.lastName = ln;
+    if (fn && !same.firstName) patch.firstName = fn;
+    if (Object.keys(patch).length) updateGuest(same.id, patch);
+    return same.id;
+  };
+
+  const submit = () => {
+    if (!lastName.trim() && !firstName.trim()) return setErr(t("Inserisci nome o cognome dell'ospite"));
+    const all: Stay[] = [...stays];
+    if (totalRooms > 0) { const cur = buildStay(); if (typeof cur === "string") return setErr(cur); all.push(cur); }
+    if (!all.length) return setErr(t("Seleziona almeno una camera"));
+    // I soggiorni messi da parte prima: ricontrollo che le camere siano ancora libere (nel frattempo qualcuno può aver prenotato). Se no NON si crea nulla.
+    for (const s of stays) {
+      if (s.drafts.some((d) => d.unitId && bookings.some((b) => b.status !== "cancelled" && b.unitId === d.unitId && b.checkIn < s.checkOut && b.checkOut > s.checkIn))) return setErr(t("Alcune camere scelte non sono più disponibili per queste date: controlla il riepilogo e riprova."));
+    }
+    const guestId = resolveGuest();
+    all.forEach((s) => s.drafts.forEach((d) => {
+      addBooking({ groupId: s.groupId, structureId: d.structureId, roomTypeId: d.roomTypeId, unitId: d.unitId, guestId, channel, status: "confirmed", checkIn: s.checkIn, checkOut: s.checkOut, adults: d.adults, children: d.children, childAges: d.childAges, total: d.total });
+    }));
     closeNewBooking();
   };
+  // Totali di tutto quello che si sta per creare (soggiorni messi da parte + quello in corso).
+  const allRooms = totalRooms + stays.reduce((a, s) => a + s.drafts.length, 0);
+  const allPrice = totalPrice + stays.reduce((a, s) => a + stayTotal(s), 0);
+  const nStays = stays.length + (totalRooms > 0 ? 1 : 0);
+
+  const staysPanel = stays.length > 0 ? (
+    <div className="rounded-2xl border p-3.5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 5%, transparent)" }}>
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-dim">{t("Soggiorni già aggiunti")} · {stays.length}</div>
+      <div className="space-y-1.5">
+        {stays.map((s, i) => (
+          <div key={i} className="flex items-center gap-2 text-sm">
+            <span className="shrink-0 font-semibold text-txt">{fmtDay(s.checkIn)} → {fmtDay(s.checkOut)}</span>
+            <span className="min-w-0 flex-1 truncate text-dim">· {stayNights(s)} {stayNights(s) === 1 ? t("notte") : t("notti")} · {s.label}</span>
+            <b className="shrink-0 text-txt">€ {stayTotal(s)}</b>
+            <button aria-label={t("Rimuovi")} title={t("Rimuovi")} onClick={() => removeStay(i)} className="shrink-0 px-1 text-faint hover:text-[color:var(--err)] max-sm:px-2.5 max-sm:py-2">✕</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div role="dialog" aria-modal="true" aria-label={t("Nuova prenotazione")} className="fixed inset-0 z-50 flex items-center justify-center p-4 max-sm:p-2">
@@ -141,6 +223,7 @@ export default function NewBookingModal() {
         {/* ─────────── STEP 1 · RICERCA ─────────── */}
         {step === "search" ? (
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5 max-sm:px-3 max-sm:py-4">
+            {staysPanel}
             {/* Soggiorno */}
             <div className="rounded-2xl border border-line bg-paper p-4">
               <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-dim">{t("Soggiorno")}</div>
@@ -197,6 +280,7 @@ export default function NewBookingModal() {
         ) : (
           /* ─────────── STEP 2 · RISULTATI ─────────── */
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 max-sm:px-3">
+            {staysPanel}
             {/* Riepilogo ricerca + modifica */}
             <button onClick={() => setStep("search")} className="flex w-full items-center gap-2 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-left transition hover:border-focus">
               <span className="text-[color:var(--focus)]"><CalIcon small /></span>
@@ -253,8 +337,9 @@ export default function NewBookingModal() {
             )}
 
             {/* Carrello + intestatario */}
-            {totalRooms > 0 && (
+            {(totalRooms > 0 || stays.length > 0) && (
               <div className="space-y-3 rounded-2xl border p-3.5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 5%, transparent)" }}>
+                {totalRooms > 0 && (<>
                 <div className="flex items-center gap-2 text-sm font-bold text-txt">
                   <span>{isGroup ? <><span className="text-[color:var(--focus)]">⛓</span> {t("Prenotazione di gruppo")}</> : t("Riepilogo")}</span>
                   <span className="text-faint">· {totalRooms} {totalRooms === 1 ? t("camera") : t("camere")}</span>
@@ -273,9 +358,22 @@ export default function NewBookingModal() {
                     );
                   })}
                 </div>
+                <button type="button" onClick={addStay} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed px-3 py-2 text-xs font-semibold text-[color:var(--focus)] transition hover:bg-wash max-sm:min-h-11" style={{ borderColor: "color-mix(in srgb, var(--focus) 45%, var(--line))" }}>
+                  <span className="text-base leading-none">＋</span> {t("Aggiungi un altro soggiorno (altre date)")}
+                </button>
+                </>)}
+                {pickedGuest && (
+                  <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 12%, transparent)", color: "var(--ok)" }}>
+                    <span>✓ {t("Ospite già nel registro")} · {bookings.filter((b) => b.guestId === pickedGuest && b.status !== "cancelled").length} {t("soggiorni precedenti")}</span>
+                    <button type="button" onClick={() => setPickedGuest(null)} className="ml-auto font-semibold underline">{t("Non è lui/lei")}</button>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2 border-t border-line pt-3 sm:grid-cols-3">
-                  <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder={t("Cognome")} /></Field>
-                  <Field label={t("Nome")}><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder={t("Nome")} /></Field>
+                  <div className="relative">
+                    <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder={t("Cognome")} /></Field>
+                    {sugOpen && <GuestSuggestList items={suggestions} onPick={pickGuest} />}
+                  </div>
+                  <Field label={t("Nome")}><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder={t("Nome")} /></Field>
                   <Field label={t("Canale")}>
                     <select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>
                       {CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}
@@ -304,9 +402,9 @@ export default function NewBookingModal() {
           ) : (
             <>
               <div className="text-sm text-dim">
-                {totalRooms > 0 ? (<>{totalRooms} {totalRooms === 1 ? t("camera") : t("camere")} · <b className="text-txt">€ {totalPrice}</b> <span className="text-faint">· {nightsN} {nightsN === 1 ? t("notte") : t("notti")}</span></>) : t("Nessuna camera selezionata")}
+                {allRooms > 0 ? (<>{allRooms} {allRooms === 1 ? t("camera") : t("camere")} · <b className="text-txt">€ {allPrice}</b> <span className="text-faint">· {nStays > 1 ? `${nStays} ${t("soggiorni")}` : `${nightsN} ${nightsN === 1 ? t("notte") : t("notti")}`}</span></>) : t("Nessuna camera selezionata")}
               </div>
-              <button onClick={submit} disabled={totalRooms < 1} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{isGroup ? t("Crea gruppo") : t("Crea prenotazione")}</button>
+              <button onClick={submit} disabled={allRooms < 1} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-on-focus shadow-sm transition hover:opacity-90 disabled:opacity-50 max-sm:min-h-11">{nStays > 1 ? `${t("Crea")} ${nStays} ${t("prenotazioni")}` : isGroup ? t("Crea gruppo") : t("Crea prenotazione")}</button>
             </>
           )}
         </div>
