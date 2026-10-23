@@ -4,6 +4,12 @@ import type { Guest } from "@/lib/types";
 import type { GuestSuggestion } from "@/lib/guest-suggest";
 import { useLang } from "@/lib/i18n";
 
+/**
+ * Da spargere (`{...NO_AUTOFILL}`) sui campi cognome/nome che hanno la tendina: Chrome ignora `autocomplete="off"` sui campi che somigliano a un nome e apre i suoi indirizzi
+ * salvati sopra la nostra tendina. Un valore che non riconosce lo spegne; gli attributi data-* fanno lo stesso con i gestori di password.
+ */
+export const NO_AUTOFILL = { autoComplete: "nope", "data-lpignore": "true", "data-1p-ignore": true, "data-form-type": "other" } as const;
+
 /** Tendina «Già ospiti da noi»: sta sotto il campo Cognome (contenitore `relative`). onMouseDown e non onClick: il campo perderebbe il fuoco prima del clic e la tendina si chiuderebbe. */
 export default function GuestSuggestList({ items, onPick }: { items: GuestSuggestion[]; onPick: (g: Guest) => void }) {
   const { t } = useLang();

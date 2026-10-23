@@ -20,7 +20,7 @@ import { Card, Button } from "@/components/ui";
 import Icon from "@/components/Icon";
 import QRCode from "qrcode";
 import Toggle from "@/components/Toggle";
-import GuestSuggestList from "@/components/GuestSuggestList";
+import GuestSuggestList, { NO_AUTOFILL } from "@/components/GuestSuggestList";
 import { suggestGuests, guestFormFields } from "@/lib/guest-suggest";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
@@ -531,10 +531,10 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                 <h3 className="mb-3 font-display text-base font-bold text-txt">Dettagli ospite</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <div className="relative">
-                    <FieldL label="Cognome *"><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder="Cognome" /></FieldL>
+                    <FieldL label="Cognome *"><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} {...NO_AUTOFILL} className={inp} placeholder="Cognome" /></FieldL>
                     {sugOpen && <GuestSuggestList items={pickedGuest ? [] : suggestGuests(guests, bookings, lastName, firstName)} onPick={pickGuest} />}
                   </div>
-                  <FieldL label="Nome"><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder="Nome" /></FieldL>
+                  <FieldL label="Nome"><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} {...NO_AUTOFILL} className={inp} placeholder="Nome" /></FieldL>
                   <FieldL label="Canale"><select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>{CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}</select></FieldL>
                   <FieldL label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder="per il voucher" /></FieldL>
                   <FieldL label="Telefono"><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>

@@ -21,7 +21,7 @@ import { useAuth } from "@/lib/authsync";
 import { waDigits } from "@/lib/contacts-check";
 import { et as etMail } from "@/lib/email-i18n";
 import { nextQuoteNumber } from "@/lib/quote-number";
-import GuestSuggestList from "@/components/GuestSuggestList";
+import GuestSuggestList, { NO_AUTOFILL } from "@/components/GuestSuggestList";
 import { suggestGuests, guestFormFields } from "@/lib/guest-suggest";
 import type { Guest } from "@/lib/types";
 
@@ -776,10 +776,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
           <SectionTitle>{t("Dati preventivo")}</SectionTitle>
           <div className="grid grid-cols-2 gap-3 max-sm:gap-x-2 max-sm:gap-y-2.5">
             <div className="relative">
-              <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder={t("Cognome")} /></Field>
+              <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} {...NO_AUTOFILL} className={inp} placeholder={t("Cognome")} /></Field>
               {sugOpen && <GuestSuggestList items={pickedGuest ? [] : suggestGuests(guests, bookings, lastName, firstName)} onPick={pickGuest} />}
             </div>
-            <Field label={t("Nome")}><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder={t("Nome")} /></Field>
+            <Field label={t("Nome")}><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} {...NO_AUTOFILL} className={inp} placeholder={t("Nome")} /></Field>
             <Field label={t("Email")}><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder={t("opzionale")} /></Field>
             <Field label={t("Telefono")}><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="+39…" /></Field>
             {structures.length > 1 && !lockedStructure && (

@@ -7,7 +7,7 @@ import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
 import { effectiveClosed, loadWeekendPct, rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, fmtDM } from "@/lib/dates";
 import DateField from "@/components/DateField";
-import GuestSuggestList from "@/components/GuestSuggestList";
+import GuestSuggestList, { NO_AUTOFILL } from "@/components/GuestSuggestList";
 import { suggestGuests, guestFormFields } from "@/lib/guest-suggest";
 import { useLang } from "@/lib/i18n";
 
@@ -370,10 +370,10 @@ export default function NewBookingModal() {
                 )}
                 <div className="grid grid-cols-2 gap-2 border-t border-line pt-3 sm:grid-cols-3">
                   <div className="relative">
-                    <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder={t("Cognome")} /></Field>
+                    <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => { setLastName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} {...NO_AUTOFILL} className={inp} placeholder={t("Cognome")} /></Field>
                     {sugOpen && <GuestSuggestList items={suggestions} onPick={pickGuest} />}
                   </div>
-                  <Field label={t("Nome")}><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} autoComplete="off" className={inp} placeholder={t("Nome")} /></Field>
+                  <Field label={t("Nome")}><input value={firstName} onChange={(e) => { setFirstName(e.target.value); setPickedGuest(null); setSugOpen(true); }} onFocus={() => setSugOpen(true)} onBlur={() => setTimeout(() => setSugOpen(false), 150)} {...NO_AUTOFILL} className={inp} placeholder={t("Nome")} /></Field>
                   <Field label={t("Canale")}>
                     <select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>
                       {CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}
