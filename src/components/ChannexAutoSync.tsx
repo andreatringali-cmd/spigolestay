@@ -5,6 +5,8 @@ import { RATEMODEL_KEY, parseRateModel } from "@/lib/rate-model";
 import { useEffect, useRef } from "react";
 import { weekendPctFromRaw } from "@/lib/pricing";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/authsync";
+import { isLocalForeign } from "@/lib/sync-owner";
 import { liveSingleDiscounts, hasPersonPlan } from "@/lib/person-plan";
 import { ensurePersonPlan, personPlanMother } from "@/lib/person-plan-client";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
@@ -90,6 +92,9 @@ const restrVal = (r: { rate?: string; rates?: { occupancy: number; rate: string 
 export default function ChannexAutoSync() {
   const { raw, rateOverrides } = useData(); // dati completi: la sincronizzazione non dipende dalle strutture selezionate in alto
   const { roomTypes, units, bookings } = raw;
+  const { user } = useAuth();
+  const uidRef = useRef<string | undefined>(undefined);
+  uidRef.current = user?.id;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ultimi dati "vivi" a disposizione del push (aggiornati a ogni render): così anche il push
   // avviato da un evento esterno (chiusure vendita) usa lo stato corrente.
@@ -102,6 +107,8 @@ export default function ChannexAutoSync() {
     const schedulePush = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
+        // Scheda rimasta su un altro account (il locale ora è di un altro): niente prezzi né disponibilità verso Channex.
+        try { if (uidRef.current && isLocalForeign(localStorage, uidRef.current)) return; } catch { /* storage non disponibile */ }
         let chxMap: Record<string, ChxStructMap> = {};
         try { chxMap = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); } catch { chxMap = {}; }
         // Mappatura mancante o vecchia (browser nuovo, dati cancellati, pagina Canali mai aperta): senza, non partirebbe nessun invio. La si rilegge dal server da sola
@@ -244,7 +251,7 @@ export default function ChannexAutoSync() {
   // prenotazioni compaiono senza premere nulla, anche per quelle già presenti prima del webhook.
   useEffect(() => {
     const hasLinked = () => { try { const m = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); return Object.values(m).some((x) => (x as ChxStructMap)?.propertyId); } catch { return false; } };
-    const pull = async () => { if (!hasLinked()) { await refreshChannexMap(5 * 60 * 1000); if (!hasLinked()) return; } apiPost("channex/import", {}).catch(() => {}); };
+    const pull = async () => { try { if (uidRef.current && isLocalForeign(localStorage, uidRef.current)) return; } catch { /* storage non disponibile */ } if (!hasLinked()) { await refreshChannexMap(5 * 60 * 1000); if (!hasLinked()) return; } apiPost("channex/import", {}).catch(() => {}); };
     const firstPull = setTimeout(pull, 15000); // primo controllo ~15s dopo l'apertura
     const iv = setInterval(pull, 3 * 60 * 1000); // poi ogni 3 minuti
     return () => { clearTimeout(firstPull); clearInterval(iv); };

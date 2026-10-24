@@ -11,6 +11,8 @@
 //  - NESSUNA base per k (primo avvio dopo wipe, nuovo dispositivo, prima versione con questa regola) → vince il SERVER (la memoria non è affidabile);
 //  - chiave che il server non ha → resta quella locale (mai cancellata da qui).
 
+import { GUIDES_KEY, mergeGuidesMap } from "./guide-protect";
+
 type Snap = Record<string, string>;
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => !!v && typeof v === "object" && !Array.isArray(v);
@@ -157,6 +159,12 @@ export function mergeFlatKeys3(
       const m = mergeUsers3(bRaw, l, s, newMode ? "server" : "local"); // cambiati entrambi o senza base: fusione per utente
       if (m !== null) put(k, m); else if (newMode) put(k, s);
       continue;
+    }
+    if (k === GUIDES_KEY) {
+      // Guide ospiti: si fondono guida per guida e mai un campo PIENO viene sostituito da uno VUOTO (una guida più povera, anche se "più recente", non cancella quella piena).
+      // Se il locale è invariato dall'ultima sync (stessa impronta della base) la base è il locale stesso: l'eventuale svuotamento arrivato dal server si accetta solo se piccolo.
+      const m = mergeGuidesMap(bRaw !== undefined ? bRaw : (hb !== undefined && hl === hb ? l : undefined), l, s);
+      if (m !== null) { put(k, m); continue; }
     }
     if (hb === undefined) { if (newMode) put(k, s); continue; }   // senza base: server (solo nella modalità con base persistente)
     if (hl === hb) put(k, s);                                       // locale invariato dall'ultima sync: era una copia vecchia

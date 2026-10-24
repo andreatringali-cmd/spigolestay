@@ -22,6 +22,11 @@ let db: IDBDatabase | null = null;
 let initPromise: Promise<void> | null = null;
 let version = 0; // sale a ogni scrittura: permette di accorgersi che qualcosa è cambiato senza rileggere i dati
 
+// Guardia di scrittura (vedi local-guard.ts): se risponde true la scrittura/rimozione della chiave viene ignorata. Serve a una scheda rimasta su un altro account:
+// senza, il suo blocco dati (in memoria) verrebbe scritto in IndexedDB, che è condiviso tra le schede, sopra i dati dell'account che è entrato dopo.
+let writeGuard: ((key: string) => boolean) | null = null;
+export function setKvWriteGuard(fn: ((key: string) => boolean) | null): void { writeGuard = fn; }
+
 /** Contatore delle modifiche locali (vedi sopra). */
 export function kvVersion(): number { return version; }
 
@@ -67,16 +72,26 @@ function toMemoryOnly(where: string, e: unknown) { noteIdbError(where, e); memor
 
 function reportFull() { try { window.dispatchEvent(new Event("xenora:storage-full")); } catch { /* ambiente senza window */ } }
 
+/** Toglie dalla coda le scritture che la guardia blocca ADESSO (vedi runFlush). */
+function dropBlocked() {
+  if (!writeGuard) return;
+  for (const k of [...pending.keys()]) { let blocked = false; try { blocked = writeGuard(k); } catch { /* nel dubbio la scrittura passa */ } if (blocked) pending.delete(k); }
+}
+
 function runFlush(): Promise<void> {
   if (timer) { clearTimeout(timer); timer = null; }
   flushing = flushing.then(async () => {
     if (!pending.size || !db) return;
+    // La guardia si rivaluta QUI, al momento di scrivere: una scrittura messa in coda quando la scheda era ancora «in regola» può venire scaricata (150 ms dopo, o alla chiusura)
+    // quando un'altra scheda ha già cambiato account. IndexedDB è condiviso: scriverla sopra sovrascriverebbe i dati dell'altro account. Le voci bloccate si scartano.
+    dropBlocked();
+    if (!pending.size) return;
     const batch = [...pending.entries()];
     batch.forEach(([k, v]) => { if (pending.get(k) === v) pending.delete(k); }); // se nel frattempo cambia, resta in coda
     try { await idbWrite(batch); } catch (e) {
       batch.forEach(([k, v]) => { if (!pending.has(k)) pending.set(k, v); });
       // Un secondo tentativo (a volte il browser chiude la transazione per un attimo); se fallisce ancora si passa alla sola memoria, senza allarmare: i dati sono al sicuro sul server.
-      try { await idbWrite([...pending.entries()]); pending.clear(); } catch (e2) { toMemoryOnly("scrittura", e2 ?? e); }
+      try { dropBlocked(); await idbWrite([...pending.entries()]); pending.clear(); } catch (e2) { toMemoryOnly("scrittura", e2 ?? e); }
     }
   });
   return flushing;
@@ -136,12 +151,14 @@ export function kvGet(key: string): string | null {
 
 /** Scrive. Per le chiavi normali può lanciare (quota localStorage) come localStorage.setItem. */
 export function kvSet(key: string, value: string): void {
+  if (writeGuard && writeGuard(key)) return; // scheda in pausa (altro account nel locale): non si scrive
   version++;
   if (isBig(key)) { mem.set(key, value); pending.set(key, value); schedule(); return; }
   localStorage.setItem(key, value);
 }
 
 export function kvRemove(key: string): void {
+  if (writeGuard && writeGuard(key)) return; // scheda in pausa (altro account nel locale): non si toglie nulla
   version++;
   if (isBig(key)) { mem.delete(key); pending.set(key, null); schedule(); return; }
   try { localStorage.removeItem(key); } catch { /* ignora */ }
