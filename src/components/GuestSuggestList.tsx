@@ -1,7 +1,7 @@
 "use client";
 
 import type { Guest } from "@/lib/types";
-import type { GuestSuggestion } from "@/lib/guest-suggest";
+import { guestDisplayName, type GuestSuggestion } from "@/lib/guest-suggest";
 import { useLang } from "@/lib/i18n";
 
 /**
@@ -20,7 +20,7 @@ export default function GuestSuggestList({ items, onPick }: { items: GuestSugges
       {items.map(({ g, n }) => (
         <button key={g.id} type="button" role="option" aria-selected={false} onMouseDown={(e) => { e.preventDefault(); onPick(g); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-wash">
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-semibold text-txt">{[g.lastName, g.firstName].filter(Boolean).join(" ") || g.fullName}</span>
+            <span className="block truncate font-semibold text-txt">{guestDisplayName(g)}</span>
             <span className="block truncate text-[11px] text-faint">{[g.email, g.phone].filter(Boolean).join(" · ") || t("nessun contatto")}</span>
           </span>
           <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{n} {n === 1 ? t("soggiorno") : t("soggiorni")}</span>

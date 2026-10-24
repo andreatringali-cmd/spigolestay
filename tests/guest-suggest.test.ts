@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { suggestGuests, guestFormFields, fold } from "../src/lib/guest-suggest.ts";
+import { suggestGuests, guestFormFields, splitFullName, guestDisplayName, fold } from "../src/lib/guest-suggest.ts";
 
 const G = (id: string, lastName: string, firstName: string, extra: Record<string, string> = {}) => ({ id, lastName, firstName, fullName: `${firstName} ${lastName}`.trim(), ...extra }) as never;
 const B = (guestId: string, status = "confirmed") => ({ guestId, status }) as never;
@@ -40,6 +40,25 @@ test("suggerimenti: niente scritto = nessun suggerimento; nessuna corrispondenza
 
 test("scegliendo un ospite si compilano insieme cognome, nome, email e telefono", () => {
   assert.deepEqual(guestFormFields(guests[0]), { lastName: "Rossi", firstName: "Mario", email: "mario@x.it", phone: "+39 333 1" });
-  assert.deepEqual(guestFormFields({ id: "9", fullName: "Mario Verdi" } as never), { lastName: "Mario Verdi", firstName: "", email: "", phone: "" }, "senza cognome separato: il nome intero va nel cognome");
   assert.equal(fold("Nicolò"), "nicolo");
+});
+
+test("ospiti senza cognome/nome separati (il 96% del registro): «Cognome Nome» si divide, mai tutto in un campo", () => {
+  const f = (fullName: string) => guestFormFields({ id: "x", fullName } as never);
+  assert.deepEqual(f("TRIDA EMANUELA"), { lastName: "Trida", firstName: "Emanuela", email: "", phone: "" }, "tutto maiuscolo → Trida Emanuela");
+  assert.deepEqual(splitFullName("Tripoli Maria Rosa"), { lastName: "Tripoli", firstName: "Maria Rosa" });
+  assert.deepEqual(splitFullName("TRIPOLI  GRAZIA"), { lastName: "Tripoli", firstName: "Grazia" }, "spazio doppio");
+  assert.deepEqual(splitFullName("Donato Laura"), { lastName: "Donato", firstName: "Laura" }, "maiuscole già giuste: non si toccano");
+  assert.deepEqual(splitFullName("De Filippis Mario"), { lastName: "De Filippis", firstName: "Mario" }, "la particella resta attaccata al cognome");
+  assert.deepEqual(splitFullName("De Filippis"), { lastName: "De Filippis", firstName: "" });
+  assert.deepEqual(splitFullName("Zarcone"), { lastName: "Zarcone", firstName: "" }, "una parola sola = cognome");
+  assert.deepEqual(splitFullName("  "), { lastName: "", firstName: "" });
+  assert.deepEqual(splitFullName("D'ANGELO MARIA-ROSA"), { lastName: "D'Angelo", firstName: "Maria-Rosa" });
+});
+
+test("se cognome e nome sono già salvati separati non si toccano; il nome da mostrare è «Cognome Nome»", () => {
+  const g = { id: "1", fullName: "Mario Rossi", lastName: "ROSSI", firstName: "mario", email: "a@b.it" } as never;
+  assert.deepEqual(guestFormFields(g), { lastName: "ROSSI", firstName: "mario", email: "a@b.it", phone: "" });
+  assert.equal(guestDisplayName(g), "ROSSI mario");
+  assert.equal(guestDisplayName({ id: "2", fullName: "TRIDA EMANUELA" } as never), "Trida Emanuela");
 });

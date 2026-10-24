@@ -17,13 +17,40 @@ export function suggestGuests(guests: readonly Guest[], bookings: readonly Pick<
   for (const b of bookings) if (b.guestId && b.status !== "cancelled") count.set(b.guestId, (count.get(b.guestId) ?? 0) + 1);
   return guests
     .filter((g) => { const words = fold(`${g.lastName ?? ""} ${g.firstName ?? ""} ${g.fullName ?? ""}`).split(/\s+/).filter(Boolean); return tokens.every((tk) => words.some((w) => w.startsWith(tk))); })
-    .map((g) => ({ g, n: count.get(g.id) ?? 0, starts: fold(g.lastName ?? g.fullName ?? "").startsWith(tokens[0]) }))
+    .map((g) => ({ g, n: count.get(g.id) ?? 0, starts: fold(guestParts(g).lastName).startsWith(tokens[0]) }))
     .sort((a, b) => Number(b.starts) - Number(a.starts) || b.n - a.n || (a.g.fullName ?? "").localeCompare(b.g.fullName ?? "", "it"))
     .slice(0, limit)
     .map(({ g, n }) => ({ g, n }));
 }
 
+// Particelle che stanno attaccate al cognome: «De Filippis Mario» → cognome «De Filippis», nome «Mario».
+const PARTICLES = new Set(["de", "di", "da", "del", "della", "dello", "dei", "degli", "delle", "dal", "dalla", "dai", "la", "lo", "le", "li", "van", "von", "der", "den", "el", "al", "mc", "mac", "st", "san", "santa"]);
+const cap = (w: string) => w.replace(/(^|[-'’])(\p{L})/gu, (_m, p: string, c: string) => p + c.toUpperCase());
+/** Tutto maiuscolo («TRIDA EMANUELA») o tutto minuscolo → «Trida Emanuela»; se c'è già un maiuscolo/minuscolo misto il testo non si tocca. */
+const tidy = (s: string) => (s !== s.toUpperCase() && s !== s.toLowerCase() ? s : s.toLowerCase().split(" ").map(cap).join(" "));
+
+/**
+ * Il registro ha quasi sempre solo il nome intero scritto «Cognome Nome» (come arriva da Booking, Airbnb o dalla schedina): prima parola = cognome, il resto = nome;
+ * le particelle (De, Di, Van…) restano attaccate al cognome. Una parola sola = cognome. Spazi doppi ignorati.
+ */
+export function splitFullName(full: string): { lastName: string; firstName: string } {
+  const words = full.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return { lastName: "", firstName: "" };
+  let n = 1;
+  while (n < words.length && PARTICLES.has(words[n - 1].toLowerCase())) n++; // una particella si unisce alla parola che segue
+  return { lastName: tidy(words.slice(0, n).join(" ")), firstName: tidy(words.slice(n).join(" ")) };
+}
+
+/** Cognome e nome di un ospite del registro: quelli salvati separati, altrimenti ricavati dal nome intero. */
+export function guestParts(g: Guest): { lastName: string; firstName: string } {
+  if ((g.lastName ?? "").trim() || (g.firstName ?? "").trim()) return { lastName: (g.lastName ?? "").trim(), firstName: (g.firstName ?? "").trim() };
+  return splitFullName(g.fullName ?? "");
+}
+/** «Cognome Nome» da mostrare nell'elenco dei suggerimenti. */
+export const guestDisplayName = (g: Guest): string => { const p = guestParts(g); return [p.lastName, p.firstName].filter(Boolean).join(" ") || (g.fullName ?? ""); };
+
 /** I campi da compilare in un colpo solo scegliendo un ospite dal registro. */
 export function guestFormFields(g: Guest): { lastName: string; firstName: string; email: string; phone: string } {
-  return { lastName: g.lastName ?? g.fullName ?? "", firstName: g.firstName ?? "", email: g.email ?? "", phone: g.phone ?? "" };
+  const p = guestParts(g);
+  return { lastName: p.lastName, firstName: p.firstName, email: g.email ?? "", phone: g.phone ?? "" };
 }
