@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildBlockData, diffBlockParts, entitiesSwitch, MERGE_KINDS } from "./server-entities";
+import { withTableKinds } from "./server-entities-store";
 
 // Dati delle STRUTTURE CONDIVISE (Structure.orgId, es. Central Perk) per il Concierge — solo server, SOLA LETTURA.
 //
@@ -51,13 +52,15 @@ async function loadOrgDatasFromTables(admin: SupabaseClient<any>, tenantId: stri
 const diffOrgDatas = (a: DataObj[], b: DataObj[]) => diffBlockParts(a, b, COLLECTIONS);
 
 // Dati (DATA_KEY già parsificato) di UNA organizzazione; null se la riga manca o il blob non è valido. Sola lettura.
+// Fase 3 (docs/FASE3-STORE-DA-TABELLE.md): le collezioni con autorità 'table' per quell'org (blocco vuoto) si rileggono dalle tabelle; senza SERVER_WRITE_ENTITIES=on, riga di
+// autorità o con un errore nel leggerla il dato è esattamente quello del blocco. Tabelle illeggibili con autorità 'table' = org saltata (come un errore di rete).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadOrgDataFromBlock(admin: SupabaseClient<any>, orgId: string): Promise<DataObj | null> {
   try {
     const { data: row } = await admin.from("org_state").select("data").eq("org_id", orgId).maybeSingle();
     const blob = (((row as { data?: unknown } | null)?.data ?? {}) as Record<string, string>) || {};
     const d = JSON.parse(blob[DATA_KEY] || "{}");
-    return d && typeof d === "object" ? (d as DataObj) : null;
+    return d && typeof d === "object" ? await withTableKinds(admin, { type: "o", id: orgId }, d as DataObj, MERGE_KINDS) : null;
   } catch { return null; /* blob org non valido o errore di rete: lo salto */ }
 }
 
@@ -116,6 +119,8 @@ export async function loadTenantData(admin: SupabaseClient<any>, tenantId: strin
     const { data } = await admin.from("app_state").select("data").eq("user_id", tenantId).maybeSingle();
     let personal: DataObj = {};
     try { personal = JSON.parse(((data?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as DataObj; } catch { personal = {}; }
+    // Fase 3: collezioni personali con autorità 'table' dalle tabelle; se non si leggono resta il blocco (mai un'eccezione: in compare il risultato del blocco deve arrivare).
+    try { personal = await withTableKinds(admin, { type: "u", id: tenantId }, personal, MERGE_KINDS); } catch (e) { console.error("[store-from-tables] loadTenantData personale", e instanceof Error ? e.message : String(e)); }
     return mergeOrgData(personal, await loadOrgDatasFromBlock(admin, tenantId));
   };
   const fromTables = async (): Promise<DataObj> => {

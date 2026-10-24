@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { rateForDay } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
 import { buildBlockData, diffBlockParts, diffValues, entitiesSwitch, readBookings, readRateOverrides, readRoomTypes, readStructureAcrossOwners, readUnits, type EntityOwner } from "@/lib/server-entities";
+import { withTableKinds } from "@/lib/server-entities-store";
 
 // Le letture di questo file seguono l'interruttore SERVER_READ_ENTITIES (off | compare | on, vedi server-entities.ts / SERVER-ENTITIES.md):
 // con "on" strutture, tipologie, camere e prenotazioni vengono dalle tabelle (public.entities) invece che dal blocco. Le scritture dei chiamanti non cambiano.
@@ -47,15 +48,17 @@ async function loadOwnerStructureDataFromBlock(admin: SupabaseClient, ownerId: s
     if (!arr(d.structures).some((s) => s.id === sid)) return null;
     return { roomTypes: arr(d.roomTypes) as unknown as RoomType[], units: arr(d.units), bookings: arr(d.bookings), rateOverrides: (d.rateOverrides && typeof d.rateOverrides === "object" ? d.rateOverrides : {}) as Record<string, number> };
   };
+  // Fase 3 (docs/FASE3-STORE-DA-TABELLE.md): le collezioni con autorita' 'table' si rileggono dalle tabelle (il blocco e' vuoto); altrimenti il dato e' quello del blocco.
+  // Tabelle illeggibili con autorita' 'table' = eccezione = null (come ogni altro errore qui: il chiamante tratta null come «non verificabile»).
   try {
     const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
     for (const m of arr(ms)) {
       const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
-      const r = pick(parse((os as { data?: unknown } | null)?.data));
+      const r = pick(await withTableKinds(admin, { type: "o", id: String(m.org_id) }, parse((os as { data?: unknown } | null)?.data), [...PART_KINDS]));
       if (r) return r;
     }
     const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
-    return pick(parse((row as { data?: unknown } | null)?.data));
+    return pick(await withTableKinds(admin, { type: "u", id: ownerId }, parse((row as { data?: unknown } | null)?.data), [...PART_KINDS]));
   } catch { return null; }
 }
 
@@ -74,7 +77,7 @@ async function loadOrgDataPartsFromBlock(admin: SupabaseClient, ownerId: string)
     const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
     for (const m of arr(ms)) {
       const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
-      out.push(parse((os as { data?: unknown } | null)?.data));
+      out.push(await withTableKinds(admin, { type: "o", id: String(m.org_id) }, parse((os as { data?: unknown } | null)?.data), [...PART_KINDS])); // Fase 3: collezioni 'table' dalle tabelle
     }
   } catch { /* best-effort: si usano i dati che ci sono */ }
   return out;
@@ -161,11 +164,11 @@ async function findOwnerStructureFromBlock(admin: SupabaseClient, ownerId: strin
     const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
     for (const m of arr(ms)) {
       const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
-      const found = arr(parse((os as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid);
+      const found = arr((await withTableKinds(admin, { type: "o", id: String(m.org_id) }, parse((os as { data?: unknown } | null)?.data), ["structures"])).structures).find((s) => s.id === sid); // Fase 3: strutture 'table' dalle tabelle
       if (found) { orgSt = found; if (found.stripeAccount) return found; }
     }
     const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
-    const perSt = arr(parse((row as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid) || null;
+    const perSt = arr((await withTableKinds(admin, { type: "u", id: ownerId }, parse((row as { data?: unknown } | null)?.data), ["structures"])).structures).find((s) => s.id === sid) || null;
     if (perSt?.stripeAccount) return perSt;
     return orgSt || perSt;
   } catch { return null; }

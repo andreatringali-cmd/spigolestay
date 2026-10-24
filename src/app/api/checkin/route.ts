@@ -3,6 +3,7 @@ import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
+import { mutateBookingScope, unreferencedRefs } from "@/lib/server-entities-write";
 import { cityTaxOfBookingRaw, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, sanitizeChosenExtras } from "@/lib/booking";
 import type { ExtraService, Structure } from "@/lib/types";
 import { guestLangOrNull } from "@/lib/guest-lang";
@@ -230,7 +231,8 @@ export async function POST(req: Request) {
     }
     let orphans: string[] = []; // file che dopo questo salvataggio non servono più a nessuno (foto sostituite)
 
-    const wrote = await mutateStore(admin, store, (data, idx) => {
+    // La modifica (prenotazione + anagrafica ospite) è la stessa sul blocco e sulle righe di public.entities (Fase 3, passo 3b): vedi sotto.
+    const applyCheckin = (data: Json, idx: number): boolean => {
       const bookings = arr(data.bookings);
       if (idx < 0 || idx >= bookings.length) return false;
       const bk = bookings[idx] as Json;
@@ -280,10 +282,25 @@ export async function POST(req: Request) {
       }
       orphans = orphanedRefs(refsBefore, data);
       return true;
-    });
+    };
+    // Fase 3, passo 3b (src/lib/server-entities-write.ts, docs/FASE3-PASSO3B.md): se per questo proprietario l'autorità di prenotazioni E ospiti è 'table'
+    // (e SERVER_WRITE_ENTITIES=on) si riscrivono le righe di public.entities (prenotazione + anagrafica ospite, solo se cambiate, con ripristino in caso di conflitto) e il
+    // blocco NON si tocca. In tutti gli altri casi (interruttore spento, autorità 'blob', errore nel leggerla) si prosegue sul blocco con mutateStore, esattamente come prima.
+    const ownerType = store.table === "org_state" ? "o" : "u";
+    const viaTables = await mutateBookingScope(admin, { ownerType, ownerId: store.keyVal, bookingId: String((store.booking as Json).id || ""), mutate: applyCheckin, supported: true, group: false, structure: false, guest: true });
+    let wrote: boolean;
+    let failReason: string | undefined;
+    if (viaTables.handled) {
+      wrote = viaTables.ok && !viaTables.skipped;
+      if (!viaTables.ok) { failReason = viaTables.error; console.warn("[checkin] scrittura sulle tabelle non riuscita", store.table, store.keyVal, viaTables.error, viaTables.message ?? ""); }
+      // Su queste righe `orphans` è solo un elenco di CANDIDATI (la funzione ha visto soltanto questa prenotazione e il suo ospite): si cancellano solo i file che nessun'altra riga cita più.
+      else if (wrote) orphans = await unreferencedRefs(admin, ownerType, store.keyVal, orphans);
+    } else {
+      wrote = await mutateStore(admin, store, applyCheckin, { tables: "skip" });
+    }
     if (!wrote) {
       for (const r of resolver.uploadedNow) await removeMedia(admin, r).catch(() => false);
-      return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
+      return NextResponse.json({ ok: false, error: "write_conflict", ...(failReason ? { reason: failReason } : {}) }, { status: 409 });
     }
     // Foto sostituite (o ospiti aggiuntivi tolti): via anche dallo Storage, se nessun'altra prenotazione/ospite le usa ancora.
     for (const r of orphans) await removeMedia(admin, r).catch(() => false);
